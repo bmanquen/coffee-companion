@@ -1,17 +1,42 @@
 import { db } from './index.ts'
-import { greenCoffees } from './schema.ts'
+import {
+  greenCoffees,
+  coffeeProcesses,
+  varieties,
+  greenCoffeesVarieties,
+  user,
+} from './schema.ts'
 
-const seedData = [
+const processesData = [
+  { name: 'Washed' },
+  { name: 'Natural' },
+  { name: 'Honey' },
+  { name: 'Wet-Hulled' },
+]
+
+const varietiesData = [
+  { name: 'Heirloom' },
+  { name: 'Caturra' },
+  { name: 'SL28' },
+  { name: 'SL34' },
+  { name: 'Bourbon' },
+  { name: 'Yellow Bourbon' },
+  { name: 'Geisha' },
+  { name: 'Catuai' },
+  { name: 'Typica' },
+]
+
+const greenCoffeesData = [
   {
     name: 'Ethiopian Yirgacheffe',
     country: 'Ethiopia',
     region: 'Yirgacheffe',
     farm: 'Kochere Washing Station',
     producer: 'Various Smallholders',
-    variety: 'Heirloom',
     process: 'Washed',
     altitude: 1950,
     notes: 'Floral, bergamot, lemon, tea-like body',
+    varieties: ['Heirloom'],
   },
   {
     name: 'Colombian Huila',
@@ -19,10 +44,10 @@ const seedData = [
     region: 'Huila',
     farm: 'Finca El Paraiso',
     producer: 'Diego Bermudez',
-    variety: 'Caturra',
     process: 'Washed',
     altitude: 1800,
     notes: 'Caramel, red apple, citrus acidity',
+    varieties: ['Caturra'],
   },
   {
     name: 'Kenyan AA Nyeri',
@@ -30,10 +55,10 @@ const seedData = [
     region: 'Nyeri',
     farm: 'Othaya Cooperative',
     producer: 'Othaya Farmers',
-    variety: 'SL28, SL34',
     process: 'Washed',
     altitude: 1700,
     notes: 'Blackcurrant, tomato, bright acidity',
+    varieties: ['SL28', 'SL34'],
   },
   {
     name: 'Guatemala Antigua',
@@ -41,10 +66,10 @@ const seedData = [
     region: 'Antigua',
     farm: 'Finca Filadelfia',
     producer: 'Filadelfia Estate',
-    variety: 'Bourbon',
     process: 'Washed',
     altitude: 1500,
     notes: 'Chocolate, nuts, mild citrus',
+    varieties: ['Bourbon'],
   },
   {
     name: 'Brazilian Cerrado',
@@ -52,10 +77,10 @@ const seedData = [
     region: 'Cerrado Mineiro',
     farm: 'Fazenda Santa Ines',
     producer: 'Carmo de Minas',
-    variety: 'Yellow Bourbon',
     process: 'Natural',
     altitude: 1100,
     notes: 'Nuts, chocolate, low acidity, full body',
+    varieties: ['Yellow Bourbon'],
   },
   {
     name: 'Panama Geisha',
@@ -63,10 +88,10 @@ const seedData = [
     region: 'Boquete',
     farm: 'Hacienda La Esmeralda',
     producer: 'Peterson Family',
-    variety: 'Geisha',
     process: 'Washed',
     altitude: 1600,
     notes: 'Jasmine, tropical fruit, bergamot, silky body',
+    varieties: ['Geisha'],
   },
   {
     name: 'Costa Rica Tarrazu',
@@ -74,10 +99,10 @@ const seedData = [
     region: 'Tarrazu',
     farm: 'Finca Don Mayo',
     producer: 'Don Mayo',
-    variety: 'Catuai',
     process: 'Honey',
     altitude: 1650,
     notes: 'Honey, stone fruit, brown sugar',
+    varieties: ['Catuai'],
   },
   {
     name: 'Sumatra Mandheling',
@@ -85,16 +110,60 @@ const seedData = [
     region: 'North Sumatra',
     farm: 'Various Smallholders',
     producer: 'Mandheling Cooperative',
-    variety: 'Typica',
     process: 'Wet-Hulled',
     altitude: 1300,
     notes: 'Earthy, herbal, full body, low acidity',
+    varieties: ['Typica'],
   },
 ]
 
+const TEST_USER_ID = 'test-user-seed-id'
+
 async function seed() {
   console.log('Seeding database...')
-  await db.insert(greenCoffees).values(seedData)
+
+  await db
+    .insert(user)
+    .values({
+      id: TEST_USER_ID,
+      name: 'Test User',
+      email: 'test@example.com',
+    })
+    .onConflictDoNothing()
+
+  const insertedProcesses = await db
+    .insert(coffeeProcesses)
+    .values(processesData)
+    .onConflictDoNothing()
+    .returning()
+  const processMap = new Map(insertedProcesses.map((p) => [p.name, p.id]))
+
+  const insertedVarieties = await db
+    .insert(varieties)
+    .values(varietiesData)
+    .onConflictDoNothing()
+    .returning()
+  const varietyMap = new Map(insertedVarieties.map((v) => [v.name, v.id]))
+
+  for (const coffee of greenCoffeesData) {
+    const { varieties: coffeeVarieties, process, ...coffeeData } = coffee
+    const [insertedCoffee] = await db
+      .insert(greenCoffees)
+      .values({ ...coffeeData, userId: TEST_USER_ID, processId: processMap.get(process) })
+      .onConflictDoNothing()
+      .returning()
+
+    for (const varietyName of coffeeVarieties) {
+      const varietyId = varietyMap.get(varietyName)
+      if (varietyId) {
+        await db.insert(greenCoffeesVarieties).values({
+          greenCoffeeId: insertedCoffee.id,
+          varietyId,
+        })
+      }
+    }
+  }
+
   console.log('Seeding complete!')
   process.exit(0)
 }

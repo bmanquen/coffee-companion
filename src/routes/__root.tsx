@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   HeadContent,
   Scripts,
@@ -49,14 +50,20 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const [navOpen, setNavOpen] = useState(false)
+
   return (
     <html lang="en">
       <head>
         <HeadContent />
       </head>
       <body>
-        <Navigation />
-        {children}
+        <Navigation open={navOpen} setOpen={setNavOpen} />
+        <main
+          className={`transition-all duration-300 ${navOpen ? 'ml-64' : 'ml-0'} px-3`}
+        >
+          {children}
+        </main>
         <TanStackDevtools
           config={{
             position: 'bottom-right',
