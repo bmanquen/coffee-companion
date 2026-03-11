@@ -1,3 +1,4 @@
+import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { createFileRoute } from '@tanstack/react-router'
 
@@ -7,8 +8,10 @@ export const Route = createFileRoute('/coffees/new')({
 
 function NewCoffeeComponent() {
   return (
-    <form action="">
-      <Input placeholder="Name" />
-    </form>
+    <Card>
+      <form action="">
+        <Input placeholder="Name" />
+      </form>
+    </Card>
   )
 }
