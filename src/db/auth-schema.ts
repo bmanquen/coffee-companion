@@ -73,10 +73,8 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account),
-}));
+// Base user relations for auth - extended in schema.ts
+// Do not define userRelations here to avoid duplicate relations declarations
 
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, {

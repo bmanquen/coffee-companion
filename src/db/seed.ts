@@ -4,6 +4,11 @@ import {
   coffeeProcesses,
   varieties,
   greenCoffeesVarieties,
+  countries,
+  regions,
+  farms,
+  roasters,
+  roastLevels,
   user,
 } from './schema.ts'
 
@@ -26,13 +31,39 @@ const varietiesData = [
   { name: 'Typica' },
 ]
 
+const countriesData = [
+  { name: 'Ethiopia' },
+  { name: 'Colombia' },
+  { name: 'Kenya' },
+  { name: 'Guatemala' },
+  { name: 'Brazil' },
+  { name: 'Panama' },
+  { name: 'Costa Rica' },
+  { name: 'Indonesia' },
+]
+
+const roastersData = [
+  { name: 'Onyx Coffee Lab' },
+  { name: 'George Howell Coffee' },
+  { name: 'Intelligentsia' },
+  { name: 'Counter Culture' },
+  { name: 'Heart Coffee Roasters' },
+]
+
+const roastLevelsData = [
+  { name: 'Light' },
+  { name: 'Medium-Light' },
+  { name: 'Medium' },
+  { name: 'Medium-Dark' },
+  { name: 'Dark' },
+]
+
 const greenCoffeesData = [
   {
     name: 'Ethiopian Yirgacheffe',
     country: 'Ethiopia',
     region: 'Yirgacheffe',
     farm: 'Kochere Washing Station',
-    producer: 'Various Smallholders',
     process: 'Washed',
     altitude: 1950,
     notes: 'Floral, bergamot, lemon, tea-like body',
@@ -43,7 +74,6 @@ const greenCoffeesData = [
     country: 'Colombia',
     region: 'Huila',
     farm: 'Finca El Paraiso',
-    producer: 'Diego Bermudez',
     process: 'Washed',
     altitude: 1800,
     notes: 'Caramel, red apple, citrus acidity',
@@ -54,7 +84,6 @@ const greenCoffeesData = [
     country: 'Kenya',
     region: 'Nyeri',
     farm: 'Othaya Cooperative',
-    producer: 'Othaya Farmers',
     process: 'Washed',
     altitude: 1700,
     notes: 'Blackcurrant, tomato, bright acidity',
@@ -65,7 +94,6 @@ const greenCoffeesData = [
     country: 'Guatemala',
     region: 'Antigua',
     farm: 'Finca Filadelfia',
-    producer: 'Filadelfia Estate',
     process: 'Washed',
     altitude: 1500,
     notes: 'Chocolate, nuts, mild citrus',
@@ -76,7 +104,6 @@ const greenCoffeesData = [
     country: 'Brazil',
     region: 'Cerrado Mineiro',
     farm: 'Fazenda Santa Ines',
-    producer: 'Carmo de Minas',
     process: 'Natural',
     altitude: 1100,
     notes: 'Nuts, chocolate, low acidity, full body',
@@ -87,7 +114,6 @@ const greenCoffeesData = [
     country: 'Panama',
     region: 'Boquete',
     farm: 'Hacienda La Esmeralda',
-    producer: 'Peterson Family',
     process: 'Washed',
     altitude: 1600,
     notes: 'Jasmine, tropical fruit, bergamot, silky body',
@@ -98,7 +124,6 @@ const greenCoffeesData = [
     country: 'Costa Rica',
     region: 'Tarrazu',
     farm: 'Finca Don Mayo',
-    producer: 'Don Mayo',
     process: 'Honey',
     altitude: 1650,
     notes: 'Honey, stone fruit, brown sugar',
@@ -109,12 +134,33 @@ const greenCoffeesData = [
     country: 'Indonesia',
     region: 'North Sumatra',
     farm: 'Various Smallholders',
-    producer: 'Mandheling Cooperative',
     process: 'Wet-Hulled',
     altitude: 1300,
     notes: 'Earthy, herbal, full body, low acidity',
     varieties: ['Typica'],
   },
+]
+
+const farmsData = [
+  { name: 'Kochere Washing Station', region: 'Yirgacheffe' },
+  { name: 'Finca El Paraiso', region: 'Huila' },
+  { name: 'Othaya Cooperative', region: 'Nyeri' },
+  { name: 'Finca Filadelfia', region: 'Antigua' },
+  { name: 'Fazenda Santa Ines', region: 'Cerrado Mineiro' },
+  { name: 'Hacienda La Esmeralda', region: 'Boquete' },
+  { name: 'Finca Don Mayo', region: 'Tarrazu' },
+  { name: 'Various Smallholders', region: 'North Sumatra' },
+]
+
+const regionsData = [
+  { name: 'Yirgacheffe', country: 'Ethiopia' },
+  { name: 'Huila', country: 'Colombia' },
+  { name: 'Nyeri', country: 'Kenya' },
+  { name: 'Antigua', country: 'Guatemala' },
+  { name: 'Cerrado Mineiro', country: 'Brazil' },
+  { name: 'Boquete', country: 'Panama' },
+  { name: 'Tarrazu', country: 'Costa Rica' },
+  { name: 'North Sumatra', country: 'Indonesia' },
 ]
 
 const TEST_USER_ID = 'test-user-seed-id'
@@ -145,11 +191,59 @@ async function seed() {
     .returning()
   const varietyMap = new Map(insertedVarieties.map((v) => [v.name, v.id]))
 
+  const insertedCountries = await db
+    .insert(countries)
+    .values(countriesData)
+    .onConflictDoNothing()
+    .returning()
+  const countryMap = new Map(insertedCountries.map((c) => [c.name, c.id]))
+
+  const insertedRegions = await db
+    .insert(regions)
+    .values(
+      regionsData.map((r) => ({
+        name: r.name,
+        countryId: countryMap.get(r.country),
+      })),
+    )
+    .onConflictDoNothing()
+    .returning()
+  const regionMap = new Map(insertedRegions.map((r) => [r.name, r.id]))
+
+  const insertedFarms = await db
+    .insert(farms)
+    .values(
+      farmsData.map((f) => ({
+        name: f.name,
+        regionId: regionMap.get(f.region),
+      })),
+    )
+    .onConflictDoNothing()
+    .returning()
+  const farmMap = new Map(insertedFarms.map((f) => [f.name, f.id]))
+
+  await db
+    .insert(roasters)
+    .values(roastersData)
+    .onConflictDoNothing()
+
+  await db
+    .insert(roastLevels)
+    .values(roastLevelsData)
+    .onConflictDoNothing()
+
   for (const coffee of greenCoffeesData) {
-    const { varieties: coffeeVarieties, process, ...coffeeData } = coffee
+    const { varieties: coffeeVarieties, process, country, region, farm, ...coffeeData } = coffee
     const [insertedCoffee] = await db
       .insert(greenCoffees)
-      .values({ ...coffeeData, userId: TEST_USER_ID, processId: processMap.get(process) })
+      .values({
+        ...coffeeData,
+        userId: TEST_USER_ID,
+        processId: processMap.get(process),
+        countryId: countryMap.get(country),
+        regionId: regionMap.get(region),
+        farmId: farmMap.get(farm),
+      })
       .onConflictDoNothing()
       .returning()
 
