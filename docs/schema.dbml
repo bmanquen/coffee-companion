@@ -1,0 +1,268 @@
+table account {
+  id text [pk, not null]
+  account_id text [not null]
+  provider_id text [not null]
+  user_id text [not null]
+  access_token text
+  refresh_token text
+  id_token text
+  access_token_expires_at timestamp
+  refresh_token_expires_at timestamp
+  scope text
+  password text
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null]
+
+  indexes {
+    user_id [name: 'account_userId_idx']
+  }
+}
+
+table coffee_processes {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text
+  name text [not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    name [name: 'coffee_processes_system_name_idx', unique]
+    (name, user_id) [name: 'coffee_processes_user_name_idx', unique]
+  }
+}
+
+table coffees {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text [not null]
+  name text [not null]
+  roaster_id uuid
+  roast_level_id uuid
+  roastDate date
+  country_id uuid
+  region_id uuid
+  process_id uuid
+  notes text
+  is_active boolean
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    user_id [name: 'coffees_user_idx']
+    (name, user_id) [name: 'coffees_user_name_idx']
+    (process_id, user_id) [name: 'coffees_user_process_id_idx']
+    (country_id, user_id) [name: 'coffees_user_country_idx']
+  }
+}
+
+table coffees_varieties {
+  variety_id uuid [not null]
+  coffee_id uuid [not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    (coffee_id, variety_id) [pk]
+  }
+}
+
+table countries {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text
+  name text [not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    name [name: 'countries_system_name_idx', unique]
+    (name, user_id) [name: 'countries_user_name_idx', unique]
+  }
+}
+
+table farms {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text
+  name text [not null]
+  region_id uuid
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    (name, region_id) [name: 'farms_system_name_idx', unique]
+    (name, region_id, user_id) [name: 'farms_user_name_idx', unique]
+  }
+}
+
+table green_coffees {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text [not null]
+  name text [not null]
+  country_id uuid
+  region_id uuid
+  farm_id uuid
+  process_id uuid
+  altitude integer
+  notes text
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    user_id [name: 'green_coffees_user_idx']
+    (name, user_id) [name: 'green_coffees_user_name_idx']
+    (process_id, user_id) [name: 'green_coffees_user_process_id_idx']
+    (country_id, user_id) [name: 'green_coffees_user_country_idx']
+  }
+}
+
+table green_coffees_varieties {
+  variety_id uuid [not null]
+  green_coffee_id uuid [not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    (green_coffee_id, variety_id) [pk]
+  }
+}
+
+table roasters {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text
+  name text [not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    name [name: 'roasters_system_name_idx', unique]
+    (name, user_id) [name: 'roasters_user_name_idx', unique]
+  }
+}
+
+table regions {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text
+  name text [not null]
+  country_id uuid
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    (name, country_id) [name: 'regions_system_name_idx', unique]
+    (name, country_id, user_id) [name: 'regions_user_name_idx', unique]
+  }
+}
+
+table roast_levels {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text
+  name text [not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    name [name: 'roast_levels_system_name_idx', unique]
+    (name, user_id) [name: 'roast_levels_user_name_idx', unique]
+  }
+}
+
+table session {
+  id text [pk, not null]
+  expires_at timestamp [not null]
+  token text [not null, unique]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null]
+  ip_address text
+  user_agent text
+  user_id text [not null]
+
+  indexes {
+    user_id [name: 'session_userId_idx']
+  }
+}
+
+table user {
+  id text [pk, not null]
+  name text [not null]
+  email text [not null, unique]
+  email_verified boolean [not null, default: false]
+  image text
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+table varieties {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text
+  name text [not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp
+
+  indexes {
+    name [name: 'varieties_system_name_idx', unique]
+    (name, user_id) [name: 'varieties_user_name_idx', unique]
+  }
+}
+
+table verification {
+  id text [pk, not null]
+  identifier text [not null]
+  value text [not null]
+  expires_at timestamp [not null]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  indexes {
+    identifier [name: 'verification_identifier_idx']
+  }
+}
+
+ref: account.user_id > user.id
+
+ref: coffee_processes.user_id > user.id
+
+ref: coffees.user_id > user.id
+
+ref: coffees.roaster_id > roasters.id
+
+ref: coffees.country_id > countries.id
+
+ref: coffees.region_id > regions.id
+
+ref: coffees.roast_level_id > roast_levels.id
+
+ref: coffees.process_id > coffee_processes.id
+
+ref: coffees_varieties.coffee_id > coffees.id
+
+ref: coffees_varieties.variety_id > varieties.id
+
+ref: countries.user_id > user.id
+
+ref: farms.user_id > user.id
+
+ref: farms.region_id > regions.id
+
+ref: green_coffees.user_id > user.id
+
+ref: green_coffees.country_id > countries.id
+
+ref: green_coffees.region_id > regions.id
+
+ref: green_coffees.farm_id > farms.id
+
+ref: green_coffees.process_id > coffee_processes.id
+
+ref: green_coffees_varieties.green_coffee_id > green_coffees.id
+
+ref: green_coffees_varieties.variety_id > varieties.id
+
+ref: roasters.user_id > user.id
+
+ref: regions.user_id > user.id
+
+ref: regions.country_id > countries.id
+
+ref: roast_levels.user_id > user.id
+
+ref: session.user_id > user.id
+
+ref: varieties.user_id > user.id
