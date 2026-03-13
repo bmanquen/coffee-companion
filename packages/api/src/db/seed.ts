@@ -1,4 +1,4 @@
-import { db } from './index.ts'
+import { db } from './index'
 import {
   greenCoffees,
   coffeeProcesses,
@@ -10,7 +10,7 @@ import {
   roasters,
   roastLevels,
   user,
-} from './schema.ts'
+} from './schema'
 
 const processesData = [
   { name: 'Washed' },
@@ -222,18 +222,19 @@ async function seed() {
     .returning()
   const farmMap = new Map(insertedFarms.map((f) => [f.name, f.id]))
 
-  await db
-    .insert(roasters)
-    .values(roastersData)
-    .onConflictDoNothing()
+  await db.insert(roasters).values(roastersData).onConflictDoNothing()
 
-  await db
-    .insert(roastLevels)
-    .values(roastLevelsData)
-    .onConflictDoNothing()
+  await db.insert(roastLevels).values(roastLevelsData).onConflictDoNothing()
 
   for (const coffee of greenCoffeesData) {
-    const { varieties: coffeeVarieties, process, country, region, farm, ...coffeeData } = coffee
+    const {
+      varieties: coffeeVarieties,
+      process,
+      country,
+      region,
+      farm,
+      ...coffeeData
+    } = coffee
     const [insertedCoffee] = await db
       .insert(greenCoffees)
       .values({

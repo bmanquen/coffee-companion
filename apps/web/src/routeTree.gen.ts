@@ -44,7 +44,7 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/coffees/new': typeof CoffeesNewRoute
-  '/coffees': typeof CoffeesIndexRoute
+  '/coffees/': typeof CoffeesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
 }
@@ -65,7 +65,7 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/coffees/new' | '/coffees' | '/api/auth/$' | '/api/trpc/$'
+  fullPaths: '/' | '/coffees/new' | '/coffees/' | '/api/auth/$' | '/api/trpc/$'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/coffees/new' | '/coffees' | '/api/auth/$' | '/api/trpc/$'
   id:
@@ -97,7 +97,7 @@ declare module '@tanstack/react-router' {
     '/coffees/': {
       id: '/coffees/'
       path: '/coffees'
-      fullPath: '/coffees'
+      fullPath: '/coffees/'
       preLoaderRoute: typeof CoffeesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
