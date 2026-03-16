@@ -35,13 +35,13 @@ export function SearchSelect({
   description?: string
   placeholder?: string
   options: SearchSelectOption[]
-  onAddItem?: (value: string) => SearchSelectOption
+  onAddItem?: (value: string) => SearchSelectOption | Promise<SearchSelectOption>
 }) {
   const field = useFieldContext<string>()
   const [search, setSearch] = useState('')
-  const [options, setOptions] = useState(initialOptions)
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const options = initialOptions
 
   const selectedOption = options.find((o) => o.value === field.state.value)
 
@@ -51,15 +51,14 @@ export function SearchSelect({
     setOpen(false)
   }
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const trimmed = search.trim()
     if (!trimmed) return
 
     const newOption = onAddItem
-      ? onAddItem(trimmed)
+      ? await onAddItem(trimmed)
       : { value: trimmed.toLowerCase(), label: trimmed }
 
-    setOptions((prev) => [...prev, newOption])
     field.handleChange(newOption.value)
     setSearch('')
     setOpen(false)
