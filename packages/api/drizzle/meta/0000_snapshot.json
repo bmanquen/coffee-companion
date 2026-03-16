@@ -1,5 +1,5 @@
 {
-  "id": "f0d57417-c228-415b-ae4b-09c35ae9fd21",
+  "id": "17a19c48-2cfa-4e17-be62-8eb6d87840e3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -14,6 +14,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "name": {
           "name": "name",
@@ -52,17 +58,23 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "coffee_processes_name_unique": {
-          "name": "coffee_processes_name_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+      "foreignKeys": {
+        "coffee_processes_user_id_user_id_fk": {
+          "name": "coffee_processes_user_id_user_id_fk",
+          "tableFrom": "coffee_processes",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -90,15 +102,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "roaster_name": {
-          "name": "roaster_name",
-          "type": "text",
+        "roaster_id": {
+          "name": "roaster_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "roast_level": {
-          "name": "roast_level",
-          "type": "text",
+        "roast_level_id": {
+          "name": "roast_level_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -108,15 +120,15 @@
           "primaryKey": false,
           "notNull": false
         },
-        "country": {
-          "name": "country",
-          "type": "text",
+        "country_id": {
+          "name": "country_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "region": {
-          "name": "region",
-          "type": "text",
+        "region_id": {
+          "name": "region_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -210,11 +222,11 @@
           "method": "btree",
           "with": {}
         },
-        "coffess_user_country_idx": {
-          "name": "coffess_user_country_idx",
+        "coffees_user_country_idx": {
+          "name": "coffees_user_country_idx",
           "columns": [
             {
-              "expression": "country",
+              "expression": "country_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -244,6 +256,58 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "coffees_roaster_id_roasters_id_fk": {
+          "name": "coffees_roaster_id_roasters_id_fk",
+          "tableFrom": "coffees",
+          "tableTo": "roasters",
+          "columnsFrom": [
+            "roaster_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coffees_roast_level_id_roast_levels_id_fk": {
+          "name": "coffees_roast_level_id_roast_levels_id_fk",
+          "tableFrom": "coffees",
+          "tableTo": "roast_levels",
+          "columnsFrom": [
+            "roast_level_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coffees_country_id_countries_id_fk": {
+          "name": "coffees_country_id_countries_id_fk",
+          "tableFrom": "coffees",
+          "tableTo": "countries",
+          "columnsFrom": [
+            "country_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coffees_region_id_regions_id_fk": {
+          "name": "coffees_region_id_regions_id_fk",
+          "tableFrom": "coffees",
+          "tableTo": "regions",
+          "columnsFrom": [
+            "region_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         },
         "coffees_process_id_coffee_processes_id_fk": {
@@ -339,6 +403,181 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.countries": {
+      "name": "countries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "countries_name_idx": {
+          "name": "countries_name_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "countries_user_id_user_id_fk": {
+          "name": "countries_user_id_user_id_fk",
+          "tableFrom": "countries",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.farms": {
+      "name": "farms",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "region_id": {
+          "name": "region_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "farms_name_region_idx": {
+          "name": "farms_name_region_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "region_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "farms_user_id_user_id_fk": {
+          "name": "farms_user_id_user_id_fk",
+          "tableFrom": "farms",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "farms_region_id_regions_id_fk": {
+          "name": "farms_region_id_regions_id_fk",
+          "tableFrom": "farms",
+          "tableTo": "regions",
+          "columnsFrom": [
+            "region_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.green_coffees": {
       "name": "green_coffees",
       "schema": "",
@@ -362,27 +601,21 @@
           "primaryKey": false,
           "notNull": true
         },
-        "country": {
-          "name": "country",
-          "type": "text",
+        "country_id": {
+          "name": "country_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "region": {
-          "name": "region",
-          "type": "text",
+        "region_id": {
+          "name": "region_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "farm": {
-          "name": "farm",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "producer": {
-          "name": "producer",
-          "type": "text",
+        "farm_id": {
+          "name": "farm_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -450,7 +683,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -480,7 +713,7 @@
           "name": "green_coffees_user_country_idx",
           "columns": [
             {
-              "expression": "country",
+              "expression": "country_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -510,6 +743,45 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "green_coffees_country_id_countries_id_fk": {
+          "name": "green_coffees_country_id_countries_id_fk",
+          "tableFrom": "green_coffees",
+          "tableTo": "countries",
+          "columnsFrom": [
+            "country_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "green_coffees_region_id_regions_id_fk": {
+          "name": "green_coffees_region_id_regions_id_fk",
+          "tableFrom": "green_coffees",
+          "tableTo": "regions",
+          "columnsFrom": [
+            "region_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "green_coffees_farm_id_farms_id_fk": {
+          "name": "green_coffees_farm_id_farms_id_fk",
+          "tableFrom": "green_coffees",
+          "tableTo": "farms",
+          "columnsFrom": [
+            "farm_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         },
         "green_coffees_process_id_coffee_processes_id_fk": {
@@ -605,6 +877,256 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.regions": {
+      "name": "regions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "country_id": {
+          "name": "country_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "regions_name_country_idx": {
+          "name": "regions_name_country_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "country_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "regions_user_id_user_id_fk": {
+          "name": "regions_user_id_user_id_fk",
+          "tableFrom": "regions",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "regions_country_id_countries_id_fk": {
+          "name": "regions_country_id_countries_id_fk",
+          "tableFrom": "regions",
+          "tableTo": "countries",
+          "columnsFrom": [
+            "country_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.roast_levels": {
+      "name": "roast_levels",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "roast_levels_name_idx": {
+          "name": "roast_levels_name_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "roast_levels_user_id_user_id_fk": {
+          "name": "roast_levels_user_id_user_id_fk",
+          "tableFrom": "roast_levels",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.roasters": {
+      "name": "roasters",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "roasters_name_idx": {
+          "name": "roasters_name_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "roasters_user_id_user_id_fk": {
+          "name": "roasters_user_id_user_id_fk",
+          "tableFrom": "roasters",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.varieties": {
       "name": "varieties",
       "schema": "",
@@ -615,6 +1137,12 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "name": {
           "name": "name",
@@ -653,17 +1181,23 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "varieties_name_unique": {
-          "name": "varieties_name_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+      "foreignKeys": {
+        "varieties_user_id_user_id_fk": {
+          "name": "varieties_user_id_user_id_fk",
+          "tableFrom": "varieties",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
