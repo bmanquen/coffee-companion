@@ -28,14 +28,7 @@ export const countries = pgTable(
     name: text().notNull(),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex('countries_system_name_idx')
-      .on(table.name)
-      .where(sql`user_id IS NULL`),
-    uniqueIndex('countries_user_name_idx')
-      .on(table.name, table.userId)
-      .where(sql`user_id IS NOT NULL`),
-  ],
+  (table) => [uniqueIndex('countries_name_idx').on(table.name)],
 )
 
 export const regions = pgTable(
@@ -47,14 +40,7 @@ export const regions = pgTable(
     countryId: uuid('country_id').references(() => countries.id),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex('regions_system_name_idx')
-      .on(table.name, table.countryId)
-      .where(sql`user_id IS NULL`),
-    uniqueIndex('regions_user_name_idx')
-      .on(table.name, table.countryId, table.userId)
-      .where(sql`user_id IS NOT NULL`),
-  ],
+  (table) => [uniqueIndex('regions_name_country_idx').on(table.name, table.countryId)],
 )
 
 export const roastLevels = pgTable(
@@ -65,14 +51,7 @@ export const roastLevels = pgTable(
     name: text().notNull(),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex('roast_levels_system_name_idx')
-      .on(table.name)
-      .where(sql`user_id IS NULL`),
-    uniqueIndex('roast_levels_user_name_idx')
-      .on(table.name, table.userId)
-      .where(sql`user_id IS NOT NULL`),
-  ],
+  (table) => [uniqueIndex('roast_levels_name_idx').on(table.name)],
 )
 
 export const farms = pgTable(
@@ -84,14 +63,7 @@ export const farms = pgTable(
     regionId: uuid('region_id').references(() => regions.id),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex('farms_system_name_idx')
-      .on(table.name, table.regionId)
-      .where(sql`user_id IS NULL`),
-    uniqueIndex('farms_user_name_idx')
-      .on(table.name, table.regionId, table.userId)
-      .where(sql`user_id IS NOT NULL`),
-  ],
+  (table) => [uniqueIndex('farms_name_region_idx').on(table.name, table.regionId)],
 )
 
 export const greenCoffees = pgTable(
@@ -112,7 +84,7 @@ export const greenCoffees = pgTable(
   },
   (table) => [
     index('green_coffees_user_idx').on(table.userId),
-    index('green_coffees_user_name_idx').on(table.name, table.userId),
+    uniqueIndex('green_coffees_user_name_idx').on(table.name, table.userId),
     index('green_coffees_user_process_id_idx').on(
       table.processId,
       table.userId,
@@ -129,14 +101,7 @@ export const roasters = pgTable(
     name: text().notNull(),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex('roasters_system_name_idx')
-      .on(table.name)
-      .where(sql`user_id IS NULL`),
-    uniqueIndex('roasters_user_name_idx')
-      .on(table.name, table.userId)
-      .where(sql`user_id IS NOT NULL`),
-  ],
+  (table) => [uniqueIndex('roasters_name_idx').on(table.name)],
 )
 
 export const coffees = pgTable(
@@ -173,14 +138,7 @@ export const varieties = pgTable(
     name: text().notNull(),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex('varieties_system_name_idx')
-      .on(table.name)
-      .where(sql`user_id IS NULL`),
-    uniqueIndex('varieties_user_name_idx')
-      .on(table.name, table.userId)
-      .where(sql`user_id IS NOT NULL`),
-  ],
+  (table) => [uniqueIndex('varieties_name_idx').on(table.name)],
 )
 
 export const coffeesVarieties = pgTable(
@@ -227,14 +185,7 @@ export const coffeeProcesses = pgTable(
     name: text().notNull(),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex('coffee_processes_system_name_idx')
-      .on(table.name)
-      .where(sql`user_id IS NULL`),
-    uniqueIndex('coffee_processes_user_name_idx')
-      .on(table.name, table.userId)
-      .where(sql`user_id IS NOT NULL`),
-  ],
+  (table) => [uniqueIndex('coffee_processes_name_idx').on(table.name)],
 )
 
 // Relations

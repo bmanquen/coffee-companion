@@ -6,7 +6,13 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "check-types": "turbo check-types"
+    "check-types": "turbo check-types",
+    "db:generate": "pnpm --filter @coffee-companion/api exec drizzle-kit generate",
+    "db:migrate": "pnpm --filter @coffee-companion/api exec drizzle-kit migrate",
+    "db:push": "pnpm --filter @coffee-companion/api exec drizzle-kit push",
+    "db:pull": "pnpm --filter @coffee-companion/api exec drizzle-kit pull",
+    "db:studio": "pnpm --filter @coffee-companion/api exec drizzle-kit studio",
+    "db:seed": "pnpm --filter @coffee-companion/api exec tsx src/db/seed.ts"
   },
   "devDependencies": {
     "turbo": "^2.8.16"
