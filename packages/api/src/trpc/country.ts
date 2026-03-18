@@ -1,5 +1,4 @@
-import { z } from 'zod'
-
+import { insertCountrySchema } from '@/db/zod'
 import { db } from '../db'
 import { countries } from '../db/schema'
 import { createTRPCRouter, publicProcedure } from './init'
@@ -12,11 +11,7 @@ export const countryRouter = createTRPCRouter({
   }),
 
   create: publicProcedure
-    .input(
-      z.object({
-        name: z.string().min(1),
-      }),
-    )
+    .input(insertCountrySchema)
     .mutation(async ({ input }) => {
       const [country] = await db.insert(countries).values(input).returning()
       return country

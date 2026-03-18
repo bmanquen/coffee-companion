@@ -10,7 +10,7 @@ import {
   primaryKey,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
-import { sql, relations } from 'drizzle-orm'
+import { relations } from 'drizzle-orm'
 import { user, session, account } from './auth-schema'
 
 export * from './auth-schema'
@@ -40,7 +40,9 @@ export const regions = pgTable(
     countryId: uuid('country_id').references(() => countries.id),
     ...timestamps,
   },
-  (table) => [uniqueIndex('regions_name_country_idx').on(table.name, table.countryId)],
+  (table) => [
+    uniqueIndex('regions_name_country_idx').on(table.name, table.countryId),
+  ],
 )
 
 export const roastLevels = pgTable(
@@ -63,7 +65,9 @@ export const farms = pgTable(
     regionId: uuid('region_id').references(() => regions.id),
     ...timestamps,
   },
-  (table) => [uniqueIndex('farms_name_region_idx').on(table.name, table.regionId)],
+  (table) => [
+    uniqueIndex('farms_name_region_idx').on(table.name, table.regionId),
+  ],
 )
 
 export const greenCoffees = pgTable(
@@ -256,14 +260,17 @@ export const roastLevelsRelations = relations(roastLevels, ({ one, many }) => ({
   coffees: many(coffees),
 }))
 
-export const coffeeProcessesRelations = relations(coffeeProcesses, ({ one, many }) => ({
-  user: one(user, {
-    fields: [coffeeProcesses.userId],
-    references: [user.id],
+export const coffeeProcessesRelations = relations(
+  coffeeProcesses,
+  ({ one, many }) => ({
+    user: one(user, {
+      fields: [coffeeProcesses.userId],
+      references: [user.id],
+    }),
+    greenCoffees: many(greenCoffees),
+    coffees: many(coffees),
   }),
-  greenCoffees: many(greenCoffees),
-  coffees: many(coffees),
-}))
+)
 
 export const varietiesRelations = relations(varieties, ({ one, many }) => ({
   user: one(user, {
@@ -274,29 +281,32 @@ export const varietiesRelations = relations(varieties, ({ one, many }) => ({
   greenCoffeesVarieties: many(greenCoffeesVarieties),
 }))
 
-export const greenCoffeesRelations = relations(greenCoffees, ({ one, many }) => ({
-  user: one(user, {
-    fields: [greenCoffees.userId],
-    references: [user.id],
+export const greenCoffeesRelations = relations(
+  greenCoffees,
+  ({ one, many }) => ({
+    user: one(user, {
+      fields: [greenCoffees.userId],
+      references: [user.id],
+    }),
+    country: one(countries, {
+      fields: [greenCoffees.countryId],
+      references: [countries.id],
+    }),
+    region: one(regions, {
+      fields: [greenCoffees.regionId],
+      references: [regions.id],
+    }),
+    farm: one(farms, {
+      fields: [greenCoffees.farmId],
+      references: [farms.id],
+    }),
+    process: one(coffeeProcesses, {
+      fields: [greenCoffees.processId],
+      references: [coffeeProcesses.id],
+    }),
+    greenCoffeesVarieties: many(greenCoffeesVarieties),
   }),
-  country: one(countries, {
-    fields: [greenCoffees.countryId],
-    references: [countries.id],
-  }),
-  region: one(regions, {
-    fields: [greenCoffees.regionId],
-    references: [regions.id],
-  }),
-  farm: one(farms, {
-    fields: [greenCoffees.farmId],
-    references: [farms.id],
-  }),
-  process: one(coffeeProcesses, {
-    fields: [greenCoffees.processId],
-    references: [coffeeProcesses.id],
-  }),
-  greenCoffeesVarieties: many(greenCoffeesVarieties),
-}))
+)
 
 export const coffeesRelations = relations(coffees, ({ one, many }) => ({
   user: one(user, {
@@ -326,24 +336,30 @@ export const coffeesRelations = relations(coffees, ({ one, many }) => ({
   coffeesVarieties: many(coffeesVarieties),
 }))
 
-export const coffeesVarietiesRelations = relations(coffeesVarieties, ({ one }) => ({
-  coffee: one(coffees, {
-    fields: [coffeesVarieties.coffeeId],
-    references: [coffees.id],
+export const coffeesVarietiesRelations = relations(
+  coffeesVarieties,
+  ({ one }) => ({
+    coffee: one(coffees, {
+      fields: [coffeesVarieties.coffeeId],
+      references: [coffees.id],
+    }),
+    variety: one(varieties, {
+      fields: [coffeesVarieties.varietyId],
+      references: [varieties.id],
+    }),
   }),
-  variety: one(varieties, {
-    fields: [coffeesVarieties.varietyId],
-    references: [varieties.id],
-  }),
-}))
+)
 
-export const greenCoffeesVarietiesRelations = relations(greenCoffeesVarieties, ({ one }) => ({
-  greenCoffee: one(greenCoffees, {
-    fields: [greenCoffeesVarieties.greenCoffeeId],
-    references: [greenCoffees.id],
+export const greenCoffeesVarietiesRelations = relations(
+  greenCoffeesVarieties,
+  ({ one }) => ({
+    greenCoffee: one(greenCoffees, {
+      fields: [greenCoffeesVarieties.greenCoffeeId],
+      references: [greenCoffees.id],
+    }),
+    variety: one(varieties, {
+      fields: [greenCoffeesVarieties.varietyId],
+      references: [varieties.id],
+    }),
   }),
-  variety: one(varieties, {
-    fields: [greenCoffeesVarieties.varietyId],
-    references: [varieties.id],
-  }),
-}))
+)

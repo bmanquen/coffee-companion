@@ -183,6 +183,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.1
         version: 0.45.1(@types/pg@8.18.0)(kysely@0.28.11)(pg@8.20.0)
+      drizzle-zod:
+        specifier: ^0.8.3
+        version: 0.8.3(drizzle-orm@0.45.1(@types/pg@8.18.0)(kysely@0.28.11)(pg@8.20.0))(zod@4.3.6)
       pg:
         specifier: ^8.16.3
         version: 8.20.0
@@ -3120,6 +3123,12 @@ packages:
         optional: true
       sqlite3:
         optional: true
+
+  drizzle-zod@0.8.3:
+    resolution: {integrity: sha512-66yVOuvGhKJnTdiqj1/Xaaz9/qzOdRJADpDa68enqS6g3t0kpNkwNYjUuaeXgZfO/UWuIM9HIhSlJ6C5ZraMww==}
+    peerDependencies:
+      drizzle-orm: '>=0.36.0'
+      zod: ^3.25.0 || ^4.0.0
 
   electron-to-chromium@1.5.313:
     resolution: {integrity: sha512-QBMrTWEf00GXZmJyx2lbYD45jpI3TUFnNIzJ5BBc8piGUDwMPa1GV6HJWTZVvY/eiN3fSopl7NRbgGp9sZ9LTA==}
@@ -7137,6 +7146,11 @@ snapshots:
       '@types/pg': 8.18.0
       kysely: 0.28.11
       pg: 8.20.0
+
+  drizzle-zod@0.8.3(drizzle-orm@0.45.1(@types/pg@8.18.0)(kysely@0.28.11)(pg@8.20.0))(zod@4.3.6):
+    dependencies:
+      drizzle-orm: 0.45.1(@types/pg@8.18.0)(kysely@0.28.11)(pg@8.20.0)
+      zod: 4.3.6
 
   electron-to-chromium@1.5.313: {}
 
