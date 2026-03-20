@@ -28,6 +28,7 @@ export const Route = createFileRoute('/coffees/new')({
 function NewCoffeeComponent() {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
+
   const { data: roasters } = useSuspenseQuery(trpc.roaster.list.queryOptions())
   const createRoaster = useMutation(
     trpc.roaster.create.mutationOptions({
@@ -36,6 +37,23 @@ function NewCoffeeComponent() {
       },
     }),
   )
+  const roasterOptions = roasters.map((r) => ({ value: r.id, label: r.name }))
+
+  const { data: roastLevels } = useSuspenseQuery(
+    trpc.roastLevel.list.queryOptions(),
+  )
+  const createRoastLevel = useMutation(
+    trpc.roaster.create.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.roastLevel.list.queryOptions())
+      },
+    }),
+  )
+  const roastLevelOptions = roastLevels.map((rl) => ({
+    value: rl.id,
+    label: rl.name,
+  }))
+
   const { data: countries } = useSuspenseQuery(trpc.country.list.queryOptions())
   const createCountry = useMutation(
     trpc.country.create.mutationOptions({
@@ -44,8 +62,6 @@ function NewCoffeeComponent() {
       },
     }),
   )
-
-  const roasterOptions = roasters.map((r) => ({ value: r.id, label: r.name }))
   const countryOptions = countries.map((c) => ({
     value: c.id,
     label: c.name,
@@ -94,6 +110,18 @@ function NewCoffeeComponent() {
               onAddItem={async (name) => {
                 const roaster = await createRoaster.mutateAsync({ name })
                 return { value: roaster.id, label: roaster.name }
+              }}
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="roastLevelId">
+          {(field) => (
+            <field.SearchSelect
+              label="Roast Level"
+              options={roastLevelOptions}
+              onAddItem={async (name) => {
+                const roastLevel = await createRoastLevel.mutateAsync({ name })
+                return { value: roastLevel.id, label: roastLevel.name }
               }}
             />
           )}
