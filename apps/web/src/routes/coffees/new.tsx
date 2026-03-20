@@ -126,6 +126,9 @@ function NewCoffeeComponent() {
             />
           )}
         </form.AppField>
+        <form.AppField name="roastDate">
+          {(field) => <field.DatePicker label="Roast Date" />}
+        </form.AppField>
         <form.AppField name="countryId">
           {(field) => (
             <field.SearchSelect

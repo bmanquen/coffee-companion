@@ -1,6 +1,3 @@
-import { useRef, useState } from 'react'
-import { useFieldContext } from '@/hooks/form-context'
-import { CheckIcon, ChevronDownIcon, PlusIcon } from 'lucide-react'
 import {
   Command,
   CommandEmpty,
@@ -17,7 +14,10 @@ import {
   FieldError,
   FieldLabel,
 } from '@/components/ui/field'
+import { useFieldContext } from '@/hooks/form-context'
 import { cn } from '@/lib/utils'
+import { CheckIcon, ChevronDownIcon, PlusIcon } from 'lucide-react'
+import { useRef, useState } from 'react'
 
 export type SearchSelectOption = {
   value: string
@@ -35,7 +35,9 @@ export function SearchSelect({
   description?: string
   placeholder?: string
   options: SearchSelectOption[]
-  onAddItem?: (value: string) => SearchSelectOption | Promise<SearchSelectOption>
+  onAddItem?: (
+    value: string,
+  ) => SearchSelectOption | Promise<SearchSelectOption>
 }) {
   const field = useFieldContext<string>()
   const [search, setSearch] = useState('')
