@@ -1,7 +1,7 @@
 import { db } from '@/db'
 import { roasters } from '@/db/schema'
 import { insertRoasterSchema } from '@/db/zod'
-import { createTRPCRouter, publicProcedure } from './init'
+import { authedProcedure, createTRPCRouter, publicProcedure } from './init'
 
 export const roasterRouter = createTRPCRouter({
   list: publicProcedure.query(async () => {
@@ -10,7 +10,7 @@ export const roasterRouter = createTRPCRouter({
     })
   }),
 
-  create: publicProcedure
+  create: authedProcedure
     .input(insertRoasterSchema)
     .mutation(async ({ input }) => {
       const [roaster] = await db.insert(roasters).values(input).returning()

@@ -1,7 +1,7 @@
 import { insertCountrySchema } from '@/db/zod'
 import { db } from '../db'
 import { countries } from '../db/schema'
-import { createTRPCRouter, publicProcedure } from './init'
+import { authedProcedure, createTRPCRouter, publicProcedure } from './init'
 
 export const countryRouter = createTRPCRouter({
   list: publicProcedure.query(async () => {
@@ -10,7 +10,7 @@ export const countryRouter = createTRPCRouter({
     })
   }),
 
-  create: publicProcedure
+  create: authedProcedure
     .input(insertCountrySchema)
     .mutation(async ({ input }) => {
       const [country] = await db.insert(countries).values(input).returning()
