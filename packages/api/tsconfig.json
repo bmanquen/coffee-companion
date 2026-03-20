@@ -8,6 +8,9 @@
     "skipLibCheck": true,
     "outDir": "./dist",
     "rootDir": "./src",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
     "paths": {
       "@/*": ["./src/*"]
     }

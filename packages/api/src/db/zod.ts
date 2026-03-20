@@ -1,15 +1,15 @@
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 import { z } from 'zod'
 import {
-    coffeeProcesses,
-    coffees,
-    countries,
-    farms,
-    greenCoffees,
-    regions,
-    roasters,
-    roastLevels,
-    varieties,
+  coffeeProcesses,
+  coffees,
+  countries,
+  farms,
+  greenCoffees,
+  regions,
+  roasters,
+  roastLevels,
+  varieties,
 } from './schema'
 
 // Countries
@@ -77,7 +77,7 @@ export type GreenCoffee = z.infer<typeof selectGreenCoffeeSchema>
 // Coffees
 export const insertCoffeeSchema = createInsertSchema(coffees, {
   name: (schema) => schema.min(1),
-}).omit({ userId: true })
+}).omit({ id: true, userId: true })
 export const selectCoffeeSchema = createSelectSchema(coffees)
 export type InsertCoffee = z.infer<typeof insertCoffeeSchema>
 export type Coffee = z.infer<typeof selectCoffeeSchema>
