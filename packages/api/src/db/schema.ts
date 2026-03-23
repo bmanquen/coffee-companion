@@ -10,7 +10,7 @@ import {
   primaryKey,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { defineRelations } from 'drizzle-orm'
 import { user, session, account } from './auth-schema'
 
 export * from './auth-schema'
@@ -194,172 +194,88 @@ export const coffeeProcesses = pgTable(
 
 // Relations
 
-export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account),
-  greenCoffees: many(greenCoffees),
-  coffees: many(coffees),
-  countries: many(countries),
-  regions: many(regions),
-  farms: many(farms),
-  roasters: many(roasters),
-  roastLevels: many(roastLevels),
-  coffeeProcesses: many(coffeeProcesses),
-  varieties: many(varieties),
-}))
-
-export const countriesRelations = relations(countries, ({ one, many }) => ({
-  user: one(user, {
-    fields: [countries.userId],
-    references: [user.id],
-  }),
-  regions: many(regions),
-  greenCoffees: many(greenCoffees),
-  coffees: many(coffees),
-}))
-
-export const regionsRelations = relations(regions, ({ one, many }) => ({
-  user: one(user, {
-    fields: [regions.userId],
-    references: [user.id],
-  }),
-  country: one(countries, {
-    fields: [regions.countryId],
-    references: [countries.id],
-  }),
-  farms: many(farms),
-  greenCoffees: many(greenCoffees),
-  coffees: many(coffees),
-}))
-
-export const farmsRelations = relations(farms, ({ one, many }) => ({
-  user: one(user, {
-    fields: [farms.userId],
-    references: [user.id],
-  }),
-  region: one(regions, {
-    fields: [farms.regionId],
-    references: [regions.id],
-  }),
-  greenCoffees: many(greenCoffees),
-}))
-
-export const roastersRelations = relations(roasters, ({ one, many }) => ({
-  user: one(user, {
-    fields: [roasters.userId],
-    references: [user.id],
-  }),
-  coffees: many(coffees),
-}))
-
-export const roastLevelsRelations = relations(roastLevels, ({ one, many }) => ({
-  user: one(user, {
-    fields: [roastLevels.userId],
-    references: [user.id],
-  }),
-  coffees: many(coffees),
-}))
-
-export const coffeeProcessesRelations = relations(
-  coffeeProcesses,
-  ({ one, many }) => ({
-    user: one(user, {
-      fields: [coffeeProcesses.userId],
-      references: [user.id],
-    }),
-    greenCoffees: many(greenCoffees),
-    coffees: many(coffees),
-  }),
-)
-
-export const varietiesRelations = relations(varieties, ({ one, many }) => ({
-  user: one(user, {
-    fields: [varieties.userId],
-    references: [user.id],
-  }),
-  coffeesVarieties: many(coffeesVarieties),
-  greenCoffeesVarieties: many(greenCoffeesVarieties),
-}))
-
-export const greenCoffeesRelations = relations(
-  greenCoffees,
-  ({ one, many }) => ({
-    user: one(user, {
-      fields: [greenCoffees.userId],
-      references: [user.id],
-    }),
-    country: one(countries, {
-      fields: [greenCoffees.countryId],
-      references: [countries.id],
-    }),
-    region: one(regions, {
-      fields: [greenCoffees.regionId],
-      references: [regions.id],
-    }),
-    farm: one(farms, {
-      fields: [greenCoffees.farmId],
-      references: [farms.id],
-    }),
-    process: one(coffeeProcesses, {
-      fields: [greenCoffees.processId],
-      references: [coffeeProcesses.id],
-    }),
-    greenCoffeesVarieties: many(greenCoffeesVarieties),
-  }),
-)
-
-export const coffeesRelations = relations(coffees, ({ one, many }) => ({
-  user: one(user, {
-    fields: [coffees.userId],
-    references: [user.id],
-  }),
-  roaster: one(roasters, {
-    fields: [coffees.roasterId],
-    references: [roasters.id],
-  }),
-  country: one(countries, {
-    fields: [coffees.countryId],
-    references: [countries.id],
-  }),
-  region: one(regions, {
-    fields: [coffees.regionId],
-    references: [regions.id],
-  }),
-  roastLevel: one(roastLevels, {
-    fields: [coffees.roastLevelId],
-    references: [roastLevels.id],
-  }),
-  process: one(coffeeProcesses, {
-    fields: [coffees.processId],
-    references: [coffeeProcesses.id],
-  }),
-  coffeesVarieties: many(coffeesVarieties),
-}))
-
-export const coffeesVarietiesRelations = relations(
-  coffeesVarieties,
-  ({ one }) => ({
-    coffee: one(coffees, {
-      fields: [coffeesVarieties.coffeeId],
-      references: [coffees.id],
-    }),
-    variety: one(varieties, {
-      fields: [coffeesVarieties.varietyId],
-      references: [varieties.id],
-    }),
-  }),
-)
-
-export const greenCoffeesVarietiesRelations = relations(
-  greenCoffeesVarieties,
-  ({ one }) => ({
-    greenCoffee: one(greenCoffees, {
-      fields: [greenCoffeesVarieties.greenCoffeeId],
-      references: [greenCoffees.id],
-    }),
-    variety: one(varieties, {
-      fields: [greenCoffeesVarieties.varietyId],
-      references: [varieties.id],
-    }),
+export const relations = defineRelations(
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties },
+  (r) => ({
+    user: {
+      sessions: r.many.session(),
+      accounts: r.many.account(),
+      greenCoffees: r.many.greenCoffees(),
+      coffees: r.many.coffees(),
+      countries: r.many.countries(),
+      regions: r.many.regions(),
+      farms: r.many.farms(),
+      roasters: r.many.roasters(),
+      roastLevels: r.many.roastLevels(),
+      coffeeProcesses: r.many.coffeeProcesses(),
+      varieties: r.many.varieties(),
+    },
+    countries: {
+      user: r.one.user({ from: r.countries.userId, to: r.user.id }),
+      regions: r.many.regions(),
+      greenCoffees: r.many.greenCoffees(),
+      coffees: r.many.coffees(),
+    },
+    regions: {
+      user: r.one.user({ from: r.regions.userId, to: r.user.id }),
+      country: r.one.countries({ from: r.regions.countryId, to: r.countries.id }),
+      farms: r.many.farms(),
+      greenCoffees: r.many.greenCoffees(),
+      coffees: r.many.coffees(),
+    },
+    farms: {
+      user: r.one.user({ from: r.farms.userId, to: r.user.id }),
+      region: r.one.regions({ from: r.farms.regionId, to: r.regions.id }),
+      greenCoffees: r.many.greenCoffees(),
+    },
+    roasters: {
+      user: r.one.user({ from: r.roasters.userId, to: r.user.id }),
+      coffees: r.many.coffees(),
+    },
+    roastLevels: {
+      user: r.one.user({ from: r.roastLevels.userId, to: r.user.id }),
+      coffees: r.many.coffees(),
+    },
+    coffeeProcesses: {
+      user: r.one.user({ from: r.coffeeProcesses.userId, to: r.user.id }),
+      greenCoffees: r.many.greenCoffees(),
+      coffees: r.many.coffees(),
+    },
+    varieties: {
+      user: r.one.user({ from: r.varieties.userId, to: r.user.id }),
+      coffeesVarieties: r.many.coffeesVarieties(),
+      greenCoffeesVarieties: r.many.greenCoffeesVarieties(),
+    },
+    greenCoffees: {
+      user: r.one.user({ from: r.greenCoffees.userId, to: r.user.id }),
+      country: r.one.countries({ from: r.greenCoffees.countryId, to: r.countries.id }),
+      region: r.one.regions({ from: r.greenCoffees.regionId, to: r.regions.id }),
+      farm: r.one.farms({ from: r.greenCoffees.farmId, to: r.farms.id }),
+      process: r.one.coffeeProcesses({ from: r.greenCoffees.processId, to: r.coffeeProcesses.id }),
+      greenCoffeesVarieties: r.many.greenCoffeesVarieties(),
+    },
+    coffees: {
+      user: r.one.user({ from: r.coffees.userId, to: r.user.id }),
+      roaster: r.one.roasters({ from: r.coffees.roasterId, to: r.roasters.id }),
+      country: r.one.countries({ from: r.coffees.countryId, to: r.countries.id }),
+      region: r.one.regions({ from: r.coffees.regionId, to: r.regions.id }),
+      roastLevel: r.one.roastLevels({ from: r.coffees.roastLevelId, to: r.roastLevels.id }),
+      process: r.one.coffeeProcesses({ from: r.coffees.processId, to: r.coffeeProcesses.id }),
+      coffeesVarieties: r.many.coffeesVarieties(),
+    },
+    coffeesVarieties: {
+      coffee: r.one.coffees({ from: r.coffeesVarieties.coffeeId, to: r.coffees.id }),
+      variety: r.one.varieties({ from: r.coffeesVarieties.varietyId, to: r.varieties.id }),
+    },
+    greenCoffeesVarieties: {
+      greenCoffee: r.one.greenCoffees({ from: r.greenCoffeesVarieties.greenCoffeeId, to: r.greenCoffees.id }),
+      variety: r.one.varieties({ from: r.greenCoffeesVarieties.varietyId, to: r.varieties.id }),
+    },
+    session: {
+      user: r.one.user({ from: r.session.userId, to: r.user.id }),
+    },
+    account: {
+      user: r.one.user({ from: r.account.userId, to: r.user.id }),
+    },
   }),
 )
