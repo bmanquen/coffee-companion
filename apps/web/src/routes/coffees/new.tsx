@@ -6,8 +6,10 @@ import {
   insertCoffeeSchema,
   type InsertCoffee,
 } from '@coffee-companion/api/db/zod'
+import { useStore } from '@tanstack/react-form'
 import {
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query'
@@ -89,6 +91,28 @@ function NewCoffeeComponent() {
     },
   })
 
+  const selectedCountryId = useStore(form.store, (s) => s.values.countryId)
+  const { data: regions } = useQuery(
+    trpc.region.getAll.queryOptions(selectedCountryId!, {
+      enabled: !!selectedCountryId,
+    }),
+  )
+  const createRegion = useMutation(
+    trpc.region.create.mutationOptions({
+      onSuccess: () => {
+        if (selectedCountryId) {
+          queryClient.invalidateQueries(
+            trpc.region.getAll.queryOptions(selectedCountryId),
+          )
+        }
+      },
+    }),
+  )
+  const regionOptions = (regions ?? []).map((r) => ({
+    value: r.id,
+    label: r.name,
+  }))
+
   return (
     <Card className="flex flex-col items-center w-3/4 h-dvh mx-auto">
       <H1 className="text-start w-1/2">Add Coffee</H1>
@@ -137,6 +161,19 @@ function NewCoffeeComponent() {
               onAddItem={async (name) => {
                 const country = await createCountry.mutateAsync({ name })
                 return { value: country.id, label: country.name }
+              }}
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="regionId">
+          {(field) => (
+            <field.SearchSelect
+              label="Region"
+              disabled={!selectedCountryId}
+              options={regionOptions}
+              onAddItem={async (name) => {
+                const region = await createRegion.mutateAsync({ name, countryId: selectedCountryId })
+                return { value: region.id, label: region.name }
               }}
             />
           )}

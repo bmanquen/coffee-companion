@@ -30,6 +30,7 @@ export function SearchSelect({
   placeholder = `Select ${label}`,
   options: initialOptions,
   onAddItem,
+  disabled = false,
 }: {
   label: string
   description?: string
@@ -38,6 +39,7 @@ export function SearchSelect({
   onAddItem?: (
     value: string,
   ) => SearchSelectOption | Promise<SearchSelectOption>
+  disabled?: boolean
 }) {
   const field = useFieldContext<string>()
   const [search, setSearch] = useState('')
@@ -90,9 +92,13 @@ export function SearchSelect({
             id={field.name}
             type="button"
             className={cn(
-              'flex h-9 w-full cursor-pointer items-center justify-between rounded-md border bg-transparent px-3 py-2 text-sm',
+              'flex h-9 w-full items-center justify-between rounded-md border bg-transparent px-3 py-2 text-sm',
+              disabled
+                ? 'cursor-not-allowed opacity-50'
+                : 'cursor-pointer',
               selectedOption ? 'text-foreground' : 'text-muted-foreground',
             )}
+            disabled={disabled}
             onClick={() => setOpen(!open)}
           >
             {selectedOption ? selectedOption.label : placeholder}
