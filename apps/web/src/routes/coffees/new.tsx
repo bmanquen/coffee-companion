@@ -15,6 +15,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { useServerFn } from '@tanstack/react-start'
 
 export const Route = createFileRoute('/coffees/new')({
   loader: async ({ context }) => {
@@ -113,6 +114,19 @@ function NewCoffeeComponent() {
     createRegion.mutateAsync({ name, countryId: selectedCountryId }),
   )
 
+  const { data: coffeeProcesses } = useQuery(
+    trpc.coffeeProcess.getAll.queryOptions(),
+  )
+  const createCoffeeProcess = useMutation(
+    trpc.coffeeProcess.create.mutationOptions({
+      onSuccess: () =>
+        queryClient.invalidateQueries(trpc.coffeeProcess.getAll.queryOptions()),
+    }),
+  )
+  const coffeeProcess = useSearchSelectResource(coffeeProcesses ?? [], (name) =>
+    createCoffeeProcess.mutateAsync({ name }),
+  )
+
   return (
     <Card className="flex flex-col items-center w-3/4 h-dvh mx-auto">
       <H1 className="text-start w-1/2">Add Coffee</H1>
@@ -127,9 +141,7 @@ function NewCoffeeComponent() {
           {(field) => <field.TextField label="Name" placeholder="Name" />}
         </form.AppField>
         <form.AppField name="roasterId">
-          {(field) => (
-            <field.SearchSelect label="Roaster" {...roaster} />
-          )}
+          {(field) => <field.SearchSelect label="Roaster" {...roaster} />}
         </form.AppField>
         <form.AppField name="roastLevelId">
           {(field) => (
@@ -140,9 +152,7 @@ function NewCoffeeComponent() {
           {(field) => <field.DatePicker label="Roast Date" />}
         </form.AppField>
         <form.AppField name="countryId">
-          {(field) => (
-            <field.SearchSelect label="Country" {...country} />
-          )}
+          {(field) => <field.SearchSelect label="Country" {...country} />}
         </form.AppField>
         <form.AppField name="regionId">
           {(field) => (
@@ -152,6 +162,12 @@ function NewCoffeeComponent() {
               {...region}
             />
           )}
+        </form.AppField>
+        <form.AppField name="processId">
+          {(field) => <field.SearchSelect label="Process" {...coffeeProcess} />}
+        </form.AppField>
+        <form.AppField name="notes">
+          {(field) => <field.TextArea label="Notes" placeholder="Notes..." />}
         </form.AppField>
       </form>
     </Card>
