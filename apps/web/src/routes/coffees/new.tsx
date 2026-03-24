@@ -1,6 +1,7 @@
 import { H1 } from '@/components/typography/h1'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
+import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import {
   insertCoffeeSchema,
@@ -39,22 +40,23 @@ function NewCoffeeComponent() {
       },
     }),
   )
-  const roasterOptions = roasters.map((r) => ({ value: r.id, label: r.name }))
+  const roaster = useSearchSelectResource(roasters, (name) =>
+    createRoaster.mutateAsync({ name }),
+  )
 
   const { data: roastLevels } = useSuspenseQuery(
     trpc.roastLevel.list.queryOptions(),
   )
   const createRoastLevel = useMutation(
-    trpc.roaster.create.mutationOptions({
+    trpc.roastLevel.create.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.roastLevel.list.queryOptions())
       },
     }),
   )
-  const roastLevelOptions = roastLevels.map((rl) => ({
-    value: rl.id,
-    label: rl.name,
-  }))
+  const roastLevel = useSearchSelectResource(roastLevels, (name) =>
+    createRoastLevel.mutateAsync({ name }),
+  )
 
   const { data: countries } = useSuspenseQuery(trpc.country.list.queryOptions())
   const createCountry = useMutation(
@@ -64,10 +66,9 @@ function NewCoffeeComponent() {
       },
     }),
   )
-  const countryOptions = countries.map((c) => ({
-    value: c.id,
-    label: c.name,
-  }))
+  const country = useSearchSelectResource(countries, (name) =>
+    createCountry.mutateAsync({ name }),
+  )
 
   const defaultCoffee: InsertCoffee = {
     name: '',
@@ -108,10 +109,9 @@ function NewCoffeeComponent() {
       },
     }),
   )
-  const regionOptions = (regions ?? []).map((r) => ({
-    value: r.id,
-    label: r.name,
-  }))
+  const region = useSearchSelectResource(regions ?? [], (name) =>
+    createRegion.mutateAsync({ name, countryId: selectedCountryId }),
+  )
 
   return (
     <Card className="flex flex-col items-center w-3/4 h-dvh mx-auto">
@@ -128,26 +128,12 @@ function NewCoffeeComponent() {
         </form.AppField>
         <form.AppField name="roasterId">
           {(field) => (
-            <field.SearchSelect
-              label="Roaster"
-              options={roasterOptions}
-              onAddItem={async (name) => {
-                const roaster = await createRoaster.mutateAsync({ name })
-                return { value: roaster.id, label: roaster.name }
-              }}
-            />
+            <field.SearchSelect label="Roaster" {...roaster} />
           )}
         </form.AppField>
         <form.AppField name="roastLevelId">
           {(field) => (
-            <field.SearchSelect
-              label="Roast Level"
-              options={roastLevelOptions}
-              onAddItem={async (name) => {
-                const roastLevel = await createRoastLevel.mutateAsync({ name })
-                return { value: roastLevel.id, label: roastLevel.name }
-              }}
-            />
+            <field.SearchSelect label="Roast Level" {...roastLevel} />
           )}
         </form.AppField>
         <form.AppField name="roastDate">
@@ -155,14 +141,7 @@ function NewCoffeeComponent() {
         </form.AppField>
         <form.AppField name="countryId">
           {(field) => (
-            <field.SearchSelect
-              label="Country"
-              options={countryOptions}
-              onAddItem={async (name) => {
-                const country = await createCountry.mutateAsync({ name })
-                return { value: country.id, label: country.name }
-              }}
-            />
+            <field.SearchSelect label="Country" {...country} />
           )}
         </form.AppField>
         <form.AppField name="regionId">
@@ -170,11 +149,7 @@ function NewCoffeeComponent() {
             <field.SearchSelect
               label="Region"
               disabled={!selectedCountryId}
-              options={regionOptions}
-              onAddItem={async (name) => {
-                const region = await createRegion.mutateAsync({ name, countryId: selectedCountryId })
-                return { value: region.id, label: region.name }
-              }}
+              {...region}
             />
           )}
         </form.AppField>
