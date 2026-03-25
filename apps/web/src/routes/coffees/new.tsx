@@ -1,4 +1,5 @@
 import { H1 } from '@/components/typography/h1'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
@@ -14,8 +15,8 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
-import { useServerFn } from '@tanstack/react-start'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Plus } from 'lucide-react'
 
 export const Route = createFileRoute('/coffees/new')({
   loader: async ({ context }) => {
@@ -32,6 +33,7 @@ export const Route = createFileRoute('/coffees/new')({
 function NewCoffeeComponent() {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const { data: roasters } = useSuspenseQuery(trpc.roaster.list.queryOptions())
   const createRoaster = useMutation(
@@ -71,6 +73,15 @@ function NewCoffeeComponent() {
     createCountry.mutateAsync({ name }),
   )
 
+  const createCoffee = useMutation(
+    trpc.coffee.create.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
+        navigate({ to: '/coffees' })
+      },
+    }),
+  )
+
   const defaultCoffee: InsertCoffee = {
     name: '',
     roasterId: null,
@@ -89,7 +100,7 @@ function NewCoffeeComponent() {
       onChange: insertCoffeeSchema,
     },
     onSubmit: ({ value }) => {
-      console.log(value)
+      createCoffee.mutate(value)
     },
   })
 
@@ -169,6 +180,10 @@ function NewCoffeeComponent() {
         <form.AppField name="notes">
           {(field) => <field.TextArea label="Notes" placeholder="Notes..." />}
         </form.AppField>
+        <Button type="submit">
+          Add
+          <Plus />
+        </Button>
       </form>
     </Card>
   )

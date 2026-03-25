@@ -1,3 +1,4 @@
+import { useTRPC } from '@/integrations/trpc/react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   Empty,

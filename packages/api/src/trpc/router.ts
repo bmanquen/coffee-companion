@@ -1,3 +1,4 @@
+import { coffeeRouter } from './coffee'
 import { coffeeProcessRouter } from './coffeeProcess'
 import { countryRouter } from './country'
 import { createTRPCRouter } from './init'
@@ -11,5 +12,6 @@ export const trpcRouter = createTRPCRouter({
   roastLevel: roastLevelRouter,
   region: regionRouter,
   coffeeProcess: coffeeProcessRouter,
+  coffee: coffeeRouter,
 })
 export type TRPCRouter = typeof trpcRouter
