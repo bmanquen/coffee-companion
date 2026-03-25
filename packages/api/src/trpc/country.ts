@@ -1,19 +1,22 @@
 import { insertCountrySchema } from '@/db/zod'
 import { db } from '../db'
 import { countries } from '../db/schema'
-import { authedProcedure, createTRPCRouter, publicProcedure } from './init'
+import { authedProcedure, createTRPCRouter } from './init'
 
 export const countryRouter = createTRPCRouter({
-  list: publicProcedure.query(async () => {
+  list: authedProcedure.query(async ({ ctx }) => {
     return db.query.countries.findMany({
-      orderBy: (countries, { asc }) => [asc(countries.name)],
+      where: {
+        OR: [{ userId: { isNull: true } }, { userId: ctx.session.user.id }],
+      },
+      orderBy: { name: 'asc' },
     })
   }),
 
   create: authedProcedure
     .input(insertCountrySchema)
-    .mutation(async ({ input }) => {
-      const [country] = await db.insert(countries).values(input).returning()
+    .mutation(async ({ ctx, input }) => {
+      const [country] = await db.insert(countries).values({ ...input, userId: ctx.session.user.id }).returning()
       return country
     }),
 })

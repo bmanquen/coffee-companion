@@ -2,17 +2,22 @@ import { db } from '@/db'
 import { insertRegionSchema } from '@/db/zod'
 import { regions } from '@/db/schema'
 import z from 'zod'
-import { authedProcedure, createTRPCRouter, publicProcedure } from './init'
+import { authedProcedure, createTRPCRouter } from './init'
 
 export const regionRouter = createTRPCRouter({
-  getAll: publicProcedure.input(z.uuid()).query(async ({ input }) => {
-    return db.query.regions.findMany({ where: { countryId: input } })
+  getAll: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {
+    return db.query.regions.findMany({
+      where: {
+        countryId: input,
+        OR: [{ userId: { isNull: true } }, { userId: ctx.session.user.id }],
+      },
+    })
   }),
 
   create: authedProcedure
     .input(insertRegionSchema)
-    .mutation(async ({ input }) => {
-      const [region] = await db.insert(regions).values(input).returning()
+    .mutation(async ({ ctx, input }) => {
+      const [region] = await db.insert(regions).values({ ...input, userId: ctx.session.user.id }).returning()
       return region
     }),
 })
