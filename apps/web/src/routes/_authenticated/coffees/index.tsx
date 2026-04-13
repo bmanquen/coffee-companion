@@ -14,7 +14,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { Card } from '@/components/ui/card'
 import { H1 } from '@/components/typography/h1'
 
-export const Route = createFileRoute('/coffees/')({
+export const Route = createFileRoute('/_authenticated/coffees/')({
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(
       context.trpc.coffee.getAll.queryOptions(),

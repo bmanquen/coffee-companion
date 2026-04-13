@@ -9,27 +9,28 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as CoffeesIndexRouteImport } from './routes/coffees/index'
-import { Route as CoffeesNewRouteImport } from './routes/coffees/new'
+import { Route as AuthenticatedCoffeesIndexRouteImport } from './routes/_authenticated/coffees/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
 
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CoffeesIndexRoute = CoffeesIndexRouteImport.update({
-  id: '/coffees/',
-  path: '/coffees/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CoffeesNewRoute = CoffeesNewRouteImport.update({
-  id: '/coffees/new',
-  path: '/coffees/new',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const AuthenticatedCoffeesIndexRoute =
+  AuthenticatedCoffeesIndexRouteImport.update({
+    id: '/coffees/',
+    path: '/coffees/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
   id: '/api/trpc/$',
   path: '/api/trpc/$',
@@ -40,53 +41,66 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedCoffeesNewRoute = AuthenticatedCoffeesNewRouteImport.update({
+  id: '/coffees/new',
+  path: '/coffees/new',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/coffees/new': typeof CoffeesNewRoute
-  '/coffees/': typeof CoffeesIndexRoute
+  '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/coffees/': typeof AuthenticatedCoffeesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/coffees/new': typeof CoffeesNewRoute
-  '/coffees': typeof CoffeesIndexRoute
+  '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/coffees': typeof AuthenticatedCoffeesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/coffees/new': typeof CoffeesNewRoute
-  '/coffees/': typeof CoffeesIndexRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/_authenticated/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/_authenticated/coffees/': typeof AuthenticatedCoffeesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/coffees/new' | '/coffees/' | '/api/auth/$' | '/api/trpc/$'
+  fullPaths: '/' | '/coffees/new' | '/api/auth/$' | '/api/trpc/$' | '/coffees/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/coffees/new' | '/coffees' | '/api/auth/$' | '/api/trpc/$'
+  to: '/' | '/coffees/new' | '/api/auth/$' | '/api/trpc/$' | '/coffees'
   id:
     | '__root__'
     | '/'
-    | '/coffees/new'
-    | '/coffees/'
+    | '/_authenticated'
+    | '/_authenticated/coffees/new'
     | '/api/auth/$'
     | '/api/trpc/$'
+    | '/_authenticated/coffees/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CoffeesNewRoute: typeof CoffeesNewRoute
-  CoffeesIndexRoute: typeof CoffeesIndexRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -94,19 +108,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/coffees/': {
-      id: '/coffees/'
+    '/_authenticated/coffees/': {
+      id: '/_authenticated/coffees/'
       path: '/coffees'
       fullPath: '/coffees/'
-      preLoaderRoute: typeof CoffeesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/coffees/new': {
-      id: '/coffees/new'
-      path: '/coffees/new'
-      fullPath: '/coffees/new'
-      preLoaderRoute: typeof CoffeesNewRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedCoffeesIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/api/trpc/$': {
       id: '/api/trpc/$'
@@ -122,13 +129,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/coffees/new': {
+      id: '/_authenticated/coffees/new'
+      path: '/coffees/new'
+      fullPath: '/coffees/new'
+      preLoaderRoute: typeof AuthenticatedCoffeesNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
+interface AuthenticatedRouteChildren {
+  AuthenticatedCoffeesNewRoute: typeof AuthenticatedCoffeesNewRoute
+  AuthenticatedCoffeesIndexRoute: typeof AuthenticatedCoffeesIndexRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedCoffeesNewRoute: AuthenticatedCoffeesNewRoute,
+  AuthenticatedCoffeesIndexRoute: AuthenticatedCoffeesIndexRoute,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CoffeesNewRoute: CoffeesNewRoute,
-  CoffeesIndexRoute: CoffeesIndexRoute,
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
 }

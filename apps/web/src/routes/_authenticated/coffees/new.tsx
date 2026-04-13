@@ -18,7 +18,7 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 
-export const Route = createFileRoute('/coffees/new')({
+export const Route = createFileRoute('/_authenticated/coffees/new')({
   loader: async ({ context }) => {
     await context.queryClient.ensureQueryData(
       context.trpc.country.list.queryOptions(),

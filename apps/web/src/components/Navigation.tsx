@@ -1,9 +1,9 @@
-import { Menu } from 'lucide-react'
-import { Sheet, SheetTrigger, SheetContent } from './ui/sheet'
-import { Button } from './ui/button'
-import { Avatar, AvatarImage } from './ui/avatar'
 import { authClient } from '@/lib/auth-client'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { Menu } from 'lucide-react'
+import { Avatar, AvatarImage } from './ui/avatar'
+import { Button } from './ui/button'
+import { Sheet, SheetContent, SheetTrigger } from './ui/sheet'
 
 interface NavigationProps {
   open: boolean
@@ -12,13 +12,15 @@ interface NavigationProps {
 
 export default function Navigation({ open, setOpen }: NavigationProps) {
   const { data: session } = authClient.useSession()
+  const navigate = useNavigate()
 
   const handleSignIn = () => {
     authClient.signIn.social({ provider: 'google' })
   }
 
-  const handleSignOut = () => {
-    authClient.signOut()
+  const handleSignOut = async () => {
+    await authClient.signOut()
+    navigate({ to: '/' })
   }
 
   return (
@@ -30,12 +32,14 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
       </SheetTrigger>
       <SheetContent side="left" className="w-64 px-2 shadow-lg">
         <nav className="flex flex-col gap-2 mt-10 h-full">
-          <a className="hover:bg-primary p-2 rounded-sm" href="/">
+          <Link className="hover:bg-primary p-2 rounded-sm" to="/">
             Home
-          </a>
-          <Link className="hover:bg-primary p-2 rounded-sm" to="/coffees">
-            Coffee
           </Link>
+          {session && (
+            <Link className="hover:bg-primary p-2 rounded-sm" to="/coffees">
+              Coffees
+            </Link>
+          )}
           {session ? (
             <div className="flex justify-between items-center gap-2 mt-auto mb-4">
               <Avatar>
