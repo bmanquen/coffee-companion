@@ -4,6 +4,7 @@ import {
   coffeeProcesses,
   coffees,
   countries,
+  espressoShots,
   farms,
   greenCoffees,
   regions,
@@ -81,3 +82,12 @@ export const insertCoffeeSchema = createInsertSchema(coffees, {
 export const selectCoffeeSchema = createSelectSchema(coffees)
 export type InsertCoffee = z.infer<typeof insertCoffeeSchema>
 export type Coffee = z.infer<typeof selectCoffeeSchema>
+
+// Espresso Shots
+export const insertEspressoShotSchema = createInsertSchema(espressoShots).omit({
+  id: true,
+  userId: true,
+})
+export const selectEspressoShotSchema = createSelectSchema(espressoShots)
+export type InsertEspressoShot = z.infer<typeof insertEspressoShotSchema>
+export type EspressoShot = z.infer<typeof selectEspressoShotSchema>

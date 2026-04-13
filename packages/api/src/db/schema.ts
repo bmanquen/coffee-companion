@@ -4,6 +4,7 @@ import {
   timestamp,
   uuid,
   integer,
+  numeric,
   date,
   boolean,
   index,
@@ -192,10 +193,33 @@ export const coffeeProcesses = pgTable(
   (table) => [uniqueIndex('coffee_processes_name_idx').on(table.name)],
 )
 
+export const espressoShots = pgTable(
+  'espresso_shots',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .references(() => user.id, { onDelete: 'cascade' })
+      .notNull(),
+    coffeeId: uuid('coffee_id')
+      .references(() => coffees.id, { onDelete: 'cascade' })
+      .notNull(),
+    dose: numeric(),
+    yield: numeric(),
+    time: integer(),
+    grindSetting: text('grind_setting'),
+    notes: text(),
+    ...timestamps,
+  },
+  (table) => [
+    index('espresso_shots_user_idx').on(table.userId),
+    index('espresso_shots_user_coffee_idx').on(table.userId, table.coffeeId),
+  ],
+)
+
 // Relations
 
 export const relations = defineRelations(
-  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties },
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, espressoShots },
   (r) => ({
     user: {
       sessions: r.many.session(),
@@ -209,6 +233,7 @@ export const relations = defineRelations(
       roastLevels: r.many.roastLevels(),
       coffeeProcesses: r.many.coffeeProcesses(),
       varieties: r.many.varieties(),
+      espressoShots: r.many.espressoShots(),
     },
     countries: {
       user: r.one.user({ from: r.countries.userId, to: r.user.id }),
@@ -262,6 +287,7 @@ export const relations = defineRelations(
       roastLevel: r.one.roastLevels({ from: r.coffees.roastLevelId, to: r.roastLevels.id }),
       process: r.one.coffeeProcesses({ from: r.coffees.processId, to: r.coffeeProcesses.id }),
       coffeesVarieties: r.many.coffeesVarieties(),
+      espressoShots: r.many.espressoShots(),
     },
     coffeesVarieties: {
       coffee: r.one.coffees({ from: r.coffeesVarieties.coffeeId, to: r.coffees.id }),
@@ -270,6 +296,10 @@ export const relations = defineRelations(
     greenCoffeesVarieties: {
       greenCoffee: r.one.greenCoffees({ from: r.greenCoffeesVarieties.greenCoffeeId, to: r.greenCoffees.id }),
       variety: r.one.varieties({ from: r.greenCoffeesVarieties.varietyId, to: r.varieties.id }),
+    },
+    espressoShots: {
+      user: r.one.user({ from: r.espressoShots.userId, to: r.user.id }),
+      coffee: r.one.coffees({ from: r.espressoShots.coffeeId, to: r.coffees.id }),
     },
     session: {
       user: r.one.user({ from: r.session.userId, to: r.user.id }),

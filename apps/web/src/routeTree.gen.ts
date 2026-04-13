@@ -11,9 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedEspressoIndexRouteImport } from './routes/_authenticated/espresso/index'
 import { Route as AuthenticatedCoffeesIndexRouteImport } from './routes/_authenticated/coffees/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as AuthenticatedEspressoNewRouteImport } from './routes/_authenticated/espresso/new'
 import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -25,6 +27,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedEspressoIndexRoute =
+  AuthenticatedEspressoIndexRouteImport.update({
+    id: '/espresso/',
+    path: '/espresso/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCoffeesIndexRoute =
   AuthenticatedCoffeesIndexRouteImport.update({
     id: '/coffees/',
@@ -41,6 +49,12 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedEspressoNewRoute =
+  AuthenticatedEspressoNewRouteImport.update({
+    id: '/espresso/new',
+    path: '/espresso/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCoffeesNewRoute = AuthenticatedCoffeesNewRouteImport.update({
   id: '/coffees/new',
   path: '/coffees/new',
@@ -50,39 +64,61 @@ const AuthenticatedCoffeesNewRoute = AuthenticatedCoffeesNewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
+  '/espresso/new': typeof AuthenticatedEspressoNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/coffees/': typeof AuthenticatedCoffeesIndexRoute
+  '/espresso/': typeof AuthenticatedEspressoIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
+  '/espresso/new': typeof AuthenticatedEspressoNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/coffees': typeof AuthenticatedCoffeesIndexRoute
+  '/espresso': typeof AuthenticatedEspressoIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_authenticated/coffees/new': typeof AuthenticatedCoffeesNewRoute
+  '/_authenticated/espresso/new': typeof AuthenticatedEspressoNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/_authenticated/coffees/': typeof AuthenticatedCoffeesIndexRoute
+  '/_authenticated/espresso/': typeof AuthenticatedEspressoIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/coffees/new' | '/api/auth/$' | '/api/trpc/$' | '/coffees/'
+  fullPaths:
+    | '/'
+    | '/coffees/new'
+    | '/espresso/new'
+    | '/api/auth/$'
+    | '/api/trpc/$'
+    | '/coffees/'
+    | '/espresso/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/coffees/new' | '/api/auth/$' | '/api/trpc/$' | '/coffees'
+  to:
+    | '/'
+    | '/coffees/new'
+    | '/espresso/new'
+    | '/api/auth/$'
+    | '/api/trpc/$'
+    | '/coffees'
+    | '/espresso'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/_authenticated/coffees/new'
+    | '/_authenticated/espresso/new'
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/_authenticated/coffees/'
+    | '/_authenticated/espresso/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -108,6 +144,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/espresso/': {
+      id: '/_authenticated/espresso/'
+      path: '/espresso'
+      fullPath: '/espresso/'
+      preLoaderRoute: typeof AuthenticatedEspressoIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/coffees/': {
       id: '/_authenticated/coffees/'
       path: '/coffees'
@@ -129,6 +172,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/espresso/new': {
+      id: '/_authenticated/espresso/new'
+      path: '/espresso/new'
+      fullPath: '/espresso/new'
+      preLoaderRoute: typeof AuthenticatedEspressoNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/coffees/new': {
       id: '/_authenticated/coffees/new'
       path: '/coffees/new'
@@ -141,12 +191,16 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedCoffeesNewRoute: typeof AuthenticatedCoffeesNewRoute
+  AuthenticatedEspressoNewRoute: typeof AuthenticatedEspressoNewRoute
   AuthenticatedCoffeesIndexRoute: typeof AuthenticatedCoffeesIndexRoute
+  AuthenticatedEspressoIndexRoute: typeof AuthenticatedEspressoIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCoffeesNewRoute: AuthenticatedCoffeesNewRoute,
+  AuthenticatedEspressoNewRoute: AuthenticatedEspressoNewRoute,
   AuthenticatedCoffeesIndexRoute: AuthenticatedCoffeesIndexRoute,
+  AuthenticatedEspressoIndexRoute: AuthenticatedEspressoIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

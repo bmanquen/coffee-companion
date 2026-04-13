@@ -36,9 +36,14 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
             Home
           </Link>
           {session && (
-            <Link className="hover:bg-primary p-2 rounded-sm" to="/coffees">
-              Coffees
-            </Link>
+            <>
+              <Link className="hover:bg-primary p-2 rounded-sm" to="/coffees">
+                Coffees
+              </Link>
+              <Link className="hover:bg-primary p-2 rounded-sm" to="/espresso">
+                Espresso
+              </Link>
+            </>
           )}
           {session ? (
             <div className="flex justify-between items-center gap-2 mt-auto mb-4">

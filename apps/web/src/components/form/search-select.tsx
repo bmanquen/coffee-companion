@@ -115,7 +115,7 @@ export function SearchSelect({
                 />
                 <CommandList>
                   <CommandEmpty>
-                    {search.trim() ? (
+                    {search.trim() && onAddItem ? (
                       <button
                         type="button"
                         className="inline-flex cursor-pointer items-center gap-1 text-muted-foreground hover:text-foreground"
@@ -150,7 +150,7 @@ export function SearchSelect({
                       </CommandItem>
                     ))}
                   </CommandGroup>
-                  {search.trim() && !exactMatch && options.length > 0 && (
+                  {search.trim() && !exactMatch && onAddItem && options.length > 0 && (
                     <>
                       <CommandSeparator />
                       <CommandGroup>
