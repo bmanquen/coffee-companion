@@ -1,0 +1,96 @@
+import { DataTable } from '@/components/data-table'
+import { PaginationControls } from '@/components/pagination-controls'
+import { Button } from '@/components/ui/button'
+import { useTRPC } from '@/integrations/trpc/react'
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table'
+import { useState } from 'react'
+import { Card } from './ui/card'
+
+const PAGE_SIZE = 5
+
+type Coffee = {
+  id: string
+  name: string
+  roastDate: string | null
+  notes: string | null
+}
+
+const columnHelper = createColumnHelper<Coffee>()
+
+const columns = [
+  columnHelper.accessor('name', { header: 'Name' }),
+  columnHelper.accessor('roastDate', {
+    header: 'Roast Date',
+    cell: (info) => info.getValue() ?? '-',
+  }),
+  columnHelper.accessor('notes', {
+    header: 'Notes',
+    cell: (info) => info.getValue() ?? '-',
+  }),
+]
+
+export function RecentCoffees() {
+  const trpc = useTRPC()
+  const [page, setPage] = useState(0)
+
+  const { data } = useSuspenseQuery(
+    trpc.coffee.getRecent.queryOptions({
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+    }),
+  )
+
+  const totalPages = Math.ceil(data.total / PAGE_SIZE)
+
+  const table = useReactTable({
+    data: data.items,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  })
+
+  return (
+    <Card className="flex flex-row items-center gap-4 p-4">
+      <div className="flex flex-col gap-3 flex-1 min-w-0">
+        <div className="flex justify-between">
+          <h2 className="text-lg font-semibold">Recent Coffees</h2>
+          <Link to="/coffees/new">
+            <Button variant="outline" size="sm">
+              Add Coffee
+            </Button>
+          </Link>
+        </div>
+        {data.items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No coffees yet.{' '}
+            <Link to="/coffees/new" className="underline">
+              Add your first coffee
+            </Link>
+            .
+          </p>
+        ) : (
+          <>
+            <DataTable table={table} />
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
+          </>
+        )}
+      </div>
+      {data.items.length === 0 && (
+        <Link to="/coffees/new">
+          <Button variant="outline" size="sm">
+            Add Coffee
+          </Button>
+        </Link>
+      )}
+    </Card>
+  )
+}

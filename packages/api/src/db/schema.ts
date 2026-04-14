@@ -298,8 +298,8 @@ export const relations = defineRelations(
       variety: r.one.varieties({ from: r.greenCoffeesVarieties.varietyId, to: r.varieties.id }),
     },
     espressoShots: {
-      user: r.one.user({ from: r.espressoShots.userId, to: r.user.id }),
-      coffee: r.one.coffees({ from: r.espressoShots.coffeeId, to: r.coffees.id }),
+      user: r.one.user({ from: r.espressoShots.userId, to: r.user.id, optional: false }),
+      coffee: r.one.coffees({ from: r.espressoShots.coffeeId, to: r.coffees.id, optional: false }),
     },
     session: {
       user: r.one.user({ from: r.session.userId, to: r.user.id }),
