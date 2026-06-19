@@ -52,6 +52,7 @@ export function RecentCoffees() {
     data: data.items,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    enableSorting: false,
   })
 
   return (

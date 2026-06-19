@@ -10,40 +10,78 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table'
+import { cn } from '@/lib/utils'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 
 interface DataTableProps<T> {
   table: TanstackTable<T>
 }
 
 export function DataTable<T>({ table }: DataTableProps<T>) {
+  // TanStack Table's instance is a stable, mutable object; React Compiler would
+  // otherwise memoize getHeaderGroups()/getRowModel() and never re-derive rows
+  // when sorting state changes. Opt this component out of the compiler.
+  'use no memo'
   return (
     <Table>
       <TableHeader>
         {table.getHeaderGroups().map((headerGroup) => (
           <TableRow key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <TableHead key={header.id}>
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )}
-              </TableHead>
-            ))}
+            {headerGroup.headers.map((header) => {
+              const canSort = header.column.getCanSort()
+              const sorted = header.column.getIsSorted()
+              return (
+                <TableHead
+                  key={header.id}
+                  className={cn(canSort && 'cursor-pointer select-none')}
+                  onClick={header.column.getToggleSortingHandler()}
+                >
+                  {header.isPlaceholder ? null : (
+                    <div className="flex items-center gap-1">
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
+                      {canSort && (
+                        <span className="h-4 w-4">
+                          {sorted === 'asc' ? (
+                            <ArrowUp className="h-4 w-4" />
+                          ) : sorted === 'desc' ? (
+                            <ArrowDown className="h-4 w-4" />
+                          ) : (
+                            <ArrowUpDown className="h-4 w-4 text-muted-foreground/50" />
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </TableHead>
+              )
+            })}
           </TableRow>
         ))}
       </TableHeader>
       <TableBody>
-        {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id}>
-            {row.getVisibleCells().map((cell) => (
-              <TableCell key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </TableCell>
-            ))}
+        {table.getRowModel().rows.length === 0 ? (
+          <TableRow>
+            <TableCell
+              colSpan={table.getAllColumns().length}
+              className="h-24 text-center text-muted-foreground"
+            >
+              No results.
+            </TableCell>
           </TableRow>
-        ))}
+        ) : (
+          table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))
+        )}
       </TableBody>
     </Table>
   )

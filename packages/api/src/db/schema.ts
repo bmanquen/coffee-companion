@@ -10,6 +10,7 @@ import {
   index,
   primaryKey,
   uniqueIndex,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
 import { defineRelations } from 'drizzle-orm'
 import { user, session, account } from './auth-schema'
@@ -125,6 +126,10 @@ export const coffees = pgTable(
     processId: uuid('process_id').references(() => coffeeProcesses.id),
     notes: text(),
     isActive: boolean('is_active'),
+    dialedInShotId: uuid('dialed_in_shot_id').references(
+      (): AnyPgColumn => espressoShots.id,
+      { onDelete: 'set null' },
+    ),
     ...timestamps,
   },
   (table) => [
@@ -286,6 +291,7 @@ export const relations = defineRelations(
       region: r.one.regions({ from: r.coffees.regionId, to: r.regions.id }),
       roastLevel: r.one.roastLevels({ from: r.coffees.roastLevelId, to: r.roastLevels.id }),
       process: r.one.coffeeProcesses({ from: r.coffees.processId, to: r.coffeeProcesses.id }),
+      dialedInShot: r.one.espressoShots({ from: r.coffees.dialedInShotId, to: r.espressoShots.id }),
       coffeesVarieties: r.many.coffeesVarieties(),
       espressoShots: r.many.espressoShots(),
     },

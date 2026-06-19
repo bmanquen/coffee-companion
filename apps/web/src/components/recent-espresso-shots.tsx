@@ -62,6 +62,7 @@ export function RecentEspressoShots() {
     data: data.items,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    enableSorting: false,
   })
 
   return (

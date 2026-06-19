@@ -7,8 +7,8 @@ import { RecentEspressoShots } from '@/components/recent-espresso-shots'
 import { RecentCoffees } from '@/components/recent-coffees'
 
 const getHeaders = createIsomorphicFn()
-  .client(() => ({}))
-  .server(async () => {
+  .client((): Record<string, string> => ({}))
+  .server(async (): Promise<Record<string, string>> => {
     const { getRequestHeaders } = await import('@tanstack/react-start/server')
     const headers = getRequestHeaders()
     const cookie = headers.get('cookie')

@@ -13,11 +13,15 @@ export function TextField({
   description,
   placeholder,
   type = 'text',
+  inputMode,
+  step,
 }: {
   label: string
   description?: string
   placeholder?: string
   type?: React.ComponentProps<'input'>['type']
+  inputMode?: React.ComponentProps<'input'>['inputMode']
+  step?: React.ComponentProps<'input'>['step']
 }) {
   const field = useFieldContext<string>()
 
@@ -29,6 +33,8 @@ export function TextField({
           id={field.name}
           name={field.name}
           type={type}
+          inputMode={inputMode}
+          step={step}
           placeholder={placeholder}
           value={field.state.value}
           onBlur={field.handleBlur}

@@ -2,6 +2,7 @@ import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
+import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import {
   insertEspressoShotSchema,
@@ -74,10 +75,26 @@ function NewEspressoShot() {
           {(field) => <field.SearchSelect label="Coffee" {...coffee} />}
         </form.AppField>
         <form.AppField name="dose">
-          {(field) => <field.TextField label="Dose (g)" placeholder="18.0" />}
+          {(field) => (
+            <field.TextField
+              label="Dose (g)"
+              placeholder="18.0"
+              type="number"
+              inputMode="decimal"
+              step="any"
+            />
+          )}
         </form.AppField>
         <form.AppField name="yield">
-          {(field) => <field.TextField label="Yield (g)" placeholder="36.0" />}
+          {(field) => (
+            <field.TextField
+              label="Yield (g)"
+              placeholder="36.0"
+              type="number"
+              inputMode="decimal"
+              step="any"
+            />
+          )}
         </form.AppField>
         <form.AppField name="time">
           {(field) => (

@@ -1,22 +1,22 @@
-import { useTRPC } from '@/integrations/trpc/react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { H1 } from '@/components/typography/h1'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import {
   Empty,
+  EmptyContent,
+  EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-  EmptyDescription,
-  EmptyContent,
 } from '@/components/ui/empty'
-import { CoffeeIcon, Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useTRPC } from '@/integrations/trpc/react'
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Card } from '@/components/ui/card'
-import { H1 } from '@/components/typography/h1'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { CoffeeIcon, Plus } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/coffees/')({
-  loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(
+  loader: ({ context }) => {
+    context.queryClient.ensureQueryData(
       context.trpc.coffee.getAll.queryOptions(),
     )
   },
@@ -68,6 +68,23 @@ function Coffee() {
           <h2 className="text-lg font-semibold">{coffee.name}</h2>
           {coffee.notes && (
             <p className="text-sm text-muted-foreground">{coffee.notes}</p>
+          )}
+          {coffee.dialedInShot && (
+            <div className="flex gap-4 text-sm text-muted-foreground mt-2 border-t pt-2">
+              <span className="font-medium text-foreground">Dialed In:</span>
+              {coffee.dialedInShot.dose && (
+                <span>{coffee.dialedInShot.dose}g in</span>
+              )}
+              {coffee.dialedInShot.yield && (
+                <span>{coffee.dialedInShot.yield}g out</span>
+              )}
+              {coffee.dialedInShot.time && (
+                <span>{coffee.dialedInShot.time}s</span>
+              )}
+              {coffee.dialedInShot.grindSetting && (
+                <span>Grind: {coffee.dialedInShot.grindSetting}</span>
+              )}
+            </div>
           )}
         </Card>
       ))}

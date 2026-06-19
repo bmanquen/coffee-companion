@@ -83,8 +83,15 @@ export const selectCoffeeSchema = createSelectSchema(coffees)
 export type InsertCoffee = z.infer<typeof insertCoffeeSchema>
 export type Coffee = z.infer<typeof selectCoffeeSchema>
 
+// Accepts an integer or decimal string, e.g. "16", "36.5", "2.5"
+const decimalString = () =>
+  z.string().regex(/^\d+(\.\d+)?$/, 'Must be a number').nullish()
+
 // Espresso Shots
-export const insertEspressoShotSchema = createInsertSchema(espressoShots).omit({
+export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
+  dose: decimalString,
+  yield: decimalString,
+}).omit({
   id: true,
   userId: true,
 })

@@ -4,7 +4,7 @@ import { createTRPCClient, httpBatchStreamLink } from '@trpc/client'
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query'
 import { createIsomorphicFn } from '@tanstack/react-start'
 
-import type { TRPCRouter } from '@/integrations/trpc/router'
+import type { TRPCRouter } from '@coffee-companion/api/trpc/router'
 
 import { TRPCProvider } from '@/integrations/trpc/react'
 

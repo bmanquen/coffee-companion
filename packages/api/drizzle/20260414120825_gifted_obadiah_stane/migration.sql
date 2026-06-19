@@ -1,0 +1,2 @@
+ALTER TABLE "coffees" ADD COLUMN "dialed_in_shot_id" uuid;--> statement-breakpoint
+ALTER TABLE "coffees" ADD CONSTRAINT "coffees_dialed_in_shot_id_espresso_shots_id_fkey" FOREIGN KEY ("dialed_in_shot_id") REFERENCES "espresso_shots"("id") ON DELETE SET NULL;
