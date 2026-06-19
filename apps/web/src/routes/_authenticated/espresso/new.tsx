@@ -80,8 +80,8 @@ function NewEspressoShot() {
               label="Dose (g)"
               placeholder="18.0"
               type="number"
-              inputMode="decimal"
               step="any"
+              inputMode="decimal"
             />
           )}
         </form.AppField>
@@ -91,8 +91,8 @@ function NewEspressoShot() {
               label="Yield (g)"
               placeholder="36.0"
               type="number"
-              inputMode="decimal"
               step="any"
+              inputMode="decimal"
             />
           )}
         </form.AppField>

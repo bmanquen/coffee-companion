@@ -12,14 +12,18 @@ import { CalendarIcon } from 'lucide-react'
 
 type DatePickerProps = {
   label: string
+  showLabel?: boolean
 }
 
-export function DatePicker({ label }: DatePickerProps) {
+export function DatePicker({ label, showLabel = true }: DatePickerProps) {
   const field = useFieldContext<Date>()
 
   return (
     <Field>
-      <FieldLabel htmlFor={field.name} className="sr-only">
+      <FieldLabel
+        htmlFor={field.name}
+        className={showLabel ? undefined : 'sr-only'}
+      >
         {label}
       </FieldLabel>
       <FieldContent>

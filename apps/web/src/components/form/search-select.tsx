@@ -26,6 +26,7 @@ export type SearchSelectOption = {
 
 export function SearchSelect({
   label,
+  showLabel = true,
   description,
   placeholder = `Select ${label}`,
   options: initialOptions,
@@ -33,6 +34,7 @@ export function SearchSelect({
   disabled = false,
 }: {
   label: string
+  showLabel?: boolean
   description?: string
   placeholder?: string
   options: SearchSelectOption[]
@@ -74,7 +76,10 @@ export function SearchSelect({
 
   return (
     <Field>
-      <FieldLabel htmlFor={field.name} className="sr-only">
+      <FieldLabel
+        htmlFor={field.name}
+        className={showLabel ? undefined : 'sr-only'}
+      >
         {label}
       </FieldLabel>
       <FieldContent>

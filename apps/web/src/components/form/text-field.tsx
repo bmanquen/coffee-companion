@@ -1,5 +1,3 @@
-import { useFieldContext } from '@/hooks/form-context'
-import { Input } from '@/components/ui/input'
 import {
   Field,
   FieldContent,
@@ -7,9 +5,12 @@ import {
   FieldError,
   FieldLabel,
 } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { useFieldContext } from '@/hooks/form-context'
 
 export function TextField({
   label,
+  showLabel = true,
   description,
   placeholder,
   type = 'text',
@@ -17,6 +18,7 @@ export function TextField({
   step,
 }: {
   label: string
+  showLabel?: boolean
   description?: string
   placeholder?: string
   type?: React.ComponentProps<'input'>['type']
@@ -27,7 +29,12 @@ export function TextField({
 
   return (
     <Field>
-      <FieldLabel htmlFor={field.name} className="sr-only">{label}</FieldLabel>
+      <FieldLabel
+        htmlFor={field.name}
+        className={showLabel ? undefined : 'sr-only'}
+      >
+        {label}
+      </FieldLabel>
       <FieldContent>
         <Input
           id={field.name}

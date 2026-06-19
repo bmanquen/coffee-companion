@@ -10,16 +10,25 @@ import { Textarea } from '../ui/textarea'
 
 type Props = {
   label: string
+  showLabel?: boolean
   description?: string
   placeholder?: string
 }
 
-export function TextArea({ label, description, placeholder }: Props) {
+export function TextArea({
+  label,
+  showLabel = true,
+  description,
+  placeholder,
+}: Props) {
   const field = useFieldContext<string>()
 
   return (
     <Field>
-      <FieldLabel htmlFor={field.name} className="sr-only">
+      <FieldLabel
+        htmlFor={field.name}
+        className={showLabel ? undefined : 'sr-only'}
+      >
         {label}
       </FieldLabel>
       <FieldContent>
