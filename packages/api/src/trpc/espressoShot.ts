@@ -1,7 +1,7 @@
 import { count, eq } from 'drizzle-orm'
-import { db } from '@/db'
-import { espressoShots } from '@/db/schema'
-import { insertEspressoShotSchema } from '@/db/zod'
+import { db } from '../db'
+import { espressoShots } from '../db/schema'
+import { insertEspressoShotSchema } from '../db/zod'
 import z from 'zod'
 import { authedProcedure, createTRPCRouter } from './init'
 

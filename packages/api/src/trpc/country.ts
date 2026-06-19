@@ -1,4 +1,4 @@
-import { insertCountrySchema } from '@/db/zod'
+import { insertCountrySchema } from '../db/zod'
 import { db } from '../db'
 import { countries } from '../db/schema'
 import { authedProcedure, createTRPCRouter } from './init'

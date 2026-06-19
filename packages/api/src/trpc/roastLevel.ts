@@ -1,6 +1,6 @@
-import { db } from '@/db'
-import { roastLevels } from '@/db/schema'
-import { insertRoastLevelSchema } from '@/db/zod'
+import { db } from '../db'
+import { roastLevels } from '../db/schema'
+import { insertRoastLevelSchema } from '../db/zod'
 import { authedProcedure, createTRPCRouter } from './init'
 
 export const roastLevelRouter = createTRPCRouter({

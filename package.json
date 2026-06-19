@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "check-types": "turbo check-types",
+    "typecheck": "turbo typecheck",
     "db:generate": "pnpm --filter @coffee-companion/api exec drizzle-kit generate",
     "db:migrate": "pnpm --filter @coffee-companion/api exec drizzle-kit migrate",
     "db:push": "pnpm --filter @coffee-companion/api exec drizzle-kit push",

@@ -1,6 +1,6 @@
-import { db } from '@/db'
-import { insertRegionSchema } from '@/db/zod'
-import { regions } from '@/db/schema'
+import { db } from '../db'
+import { insertRegionSchema } from '../db/zod'
+import { regions } from '../db/schema'
 import z from 'zod'
 import { authedProcedure, createTRPCRouter } from './init'
 

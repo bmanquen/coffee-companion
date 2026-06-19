@@ -1,6 +1,6 @@
-import { db } from '@/db'
-import { coffeeProcesses } from '@/db/schema'
-import { insertCoffeeProcessSchema } from '@/db/zod'
+import { db } from '../db'
+import { coffeeProcesses } from '../db/schema'
+import { insertCoffeeProcessSchema } from '../db/zod'
 import { authedProcedure, createTRPCRouter } from './init'
 
 export const coffeeProcessRouter = createTRPCRouter({
