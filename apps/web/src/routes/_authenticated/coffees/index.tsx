@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/empty'
 import { useTRPC } from '@/integrations/trpc/react'
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { CoffeeIcon, Plus } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/coffees/')({
@@ -65,7 +65,27 @@ function Coffee() {
       </div>
       {coffees.map((coffee) => (
         <Card key={coffee.id} className="w-full p-4">
-          <h2 className="text-lg font-semibold">{coffee.name}</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold">{coffee.name}</h2>
+            {coffee.country && (
+              <p className="text-muted-foreground text-sm">
+                <span className="font-bold">Country: </span>
+                {coffee.country.name}
+              </p>
+            )}
+            {coffee.region && (
+              <p className="text-muted-foreground text-sm">
+                <span className="font-bold">Region: </span>
+                {coffee.region.name}
+              </p>
+            )}
+            {coffee.process && (
+              <p className="text-muted-foreground text-sm">
+                <span className="font-bold">Process: </span>
+                {coffee.process.name}
+              </p>
+            )}
+          </div>
           {coffee.notes && (
             <p className="text-sm text-muted-foreground">{coffee.notes}</p>
           )}
