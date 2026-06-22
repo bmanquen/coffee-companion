@@ -1,0 +1,16 @@
+# tbls configuration — generates GitHub-friendly Markdown schema docs from the
+# live database. Connection string is read from DATABASE_URL (see .env.local).
+dsn: ${DATABASE_URL}
+
+# Output directory for the generated docs.
+docPath: docs/schema
+
+# Render ER diagrams as Mermaid so they display natively on GitHub (no Graphviz
+# dependency required).
+er:
+  format: mermaid
+
+# Drop better-auth / migration plumbing tables from the docs.
+exclude:
+  - verification
+  - drizzle.__drizzle_migrations

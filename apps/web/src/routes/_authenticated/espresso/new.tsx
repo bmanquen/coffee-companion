@@ -21,6 +21,9 @@ export const Route = createFileRoute('/_authenticated/espresso/new')({
     await context.queryClient.ensureQueryData(
       context.trpc.coffee.getAll.queryOptions(),
     )
+    await context.queryClient.ensureQueryData(
+      context.trpc.grinder.list.queryOptions(),
+    )
   },
   component: NewEspressoShot,
 })
@@ -33,6 +36,9 @@ function NewEspressoShot() {
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
   const coffee = useSearchSelectResource(coffees)
 
+  const { data: grinders } = useSuspenseQuery(trpc.grinder.list.queryOptions())
+  const grinder = useSearchSelectResource(grinders)
+
   const createShot = useMutation(
     trpc.espressoShot.create.mutationOptions({
       onSuccess: () => {
@@ -44,6 +50,7 @@ function NewEspressoShot() {
 
   const defaultShot: InsertEspressoShot = {
     coffeeId: '',
+    grinderId: '',
     dose: null,
     yield: null,
     time: null,
@@ -73,6 +80,9 @@ function NewEspressoShot() {
       >
         <form.AppField name="coffeeId">
           {(field) => <field.SearchSelect label="Coffee" {...coffee} />}
+        </form.AppField>
+        <form.AppField name="grinderId">
+          {(field) => <field.SearchSelect label="Grinder" {...grinder} />}
         </form.AppField>
         <form.AppField name="dose">
           {(field) => (

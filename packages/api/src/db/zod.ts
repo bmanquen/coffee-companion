@@ -7,6 +7,7 @@ import {
   espressoShots,
   farms,
   greenCoffees,
+  grinders,
   regions,
   roasters,
   roastLevels,
@@ -83,6 +84,15 @@ export const selectCoffeeSchema = createSelectSchema(coffees)
 export type InsertCoffee = z.infer<typeof insertCoffeeSchema>
 export type Coffee = z.infer<typeof selectCoffeeSchema>
 
+// Grinders
+export const insertGrinderSchema = createInsertSchema(grinders, {
+  name: (schema) => schema.min(1),
+  brand: (schema) => schema.min(1),
+}).omit({ id: true, userId: true })
+export const selectGrinderSchema = createSelectSchema(grinders)
+export type InsertGrinder = z.infer<typeof insertGrinderSchema>
+export type Grinder = z.infer<typeof selectGrinderSchema>
+
 // Accepts an integer or decimal string, e.g. "16", "36.5", "2.5"
 const decimalString = () =>
   z.string().regex(/^\d+(\.\d+)?$/, 'Must be a number').nullish()
@@ -91,6 +101,8 @@ const decimalString = () =>
 export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
   dose: decimalString,
   yield: decimalString,
+  coffeeId: () => z.uuid('Select a coffee'),
+  grinderId: () => z.uuid('Select a grinder'),
 }).omit({
   id: true,
   userId: true,

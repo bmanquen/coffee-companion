@@ -9,7 +9,8 @@
     "db:push": "drizzle-kit push",
     "db:pull": "drizzle-kit pull",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "db:docs": "dotenv -e .env.local -- tbls doc --rm-dist --force"
   },
   "exports": {
     "./trpc/router": "./src/trpc/router.ts",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@types/pg": "^8.16.0",
+    "dotenv-cli": "^11.0.0",
     "drizzle-kit": "1.0.0-beta.18-7eb39f0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

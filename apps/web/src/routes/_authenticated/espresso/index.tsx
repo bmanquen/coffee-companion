@@ -47,6 +47,7 @@ type Shot = {
   grindSetting: string | null
   notes: string | null
   coffee: { name: string; dialedInShotId: string | null }
+  grinder: { name: string; brand: string }
 }
 
 const columnHelper = createColumnHelper<Shot>()
@@ -125,6 +126,9 @@ const columns = [
   columnHelper.accessor('time', {
     header: 'Time',
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
+  }),
+  columnHelper.accessor('grinder.name', {
+    header: 'Grinder',
   }),
   columnHelper.accessor('grindSetting', {
     header: 'Grind',

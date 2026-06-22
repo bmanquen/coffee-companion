@@ -10,7 +10,7 @@ export const espressoShotRouter = createTRPCRouter({
     return db.query.espressoShots.findMany({
       where: { userId: ctx.session.user.id },
       orderBy: { createdAt: 'desc' },
-      with: { coffee: true },
+      with: { coffee: true, grinder: true },
     })
   }),
 
@@ -21,7 +21,7 @@ export const espressoShotRouter = createTRPCRouter({
         db.query.espressoShots.findMany({
           where: { userId: ctx.session.user.id },
           orderBy: { createdAt: 'desc' },
-          with: { coffee: true },
+          with: { coffee: true, grinder: true },
           limit: input.limit,
           offset: input.offset,
         }),

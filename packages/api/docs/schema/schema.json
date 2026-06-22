@@ -1,0 +1,1963 @@
+{
+  "name": "railway",
+  "tables": [
+    {
+      "name": "public.coffee_processes",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "coffee_processes_pkey",
+          "def": "CREATE UNIQUE INDEX coffee_processes_pkey ON public.coffee_processes USING btree (id)",
+          "table": "public.coffee_processes",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffee_processes_name_idx",
+          "def": "CREATE UNIQUE INDEX coffee_processes_name_idx ON public.coffee_processes USING btree (name)",
+          "table": "public.coffee_processes",
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "coffee_processes_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.coffee_processes",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffee_processes_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.coffee_processes",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.coffees",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "roaster_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "roast_level_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "roastDate",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "country_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "region_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "process_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        },
+        {
+          "name": "dialed_in_shot_id",
+          "type": "uuid",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "coffees_pkey",
+          "def": "CREATE UNIQUE INDEX coffees_pkey ON public.coffees USING btree (id)",
+          "table": "public.coffees",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffees_user_idx",
+          "def": "CREATE INDEX coffees_user_idx ON public.coffees USING btree (user_id)",
+          "table": "public.coffees",
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "name": "coffees_user_name_idx",
+          "def": "CREATE INDEX coffees_user_name_idx ON public.coffees USING btree (name, user_id)",
+          "table": "public.coffees",
+          "columns": [
+            "name",
+            "user_id"
+          ]
+        },
+        {
+          "name": "coffees_user_process_id_idx",
+          "def": "CREATE INDEX coffees_user_process_id_idx ON public.coffees USING btree (process_id, user_id)",
+          "table": "public.coffees",
+          "columns": [
+            "process_id",
+            "user_id"
+          ]
+        },
+        {
+          "name": "coffees_user_country_idx",
+          "def": "CREATE INDEX coffees_user_country_idx ON public.coffees USING btree (country_id, user_id)",
+          "table": "public.coffees",
+          "columns": [
+            "country_id",
+            "user_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "coffees_process_id_coffee_processes_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (process_id) REFERENCES coffee_processes(id)",
+          "table": "public.coffees",
+          "referenced_table": "public.coffee_processes",
+          "columns": [
+            "process_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffees_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.coffees",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffees_country_id_countries_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (country_id) REFERENCES countries(id)",
+          "table": "public.coffees",
+          "referenced_table": "public.countries",
+          "columns": [
+            "country_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffees_dialed_in_shot_id_espresso_shots_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (dialed_in_shot_id) REFERENCES espresso_shots(id) ON DELETE SET NULL",
+          "table": "public.coffees",
+          "referenced_table": "public.espresso_shots",
+          "columns": [
+            "dialed_in_shot_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffees_region_id_regions_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (region_id) REFERENCES regions(id)",
+          "table": "public.coffees",
+          "referenced_table": "public.regions",
+          "columns": [
+            "region_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffees_roast_level_id_roast_levels_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (roast_level_id) REFERENCES roast_levels(id)",
+          "table": "public.coffees",
+          "referenced_table": "public.roast_levels",
+          "columns": [
+            "roast_level_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffees_roaster_id_roasters_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (roaster_id) REFERENCES roasters(id)",
+          "table": "public.coffees",
+          "referenced_table": "public.roasters",
+          "columns": [
+            "roaster_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffees_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.coffees",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.coffees_varieties",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "variety_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "coffee_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "coffees_varieties_pkey",
+          "def": "CREATE UNIQUE INDEX coffees_varieties_pkey ON public.coffees_varieties USING btree (coffee_id, variety_id)",
+          "table": "public.coffees_varieties",
+          "columns": [
+            "coffee_id",
+            "variety_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "coffees_varieties_coffee_id_coffees_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (coffee_id) REFERENCES coffees(id) ON DELETE CASCADE",
+          "table": "public.coffees_varieties",
+          "referenced_table": "public.coffees",
+          "columns": [
+            "coffee_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "coffees_varieties_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (coffee_id, variety_id)",
+          "table": "public.coffees_varieties",
+          "referenced_table": "",
+          "columns": [
+            "coffee_id",
+            "variety_id"
+          ]
+        },
+        {
+          "name": "coffees_varieties_variety_id_varieties_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (variety_id) REFERENCES varieties(id) ON DELETE CASCADE",
+          "table": "public.coffees_varieties",
+          "referenced_table": "public.varieties",
+          "columns": [
+            "variety_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.countries",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "countries_pkey",
+          "def": "CREATE UNIQUE INDEX countries_pkey ON public.countries USING btree (id)",
+          "table": "public.countries",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "countries_name_idx",
+          "def": "CREATE UNIQUE INDEX countries_name_idx ON public.countries USING btree (name)",
+          "table": "public.countries",
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "countries_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.countries",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "countries_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.countries",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.espresso_shots",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "coffee_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "dose",
+          "type": "numeric",
+          "nullable": true
+        },
+        {
+          "name": "yield",
+          "type": "numeric",
+          "nullable": true
+        },
+        {
+          "name": "time",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "grind_setting",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "espresso_shots_pkey",
+          "def": "CREATE UNIQUE INDEX espresso_shots_pkey ON public.espresso_shots USING btree (id)",
+          "table": "public.espresso_shots",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "espresso_shots_user_idx",
+          "def": "CREATE INDEX espresso_shots_user_idx ON public.espresso_shots USING btree (user_id)",
+          "table": "public.espresso_shots",
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "name": "espresso_shots_user_coffee_idx",
+          "def": "CREATE INDEX espresso_shots_user_coffee_idx ON public.espresso_shots USING btree (user_id, coffee_id)",
+          "table": "public.espresso_shots",
+          "columns": [
+            "user_id",
+            "coffee_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "espresso_shots_coffee_id_coffees_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (coffee_id) REFERENCES coffees(id) ON DELETE CASCADE",
+          "table": "public.espresso_shots",
+          "referenced_table": "public.coffees",
+          "columns": [
+            "coffee_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "espresso_shots_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.espresso_shots",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "espresso_shots_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.espresso_shots",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.farms",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "region_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "farms_pkey",
+          "def": "CREATE UNIQUE INDEX farms_pkey ON public.farms USING btree (id)",
+          "table": "public.farms",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "farms_name_region_idx",
+          "def": "CREATE UNIQUE INDEX farms_name_region_idx ON public.farms USING btree (name, region_id)",
+          "table": "public.farms",
+          "columns": [
+            "name",
+            "region_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "farms_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.farms",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "farms_region_id_regions_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (region_id) REFERENCES regions(id)",
+          "table": "public.farms",
+          "referenced_table": "public.regions",
+          "columns": [
+            "region_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "farms_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.farms",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.green_coffees",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "country_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "region_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "farm_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "process_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "altitude",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "green_coffees_pkey",
+          "def": "CREATE UNIQUE INDEX green_coffees_pkey ON public.green_coffees USING btree (id)",
+          "table": "public.green_coffees",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "green_coffees_user_idx",
+          "def": "CREATE INDEX green_coffees_user_idx ON public.green_coffees USING btree (user_id)",
+          "table": "public.green_coffees",
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "name": "green_coffees_user_name_idx",
+          "def": "CREATE UNIQUE INDEX green_coffees_user_name_idx ON public.green_coffees USING btree (name, user_id)",
+          "table": "public.green_coffees",
+          "columns": [
+            "name",
+            "user_id"
+          ]
+        },
+        {
+          "name": "green_coffees_user_process_id_idx",
+          "def": "CREATE INDEX green_coffees_user_process_id_idx ON public.green_coffees USING btree (process_id, user_id)",
+          "table": "public.green_coffees",
+          "columns": [
+            "process_id",
+            "user_id"
+          ]
+        },
+        {
+          "name": "green_coffees_user_country_idx",
+          "def": "CREATE INDEX green_coffees_user_country_idx ON public.green_coffees USING btree (country_id, user_id)",
+          "table": "public.green_coffees",
+          "columns": [
+            "country_id",
+            "user_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "green_coffees_process_id_coffee_processes_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (process_id) REFERENCES coffee_processes(id)",
+          "table": "public.green_coffees",
+          "referenced_table": "public.coffee_processes",
+          "columns": [
+            "process_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "green_coffees_country_id_countries_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (country_id) REFERENCES countries(id)",
+          "table": "public.green_coffees",
+          "referenced_table": "public.countries",
+          "columns": [
+            "country_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "green_coffees_farm_id_farms_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (farm_id) REFERENCES farms(id)",
+          "table": "public.green_coffees",
+          "referenced_table": "public.farms",
+          "columns": [
+            "farm_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "green_coffees_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.green_coffees",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "green_coffees_region_id_regions_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (region_id) REFERENCES regions(id)",
+          "table": "public.green_coffees",
+          "referenced_table": "public.regions",
+          "columns": [
+            "region_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "green_coffees_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.green_coffees",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.green_coffees_varieties",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "variety_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "green_coffee_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "green_coffees_varieties_pkey",
+          "def": "CREATE UNIQUE INDEX green_coffees_varieties_pkey ON public.green_coffees_varieties USING btree (green_coffee_id, variety_id)",
+          "table": "public.green_coffees_varieties",
+          "columns": [
+            "green_coffee_id",
+            "variety_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "green_coffees_varieties_green_coffee_id_green_coffees_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (green_coffee_id) REFERENCES green_coffees(id) ON DELETE CASCADE",
+          "table": "public.green_coffees_varieties",
+          "referenced_table": "public.green_coffees",
+          "columns": [
+            "green_coffee_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "green_coffees_varieties_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (green_coffee_id, variety_id)",
+          "table": "public.green_coffees_varieties",
+          "referenced_table": "",
+          "columns": [
+            "green_coffee_id",
+            "variety_id"
+          ]
+        },
+        {
+          "name": "green_coffees_varieties_variety_id_varieties_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (variety_id) REFERENCES varieties(id) ON DELETE CASCADE",
+          "table": "public.green_coffees_varieties",
+          "referenced_table": "public.varieties",
+          "columns": [
+            "variety_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.regions",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "country_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "regions_pkey",
+          "def": "CREATE UNIQUE INDEX regions_pkey ON public.regions USING btree (id)",
+          "table": "public.regions",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "regions_name_country_idx",
+          "def": "CREATE UNIQUE INDEX regions_name_country_idx ON public.regions USING btree (name, country_id)",
+          "table": "public.regions",
+          "columns": [
+            "name",
+            "country_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "regions_country_id_countries_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (country_id) REFERENCES countries(id)",
+          "table": "public.regions",
+          "referenced_table": "public.countries",
+          "columns": [
+            "country_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "regions_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.regions",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "regions_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.regions",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.roast_levels",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "roast_levels_pkey",
+          "def": "CREATE UNIQUE INDEX roast_levels_pkey ON public.roast_levels USING btree (id)",
+          "table": "public.roast_levels",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "roast_levels_name_idx",
+          "def": "CREATE UNIQUE INDEX roast_levels_name_idx ON public.roast_levels USING btree (name)",
+          "table": "public.roast_levels",
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "roast_levels_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.roast_levels",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "roast_levels_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.roast_levels",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.roasters",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "roasters_pkey",
+          "def": "CREATE UNIQUE INDEX roasters_pkey ON public.roasters USING btree (id)",
+          "table": "public.roasters",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "roasters_name_idx",
+          "def": "CREATE UNIQUE INDEX roasters_name_idx ON public.roasters USING btree (name)",
+          "table": "public.roasters",
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "roasters_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.roasters",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "roasters_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.roasters",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.varieties",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "varieties_pkey",
+          "def": "CREATE UNIQUE INDEX varieties_pkey ON public.varieties USING btree (id)",
+          "table": "public.varieties",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "varieties_name_idx",
+          "def": "CREATE UNIQUE INDEX varieties_name_idx ON public.varieties USING btree (name)",
+          "table": "public.varieties",
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "varieties_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.varieties",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "varieties_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.varieties",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.account",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "account_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "provider_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "access_token",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "refresh_token",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "id_token",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "access_token_expires_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        },
+        {
+          "name": "refresh_token_expires_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "password",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "account_pkey",
+          "def": "CREATE UNIQUE INDEX account_pkey ON public.account USING btree (id)",
+          "table": "public.account",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "account_userId_idx",
+          "def": "CREATE INDEX \"account_userId_idx\" ON public.account USING btree (user_id)",
+          "table": "public.account",
+          "columns": [
+            "user_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "account_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.account",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "account_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.account",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.session",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp without time zone",
+          "nullable": false
+        },
+        {
+          "name": "token",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": false
+        },
+        {
+          "name": "ip_address",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "user_agent",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "session_pkey",
+          "def": "CREATE UNIQUE INDEX session_pkey ON public.session USING btree (id)",
+          "table": "public.session",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "session_token_key",
+          "def": "CREATE UNIQUE INDEX session_token_key ON public.session USING btree (token)",
+          "table": "public.session",
+          "columns": [
+            "token"
+          ]
+        },
+        {
+          "name": "session_userId_idx",
+          "def": "CREATE INDEX \"session_userId_idx\" ON public.session USING btree (user_id)",
+          "table": "public.session",
+          "columns": [
+            "user_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "session_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.session",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "session_token_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (token)",
+          "table": "public.session",
+          "referenced_table": "",
+          "columns": [
+            "token"
+          ]
+        },
+        {
+          "name": "session_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.session",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.user",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "email_verified",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false"
+        },
+        {
+          "name": "image",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "user_pkey",
+          "def": "CREATE UNIQUE INDEX user_pkey ON public.\"user\" USING btree (id)",
+          "table": "public.user",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "user_email_key",
+          "def": "CREATE UNIQUE INDEX user_email_key ON public.\"user\" USING btree (email)",
+          "table": "public.user",
+          "columns": [
+            "email"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "user_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.user",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "user_email_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (email)",
+          "table": "public.user",
+          "referenced_table": "",
+          "columns": [
+            "email"
+          ]
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "table": "public.coffee_processes",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.coffees",
+      "columns": [
+        "process_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.coffee_processes",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (process_id) REFERENCES coffee_processes(id)"
+    },
+    {
+      "table": "public.coffees",
+      "columns": [
+        "country_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.countries",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (country_id) REFERENCES countries(id)"
+    },
+    {
+      "table": "public.coffees",
+      "columns": [
+        "dialed_in_shot_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.espresso_shots",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (dialed_in_shot_id) REFERENCES espresso_shots(id) ON DELETE SET NULL"
+    },
+    {
+      "table": "public.coffees",
+      "columns": [
+        "region_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.regions",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (region_id) REFERENCES regions(id)"
+    },
+    {
+      "table": "public.coffees",
+      "columns": [
+        "roast_level_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.roast_levels",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (roast_level_id) REFERENCES roast_levels(id)"
+    },
+    {
+      "table": "public.coffees",
+      "columns": [
+        "roaster_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.roasters",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (roaster_id) REFERENCES roasters(id)"
+    },
+    {
+      "table": "public.coffees",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.coffees_varieties",
+      "columns": [
+        "coffee_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.coffees",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (coffee_id) REFERENCES coffees(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.coffees_varieties",
+      "columns": [
+        "variety_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.varieties",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (variety_id) REFERENCES varieties(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.countries",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.espresso_shots",
+      "columns": [
+        "coffee_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.coffees",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (coffee_id) REFERENCES coffees(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.espresso_shots",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.farms",
+      "columns": [
+        "region_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.regions",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (region_id) REFERENCES regions(id)"
+    },
+    {
+      "table": "public.farms",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.green_coffees",
+      "columns": [
+        "process_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.coffee_processes",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (process_id) REFERENCES coffee_processes(id)"
+    },
+    {
+      "table": "public.green_coffees",
+      "columns": [
+        "country_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.countries",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (country_id) REFERENCES countries(id)"
+    },
+    {
+      "table": "public.green_coffees",
+      "columns": [
+        "farm_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.farms",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (farm_id) REFERENCES farms(id)"
+    },
+    {
+      "table": "public.green_coffees",
+      "columns": [
+        "region_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.regions",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (region_id) REFERENCES regions(id)"
+    },
+    {
+      "table": "public.green_coffees",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.green_coffees_varieties",
+      "columns": [
+        "green_coffee_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.green_coffees",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (green_coffee_id) REFERENCES green_coffees(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.green_coffees_varieties",
+      "columns": [
+        "variety_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.varieties",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (variety_id) REFERENCES varieties(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.regions",
+      "columns": [
+        "country_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.countries",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (country_id) REFERENCES countries(id)"
+    },
+    {
+      "table": "public.regions",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.roast_levels",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.roasters",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.varieties",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.account",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.session",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    }
+  ],
+  "driver": {
+    "name": "postgres",
+    "database_version": "PostgreSQL 17.7 (Debian 17.7-3.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "meta": {
+      "current_schema": "public",
+      "search_paths": [
+        "postgres",
+        "public"
+      ],
+      "dict": {
+        "Functions": "Stored procedures and functions"
+      }
+    }
+  }
+}

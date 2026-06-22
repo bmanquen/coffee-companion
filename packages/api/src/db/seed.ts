@@ -13,6 +13,7 @@ import {
   coffees,
   coffeesVarieties,
   espressoShots,
+  grinders,
   user,
 } from './schema'
 
@@ -52,6 +53,12 @@ const roastersData = [
   { name: 'Intelligentsia' },
   { name: 'Counter Culture' },
   { name: 'Heart Coffee Roasters' },
+]
+
+const grindersData = [
+  { name: 'Niche Zero', brand: 'Niche' },
+  { name: 'DF64', brand: 'Turin' },
+  { name: 'Mignon Specialita', brand: 'Eureka' },
 ]
 
 const roastLevelsData = [
@@ -328,6 +335,7 @@ async function seed() {
   // are upserted, so they are left in place.
   await db.delete(coffees).where(eq(coffees.userId, SEED_USER_ID))
   await db.delete(greenCoffees).where(eq(greenCoffees.userId, SEED_USER_ID))
+  await db.delete(grinders).where(eq(grinders.userId, SEED_USER_ID))
 
   // Lookup maps are built from a full table read (not insert().returning(),
   // which only returns newly inserted rows) so foreign keys resolve whether or
@@ -383,6 +391,17 @@ async function seed() {
     (await db.select().from(roastLevels)).map((r) => [r.name, r.id]),
   )
 
+  // Grinders are user-owned and were cleared above, so insert fresh.
+  await db
+    .insert(grinders)
+    .values(grindersData.map((g) => ({ ...g, userId: SEED_USER_ID })))
+  const grinderMap = new Map(
+    (
+      await db.select().from(grinders).where(eq(grinders.userId, SEED_USER_ID))
+    ).map((g) => [g.name, g.id]),
+  )
+  const grinderIds = grindersData.map((g) => grinderMap.get(g.name)!)
+
   for (const coffee of greenCoffeesData) {
     const {
       varieties: coffeeVarieties,
@@ -416,7 +435,7 @@ async function seed() {
     }
   }
 
-  for (const coffee of coffeesData) {
+  for (const [coffeeIndex, coffee] of coffeesData.entries()) {
     const {
       varieties: coffeeVarieties,
       shots,
@@ -428,6 +447,8 @@ async function seed() {
       region,
       ...coffeeData
     } = coffee
+
+    const grinderId = grinderIds[coffeeIndex % grinderIds.length]
 
     const [insertedCoffee] = await db
       .insert(coffees)
@@ -452,6 +473,7 @@ async function seed() {
           ...shot,
           userId: SEED_USER_ID,
           coffeeId: insertedCoffee.id,
+          grinderId,
         })),
       )
       .returning()

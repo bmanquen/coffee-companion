@@ -43,6 +43,9 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
               <Link className="hover:bg-primary p-2 rounded-sm" to="/espresso">
                 Espresso
               </Link>
+              <Link className="hover:bg-primary p-2 rounded-sm" to="/equipment">
+                Equipment
+              </Link>
             </>
           )}
           {session ? (

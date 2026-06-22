@@ -12,11 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedEspressoIndexRouteImport } from './routes/_authenticated/espresso/index'
+import { Route as AuthenticatedEquipmentIndexRouteImport } from './routes/_authenticated/equipment/index'
 import { Route as AuthenticatedCoffeesIndexRouteImport } from './routes/_authenticated/coffees/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthenticatedEspressoNewRouteImport } from './routes/_authenticated/espresso/new'
 import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
+import { Route as AuthenticatedEquipmentGrindersNewRouteImport } from './routes/_authenticated/equipment/grinders/new'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -31,6 +33,12 @@ const AuthenticatedEspressoIndexRoute =
   AuthenticatedEspressoIndexRouteImport.update({
     id: '/espresso/',
     path: '/espresso/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedEquipmentIndexRoute =
+  AuthenticatedEquipmentIndexRouteImport.update({
+    id: '/equipment/',
+    path: '/equipment/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedCoffeesIndexRoute =
@@ -60,6 +68,12 @@ const AuthenticatedCoffeesNewRoute = AuthenticatedCoffeesNewRouteImport.update({
   path: '/coffees/new',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedEquipmentGrindersNewRoute =
+  AuthenticatedEquipmentGrindersNewRouteImport.update({
+    id: '/equipment/grinders/new',
+    path: '/equipment/grinders/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -68,7 +82,9 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/coffees/': typeof AuthenticatedCoffeesIndexRoute
+  '/equipment/': typeof AuthenticatedEquipmentIndexRoute
   '/espresso/': typeof AuthenticatedEspressoIndexRoute
+  '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -77,7 +93,9 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/coffees': typeof AuthenticatedCoffeesIndexRoute
+  '/equipment': typeof AuthenticatedEquipmentIndexRoute
   '/espresso': typeof AuthenticatedEspressoIndexRoute
+  '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -88,7 +106,9 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/_authenticated/coffees/': typeof AuthenticatedCoffeesIndexRoute
+  '/_authenticated/equipment/': typeof AuthenticatedEquipmentIndexRoute
   '/_authenticated/espresso/': typeof AuthenticatedEspressoIndexRoute
+  '/_authenticated/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -99,7 +119,9 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/coffees/'
+    | '/equipment/'
     | '/espresso/'
+    | '/equipment/grinders/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -108,7 +130,9 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/coffees'
+    | '/equipment'
     | '/espresso'
+    | '/equipment/grinders/new'
   id:
     | '__root__'
     | '/'
@@ -118,7 +142,9 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/_authenticated/coffees/'
+    | '/_authenticated/equipment/'
     | '/_authenticated/espresso/'
+    | '/_authenticated/equipment/grinders/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -149,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/espresso'
       fullPath: '/espresso/'
       preLoaderRoute: typeof AuthenticatedEspressoIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/equipment/': {
+      id: '/_authenticated/equipment/'
+      path: '/equipment'
+      fullPath: '/equipment/'
+      preLoaderRoute: typeof AuthenticatedEquipmentIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/coffees/': {
@@ -186,6 +219,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCoffeesNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/equipment/grinders/new': {
+      id: '/_authenticated/equipment/grinders/new'
+      path: '/equipment/grinders/new'
+      fullPath: '/equipment/grinders/new'
+      preLoaderRoute: typeof AuthenticatedEquipmentGrindersNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -193,14 +233,19 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCoffeesNewRoute: typeof AuthenticatedCoffeesNewRoute
   AuthenticatedEspressoNewRoute: typeof AuthenticatedEspressoNewRoute
   AuthenticatedCoffeesIndexRoute: typeof AuthenticatedCoffeesIndexRoute
+  AuthenticatedEquipmentIndexRoute: typeof AuthenticatedEquipmentIndexRoute
   AuthenticatedEspressoIndexRoute: typeof AuthenticatedEspressoIndexRoute
+  AuthenticatedEquipmentGrindersNewRoute: typeof AuthenticatedEquipmentGrindersNewRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCoffeesNewRoute: AuthenticatedCoffeesNewRoute,
   AuthenticatedEspressoNewRoute: AuthenticatedEspressoNewRoute,
   AuthenticatedCoffeesIndexRoute: AuthenticatedCoffeesIndexRoute,
+  AuthenticatedEquipmentIndexRoute: AuthenticatedEquipmentIndexRoute,
   AuthenticatedEspressoIndexRoute: AuthenticatedEspressoIndexRoute,
+  AuthenticatedEquipmentGrindersNewRoute:
+    AuthenticatedEquipmentGrindersNewRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

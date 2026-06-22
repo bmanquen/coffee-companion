@@ -7,10 +7,14 @@ import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
+  getExpandedRowModel,
   useReactTable,
+  type Row,
 } from '@tanstack/react-table'
+import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { Card } from './ui/card'
+import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 5
 
@@ -20,7 +24,9 @@ type EspressoShot = {
   yield: string | null
   time: number | null
   grindSetting: string | null
+  notes: string | null
   coffee: { name: string }
+  grinder: { name: string; brand: string }
 }
 
 const columnHelper = createColumnHelper<EspressoShot>()
@@ -43,7 +49,48 @@ const columns = [
     header: 'Grind',
     cell: (info) => info.getValue() ?? '-',
   }),
+  columnHelper.display({
+    id: 'expander',
+    header: '',
+    cell: ({ row }) => (
+      <ChevronDown
+        className={cn(
+          'h-4 w-4 text-muted-foreground transition-transform',
+          row.getIsExpanded() && 'rotate-180',
+        )}
+      />
+    ),
+  }),
 ]
+
+function ratio(shot: EspressoShot) {
+  if (shot.dose && shot.yield) {
+    return `1:${(Number(shot.yield) / Number(shot.dose)).toFixed(1)}`
+  }
+  return '-'
+}
+
+function ShotDetails({ row }: { row: Row<EspressoShot> }) {
+  const shot = row.original
+  return (
+    <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm py-1">
+      <div>
+        <dt className="inline font-medium">Grinder: </dt>
+        <dd className="inline text-muted-foreground">
+          {shot.grinder.name} ({shot.grinder.brand})
+        </dd>
+      </div>
+      <div>
+        <dt className="inline font-medium">Ratio: </dt>
+        <dd className="inline text-muted-foreground">{ratio(shot)}</dd>
+      </div>
+      <div className="col-span-2">
+        <dt className="inline font-medium">Notes: </dt>
+        <dd className="inline text-muted-foreground">{shot.notes ?? '-'}</dd>
+      </div>
+    </dl>
+  )
+}
 
 export function RecentEspressoShots() {
   const trpc = useTRPC()
@@ -62,6 +109,8 @@ export function RecentEspressoShots() {
     data: data.items,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getRowCanExpand: () => true,
     enableSorting: false,
   })
 
@@ -86,7 +135,10 @@ export function RecentEspressoShots() {
           </p>
         ) : (
           <>
-            <DataTable table={table} />
+            <DataTable
+              table={table}
+              renderSubComponent={(row) => <ShotDetails row={row} />}
+            />
             <PaginationControls
               page={page}
               totalPages={totalPages}
@@ -95,13 +147,6 @@ export function RecentEspressoShots() {
           </>
         )}
       </div>
-      {data.items.length === 0 && (
-        <Link to="/espresso/new">
-          <Button variant="outline" size="sm">
-            Log Shot
-          </Button>
-        </Link>
-      )}
     </Card>
   )
 }

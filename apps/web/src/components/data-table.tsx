@@ -1,4 +1,5 @@
 import {
+  type Row,
   type Table as TanstackTable,
   flexRender,
 } from '@tanstack/react-table'
@@ -12,12 +13,17 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { Fragment, type ReactNode } from 'react'
 
 interface DataTableProps<T> {
   table: TanstackTable<T>
+  // When provided, rows become clickable to toggle an expanded detail row
+  // rendered by this function. Requires the table to enable row expansion
+  // (getExpandedRowModel + getRowCanExpand).
+  renderSubComponent?: (row: Row<T>) => ReactNode
 }
 
-export function DataTable<T>({ table }: DataTableProps<T>) {
+export function DataTable<T>({ table, renderSubComponent }: DataTableProps<T>) {
   // TanStack Table's instance is a stable, mutable object; React Compiler would
   // otherwise memoize getHeaderGroups()/getRowModel() and never re-derive rows
   // when sorting state changes. Opt this component out of the compiler.
@@ -73,13 +79,32 @@ export function DataTable<T>({ table }: DataTableProps<T>) {
           </TableRow>
         ) : (
           table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
-            </TableRow>
+            <Fragment key={row.id}>
+              <TableRow
+                className={cn(renderSubComponent && 'cursor-pointer')}
+                onClick={
+                  renderSubComponent
+                    ? row.getToggleExpandedHandler()
+                    : undefined
+                }
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+              {renderSubComponent && row.getIsExpanded() && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    colSpan={row.getVisibleCells().length}
+                    className="bg-muted/50"
+                  >
+                    {renderSubComponent(row)}
+                  </TableCell>
+                </TableRow>
+              )}
+            </Fragment>
           ))
         )}
       </TableBody>

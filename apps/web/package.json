@@ -10,8 +10,7 @@
     "test": "vitest run",
     "lint": "eslint",
     "format": "prettier",
-    "check": "prettier --write . && eslint --fix",
-    "db:dbml": "tsx scripts/generate-dbml.ts"
+    "check": "prettier --write . && eslint --fix"
   },
   "dependencies": {
     "@coffee-companion/api": "workspace:*",
@@ -39,7 +38,6 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
-    "drizzle-dbml-generator": "^0.10.0",
     "lucide-react": "^0.562.0",
     "nitro": "latest",
     "radix-ui": "^1.4.3",
