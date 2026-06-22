@@ -48,6 +48,7 @@ type Shot = {
   notes: string | null
   coffee: { name: string; dialedInShotId: string | null }
   grinder: { name: string; brand: string }
+  brewingDevice: { name: string; brand: string; type: { name: string } }
 }
 
 const columnHelper = createColumnHelper<Shot>()
@@ -129,6 +130,9 @@ const columns = [
   }),
   columnHelper.accessor('grinder.name', {
     header: 'Grinder',
+  }),
+  columnHelper.accessor('brewingDevice.name', {
+    header: 'Device',
   }),
   columnHelper.accessor('grindSetting', {
     header: 'Grind',

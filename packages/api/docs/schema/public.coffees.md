@@ -90,6 +90,8 @@ erDiagram
   text notes
   timestamp_without_time_zone created_at
   timestamp_without_time_zone updated_at
+  uuid grinder_id FK
+  uuid brewing_device_id FK
 }
 "public.user" {
   text id

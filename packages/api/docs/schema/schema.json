@@ -511,6 +511,16 @@
           "name": "updated_at",
           "type": "timestamp without time zone",
           "nullable": true
+        },
+        {
+          "name": "grinder_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "brewing_device_id",
+          "type": "uuid",
+          "nullable": false
         }
       ],
       "indexes": [
@@ -572,6 +582,32 @@
           "referenced_table": "public.user",
           "columns": [
             "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "espresso_shots_grinder_id_grinders_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (grinder_id) REFERENCES grinders(id) ON DELETE CASCADE",
+          "table": "public.espresso_shots",
+          "referenced_table": "public.grinders",
+          "columns": [
+            "grinder_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "espresso_shots_brewing_device_id_brewing_devices_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (brewing_device_id) REFERENCES brewing_devices(id) ON DELETE CASCADE",
+          "table": "public.espresso_shots",
+          "referenced_table": "public.brewing_devices",
+          "columns": [
+            "brewing_device_id"
           ],
           "referenced_columns": [
             "id"
@@ -1565,6 +1601,280 @@
           ]
         }
       ]
+    },
+    {
+      "name": "public.grinders",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "brand",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "grinders_pkey",
+          "def": "CREATE UNIQUE INDEX grinders_pkey ON public.grinders USING btree (id)",
+          "table": "public.grinders",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "grinders_user_id_index",
+          "def": "CREATE INDEX grinders_user_id_index ON public.grinders USING btree (user_id)",
+          "table": "public.grinders",
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "name": "grinders_name_user_id_index",
+          "def": "CREATE UNIQUE INDEX grinders_name_user_id_index ON public.grinders USING btree (name, user_id)",
+          "table": "public.grinders",
+          "columns": [
+            "name",
+            "user_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "grinders_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.grinders",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "grinders_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.grinders",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.brewing_device_types",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "brewing_device_types_pkey",
+          "def": "CREATE UNIQUE INDEX brewing_device_types_pkey ON public.brewing_device_types USING btree (id)",
+          "table": "public.brewing_device_types",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "brewing_device_types_name_idx",
+          "def": "CREATE UNIQUE INDEX brewing_device_types_name_idx ON public.brewing_device_types USING btree (name)",
+          "table": "public.brewing_device_types",
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "brewing_device_types_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.brewing_device_types",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "brewing_device_types_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.brewing_device_types",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.brewing_devices",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        {
+          "name": "user_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "brand",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "type_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "brewing_devices_pkey",
+          "def": "CREATE UNIQUE INDEX brewing_devices_pkey ON public.brewing_devices USING btree (id)",
+          "table": "public.brewing_devices",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "brewing_devices_user_id_index",
+          "def": "CREATE INDEX brewing_devices_user_id_index ON public.brewing_devices USING btree (user_id)",
+          "table": "public.brewing_devices",
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "name": "brewing_devices_name_user_id_index",
+          "def": "CREATE UNIQUE INDEX brewing_devices_name_user_id_index ON public.brewing_devices USING btree (name, user_id)",
+          "table": "public.brewing_devices",
+          "columns": [
+            "name",
+            "user_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "brewing_devices_user_id_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE",
+          "table": "public.brewing_devices",
+          "referenced_table": "public.user",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "brewing_devices_type_id_brewing_device_types_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (type_id) REFERENCES brewing_device_types(id)",
+          "table": "public.brewing_devices",
+          "referenced_table": "public.brewing_device_types",
+          "columns": [
+            "type_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "brewing_devices_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.brewing_devices",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
     }
   ],
   "relations": [
@@ -1736,6 +2046,32 @@
       ],
       "parent_cardinality": "exactly_one",
       "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.espresso_shots",
+      "columns": [
+        "grinder_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.grinders",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (grinder_id) REFERENCES grinders(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.espresso_shots",
+      "columns": [
+        "brewing_device_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.brewing_devices",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (brewing_device_id) REFERENCES brewing_devices(id) ON DELETE CASCADE"
     },
     {
       "table": "public.farms",
@@ -1944,6 +2280,58 @@
       ],
       "parent_cardinality": "exactly_one",
       "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.grinders",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.brewing_device_types",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.brewing_devices",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.user",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES \"user\"(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.brewing_devices",
+      "columns": [
+        "type_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.brewing_device_types",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (type_id) REFERENCES brewing_device_types(id)"
     }
   ],
   "driver": {

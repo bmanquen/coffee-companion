@@ -14,6 +14,8 @@
 | notes | text |  | true |  |  |  |
 | created_at | timestamp without time zone | now() | false |  |  |  |
 | updated_at | timestamp without time zone |  | true |  |  |  |
+| grinder_id | uuid |  | false |  | [public.grinders](public.grinders.md) |  |
+| brewing_device_id | uuid |  | false |  | [public.brewing_devices](public.brewing_devices.md) |  |
 
 ## Constraints
 
@@ -22,6 +24,8 @@
 | espresso_shots_coffee_id_coffees_id_fkey | FOREIGN KEY | FOREIGN KEY (coffee_id) REFERENCES coffees(id) ON DELETE CASCADE |
 | espresso_shots_pkey | PRIMARY KEY | PRIMARY KEY (id) |
 | espresso_shots_user_id_user_id_fkey | FOREIGN KEY | FOREIGN KEY (user_id) REFERENCES "user"(id) ON DELETE CASCADE |
+| espresso_shots_grinder_id_grinders_id_fkey | FOREIGN KEY | FOREIGN KEY (grinder_id) REFERENCES grinders(id) ON DELETE CASCADE |
+| espresso_shots_brewing_device_id_brewing_devices_id_fkey | FOREIGN KEY | FOREIGN KEY (brewing_device_id) REFERENCES brewing_devices(id) ON DELETE CASCADE |
 
 ## Indexes
 
@@ -39,6 +43,8 @@ erDiagram
 "public.coffees" }o--o| "public.espresso_shots" : "FOREIGN KEY (dialed_in_shot_id) REFERENCES espresso_shots(id) ON DELETE SET NULL"
 "public.espresso_shots" }o--|| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
 "public.espresso_shots" }o--|| "public.coffees" : "FOREIGN KEY (coffee_id) REFERENCES coffees(id) ON DELETE CASCADE"
+"public.espresso_shots" }o--|| "public.grinders" : "FOREIGN KEY (grinder_id) REFERENCES grinders(id) ON DELETE CASCADE"
+"public.espresso_shots" }o--|| "public.brewing_devices" : "FOREIGN KEY (brewing_device_id) REFERENCES brewing_devices(id) ON DELETE CASCADE"
 
 "public.espresso_shots" {
   uuid id
@@ -51,6 +57,8 @@ erDiagram
   text notes
   timestamp_without_time_zone created_at
   timestamp_without_time_zone updated_at
+  uuid grinder_id FK
+  uuid brewing_device_id FK
 }
 "public.coffees" {
   uuid id
@@ -74,6 +82,23 @@ erDiagram
   text email
   boolean email_verified
   text image
+  timestamp_without_time_zone created_at
+  timestamp_without_time_zone updated_at
+}
+"public.grinders" {
+  uuid id
+  text user_id FK
+  text name
+  text brand
+  timestamp_without_time_zone created_at
+  timestamp_without_time_zone updated_at
+}
+"public.brewing_devices" {
+  uuid id
+  text user_id FK
+  text name
+  text brand
+  uuid type_id FK
   timestamp_without_time_zone created_at
   timestamp_without_time_zone updated_at
 }

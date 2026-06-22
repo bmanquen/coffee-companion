@@ -4,7 +4,7 @@
 
 | Name | Type | Default | Nullable | Children | Parents | Comment |
 | ---- | ---- | ------- | -------- | -------- | ------- | ------- |
-| id | text |  | false | [public.coffee_processes](public.coffee_processes.md) [public.coffees](public.coffees.md) [public.countries](public.countries.md) [public.espresso_shots](public.espresso_shots.md) [public.farms](public.farms.md) [public.green_coffees](public.green_coffees.md) [public.regions](public.regions.md) [public.roast_levels](public.roast_levels.md) [public.roasters](public.roasters.md) [public.varieties](public.varieties.md) [public.account](public.account.md) [public.session](public.session.md) |  |  |
+| id | text |  | false | [public.coffee_processes](public.coffee_processes.md) [public.coffees](public.coffees.md) [public.countries](public.countries.md) [public.espresso_shots](public.espresso_shots.md) [public.farms](public.farms.md) [public.green_coffees](public.green_coffees.md) [public.regions](public.regions.md) [public.roast_levels](public.roast_levels.md) [public.roasters](public.roasters.md) [public.varieties](public.varieties.md) [public.account](public.account.md) [public.session](public.session.md) [public.grinders](public.grinders.md) [public.brewing_device_types](public.brewing_device_types.md) [public.brewing_devices](public.brewing_devices.md) |  |  |
 | name | text |  | false |  |  |  |
 | email | text |  | false |  |  |  |
 | email_verified | boolean | false | false |  |  |  |
@@ -43,6 +43,9 @@ erDiagram
 "public.varieties" }o--o| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
 "public.account" }o--|| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
 "public.session" }o--|| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
+"public.grinders" }o--|| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
+"public.brewing_device_types" }o--o| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
+"public.brewing_devices" }o--|| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
 
 "public.user" {
   text id
@@ -94,6 +97,8 @@ erDiagram
   text notes
   timestamp_without_time_zone created_at
   timestamp_without_time_zone updated_at
+  uuid grinder_id FK
+  uuid brewing_device_id FK
 }
 "public.farms" {
   uuid id
@@ -169,6 +174,30 @@ erDiagram
   text ip_address
   text user_agent
   text user_id FK
+}
+"public.grinders" {
+  uuid id
+  text user_id FK
+  text name
+  text brand
+  timestamp_without_time_zone created_at
+  timestamp_without_time_zone updated_at
+}
+"public.brewing_device_types" {
+  uuid id
+  text user_id FK
+  text name
+  timestamp_without_time_zone created_at
+  timestamp_without_time_zone updated_at
+}
+"public.brewing_devices" {
+  uuid id
+  text user_id FK
+  text name
+  text brand
+  uuid type_id FK
+  timestamp_without_time_zone created_at
+  timestamp_without_time_zone updated_at
 }
 ```
 

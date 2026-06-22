@@ -1,6 +1,8 @@
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 import { z } from 'zod'
 import {
+  brewingDevices,
+  brewingDeviceTypes,
   coffeeProcesses,
   coffees,
   countries,
@@ -13,6 +15,10 @@ import {
   roastLevels,
   varieties,
 } from './schema'
+
+// The brewing device type that espresso shots must use. Seeded as a system
+// default (see seed.ts / the brewing_device_types migration).
+export const ESPRESSO_DEVICE_TYPE = 'Espresso'
 
 // Countries
 export const insertCountrySchema = createInsertSchema(countries, {
@@ -93,6 +99,30 @@ export const selectGrinderSchema = createSelectSchema(grinders)
 export type InsertGrinder = z.infer<typeof insertGrinderSchema>
 export type Grinder = z.infer<typeof selectGrinderSchema>
 
+// Brewing Device Types
+export const insertBrewingDeviceTypeSchema = createInsertSchema(
+  brewingDeviceTypes,
+  {
+    name: (schema) => schema.min(1),
+  },
+)
+export const selectBrewingDeviceTypeSchema =
+  createSelectSchema(brewingDeviceTypes)
+export type InsertBrewingDeviceType = z.infer<
+  typeof insertBrewingDeviceTypeSchema
+>
+export type BrewingDeviceType = z.infer<typeof selectBrewingDeviceTypeSchema>
+
+// Brewing Devices
+export const insertBrewingDeviceSchema = createInsertSchema(brewingDevices, {
+  name: (schema) => schema.min(1),
+  brand: (schema) => schema.min(1),
+  typeId: () => z.uuid('Select a type'),
+}).omit({ id: true, userId: true })
+export const selectBrewingDeviceSchema = createSelectSchema(brewingDevices)
+export type InsertBrewingDevice = z.infer<typeof insertBrewingDeviceSchema>
+export type BrewingDevice = z.infer<typeof selectBrewingDeviceSchema>
+
 // Accepts an integer or decimal string, e.g. "16", "36.5", "2.5"
 const decimalString = () =>
   z.string().regex(/^\d+(\.\d+)?$/, 'Must be a number').nullish()
@@ -103,6 +133,7 @@ export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
   yield: decimalString,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
+  brewingDeviceId: () => z.uuid('Select a brewing device'),
 }).omit({
   id: true,
   userId: true,

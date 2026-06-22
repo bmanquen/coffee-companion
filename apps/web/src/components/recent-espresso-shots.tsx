@@ -27,6 +27,7 @@ type EspressoShot = {
   notes: string | null
   coffee: { name: string }
   grinder: { name: string; brand: string }
+  brewingDevice: { name: string; brand: string; type: { name: string } }
 }
 
 const columnHelper = createColumnHelper<EspressoShot>()
@@ -78,6 +79,12 @@ function ShotDetails({ row }: { row: Row<EspressoShot> }) {
         <dt className="inline font-medium">Grinder: </dt>
         <dd className="inline text-muted-foreground">
           {shot.grinder.name} ({shot.grinder.brand})
+        </dd>
+      </div>
+      <div>
+        <dt className="inline font-medium">Device: </dt>
+        <dd className="inline text-muted-foreground">
+          {shot.brewingDevice.name} ({shot.brewingDevice.brand})
         </dd>
       </div>
       <div>

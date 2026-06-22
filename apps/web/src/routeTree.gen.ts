@@ -19,6 +19,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthenticatedEspressoNewRouteImport } from './routes/_authenticated/espresso/new'
 import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
 import { Route as AuthenticatedEquipmentGrindersNewRouteImport } from './routes/_authenticated/equipment/grinders/new'
+import { Route as AuthenticatedEquipmentBrewingDevicesNewRouteImport } from './routes/_authenticated/equipment/brewing-devices/new'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -74,6 +75,12 @@ const AuthenticatedEquipmentGrindersNewRoute =
     path: '/equipment/grinders/new',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedEquipmentBrewingDevicesNewRoute =
+  AuthenticatedEquipmentBrewingDevicesNewRouteImport.update({
+    id: '/equipment/brewing-devices/new',
+    path: '/equipment/brewing-devices/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -84,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/coffees/': typeof AuthenticatedCoffeesIndexRoute
   '/equipment/': typeof AuthenticatedEquipmentIndexRoute
   '/espresso/': typeof AuthenticatedEspressoIndexRoute
+  '/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
 }
 export interface FileRoutesByTo {
@@ -95,6 +103,7 @@ export interface FileRoutesByTo {
   '/coffees': typeof AuthenticatedCoffeesIndexRoute
   '/equipment': typeof AuthenticatedEquipmentIndexRoute
   '/espresso': typeof AuthenticatedEspressoIndexRoute
+  '/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
 }
 export interface FileRoutesById {
@@ -108,6 +117,7 @@ export interface FileRoutesById {
   '/_authenticated/coffees/': typeof AuthenticatedCoffeesIndexRoute
   '/_authenticated/equipment/': typeof AuthenticatedEquipmentIndexRoute
   '/_authenticated/espresso/': typeof AuthenticatedEspressoIndexRoute
+  '/_authenticated/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/_authenticated/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
 }
 export interface FileRouteTypes {
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | '/coffees/'
     | '/equipment/'
     | '/espresso/'
+    | '/equipment/brewing-devices/new'
     | '/equipment/grinders/new'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -132,6 +143,7 @@ export interface FileRouteTypes {
     | '/coffees'
     | '/equipment'
     | '/espresso'
+    | '/equipment/brewing-devices/new'
     | '/equipment/grinders/new'
   id:
     | '__root__'
@@ -144,6 +156,7 @@ export interface FileRouteTypes {
     | '/_authenticated/coffees/'
     | '/_authenticated/equipment/'
     | '/_authenticated/espresso/'
+    | '/_authenticated/equipment/brewing-devices/new'
     | '/_authenticated/equipment/grinders/new'
   fileRoutesById: FileRoutesById
 }
@@ -226,6 +239,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEquipmentGrindersNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/equipment/brewing-devices/new': {
+      id: '/_authenticated/equipment/brewing-devices/new'
+      path: '/equipment/brewing-devices/new'
+      fullPath: '/equipment/brewing-devices/new'
+      preLoaderRoute: typeof AuthenticatedEquipmentBrewingDevicesNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -235,6 +255,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCoffeesIndexRoute: typeof AuthenticatedCoffeesIndexRoute
   AuthenticatedEquipmentIndexRoute: typeof AuthenticatedEquipmentIndexRoute
   AuthenticatedEspressoIndexRoute: typeof AuthenticatedEspressoIndexRoute
+  AuthenticatedEquipmentBrewingDevicesNewRoute: typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   AuthenticatedEquipmentGrindersNewRoute: typeof AuthenticatedEquipmentGrindersNewRoute
 }
 
@@ -244,6 +265,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCoffeesIndexRoute: AuthenticatedCoffeesIndexRoute,
   AuthenticatedEquipmentIndexRoute: AuthenticatedEquipmentIndexRoute,
   AuthenticatedEspressoIndexRoute: AuthenticatedEspressoIndexRoute,
+  AuthenticatedEquipmentBrewingDevicesNewRoute:
+    AuthenticatedEquipmentBrewingDevicesNewRoute,
   AuthenticatedEquipmentGrindersNewRoute:
     AuthenticatedEquipmentGrindersNewRoute,
 }

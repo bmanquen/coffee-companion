@@ -1,7 +1,8 @@
 import { count, eq } from 'drizzle-orm'
+import { TRPCError } from '@trpc/server'
 import { db } from '../db'
 import { espressoShots } from '../db/schema'
-import { insertEspressoShotSchema } from '../db/zod'
+import { ESPRESSO_DEVICE_TYPE, insertEspressoShotSchema } from '../db/zod'
 import z from 'zod'
 import { authedProcedure, createTRPCRouter } from './init'
 
@@ -10,7 +11,7 @@ export const espressoShotRouter = createTRPCRouter({
     return db.query.espressoShots.findMany({
       where: { userId: ctx.session.user.id },
       orderBy: { createdAt: 'desc' },
-      with: { coffee: true, grinder: true },
+      with: { coffee: true, grinder: true, brewingDevice: { with: { type: true } } },
     })
   }),
 
@@ -21,7 +22,7 @@ export const espressoShotRouter = createTRPCRouter({
         db.query.espressoShots.findMany({
           where: { userId: ctx.session.user.id },
           orderBy: { createdAt: 'desc' },
-          with: { coffee: true, grinder: true },
+          with: { coffee: true, grinder: true, brewingDevice: { with: { type: true } } },
           limit: input.limit,
           offset: input.offset,
         }),
@@ -33,6 +34,24 @@ export const espressoShotRouter = createTRPCRouter({
   create: authedProcedure
     .input(insertEspressoShotSchema)
     .mutation(async ({ ctx, input }) => {
+      // Espresso shots must be brewed on an Espresso-type device.
+      const device = await db.query.brewingDevices.findFirst({
+        where: { id: input.brewingDeviceId, userId: ctx.session.user.id },
+        with: { type: true },
+      })
+      if (!device) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Brewing device not found',
+        })
+      }
+      if (device.type.name !== ESPRESSO_DEVICE_TYPE) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Espresso shots require an ${ESPRESSO_DEVICE_TYPE} brewing device`,
+        })
+      }
+
       const [shot] = await db
         .insert(espressoShots)
         .values({ ...input, userId: ctx.session.user.id })

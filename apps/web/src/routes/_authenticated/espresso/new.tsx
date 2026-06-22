@@ -5,6 +5,7 @@ import { useAppForm } from '@/hooks/form'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import {
+  ESPRESSO_DEVICE_TYPE,
   insertEspressoShotSchema,
   type InsertEspressoShot,
 } from '@coffee-companion/api/db/zod'
@@ -24,6 +25,9 @@ export const Route = createFileRoute('/_authenticated/espresso/new')({
     await context.queryClient.ensureQueryData(
       context.trpc.grinder.list.queryOptions(),
     )
+    await context.queryClient.ensureQueryData(
+      context.trpc.brewingDevice.list.queryOptions(),
+    )
   },
   component: NewEspressoShot,
 })
@@ -39,6 +43,16 @@ function NewEspressoShot() {
   const { data: grinders } = useSuspenseQuery(trpc.grinder.list.queryOptions())
   const grinder = useSearchSelectResource(grinders)
 
+  // Espresso shots must be brewed on an Espresso-type device (enforced again
+  // server-side in espressoShot.create).
+  const { data: brewingDevices } = useSuspenseQuery(
+    trpc.brewingDevice.list.queryOptions(),
+  )
+  const espressoDevices = brewingDevices.filter(
+    (device) => device.type.name === ESPRESSO_DEVICE_TYPE,
+  )
+  const brewingDevice = useSearchSelectResource(espressoDevices)
+
   const createShot = useMutation(
     trpc.espressoShot.create.mutationOptions({
       onSuccess: () => {
@@ -51,6 +65,7 @@ function NewEspressoShot() {
   const defaultShot: InsertEspressoShot = {
     coffeeId: '',
     grinderId: '',
+    brewingDeviceId: '',
     dose: null,
     yield: null,
     time: null,
@@ -83,6 +98,11 @@ function NewEspressoShot() {
         </form.AppField>
         <form.AppField name="grinderId">
           {(field) => <field.SearchSelect label="Grinder" {...grinder} />}
+        </form.AppField>
+        <form.AppField name="brewingDeviceId">
+          {(field) => (
+            <field.SearchSelect label="Brewing Device" {...brewingDevice} />
+          )}
         </form.AppField>
         <form.AppField name="dose">
           {(field) => (

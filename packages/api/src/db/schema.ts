@@ -215,6 +215,37 @@ export const grinders = pgTable(
   ],
 )
 
+export const brewingDeviceTypes = pgTable(
+  'brewing_device_types',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('brewing_device_types_name_idx').on(table.name)],
+)
+
+export const brewingDevices = pgTable(
+  'brewing_devices',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .references(() => user.id, { onDelete: 'cascade' })
+      .notNull(),
+    name: text().notNull(),
+    brand: text().notNull(),
+    typeId: uuid('type_id')
+      .references(() => brewingDeviceTypes.id)
+      .notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index().on(table.userId),
+    uniqueIndex().on(table.name, table.userId),
+  ],
+)
+
 export const espressoShots = pgTable(
   'espresso_shots',
   {
@@ -227,6 +258,9 @@ export const espressoShots = pgTable(
       .notNull(),
     grinderId: uuid('grinder_id')
       .references(() => grinders.id, { onDelete: 'cascade' })
+      .notNull(),
+    brewingDeviceId: uuid('brewing_device_id')
+      .references(() => brewingDevices.id, { onDelete: 'cascade' })
       .notNull(),
     dose: numeric(),
     yield: numeric(),
@@ -244,7 +278,7 @@ export const espressoShots = pgTable(
 // Relations
 
 export const relations = defineRelations(
-  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, espressoShots },
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots },
   (r) => ({
     user: {
       sessions: r.many.session(),
@@ -259,6 +293,8 @@ export const relations = defineRelations(
       coffeeProcesses: r.many.coffeeProcesses(),
       varieties: r.many.varieties(),
       grinders: r.many.grinders(),
+      brewingDeviceTypes: r.many.brewingDeviceTypes(),
+      brewingDevices: r.many.brewingDevices(),
       espressoShots: r.many.espressoShots(),
     },
     countries: {
@@ -328,10 +364,20 @@ export const relations = defineRelations(
       user: r.one.user({ from: r.grinders.userId, to: r.user.id, optional: false }),
       espressoShots: r.many.espressoShots(),
     },
+    brewingDeviceTypes: {
+      user: r.one.user({ from: r.brewingDeviceTypes.userId, to: r.user.id }),
+      brewingDevices: r.many.brewingDevices(),
+    },
+    brewingDevices: {
+      user: r.one.user({ from: r.brewingDevices.userId, to: r.user.id, optional: false }),
+      type: r.one.brewingDeviceTypes({ from: r.brewingDevices.typeId, to: r.brewingDeviceTypes.id, optional: false }),
+      espressoShots: r.many.espressoShots(),
+    },
     espressoShots: {
       user: r.one.user({ from: r.espressoShots.userId, to: r.user.id, optional: false }),
       coffee: r.one.coffees({ from: r.espressoShots.coffeeId, to: r.coffees.id, optional: false }),
       grinder: r.one.grinders({ from: r.espressoShots.grinderId, to: r.grinders.id, optional: false }),
+      brewingDevice: r.one.brewingDevices({ from: r.espressoShots.brewingDeviceId, to: r.brewingDevices.id, optional: false }),
     },
     session: {
       user: r.one.user({ from: r.session.userId, to: r.user.id }),

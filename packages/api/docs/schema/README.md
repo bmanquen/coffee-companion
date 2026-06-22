@@ -8,7 +8,7 @@
 | [public.coffees](public.coffees.md) | 14 |  | BASE TABLE |
 | [public.coffees_varieties](public.coffees_varieties.md) | 4 |  | BASE TABLE |
 | [public.countries](public.countries.md) | 5 |  | BASE TABLE |
-| [public.espresso_shots](public.espresso_shots.md) | 10 |  | BASE TABLE |
+| [public.espresso_shots](public.espresso_shots.md) | 12 |  | BASE TABLE |
 | [public.farms](public.farms.md) | 6 |  | BASE TABLE |
 | [public.green_coffees](public.green_coffees.md) | 11 |  | BASE TABLE |
 | [public.green_coffees_varieties](public.green_coffees_varieties.md) | 4 |  | BASE TABLE |
@@ -19,6 +19,9 @@
 | [public.account](public.account.md) | 13 |  | BASE TABLE |
 | [public.session](public.session.md) | 8 |  | BASE TABLE |
 | [public.user](public.user.md) | 7 |  | BASE TABLE |
+| [public.grinders](public.grinders.md) | 6 |  | BASE TABLE |
+| [public.brewing_device_types](public.brewing_device_types.md) | 5 |  | BASE TABLE |
+| [public.brewing_devices](public.brewing_devices.md) | 7 |  | BASE TABLE |
 
 ## Relations
 
@@ -38,6 +41,8 @@ erDiagram
 "public.countries" }o--o| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
 "public.espresso_shots" }o--|| "public.coffees" : "FOREIGN KEY (coffee_id) REFERENCES coffees(id) ON DELETE CASCADE"
 "public.espresso_shots" }o--|| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
+"public.espresso_shots" }o--|| "public.grinders" : "FOREIGN KEY (grinder_id) REFERENCES grinders(id) ON DELETE CASCADE"
+"public.espresso_shots" }o--|| "public.brewing_devices" : "FOREIGN KEY (brewing_device_id) REFERENCES brewing_devices(id) ON DELETE CASCADE"
 "public.farms" }o--o| "public.regions" : "FOREIGN KEY (region_id) REFERENCES regions(id)"
 "public.farms" }o--o| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
 "public.green_coffees" }o--o| "public.coffee_processes" : "FOREIGN KEY (process_id) REFERENCES coffee_processes(id)"
@@ -54,6 +59,10 @@ erDiagram
 "public.varieties" }o--o| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
 "public.account" }o--|| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
 "public.session" }o--|| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
+"public.grinders" }o--|| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
+"public.brewing_device_types" }o--o| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
+"public.brewing_devices" }o--|| "public.user" : "FOREIGN KEY (user_id) REFERENCES #quot;user#quot;(id) ON DELETE CASCADE"
+"public.brewing_devices" }o--|| "public.brewing_device_types" : "FOREIGN KEY (type_id) REFERENCES brewing_device_types(id)"
 
 "public.coffee_processes" {
   uuid id
@@ -102,6 +111,8 @@ erDiagram
   text notes
   timestamp_without_time_zone created_at
   timestamp_without_time_zone updated_at
+  uuid grinder_id FK
+  uuid brewing_device_id FK
 }
 "public.farms" {
   uuid id
@@ -190,6 +201,30 @@ erDiagram
   text email
   boolean email_verified
   text image
+  timestamp_without_time_zone created_at
+  timestamp_without_time_zone updated_at
+}
+"public.grinders" {
+  uuid id
+  text user_id FK
+  text name
+  text brand
+  timestamp_without_time_zone created_at
+  timestamp_without_time_zone updated_at
+}
+"public.brewing_device_types" {
+  uuid id
+  text user_id FK
+  text name
+  timestamp_without_time_zone created_at
+  timestamp_without_time_zone updated_at
+}
+"public.brewing_devices" {
+  uuid id
+  text user_id FK
+  text name
+  text brand
+  uuid type_id FK
   timestamp_without_time_zone created_at
   timestamp_without_time_zone updated_at
 }

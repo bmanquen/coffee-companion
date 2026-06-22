@@ -14,6 +14,8 @@ import {
   coffeesVarieties,
   espressoShots,
   grinders,
+  brewingDeviceTypes,
+  brewingDevices,
   user,
 } from './schema'
 
@@ -59,6 +61,24 @@ const grindersData = [
   { name: 'Niche Zero', brand: 'Niche' },
   { name: 'DF64', brand: 'Turin' },
   { name: 'Mignon Specialita', brand: 'Eureka' },
+]
+
+// System-default brewing device types (shared across all users, userId null).
+const brewingDeviceTypesData = [
+  { name: 'Espresso' },
+  { name: 'Pour Over' },
+  { name: 'French Press' },
+  { name: 'AeroPress' },
+  { name: 'Moka Pot' },
+  { name: 'Drip Machine' },
+  { name: 'Cold Brew' },
+  { name: 'Siphon' },
+]
+
+const brewingDevicesData = [
+  { name: 'Linea Mini', brand: 'La Marzocco', type: 'Espresso' },
+  { name: 'Pro 600', brand: 'Profitec', type: 'Espresso' },
+  { name: 'Bianca', brand: 'Lelit', type: 'Espresso' },
 ]
 
 const roastLevelsData = [
@@ -336,6 +356,9 @@ async function seed() {
   await db.delete(coffees).where(eq(coffees.userId, SEED_USER_ID))
   await db.delete(greenCoffees).where(eq(greenCoffees.userId, SEED_USER_ID))
   await db.delete(grinders).where(eq(grinders.userId, SEED_USER_ID))
+  await db
+    .delete(brewingDevices)
+    .where(eq(brewingDevices.userId, SEED_USER_ID))
 
   // Lookup maps are built from a full table read (not insert().returning(),
   // which only returns newly inserted rows) so foreign keys resolve whether or
@@ -402,6 +425,36 @@ async function seed() {
   )
   const grinderIds = grindersData.map((g) => grinderMap.get(g.name)!)
 
+  // Brewing device types are system defaults (userId null), upserted by name.
+  await db
+    .insert(brewingDeviceTypes)
+    .values(brewingDeviceTypesData)
+    .onConflictDoNothing()
+  const brewingDeviceTypeMap = new Map(
+    (await db.select().from(brewingDeviceTypes)).map((t) => [t.name, t.id]),
+  )
+
+  // Brewing devices are user-owned and were cleared above, so insert fresh.
+  await db.insert(brewingDevices).values(
+    brewingDevicesData.map((d) => ({
+      name: d.name,
+      brand: d.brand,
+      userId: SEED_USER_ID,
+      typeId: brewingDeviceTypeMap.get(d.type)!,
+    })),
+  )
+  const brewingDeviceMap = new Map(
+    (
+      await db
+        .select()
+        .from(brewingDevices)
+        .where(eq(brewingDevices.userId, SEED_USER_ID))
+    ).map((d) => [d.name, d.id]),
+  )
+  const brewingDeviceIds = brewingDevicesData.map(
+    (d) => brewingDeviceMap.get(d.name)!,
+  )
+
   for (const coffee of greenCoffeesData) {
     const {
       varieties: coffeeVarieties,
@@ -449,6 +502,8 @@ async function seed() {
     } = coffee
 
     const grinderId = grinderIds[coffeeIndex % grinderIds.length]
+    const brewingDeviceId =
+      brewingDeviceIds[coffeeIndex % brewingDeviceIds.length]
 
     const [insertedCoffee] = await db
       .insert(coffees)
@@ -474,6 +529,7 @@ async function seed() {
           userId: SEED_USER_ID,
           coffeeId: insertedCoffee.id,
           grinderId,
+          brewingDeviceId,
         })),
       )
       .returning()
