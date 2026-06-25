@@ -1,9 +1,15 @@
 import { authClient } from '@/lib/auth-client'
+import { getForwardedHeaders } from '@/lib/request-headers'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async () => {
-    const { data: session } = await authClient.getSession()
+    // Forward the cookie during SSR so the session resolves on direct loads of
+    // authenticated routes (not just via client-side navigation).
+    const headers = await getForwardedHeaders()
+    const { data: session } = await authClient.getSession({
+      fetchOptions: { headers },
+    })
     if (!session) {
       throw redirect({ to: '/' })
     }

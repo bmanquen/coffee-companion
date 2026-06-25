@@ -1,5 +1,5 @@
 {
-  "name": "coffee-companion",
+  "name": "coffee-companion-monorepo",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.32.1",
@@ -7,6 +7,11 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:all": "turbo test test:integration test:e2e",
+    "test:coverage": "turbo test:coverage",
+    "test:integration": "turbo test:integration",
+    "test:e2e": "turbo test:e2e",
     "db:generate": "pnpm --filter @coffee-companion/api exec drizzle-kit generate",
     "db:migrate": "pnpm --filter @coffee-companion/api exec drizzle-kit migrate",
     "db:push": "pnpm --filter @coffee-companion/api exec drizzle-kit push",

@@ -4,6 +4,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --config vitest.integration.config.ts --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -17,8 +20,10 @@
     "./trpc/init": "./src/trpc/init.ts",
     "./db": "./src/db/index.ts",
     "./db/schema": "./src/db/schema.ts",
+    "./db/seed-e2e": "./src/db/seed-e2e.ts",
     "./db/zod": "./src/db/zod.ts",
-    "./lib/auth": "./src/lib/auth.ts"
+    "./lib/auth": "./src/lib/auth.ts",
+    "./lib/e2e-auth": "./src/lib/e2e-auth.ts"
   },
   "dependencies": {
     "@trpc/server": "^11.8.1",
@@ -35,6 +40,8 @@
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "1.0.0-beta.18-7eb39f0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9",
+    "@vitest/coverage-v8": "^4.1.9"
   }
 }

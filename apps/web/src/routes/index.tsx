@@ -1,23 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { createIsomorphicFn } from '@tanstack/react-start'
 import { authClient } from '@/lib/auth-client'
+import { getForwardedHeaders } from '@/lib/request-headers'
 import { Button } from '@/components/ui/button'
 import { H1 } from '@/components/typography/h1'
 import { RecentEspressoShots } from '@/components/recent-espresso-shots'
 import { RecentCoffees } from '@/components/recent-coffees'
 
-const getHeaders = createIsomorphicFn()
-  .client((): Record<string, string> => ({}))
-  .server(async (): Promise<Record<string, string>> => {
-    const { getRequestHeaders } = await import('@tanstack/react-start/server')
-    const headers = getRequestHeaders()
-    const cookie = headers.get('cookie')
-    return cookie ? { cookie } : {}
-  })
-
 export const Route = createFileRoute('/')({
   beforeLoad: async () => {
-    const headers = await getHeaders()
+    const headers = await getForwardedHeaders()
     const { data: session } = await authClient.getSession({
       fetchOptions: { headers },
     })
