@@ -4,8 +4,11 @@ import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import { db } from '../db'
 import * as schema from '../db/auth-schema'
 
+const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'
+
 export const auth = betterAuth({
-  baseURL: 'http://localhost:3000',
+  baseURL,
+  trustedOrigins: [baseURL],
   database: drizzleAdapter(db, { provider: 'pg', schema }),
   socialProviders: {
     google: {
