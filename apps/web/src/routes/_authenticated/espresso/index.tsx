@@ -1,4 +1,5 @@
 import { DataTable } from '@/components/data-table'
+import { brewRatio, formatBrewRatio, isDialedIn } from '@/lib/brew-ratio'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import {
@@ -66,17 +67,17 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
   )
 
   const shot = row.original
-  const isDialedIn = shot.coffee.dialedInShotId === shot.id
+  const dialedIn = isDialedIn(shot)
 
   return (
     <Button
-      variant={isDialedIn ? 'default' : 'ghost'}
+      variant={dialedIn ? 'default' : 'ghost'}
       size="icon"
       className="h-8 w-8"
       onClick={() =>
         setDialedIn.mutate({
           coffeeId: shot.coffeeId,
-          shotId: isDialedIn ? null : shot.id,
+          shotId: dialedIn ? null : shot.id,
         })
       }
     >
@@ -104,23 +105,10 @@ const columns = [
   columnHelper.display({
     id: 'ratio',
     header: 'Ratio',
-    cell: ({ row }) => {
-      const dose = row.original.dose
-      const yld = row.original.yield
-      if (dose && yld) {
-        return `1:${(Number(yld) / Number(dose)).toFixed(1)}`
-      }
-      return '-'
-    },
+    cell: ({ row }) => formatBrewRatio(row.original.dose, row.original.yield),
     sortingFn: (a, b) => {
-      const ratioA =
-        a.original.dose && a.original.yield
-          ? Number(a.original.yield) / Number(a.original.dose)
-          : 0
-      const ratioB =
-        b.original.dose && b.original.yield
-          ? Number(b.original.yield) / Number(b.original.dose)
-          : 0
+      const ratioA = brewRatio(a.original.dose, a.original.yield) ?? 0
+      const ratioB = brewRatio(b.original.dose, b.original.yield) ?? 0
       return ratioA - ratioB
     },
   }),

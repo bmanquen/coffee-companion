@@ -1,5 +1,13 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": [
+    "CI",
+    "DATABASE_URL",
+    "E2E_BASE_URL",
+    "BETTER_AUTH_SECRET",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -11,6 +19,16 @@
     },
     "typecheck": {
       "dependsOn": ["^typecheck"]
+    },
+    "test": {},
+    "test:coverage": {
+      "outputs": ["coverage/**"]
+    },
+    "test:integration": {
+      "cache": false
+    },
+    "test:e2e": {
+      "cache": false
     }
   }
 }

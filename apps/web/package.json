@@ -8,6 +8,8 @@
     "serve": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "vite build && playwright test",
     "lint": "eslint",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix"
@@ -52,11 +54,13 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.0",
     "@tanstack/devtools-vite": "^0.4.1",
     "@tanstack/eslint-config": "^0.3.4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.1",
     "@types/node": "^25.0.3",
+    "@vitest/coverage-v8": "^4.1.9",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
@@ -66,7 +70,7 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
-    "vitest": "^4.0.16",
+    "vitest": "^4.1.9",
     "web-vitals": "^5.1.0"
   }
 }

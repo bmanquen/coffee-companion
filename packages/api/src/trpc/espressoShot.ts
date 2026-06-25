@@ -2,7 +2,11 @@ import { count, eq } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import { db } from '../db'
 import { espressoShots } from '../db/schema'
-import { ESPRESSO_DEVICE_TYPE, insertEspressoShotSchema } from '../db/zod'
+import {
+  ESPRESSO_DEVICE_TYPE,
+  insertEspressoShotSchema,
+  isEspressoDevice,
+} from '../db/zod'
 import z from 'zod'
 import { authedProcedure, createTRPCRouter } from './init'
 
@@ -45,7 +49,7 @@ export const espressoShotRouter = createTRPCRouter({
           message: 'Brewing device not found',
         })
       }
-      if (device.type.name !== ESPRESSO_DEVICE_TYPE) {
+      if (!isEspressoDevice(device)) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: `Espresso shots require an ${ESPRESSO_DEVICE_TYPE} brewing device`,

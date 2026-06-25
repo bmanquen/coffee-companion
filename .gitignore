@@ -12,3 +12,9 @@ count.txt
 .vinxi
 todos.json
 .turbo
+coverage
+test-results
+playwright-report
+blob-report
+playwright/.cache
+.auth

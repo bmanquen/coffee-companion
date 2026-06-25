@@ -1,5 +1,6 @@
 import { DataTable } from '@/components/data-table'
 import { PaginationControls } from '@/components/pagination-controls'
+import { formatBrewRatio } from '@/lib/brew-ratio'
 import { Button } from '@/components/ui/button'
 import { useTRPC } from '@/integrations/trpc/react'
 import { useSuspenseQuery } from '@tanstack/react-query'
@@ -64,13 +65,6 @@ const columns = [
   }),
 ]
 
-function ratio(shot: EspressoShot) {
-  if (shot.dose && shot.yield) {
-    return `1:${(Number(shot.yield) / Number(shot.dose)).toFixed(1)}`
-  }
-  return '-'
-}
-
 function ShotDetails({ row }: { row: Row<EspressoShot> }) {
   const shot = row.original
   return (
@@ -89,7 +83,9 @@ function ShotDetails({ row }: { row: Row<EspressoShot> }) {
       </div>
       <div>
         <dt className="inline font-medium">Ratio: </dt>
-        <dd className="inline text-muted-foreground">{ratio(shot)}</dd>
+        <dd className="inline text-muted-foreground">
+          {formatBrewRatio(shot.dose, shot.yield)}
+        </dd>
       </div>
       <div className="col-span-2">
         <dt className="inline font-medium">Notes: </dt>
