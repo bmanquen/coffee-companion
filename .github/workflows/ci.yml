@@ -5,31 +5,19 @@ on:
     branches: [main]
   pull_request:
 
-# Cancel in-progress runs for the same ref when new commits are pushed.
+# Serialize all runs: they share one test database, so they must not run
+# concurrently (queue instead of cancel, so no run is interrupted mid-write).
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-shared-test-db
+  cancel-in-progress: false
 
 jobs:
   test:
     name: Typecheck & test
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: coffee_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/coffee_test
+      # Hosted test database (Railway). Stored in repo secrets, not inline.
+      DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
       # Placeholders so the app boots; the e2e auth bypass is enabled by
       # E2E_BYPASS_AUTH (set per-server in playwright.config.ts).
       BETTER_AUTH_SECRET: ci-secret-not-for-production

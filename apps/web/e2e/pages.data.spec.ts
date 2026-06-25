@@ -7,7 +7,9 @@ import { expect, test } from '@playwright/test'
 test('espresso page shows the shots table', async ({ page }) => {
   await page.goto('/espresso')
   await expect(page.getByRole('heading', { name: 'Espresso' })).toBeVisible()
-  await expect(page.getByText('Ethiopia Guji')).toBeVisible()
+  // .first(): the create-espresso flow can add another shot for this coffee,
+  // so tolerate more than one row (tests share the seeded user/DB).
+  await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()
 })
 
 test('coffees page lists coffees', async ({ page }) => {
