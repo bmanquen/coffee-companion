@@ -30,7 +30,11 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-64 px-2 shadow-lg">
+      <SheetContent
+        side="left"
+        className="w-64 px-2 shadow-lg"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <nav className="flex flex-col gap-2 mt-10 h-full">
           <Link className="hover:bg-primary p-2 rounded-sm" to="/">
             Home

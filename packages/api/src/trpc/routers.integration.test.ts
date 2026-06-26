@@ -186,6 +186,75 @@ describe('espressoShot.getAll / getRecent', () => {
   })
 })
 
+describe('espressoShot.getDialedIn', () => {
+  it('returns only each coffee’s dialed-in reference shot, with relations', async () => {
+    asUser(USER_A)
+    const coffee = await caller.coffee.create({ name: uniq('Dialed Coffee') })
+    const dialedShot = await caller.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId: grinderAId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+    })
+    // A second, non-dialed shot for the same coffee must be excluded.
+    const otherShot = await caller.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId: grinderAId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '20',
+      yield: '40',
+    })
+    await caller.coffee.setDialedIn({ coffeeId: coffee.id, shotId: dialedShot.id })
+
+    const dialedIn = await caller.espressoShot.getDialedIn()
+
+    const entry = dialedIn.find((s) => s.id === dialedShot.id)
+    expect(entry).toBeTruthy()
+    expect(entry!.coffee.name).toBe(coffee.name)
+    expect(entry!.grinder.name).toBeTruthy()
+    expect(entry!.brewingDevice.type).toBeTruthy()
+
+    expect(dialedIn.some((s) => s.id === otherShot.id)).toBe(false)
+    // Every returned shot is the dialed-in reference for its own coffee.
+    expect(dialedIn.every((s) => s.coffee.dialedInShotId === s.id)).toBe(true)
+  })
+
+  it('returns shots ordered most recent first', async () => {
+    asUser(USER_A)
+    const dialedIn = await caller.espressoShot.getDialedIn()
+    const times = dialedIn.map((s) => new Date(s.createdAt).getTime())
+    const descending = [...times].sort((a, b) => b - a)
+    expect(times).toEqual(descending)
+  })
+
+  it('caps the result to the requested limit', async () => {
+    asUser(USER_A)
+    // Ensure at least two dialed-in coffees exist for this user.
+    for (let i = 0; i < 2; i++) {
+      const c = await caller.coffee.create({ name: uniq('Capped Coffee') })
+      const s = await caller.espressoShot.create({
+        coffeeId: c.id,
+        grinderId: grinderAId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+      })
+      await caller.coffee.setDialedIn({ coffeeId: c.id, shotId: s.id })
+    }
+    const all = await caller.espressoShot.getDialedIn()
+    expect(all.length).toBeGreaterThanOrEqual(2)
+    const limited = await caller.espressoShot.getDialedIn({ limit: 1 })
+    expect(limited.length).toBe(1)
+  })
+
+  it('does not return another user’s dialed-in shots', async () => {
+    asUser(USER_B)
+    const dialedIn = await caller.espressoShot.getDialedIn()
+    expect(dialedIn.every((s) => s.userId === USER_B)).toBe(true)
+  })
+})
+
 describe('coffee.setDialedIn', () => {
   it('sets and clears the dialed-in shot', async () => {
     asUser(USER_A)

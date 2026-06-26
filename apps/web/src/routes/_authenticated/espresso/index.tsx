@@ -1,5 +1,4 @@
 import { DataTable } from '@/components/data-table'
-import { brewRatio, formatBrewRatio, isDialedIn } from '@/lib/brew-ratio'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,11 +11,13 @@ import {
 } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
+import { brewRatio, formatBrewRatio, isDialedIn } from '@/lib/brew-ratio'
 import {
   useMutation,
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -26,7 +27,6 @@ import {
   type CellContext,
   type SortingState,
 } from '@tanstack/react-table'
-import { createFileRoute, Link } from '@tanstack/react-router'
 import { CoffeeIcon, Crosshair, Plus } from 'lucide-react'
 import { useState } from 'react'
 
@@ -185,7 +185,7 @@ function EspressoIndex() {
   }
 
   return (
-    <div className="flex flex-col items-center w-3/4 mx-auto gap-4">
+    <div className="flex flex-col items-center p-4 gap-4">
       <div className="flex justify-between items-center w-full">
         <H1>Espresso</H1>
         <Link to="/espresso/new">

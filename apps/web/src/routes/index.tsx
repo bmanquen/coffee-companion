@@ -3,6 +3,7 @@ import { authClient } from '@/lib/auth-client'
 import { getForwardedHeaders } from '@/lib/request-headers'
 import { Button } from '@/components/ui/button'
 import { H1 } from '@/components/typography/h1'
+import { RecentDialedInShots } from '@/components/recent-dialed-in-shots'
 import { RecentEspressoShots } from '@/components/recent-espresso-shots'
 import { RecentCoffees } from '@/components/recent-coffees'
 
@@ -49,6 +50,7 @@ function Dashboard() {
   return (
     <div className="flex flex-col w-full max-w-4xl mx-auto gap-8 py-6">
       <H1>Dashboard</H1>
+      <RecentDialedInShots />
       <RecentEspressoShots />
       <RecentCoffees />
     </div>

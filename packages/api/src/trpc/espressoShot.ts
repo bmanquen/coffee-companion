@@ -35,6 +35,28 @@ export const espressoShotRouter = createTRPCRouter({
       return { items, total }
     }),
 
+  // Shots that are the dialed-in reference for their coffee, most recent first.
+  // An optional limit caps the result (the dashboard asks for a handful);
+  // omitting it returns every dialed-in shot.
+  getDialedIn: authedProcedure
+    .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const coffeesWithDialedIn = await db.query.coffees.findMany({
+        where: { userId: ctx.session.user.id, dialedInShotId: { isNotNull: true } },
+        with: {
+          dialedInShot: {
+            with: { grinder: true, brewingDevice: { with: { type: true } } },
+          },
+        },
+      })
+      return coffeesWithDialedIn
+        .flatMap(({ dialedInShot, ...coffee }) =>
+          dialedInShot ? [{ ...dialedInShot, coffee }] : [],
+        )
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, input?.limit)
+    }),
+
   create: authedProcedure
     .input(insertEspressoShotSchema)
     .mutation(async ({ ctx, input }) => {

@@ -22,9 +22,8 @@ export const ESPRESSO_DEVICE_TYPE = 'Espresso'
 
 // Whether a brewing device is an Espresso-type device, i.e. valid for pulling
 // espresso shots. Pure helper so it can be unit tested without a database.
-export const isEspressoDevice = (device: {
-  type: { name: string }
-}): boolean => device.type.name === ESPRESSO_DEVICE_TYPE
+export const isEspressoDevice = (device: { type: { name: string } }): boolean =>
+  device.type.name === ESPRESSO_DEVICE_TYPE
 
 // Countries
 export const insertCountrySchema = createInsertSchema(countries, {
@@ -131,7 +130,10 @@ export type BrewingDevice = z.infer<typeof selectBrewingDeviceSchema>
 
 // Accepts an integer or decimal string, e.g. "16", "36.5", "2.5"
 const decimalString = () =>
-  z.string().regex(/^\d+(\.\d+)?$/, 'Must be a number').nullish()
+  z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, 'Must be a number')
+    .nullish()
 
 // Espresso Shots
 export const insertEspressoShotSchema = createInsertSchema(espressoShots, {

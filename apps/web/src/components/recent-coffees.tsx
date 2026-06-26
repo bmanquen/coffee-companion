@@ -85,13 +85,6 @@ export function RecentCoffees() {
           </>
         )}
       </div>
-      {data.items.length === 0 && (
-        <Link to="/coffees/new">
-          <Button variant="outline" size="sm">
-            Add Coffee
-          </Button>
-        </Link>
-      )}
     </Card>
   )
 }
