@@ -2,14 +2,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createTRPCClient, httpBatchStreamLink } from '@trpc/client'
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query'
 import superjson from 'superjson'
-import { Suspense, type ReactNode } from 'react'
-import { TRPCProvider } from '@/integrations/trpc/react'
+import { Suspense } from 'react'
+import type { ReactNode } from 'react'
 import type { TRPCRouter } from '@coffee-companion/api/trpc/router'
+import { TRPCProvider } from '@/integrations/trpc/react'
 
 // A throwaway client; tests pre-seed the query cache so it's never called.
 const trpcClient = createTRPCClient<TRPCRouter>({
   links: [
-    httpBatchStreamLink({ transformer: superjson, url: 'http://localhost/api/trpc' }),
+    httpBatchStreamLink({
+      transformer: superjson,
+      url: 'http://localhost/api/trpc',
+    }),
   ],
 })
 

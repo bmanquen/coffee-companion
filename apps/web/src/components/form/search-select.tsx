@@ -1,3 +1,5 @@
+import { CheckIcon, ChevronDownIcon, PlusIcon } from 'lucide-react'
+import { useRef, useState } from 'react'
 import {
   Command,
   CommandEmpty,
@@ -16,8 +18,6 @@ import {
 } from '@/components/ui/field'
 import { useFieldContext } from '@/hooks/form-context'
 import { cn } from '@/lib/utils'
-import { CheckIcon, ChevronDownIcon, PlusIcon } from 'lucide-react'
-import { useRef, useState } from 'react'
 
 export type SearchSelectOption = {
   value: string
@@ -37,7 +37,7 @@ export function SearchSelect({
   showLabel?: boolean
   description?: string
   placeholder?: string
-  options: SearchSelectOption[]
+  options: Array<SearchSelectOption>
   onAddItem?: (
     value: string,
   ) => SearchSelectOption | Promise<SearchSelectOption>
@@ -98,9 +98,7 @@ export function SearchSelect({
             type="button"
             className={cn(
               'flex h-9 w-full items-center justify-between rounded-md border bg-transparent px-3 py-2 text-sm',
-              disabled
-                ? 'cursor-not-allowed opacity-50'
-                : 'cursor-pointer',
+              disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
               selectedOption ? 'text-foreground' : 'text-muted-foreground',
             )}
             disabled={disabled}
@@ -155,17 +153,20 @@ export function SearchSelect({
                       </CommandItem>
                     ))}
                   </CommandGroup>
-                  {search.trim() && !exactMatch && onAddItem && options.length > 0 && (
-                    <>
-                      <CommandSeparator />
-                      <CommandGroup>
-                        <CommandItem onSelect={handleAdd}>
-                          <PlusIcon className="size-4" />
-                          Add &ldquo;{search.trim()}&rdquo;
-                        </CommandItem>
-                      </CommandGroup>
-                    </>
-                  )}
+                  {search.trim() &&
+                    !exactMatch &&
+                    onAddItem &&
+                    options.length > 0 && (
+                      <>
+                        <CommandSeparator />
+                        <CommandGroup>
+                          <CommandItem onSelect={handleAdd}>
+                            <PlusIcon className="size-4" />
+                            Add &ldquo;{search.trim()}&rdquo;
+                          </CommandItem>
+                        </CommandGroup>
+                      </>
+                    )}
                 </CommandList>
               </Command>
             </div>

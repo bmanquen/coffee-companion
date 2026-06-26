@@ -1,13 +1,4 @@
-import { H1 } from '@/components/typography/h1'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { useAppForm } from '@/hooks/form'
-import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
-import { useTRPC } from '@/integrations/trpc/react'
-import {
-  insertCoffeeSchema,
-  type InsertCoffee,
-} from '@coffee-companion/api/db/zod'
+import { insertCoffeeSchema } from '@coffee-companion/api/db/zod'
 import { useStore } from '@tanstack/react-form'
 import {
   useMutation,
@@ -17,6 +8,13 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
+import type { InsertCoffee } from '@coffee-companion/api/db/zod'
+import { H1 } from '@/components/typography/h1'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { useAppForm } from '@/hooks/form'
+import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
+import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute('/_authenticated/coffees/new')({
   loader: async ({ context }) => {
@@ -150,7 +148,11 @@ function NewCoffeeComponent() {
       >
         <form.AppField name="name">
           {(field) => (
-            <field.TextField showLabel={false} label="Name" placeholder="Name" />
+            <field.TextField
+              showLabel={false}
+              label="Name"
+              placeholder="Name"
+            />
           )}
         </form.AppField>
         <form.AppField name="roasterId">

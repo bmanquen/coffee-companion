@@ -1,3 +1,6 @@
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { Link, createFileRoute } from '@tanstack/react-router'
+import { CoffeeIcon, Plus } from 'lucide-react'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -10,9 +13,6 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { useTRPC } from '@/integrations/trpc/react'
-import { useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute } from '@tanstack/react-router'
-import { CoffeeIcon, Plus } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/coffees/')({
   loader: ({ context }) => {

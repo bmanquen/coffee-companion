@@ -42,8 +42,8 @@ describe('isDialedIn', () => {
     expect(
       isDialedIn({ id: 'shot-1', coffee: { dialedInShotId: 'shot-2' } }),
     ).toBe(false)
-    expect(
-      isDialedIn({ id: 'shot-1', coffee: { dialedInShotId: null } }),
-    ).toBe(false)
+    expect(isDialedIn({ id: 'shot-1', coffee: { dialedInShotId: null } })).toBe(
+      false,
+    )
   })
 })

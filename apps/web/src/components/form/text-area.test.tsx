@@ -33,9 +33,8 @@ describe('TextArea', () => {
 
   it('updates the field value on change', async () => {
     render(<Harness />)
-    const textarea = screen.getByPlaceholderText(
-      'Tasting notes',
-    ) as HTMLTextAreaElement
+    const textarea =
+      screen.getByPlaceholderText<HTMLTextAreaElement>('Tasting notes')
     await act(async () => {
       fireEvent.change(textarea, { target: { value: 'Floral and bright' } })
     })

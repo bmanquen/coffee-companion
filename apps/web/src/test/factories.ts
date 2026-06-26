@@ -9,7 +9,9 @@ type RecentCoffee = RouterOutputs['coffee']['getRecent']['items'][number]
 
 const epoch = new Date(0)
 
-export function makeRecentShot(overrides: Partial<RecentShot> = {}): RecentShot {
+export function makeRecentShot(
+  overrides: Partial<RecentShot> = {},
+): RecentShot {
   return {
     id: 's1',
     userId: 'u1',

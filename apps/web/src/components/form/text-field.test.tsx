@@ -37,7 +37,7 @@ describe('TextField', () => {
 
   it('updates the field value on change', async () => {
     render(<Harness />)
-    const input = screen.getByPlaceholderText('Enter name') as HTMLInputElement
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Enter name')
     await act(async () => {
       fireEvent.change(input, { target: { value: 'Ethiopia' } })
     })

@@ -1,11 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { RecentCoffees } from './recent-coffees'
+import type * as ReactRouter from '@tanstack/react-router'
 import { createTestProviders } from '@/test/providers'
 import { makeRecentCoffee } from '@/test/factories'
-import { RecentCoffees } from './recent-coffees'
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@tanstack/react-router')>()
+  const actual = await importOriginal<typeof ReactRouter>()
   return {
     ...actual,
     Link: ({

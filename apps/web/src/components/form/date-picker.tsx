@@ -1,3 +1,5 @@
+import { format } from 'date-fns'
+import { CalendarIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Field, FieldContent, FieldLabel } from '@/components/ui/field'
@@ -7,8 +9,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { useFieldContext } from '@/hooks/form-context'
-import { format } from 'date-fns'
-import { CalendarIcon } from 'lucide-react'
 
 type DatePickerProps = {
   label: string
@@ -16,7 +16,7 @@ type DatePickerProps = {
 }
 
 export function DatePicker({ label, showLabel = true }: DatePickerProps) {
-  const field = useFieldContext<Date>()
+  const field = useFieldContext<Date | undefined>()
 
   return (
     <Field>

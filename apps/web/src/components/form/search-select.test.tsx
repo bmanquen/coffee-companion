@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
 import { useAppForm } from '@/hooks/form'
 
 // Mock the cmdk command primitives with plain elements so we can unit-test
@@ -9,8 +9,12 @@ import { useAppForm } from '@/hooks/form'
 vi.mock('@/components/ui/command', () => ({
   Command: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   CommandList: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  CommandGroup: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  CommandEmpty: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  CommandGroup: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CommandEmpty: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
   CommandSeparator: () => <hr />,
   CommandInput: ({
     value,

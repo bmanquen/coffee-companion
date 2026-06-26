@@ -19,9 +19,7 @@ function getUrl() {
 const getHeaders = createIsomorphicFn()
   .client(() => ({}))
   .server(async () => {
-    const { getRequestHeaders } = await import(
-      '@tanstack/react-start/server'
-    )
+    const { getRequestHeaders } = await import('@tanstack/react-start/server')
     const headers = getRequestHeaders()
     const cookie = headers.get('cookie')
     return cookie ? { cookie } : {}

@@ -1,4 +1,3 @@
-import { useFieldContext } from '@/hooks/form-context'
 import {
   Field,
   FieldContent,
@@ -7,6 +6,7 @@ import {
   FieldLabel,
 } from '../ui/field'
 import { Textarea } from '../ui/textarea'
+import { useFieldContext } from '@/hooks/form-context'
 
 type Props = {
   label: string
@@ -21,7 +21,7 @@ export function TextArea({
   description,
   placeholder,
 }: Props) {
-  const field = useFieldContext<string>()
+  const field = useFieldContext<string | null>()
 
   return (
     <Field>

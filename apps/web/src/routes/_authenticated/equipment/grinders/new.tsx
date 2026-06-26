@@ -1,15 +1,13 @@
+import { insertGrinderSchema } from '@coffee-companion/api/db/zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Plus } from 'lucide-react'
+import type { InsertGrinder } from '@coffee-companion/api/db/zod'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useTRPC } from '@/integrations/trpc/react'
-import {
-  insertGrinderSchema,
-  type InsertGrinder,
-} from '@coffee-companion/api/db/zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/equipment/grinders/new')({
   component: NewGrinder,

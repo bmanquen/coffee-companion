@@ -1,10 +1,3 @@
-import { DataTable } from '@/components/data-table'
-import { PaginationControls } from '@/components/pagination-controls'
-import { Button } from '@/components/ui/button'
-import { useTRPC } from '@/integrations/trpc/react'
-import { formatBrewRatio } from '@/lib/brew-ratio'
-import { cn } from '@/lib/utils'
-import type { EspressoShotWithRelations } from '@/types'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
@@ -12,11 +5,18 @@ import {
   getCoreRowModel,
   getExpandedRowModel,
   useReactTable,
-  type Row,
 } from '@tanstack/react-table'
 import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { Card } from './ui/card'
+import type { EspressoShotWithRelations } from '@/types'
+import type { Row } from '@tanstack/react-table'
+import { DataTable } from '@/components/data-table'
+import { PaginationControls } from '@/components/pagination-controls'
+import { Button } from '@/components/ui/button'
+import { useTRPC } from '@/integrations/trpc/react'
+import { formatBrewRatio } from '@/lib/brew-ratio'
+import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 5
 

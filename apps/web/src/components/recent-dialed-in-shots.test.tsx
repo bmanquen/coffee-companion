@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { MAX_SHOTS, RecentDialedInShots } from './recent-dialed-in-shots'
 import { createTestProviders } from '@/test/providers'
 import { makeRecentShot } from '@/test/factories'
-import { MAX_SHOTS, RecentDialedInShots } from './recent-dialed-in-shots'
 
 describe('RecentDialedInShots', () => {
   it('renders nothing when there are no dialed-in shots', () => {

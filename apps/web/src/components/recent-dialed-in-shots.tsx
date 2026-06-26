@@ -1,18 +1,18 @@
-import { DataTable } from '@/components/data-table'
-import { useTRPC } from '@/integrations/trpc/react'
-import { formatBrewRatio } from '@/lib/brew-ratio'
-import { cn } from '@/lib/utils'
-import type { EspressoShotWithRelations } from '@/types'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import {
   createColumnHelper,
   getCoreRowModel,
   getExpandedRowModel,
   useReactTable,
-  type Row,
 } from '@tanstack/react-table'
 import { ChevronDown } from 'lucide-react'
 import { Card } from './ui/card'
+import type { EspressoShotWithRelations } from '@/types'
+import type { Row } from '@tanstack/react-table'
+import { DataTable } from '@/components/data-table'
+import { useTRPC } from '@/integrations/trpc/react'
+import { formatBrewRatio } from '@/lib/brew-ratio'
+import { cn } from '@/lib/utils'
 
 export const MAX_SHOTS = 5
 

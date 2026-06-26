@@ -21,7 +21,7 @@ describe('PaginationControls', () => {
     render(
       <PaginationControls page={0} totalPages={3} onPageChange={() => {}} />,
     )
-    const [prev, next] = screen.getAllByRole('button') as Array<HTMLButtonElement>
+    const [prev, next] = screen.getAllByRole<HTMLButtonElement>('button')
     expect(prev.disabled).toBe(true)
     expect(next.disabled).toBe(false)
   })
@@ -30,7 +30,7 @@ describe('PaginationControls', () => {
     render(
       <PaginationControls page={2} totalPages={3} onPageChange={() => {}} />,
     )
-    const [prev, next] = screen.getAllByRole('button') as Array<HTMLButtonElement>
+    const [prev, next] = screen.getAllByRole<HTMLButtonElement>('button')
     expect(prev.disabled).toBe(false)
     expect(next.disabled).toBe(true)
   })
@@ -44,7 +44,7 @@ describe('PaginationControls', () => {
         onPageChange={onPageChange}
       />,
     )
-    const [prev, next] = screen.getAllByRole('button') as Array<HTMLButtonElement>
+    const [prev, next] = screen.getAllByRole<HTMLButtonElement>('button')
     fireEvent.click(prev)
     fireEvent.click(next)
     expect(onPageChange).toHaveBeenNthCalledWith(1, 0)

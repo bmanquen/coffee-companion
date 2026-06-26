@@ -1,7 +1,3 @@
-import { DataTable } from '@/components/data-table'
-import { PaginationControls } from '@/components/pagination-controls'
-import { Button } from '@/components/ui/button'
-import { useTRPC } from '@/integrations/trpc/react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
@@ -11,6 +7,10 @@ import {
 } from '@tanstack/react-table'
 import { useState } from 'react'
 import { Card } from './ui/card'
+import { useTRPC } from '@/integrations/trpc/react'
+import { Button } from '@/components/ui/button'
+import { PaginationControls } from '@/components/pagination-controls'
+import { DataTable } from '@/components/data-table'
 
 const PAGE_SIZE = 5
 

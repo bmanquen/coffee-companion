@@ -1,19 +1,17 @@
-import {
-  type Row,
-  type Table as TanstackTable,
-  flexRender,
-} from '@tanstack/react-table'
+import { flexRender } from '@tanstack/react-table'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { Fragment } from 'react'
+import type { Row, Table as TanstackTable } from '@tanstack/react-table'
+import type { ReactNode } from 'react'
 import {
   Table,
-  TableHeader,
   TableBody,
-  TableRow,
-  TableHead,
   TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
-import { Fragment, type ReactNode } from 'react'
 
 interface DataTableProps<T> {
   table: TanstackTable<T>

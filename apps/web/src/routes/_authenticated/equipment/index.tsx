@@ -1,9 +1,3 @@
-import { DataTable } from '@/components/data-table'
-import { H1 } from '@/components/typography/h1'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { useTRPC } from '@/integrations/trpc/react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import {
   createColumnHelper,
@@ -11,11 +5,17 @@ import {
   getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
-  type SortingState,
 } from '@tanstack/react-table'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
+import type { SortingState } from '@tanstack/react-table'
+import { DataTable } from '@/components/data-table'
+import { H1 } from '@/components/typography/h1'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute('/_authenticated/equipment/')({
   loader: ({ context }) => {
@@ -76,7 +76,7 @@ function GrindersSection() {
   const [globalFilter, setGlobalFilter] = useState('')
 
   const table = useReactTable({
-    data: grinders as Grinder[],
+    data: grinders as Array<Grinder>,
     columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
@@ -131,7 +131,7 @@ function BrewingDevicesSection() {
   const [globalFilter, setGlobalFilter] = useState('')
 
   const table = useReactTable({
-    data: devices as BrewingDevice[],
+    data: devices as Array<BrewingDevice>,
     columns: deviceColumns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,

@@ -1,18 +1,25 @@
-import type { ReactNode } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
 import { useAppForm } from '@/hooks/form'
 
 // Mock the Radix Popover + Calendar so the date-picker's own logic (display +
 // onSelect) runs without browser-only APIs. Real calendar use is covered by e2e.
 vi.mock('@/components/ui/popover', () => ({
   Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  PopoverContent: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
 }))
 vi.mock('@/components/ui/calendar', () => ({
   Calendar: ({ onSelect }: { onSelect: (date: Date) => void }) => (
-    <button type="button" onClick={() => onSelect(new Date('2026-01-15T00:00:00'))}>
+    <button
+      type="button"
+      onClick={() => onSelect(new Date('2026-01-15T00:00:00'))}
+    >
       pick-jan-15
     </button>
   ),
@@ -20,7 +27,7 @@ vi.mock('@/components/ui/calendar', () => ({
 
 function Harness({ value }: { value?: Date }) {
   const form = useAppForm({
-    defaultValues: { roastDate: value as Date | undefined },
+    defaultValues: { roastDate: value },
   })
   return (
     <form.AppField name="roastDate">
