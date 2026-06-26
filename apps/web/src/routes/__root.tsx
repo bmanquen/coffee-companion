@@ -7,6 +7,8 @@ import {
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { useState } from 'react'
 
+import BottomNav from '../components/BottomNav'
+import MobileHeader from '../components/MobileHeader'
 import Navigation from '../components/Navigation'
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
@@ -59,11 +61,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <Navigation open={navOpen} setOpen={setNavOpen} />
+        <MobileHeader />
         <main
-          className={`transition-all duration-300 ${navOpen ? 'ml-64' : 'ml-0'} px-3`}
+          className={`transition-all duration-300 ${navOpen ? 'md:ml-64' : ''} px-3 pb-20 md:pb-0`}
         >
           {children}
         </main>
+        <BottomNav />
         <TanStackDevtools
           config={{
             position: 'bottom-right',

@@ -177,7 +177,7 @@ function BrewingDevicesSection() {
 
 function EquipmentIndex() {
   return (
-    <div className="flex flex-col items-center w-3/4 mx-auto gap-8">
+    <div className="flex flex-col items-center w-full max-w-4xl mx-auto gap-8">
       <H1 className="w-full">Equipment</H1>
       <GrindersSection />
       <BrewingDevicesSection />

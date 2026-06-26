@@ -53,7 +53,7 @@ function Coffee() {
   }
 
   return (
-    <div className="flex flex-col items-center w-3/4 mx-auto gap-4">
+    <div className="flex flex-col items-center w-full max-w-4xl mx-auto gap-4">
       <div className="flex justify-between items-center w-full">
         <H1>Coffees</H1>
         <Link to="/coffees/new">
@@ -65,7 +65,7 @@ function Coffee() {
       </div>
       {coffees.map((coffee) => (
         <Card key={coffee.id} className="w-full p-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <h2 className="text-lg font-semibold">{coffee.name}</h2>
             {coffee.country && (
               <p className="text-muted-foreground text-sm">
@@ -90,7 +90,7 @@ function Coffee() {
             <p className="text-sm text-muted-foreground">{coffee.notes}</p>
           )}
           {coffee.dialedInShot && (
-            <div className="flex gap-4 text-sm text-muted-foreground mt-2 border-t pt-2">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mt-2 border-t pt-2">
               <span className="font-medium text-foreground">Dialed In:</span>
               {coffee.dialedInShot.dose && (
                 <span>{coffee.dialedInShot.dose}g in</span>

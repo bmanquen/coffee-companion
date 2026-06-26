@@ -1,3 +1,10 @@
+import { H1 } from '@/components/typography/h1'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { useAppForm } from '@/hooks/form'
+import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
+import { useTRPC } from '@/integrations/trpc/react'
+import type { InsertBrewingDevice } from '@coffee-companion/api/db/zod'
 import { insertBrewingDeviceSchema } from '@coffee-companion/api/db/zod'
 import {
   useMutation,
@@ -6,13 +13,6 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
-import type { InsertBrewingDevice } from '@coffee-companion/api/db/zod'
-import { H1 } from '@/components/typography/h1'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { useAppForm } from '@/hooks/form'
-import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
-import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute(
   '/_authenticated/equipment/brewing-devices/new',
@@ -72,10 +72,10 @@ function NewBrewingDevice() {
   })
 
   return (
-    <Card className="flex flex-col items-center w-3/4 h-dvh mx-auto">
-      <H1 className="text-start w-1/2">Add Brewing Device</H1>
+    <Card className="flex flex-col items-center w-full max-w-2xl mx-auto p-4">
+      <H1 className="text-start w-full max-w-md">Add Brewing Device</H1>
       <form
-        className="w-1/2 flex flex-col gap-2"
+        className="w-full max-w-md flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault()
           form.handleSubmit()
