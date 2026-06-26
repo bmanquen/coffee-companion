@@ -1,4 +1,4 @@
-import { initTRPC, TRPCError } from '@trpc/server'
+import { TRPCError, initTRPC } from '@trpc/server'
 import superjson from 'superjson'
 import { auth } from '../lib/auth'
 import { e2eBypassSession } from '../lib/e2e-auth'

@@ -1,19 +1,20 @@
 import {
-  pgTable,
-  text,
-  timestamp,
-  uuid,
+  
+  boolean,
+  date,
+  index,
   integer,
   numeric,
-  date,
-  boolean,
-  index,
+  pgTable,
   primaryKey,
+  text,
+  timestamp,
   uniqueIndex,
-  type AnyPgColumn,
+  uuid
 } from 'drizzle-orm/pg-core'
 import { defineRelations } from 'drizzle-orm'
-import { user, session, account } from './auth-schema'
+import { account, session, user } from './auth-schema'
+import type {AnyPgColumn} from 'drizzle-orm/pg-core';
 
 export * from './auth-schema'
 

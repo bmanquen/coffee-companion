@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { db } from './index'
+import { E2E_USER_WITH_DATA } from '../lib/e2e-auth'
 import {
   brewingDeviceTypes,
   brewingDevices,
@@ -9,7 +9,7 @@ import {
   roasters,
   user,
 } from './schema'
-import { E2E_USER_WITH_DATA } from '../lib/e2e-auth'
+import { db } from './index'
 
 // Seeds the auth-bypass test user with a little data so authenticated pages
 // render real content during e2e. Idempotent — resets the user's rows each run.

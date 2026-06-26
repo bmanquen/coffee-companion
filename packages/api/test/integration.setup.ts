@@ -30,6 +30,6 @@ export default async function setup() {
   process.env.PGDATABASE = url.pathname.slice(1)
 
   const pool = new Pool()
-  await migrate(drizzle(pool), { migrationsFolder: './drizzle' })
+  await migrate(drizzle({ client: pool }), { migrationsFolder: './drizzle' })
   await pool.end()
 }

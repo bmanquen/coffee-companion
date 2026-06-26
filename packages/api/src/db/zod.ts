@@ -1,8 +1,8 @@
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 import { z } from 'zod'
 import {
-  brewingDevices,
   brewingDeviceTypes,
+  brewingDevices,
   coffeeProcesses,
   coffees,
   countries,
@@ -11,8 +11,8 @@ import {
   greenCoffees,
   grinders,
   regions,
-  roasters,
   roastLevels,
+  roasters,
   varieties,
 } from './schema'
 

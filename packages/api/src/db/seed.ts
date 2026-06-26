@@ -1,23 +1,23 @@
 import { eq } from 'drizzle-orm'
-import { db } from './index'
 import {
-  greenCoffees,
-  coffeeProcesses,
-  varieties,
-  greenCoffeesVarieties,
-  countries,
-  regions,
-  farms,
-  roasters,
-  roastLevels,
-  coffees,
-  coffeesVarieties,
-  espressoShots,
-  grinders,
   brewingDeviceTypes,
   brewingDevices,
+  coffeeProcesses,
+  coffees,
+  coffeesVarieties,
+  countries,
+  espressoShots,
+  farms,
+  greenCoffees,
+  greenCoffeesVarieties,
+  grinders,
+  regions,
+  roastLevels,
+  roasters,
   user,
+  varieties,
 } from './schema'
+import { db } from './index'
 
 const processesData = [
   { name: 'Washed' },
@@ -519,6 +519,9 @@ async function seed() {
       .onConflictDoNothing()
       .returning()
 
+    // `onConflictDoNothing` yields an empty array on conflict, so the row may
+    // be absent at runtime even though the type says otherwise.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!insertedCoffee) continue
 
     const insertedShots = await db
@@ -535,6 +538,8 @@ async function seed() {
       .returning()
 
     const dialedInShot = insertedShots[dialedInShotIndex]
+    // Index access can fall outside the inserted rows at runtime.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (dialedInShot) {
       await db
         .update(coffees)
