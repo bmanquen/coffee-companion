@@ -5,19 +5,113 @@ on:
     branches: [main]
   pull_request:
 
-# Serialize all runs: they share one test database, so they must not run
-# concurrently (queue instead of cancel, so no run is interrupted mid-write).
+# Each run gets its own ephemeral Postgres, so runs no longer share state and
+# need not be serialized. Cancel superseded in-progress runs for the same ref.
 concurrency:
-  group: ci-shared-test-db
-  cancel-in-progress: false
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    name: Typecheck & test
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    # No database: web tests seed the React Query cache (tRPC is never called)
+    # and the api unit config excludes the DB-backed *.integration.test.ts.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Web unit tests with coverage (fails below thresholds)
+        run: pnpm --filter coffee-companion test:coverage
+
+      - name: API unit tests
+        run: pnpm --filter @coffee-companion/api test
+
+      - name: Upload web coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-coverage
+          path: apps/web/coverage
+          retention-days: 7
+          if-no-files-found: ignore
+
+  integration-e2e:
+    name: Integration & E2E tests
+    runs-on: ubuntu-latest
+    # The only job that needs a database. Integration tests exercise real
+    # Drizzle/SQL and the e2e app server connects to the same DB. A throwaway
+    # Postgres service container gives each run its own clean database — no
+    # hosted dependency, no shared state, no secret.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: coffee_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
-      # Hosted test database (Railway). Stored in repo secrets, not inline.
-      DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/coffee_test
       # Placeholders so the app boots; the e2e auth bypass is enabled by
       # E2E_BYPASS_AUTH (set per-server in playwright.config.ts).
       BETTER_AUTH_SECRET: ci-secret-not-for-production
@@ -38,14 +132,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm typecheck
-
       - name: Apply database migrations
         run: pnpm db:migrate
 
-      - name: Unit + integration tests with coverage (fails below thresholds)
-        run: pnpm test:coverage
+      - name: API integration tests with coverage (fails below thresholds)
+        run: pnpm --filter @coffee-companion/api test:coverage
 
       - name: Install Playwright browsers
         run: pnpm --filter coffee-companion exec playwright install --with-deps chromium
@@ -53,14 +144,12 @@ jobs:
       - name: End-to-end tests (Playwright)
         run: pnpm test:e2e
 
-      - name: Upload coverage reports
+      - name: Upload api coverage report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
-          path: |
-            apps/web/coverage
-            packages/api/coverage
+          name: api-coverage
+          path: packages/api/coverage
           retention-days: 7
           if-no-files-found: ignore
 
