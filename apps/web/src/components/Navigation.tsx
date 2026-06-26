@@ -1,9 +1,9 @@
-import { authClient } from '@/lib/auth-client'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Menu } from 'lucide-react'
 import { Avatar, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet'
+import { authClient } from '@/lib/auth-client'
 
 interface NavigationProps {
   open: boolean
@@ -42,7 +42,7 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
           {session && (
             <>
               <Link className="hover:bg-primary p-2 rounded-sm" to="/coffees">
-                Coffees
+                Coffee
               </Link>
               <Link className="hover:bg-primary p-2 rounded-sm" to="/espresso">
                 Espresso

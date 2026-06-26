@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import Navigation from './Navigation'
+import type { ReactNode } from 'react'
 
 const authState = vi.hoisted(() => ({
   session: null as { user: { name: string; image: string | null } } | null,
@@ -30,8 +30,12 @@ vi.mock('@tanstack/react-router', () => ({
 // Mock the Radix Sheet so its content renders inline (no browser-only APIs).
 vi.mock('@/components/ui/sheet', () => ({
   Sheet: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  SheetTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  SheetContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SheetTrigger: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  SheetContent: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
 }))
 
 vi.mock('@/components/ui/avatar', () => ({
@@ -44,7 +48,7 @@ describe('Navigation', () => {
     authState.session = { user: { name: 'Test User', image: null } }
     render(<Navigation open setOpen={() => {}} />)
 
-    expect(screen.getByRole('link', { name: 'Coffees' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Coffee' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Espresso' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Equipment' })).toBeTruthy()
     expect(screen.getByText('Test User')).toBeTruthy()
@@ -59,7 +63,7 @@ describe('Navigation', () => {
     authState.session = null
     render(<Navigation open setOpen={() => {}} />)
 
-    expect(screen.queryByRole('link', { name: 'Coffees' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Coffee' })).toBeNull()
     await act(async () => {
       fireEvent.click(
         screen.getByRole('button', { name: 'Sign in with Google' }),
