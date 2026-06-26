@@ -1,3 +1,20 @@
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query'
+import { Link, createFileRoute } from '@tanstack/react-router'
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table'
+import { CoffeeIcon, Crosshair, Plus } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import type { CellContext, SortingState } from '@tanstack/react-table'
+import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
@@ -12,23 +29,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
 import { brewRatio, formatBrewRatio, isDialedIn } from '@/lib/brew-ratio'
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from '@tanstack/react-query'
-import { createFileRoute, Link } from '@tanstack/react-router'
-import {
-  createColumnHelper,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  useReactTable,
-  type CellContext,
-  type SortingState,
-} from '@tanstack/react-table'
-import { CoffeeIcon, Crosshair, Plus } from 'lucide-react'
-import { useState } from 'react'
 
 export const Route = createFileRoute('/_authenticated/espresso/')({
   loader: ({ context }) => {
@@ -148,9 +148,29 @@ function EspressoIndex() {
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
+  const [coffeeId, setCoffeeId] = useState('')
+
+  // Unique coffees that actually appear in the log, sorted by name.
+  const coffeeOptions = useMemo(
+    () =>
+      Array.from(
+        new Map(shots.map((s) => [s.coffeeId, s.coffee.name])).entries(),
+      )
+        .map(([value, label]) => ({ value, label }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [shots],
+  )
+
+  // Memoized so the filtered array keeps a stable reference between renders.
+  // Passing a fresh array to the table on every render trips its default
+  // autoReset* state updates and spins into an infinite render loop.
+  const visibleShots = useMemo(
+    () => (coffeeId ? shots.filter((s) => s.coffeeId === coffeeId) : shots),
+    [shots, coffeeId],
+  )
 
   const table = useReactTable({
-    data: shots as Shot[],
+    data: visibleShots,
     columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
@@ -195,12 +215,19 @@ function EspressoIndex() {
           </Button>
         </Link>
       </div>
-      <Input
-        placeholder="Filter shots..."
-        value={globalFilter}
-        onChange={(e) => setGlobalFilter(e.target.value)}
-        className="w-full"
-      />
+      <div className="flex w-full flex-col gap-2 sm:flex-row">
+        <CoffeeFilter
+          options={coffeeOptions}
+          value={coffeeId}
+          onChange={setCoffeeId}
+        />
+        <Input
+          placeholder="Filter shots..."
+          value={globalFilter}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          className="flex-1"
+        />
+      </div>
       <div className="w-full">
         <DataTable table={table} />
       </div>
