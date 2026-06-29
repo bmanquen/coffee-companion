@@ -1,4 +1,5 @@
 import { and, count, eq } from 'drizzle-orm'
+import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
 import { coffees } from '../db/schema'
@@ -9,8 +10,19 @@ export const coffeeRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
     return db.query.coffees.findMany({
       where: { userId: ctx.session.user.id },
+      orderBy: { updatedAt: 'desc' },
       with: { dialedInShot: true, country: true, region: true, process: true },
     })
+  }),
+
+  getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {
+    const coffee = await db.query.coffees.findFirst({
+      where: { id: input, userId: ctx.session.user.id },
+    })
+    if (!coffee) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
+    }
+    return coffee
   }),
 
   getRecent: authedProcedure
@@ -41,6 +53,36 @@ export const coffeeRouter = createTRPCRouter({
         .values({ ...input, userId: ctx.session.user.id })
         .returning()
       return coffee
+    }),
+
+  update: authedProcedure
+    .input(insertCoffeeSchema.extend({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input
+      const updated = await db
+        .update(coffees)
+        .set(data)
+        .where(and(eq(coffees.id, id), eq(coffees.userId, ctx.session.user.id)))
+        .returning()
+      if (updated.length === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
+      }
+      return updated[0]
+    }),
+
+  delete: authedProcedure
+    .input(z.uuid())
+    .mutation(async ({ ctx, input }) => {
+      const deleted = await db
+        .delete(coffees)
+        .where(
+          and(eq(coffees.id, input), eq(coffees.userId, ctx.session.user.id)),
+        )
+        .returning()
+      if (deleted.length === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
+      }
+      return deleted[0]
     }),
 
   setDialedIn: authedProcedure

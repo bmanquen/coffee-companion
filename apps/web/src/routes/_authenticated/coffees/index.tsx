@@ -1,9 +1,16 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
-import { Link, createFileRoute } from '@tanstack/react-router'
-import { CoffeeIcon, Plus } from 'lucide-react'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   Empty,
   EmptyContent,
@@ -13,6 +20,13 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { useTRPC } from '@/integrations/trpc/react'
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query'
+import { Link, createFileRoute } from '@tanstack/react-router'
+import { CoffeeIcon, Pencil, Plus, Trash2 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/coffees/')({
   loader: ({ context }) => {
@@ -25,7 +39,15 @@ export const Route = createFileRoute('/_authenticated/coffees/')({
 
 function Coffee() {
   const trpc = useTRPC()
+  const queryClient = useQueryClient()
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
+  const deleteCoffee = useMutation(
+    trpc.coffee.delete.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
+      },
+    }),
+  )
 
   if (coffees.length === 0) {
     return (
@@ -85,6 +107,47 @@ function Coffee() {
                 {coffee.process.name}
               </p>
             )}
+            <div className="ml-auto flex items-center gap-1">
+              <Link
+                to="/coffees/$coffeeId/edit"
+                params={{ coffeeId: coffee.id }}
+              >
+                <Button variant="ghost" size="icon" aria-label="Edit coffee">
+                  <Pencil />
+                </Button>
+              </Link>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Delete coffee"
+                  >
+                    <Trash2 />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete coffee</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to delete &quot;{coffee.name}
+                      &quot;? This action cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter showCloseButton>
+                    <DialogClose asChild>
+                      <Button
+                        variant="destructive"
+                        disabled={deleteCoffee.isPending}
+                        onClick={() => deleteCoffee.mutate(coffee.id)}
+                      >
+                        Delete
+                      </Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
           {coffee.notes && (
             <p className="text-sm text-muted-foreground">{coffee.notes}</p>
