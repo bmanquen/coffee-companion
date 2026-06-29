@@ -12,7 +12,7 @@ import {
   uniqueIndex,
   uuid
 } from 'drizzle-orm/pg-core'
-import { defineRelations } from 'drizzle-orm'
+import { defineRelations, sql } from 'drizzle-orm'
 import { account, session, user } from './auth-schema'
 import type {AnyPgColumn} from 'drizzle-orm/pg-core';
 
@@ -23,7 +23,9 @@ const timestamps = {
   updatedAt: timestamp('updated_at')
     .defaultNow()
     .notNull()
-    .$onUpdate(() => new Date()),
+    // Use the database clock (not the app's JS clock) so updatedAt stays
+    // consistent with createdAt's defaultNow() and never lands before it.
+    .$onUpdate(() => sql`now()`),
 }
 
 export const countries = pgTable(
