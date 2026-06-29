@@ -7,7 +7,8 @@ type RouterOutputs = inferRouterOutputs<TRPCRouter>
 type RecentShot = RouterOutputs['espressoShot']['getRecent']['items'][number]
 type RecentCoffee = RouterOutputs['coffee']['getRecent']['items'][number]
 
-const epoch = new Date(0)
+const createdAt = new Date('2026-06-01T08:00:00.000Z')
+const updatedAt = new Date('2026-06-15T10:30:00.000Z')
 
 export function makeRecentShot(
   overrides: Partial<RecentShot> = {},
@@ -23,16 +24,16 @@ export function makeRecentShot(
     time: 28,
     grindSetting: '4.5',
     notes: 'tasty',
-    createdAt: epoch,
-    updatedAt: null,
+    createdAt,
+    updatedAt,
     coffee: makeRecentCoffee({ id: 'c1' }),
     grinder: {
       id: 'g1',
       userId: 'u1',
       name: 'Niche Zero',
       brand: 'Niche',
-      createdAt: epoch,
-      updatedAt: null,
+      createdAt,
+      updatedAt,
     },
     brewingDevice: {
       id: 'd1',
@@ -40,14 +41,14 @@ export function makeRecentShot(
       name: 'Linea Mini',
       brand: 'La Marzocco',
       typeId: 't1',
-      createdAt: epoch,
-      updatedAt: null,
+      createdAt,
+      updatedAt,
       type: {
         id: 't1',
         userId: null,
         name: 'Espresso',
-        createdAt: epoch,
-        updatedAt: null,
+        createdAt,
+        updatedAt,
       },
     },
     ...overrides,
@@ -70,8 +71,8 @@ export function makeRecentCoffee(
     notes: null,
     isActive: false,
     dialedInShotId: null,
-    createdAt: epoch,
-    updatedAt: null,
+    createdAt,
+    updatedAt,
     ...overrides,
   }
 }
