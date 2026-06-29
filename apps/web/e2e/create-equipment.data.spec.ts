@@ -22,9 +22,10 @@ test('create a brewing device via the new-device form', async ({ page }) => {
   await page.getByPlaceholder('e.g. Linea Mini').fill(name)
   await page.getByPlaceholder('e.g. La Marzocco').fill('Test Brand')
 
-  // Type SearchSelect — pick the seeded Espresso type.
+  // Type SearchSelect — pick the seeded Espresso type. Scope to the dropdown
+  // option; "Espresso" also appears as a (viewport-hidden) bottom-nav label.
   await page.getByText('Select Type').click()
-  await page.getByText('Espresso', { exact: true }).click()
+  await page.getByRole('option', { name: 'Espresso', exact: true }).click()
 
   await page.getByRole('button', { name: 'Add', exact: true }).click()
 

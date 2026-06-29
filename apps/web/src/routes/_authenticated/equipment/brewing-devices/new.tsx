@@ -1,10 +1,3 @@
-import { H1 } from '@/components/typography/h1'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { useAppForm } from '@/hooks/form'
-import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
-import { useTRPC } from '@/integrations/trpc/react'
-import type { InsertBrewingDevice } from '@coffee-companion/api/db/zod'
 import { insertBrewingDeviceSchema } from '@coffee-companion/api/db/zod'
 import {
   useMutation,
@@ -13,6 +6,13 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
+import type { InsertBrewingDevice } from '@coffee-companion/api/db/zod'
+import { H1 } from '@/components/typography/h1'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { useAppForm } from '@/hooks/form'
+import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
+import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute(
   '/_authenticated/equipment/brewing-devices/new',
