@@ -1,4 +1,8 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -7,13 +11,23 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import type { SortingState } from '@tanstack/react-table'
+import type { CellContext, SortingState } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
 
@@ -55,6 +69,70 @@ type BrewingDevice = {
 
 const deviceColumnHelper = createColumnHelper<BrewingDevice>()
 
+function DeviceActionsCell({ row }: CellContext<BrewingDevice, unknown>) {
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+  const deleteDevice = useMutation(
+    trpc.brewingDevice.delete.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.brewingDevice.list.queryOptions())
+      },
+    }),
+  )
+
+  const device = row.original
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <Link
+        to="/equipment/brewing-devices/$deviceId/edit"
+        params={{ deviceId: device.id }}
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          aria-label="Edit brewing device"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </Link>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            aria-label="Delete brewing device"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete brewing device</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{device.name}&quot;? This
+              also removes its espresso shots and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter showCloseButton>
+            <DialogClose asChild>
+              <Button
+                variant="destructive"
+                disabled={deleteDevice.isPending}
+                onClick={() => deleteDevice.mutate(device.id)}
+              >
+                Delete
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
 const deviceColumns = [
   deviceColumnHelper.accessor('name', {
     header: 'Name',
@@ -64,6 +142,12 @@ const deviceColumns = [
   }),
   deviceColumnHelper.accessor('type.name', {
     header: 'Type',
+  }),
+  deviceColumnHelper.display({
+    id: 'actions',
+    header: '',
+    cell: DeviceActionsCell,
+    enableSorting: false,
   }),
 ]
 
