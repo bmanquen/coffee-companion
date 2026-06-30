@@ -15,7 +15,7 @@ import { Route as AuthenticatedEspressoIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedEquipmentIndexRouteImport } from './routes/_authenticated/equipment/index'
 import { Route as AuthenticatedCoffeesIndexRouteImport } from './routes/_authenticated/coffees/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AuthenticatedEspressoNewRouteImport } from './routes/_authenticated/espresso/new'
 import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
 import { Route as AuthenticatedEquipmentGrindersNewRouteImport } from './routes/_authenticated/equipment/grinders/new'
