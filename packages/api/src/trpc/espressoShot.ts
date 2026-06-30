@@ -1,4 +1,4 @@
-import { count, eq } from 'drizzle-orm'
+import { and, count, eq } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
@@ -9,6 +9,27 @@ import {
   isEspressoDevice,
 } from '../db/zod'
 import { authedProcedure, createTRPCRouter } from './init'
+
+// Espresso shots must be brewed on an Espresso-type device. Throws if the
+// device is missing, owned by another user, or not an espresso device.
+async function assertEspressoDevice(brewingDeviceId: string, userId: string) {
+  const device = await db.query.brewingDevices.findFirst({
+    where: { id: brewingDeviceId, userId },
+    with: { type: true },
+  })
+  if (!device) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Brewing device not found',
+    })
+  }
+  if (!isEspressoDevice(device)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Espresso shots require an ${ESPRESSO_DEVICE_TYPE} brewing device`,
+    })
+  }
+}
 
 export const espressoShotRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
@@ -57,31 +78,65 @@ export const espressoShotRouter = createTRPCRouter({
         .slice(0, input?.limit)
     }),
 
+  getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {
+    const shot = await db.query.espressoShots.findFirst({
+      where: { id: input, userId: ctx.session.user.id },
+    })
+    if (!shot) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Shot not found' })
+    }
+    return shot
+  }),
+
   create: authedProcedure
     .input(insertEspressoShotSchema)
     .mutation(async ({ ctx, input }) => {
-      // Espresso shots must be brewed on an Espresso-type device.
-      const device = await db.query.brewingDevices.findFirst({
-        where: { id: input.brewingDeviceId, userId: ctx.session.user.id },
-        with: { type: true },
-      })
-      if (!device) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Brewing device not found',
-        })
-      }
-      if (!isEspressoDevice(device)) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Espresso shots require an ${ESPRESSO_DEVICE_TYPE} brewing device`,
-        })
-      }
+      await assertEspressoDevice(input.brewingDeviceId, ctx.session.user.id)
 
       const [shot] = await db
         .insert(espressoShots)
         .values({ ...input, userId: ctx.session.user.id })
         .returning()
       return shot
+    }),
+
+  update: authedProcedure
+    .input(insertEspressoShotSchema.extend({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input
+      await assertEspressoDevice(data.brewingDeviceId, ctx.session.user.id)
+
+      const updated = await db
+        .update(espressoShots)
+        .set(data)
+        .where(
+          and(
+            eq(espressoShots.id, id),
+            eq(espressoShots.userId, ctx.session.user.id),
+          ),
+        )
+        .returning()
+      if (updated.length === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Shot not found' })
+      }
+      return updated[0]
+    }),
+
+  delete: authedProcedure
+    .input(z.uuid())
+    .mutation(async ({ ctx, input }) => {
+      const deleted = await db
+        .delete(espressoShots)
+        .where(
+          and(
+            eq(espressoShots.id, input),
+            eq(espressoShots.userId, ctx.session.user.id),
+          ),
+        )
+        .returning()
+      if (deleted.length === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Shot not found' })
+      }
+      return deleted[0]
     }),
 })

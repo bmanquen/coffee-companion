@@ -102,6 +102,170 @@ describe('espressoShot.create', () => {
   })
 })
 
+describe('espressoShot.getById', () => {
+  it('returns the user’s shot', async () => {
+    const created = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+    })
+    const shot = await asA.espressoShot.getById(created.id)
+    expect(shot.id).toBe(created.id)
+    expect(shot.userId).toBe(USER_A)
+  })
+
+  it('throws NOT_FOUND for an unknown id', async () => {
+    await expect(asA.espressoShot.getById(UNKNOWN_UUID)).rejects.toThrow(
+      /not found/i,
+    )
+  })
+
+  it('does not return another user’s shot', async () => {
+    const created = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+    })
+    await expect(asB.espressoShot.getById(created.id)).rejects.toThrow(
+      /not found/i,
+    )
+  })
+})
+
+describe('espressoShot.update', () => {
+  it('updates fields on the user’s shot', async () => {
+    const created = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+    })
+    const updated = await asA.espressoShot.update({
+      id: created.id,
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '20',
+      yield: '40',
+    })
+    expect(updated.dose).toBe('20')
+    expect(updated.yield).toBe('40')
+  })
+
+  it('rejects a non-espresso brewing device', async () => {
+    const created = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+    })
+    await expect(
+      asA.espressoShot.update({
+        id: created.id,
+        coffeeId: coffeeAId,
+        grinderId,
+        brewingDeviceId: pourOverDeviceId,
+        dose: '18',
+        yield: '36',
+      }),
+    ).rejects.toThrow(/Espresso/)
+  })
+
+  it('throws NOT_FOUND for an unknown id', async () => {
+    await expect(
+      asA.espressoShot.update({
+        id: UNKNOWN_UUID,
+        coffeeId: coffeeAId,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+      }),
+    ).rejects.toThrow(/not found/i)
+  })
+
+  it('will not update another user’s shot', async () => {
+    const created = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+    })
+    await expect(
+      asB.espressoShot.update({
+        id: created.id,
+        coffeeId: coffeeAId,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '99',
+        yield: '99',
+      }),
+    ).rejects.toThrow(/not found/i)
+  })
+})
+
+describe('espressoShot.delete', () => {
+  it('deletes the user’s shot', async () => {
+    const created = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+    })
+    const deleted = await asA.espressoShot.delete(created.id)
+    expect(deleted.id).toBe(created.id)
+    await expect(asA.espressoShot.getById(created.id)).rejects.toThrow(
+      /not found/i,
+    )
+  })
+
+  it('clears the dialed-in reference when its shot is deleted', async () => {
+    const coffee = await asA.coffee.create({ name: uniq('Dialed To Delete') })
+    const shot = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+    })
+    await asA.coffee.setDialedIn({ coffeeId: coffee.id, shotId: shot.id })
+
+    await asA.espressoShot.delete(shot.id)
+
+    // The FK is ON DELETE SET NULL, so the coffee survives with no reference.
+    const refreshed = await asA.coffee.getById(coffee.id)
+    expect(refreshed.dialedInShotId).toBeNull()
+  })
+
+  it('throws NOT_FOUND for an unknown id', async () => {
+    await expect(asA.espressoShot.delete(UNKNOWN_UUID)).rejects.toThrow(
+      /not found/i,
+    )
+  })
+
+  it('will not delete another user’s shot', async () => {
+    const created = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+    })
+    await expect(asB.espressoShot.delete(created.id)).rejects.toThrow(
+      /not found/i,
+    )
+    expect((await asA.espressoShot.getById(created.id)).id).toBe(created.id)
+  })
+})
+
 describe('espressoShot.getAll / getRecent', () => {
   it('returns the user shots with relations', async () => {
     const shots = await asA.espressoShot.getAll()

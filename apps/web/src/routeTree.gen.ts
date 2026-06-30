@@ -18,6 +18,7 @@ import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AuthenticatedEspressoNewRouteImport } from './routes/_authenticated/espresso/new'
 import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
+import { Route as AuthenticatedEspressoShotIdEditRouteImport } from './routes/_authenticated/espresso/$shotId.edit'
 import { Route as AuthenticatedEquipmentGrindersNewRouteImport } from './routes/_authenticated/equipment/grinders/new'
 import { Route as AuthenticatedEquipmentBrewingDevicesNewRouteImport } from './routes/_authenticated/equipment/brewing-devices/new'
 import { Route as AuthenticatedCoffeesCoffeeIdEditRouteImport } from './routes/_authenticated/coffees/$coffeeId.edit'
@@ -70,6 +71,12 @@ const AuthenticatedCoffeesNewRoute = AuthenticatedCoffeesNewRouteImport.update({
   path: '/coffees/new',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedEspressoShotIdEditRoute =
+  AuthenticatedEspressoShotIdEditRouteImport.update({
+    id: '/espresso/$shotId/edit',
+    path: '/espresso/$shotId/edit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedEquipmentGrindersNewRoute =
   AuthenticatedEquipmentGrindersNewRouteImport.update({
     id: '/equipment/grinders/new',
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/coffees/$coffeeId/edit': typeof AuthenticatedCoffeesCoffeeIdEditRoute
   '/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
+  '/espresso/$shotId/edit': typeof AuthenticatedEspressoShotIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -114,6 +122,7 @@ export interface FileRoutesByTo {
   '/coffees/$coffeeId/edit': typeof AuthenticatedCoffeesCoffeeIdEditRoute
   '/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
+  '/espresso/$shotId/edit': typeof AuthenticatedEspressoShotIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -129,6 +138,7 @@ export interface FileRoutesById {
   '/_authenticated/coffees/$coffeeId/edit': typeof AuthenticatedCoffeesCoffeeIdEditRoute
   '/_authenticated/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/_authenticated/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
+  '/_authenticated/espresso/$shotId/edit': typeof AuthenticatedEspressoShotIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/coffees/$coffeeId/edit'
     | '/equipment/brewing-devices/new'
     | '/equipment/grinders/new'
+    | '/espresso/$shotId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/coffees/$coffeeId/edit'
     | '/equipment/brewing-devices/new'
     | '/equipment/grinders/new'
+    | '/espresso/$shotId/edit'
   id:
     | '__root__'
     | '/'
@@ -171,6 +183,7 @@ export interface FileRouteTypes {
     | '/_authenticated/coffees/$coffeeId/edit'
     | '/_authenticated/equipment/brewing-devices/new'
     | '/_authenticated/equipment/grinders/new'
+    | '/_authenticated/espresso/$shotId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -245,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCoffeesNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/espresso/$shotId/edit': {
+      id: '/_authenticated/espresso/$shotId/edit'
+      path: '/espresso/$shotId/edit'
+      fullPath: '/espresso/$shotId/edit'
+      preLoaderRoute: typeof AuthenticatedEspressoShotIdEditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/equipment/grinders/new': {
       id: '/_authenticated/equipment/grinders/new'
       path: '/equipment/grinders/new'
@@ -278,6 +298,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCoffeesCoffeeIdEditRoute: typeof AuthenticatedCoffeesCoffeeIdEditRoute
   AuthenticatedEquipmentBrewingDevicesNewRoute: typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   AuthenticatedEquipmentGrindersNewRoute: typeof AuthenticatedEquipmentGrindersNewRoute
+  AuthenticatedEspressoShotIdEditRoute: typeof AuthenticatedEspressoShotIdEditRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -291,6 +312,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedEquipmentBrewingDevicesNewRoute,
   AuthenticatedEquipmentGrindersNewRoute:
     AuthenticatedEquipmentGrindersNewRoute,
+  AuthenticatedEspressoShotIdEditRoute: AuthenticatedEspressoShotIdEditRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

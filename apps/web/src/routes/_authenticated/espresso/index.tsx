@@ -11,13 +11,23 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { CoffeeIcon, Crosshair, Plus } from 'lucide-react'
+import { CoffeeIcon, Crosshair, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   Empty,
   EmptyContent,
@@ -86,6 +96,63 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
   )
 }
 
+function ActionsCell({ row }: CellContext<Shot, unknown>) {
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+  const deleteShot = useMutation(
+    trpc.espressoShot.delete.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
+        queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
+      },
+    }),
+  )
+
+  const shot = row.original
+
+  return (
+    <div className="flex items-center gap-1">
+      <Link to="/espresso/$shotId/edit" params={{ shotId: shot.id }}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit shot">
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </Link>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            aria-label="Delete shot"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete shot</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this shot for &quot;
+              {shot.coffee.name}&quot;? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter showCloseButton>
+            <DialogClose asChild>
+              <Button
+                variant="destructive"
+                disabled={deleteShot.isPending}
+                onClick={() => deleteShot.mutate(shot.id)}
+              >
+                Delete
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
 const columns = [
   columnHelper.accessor('coffee.name', {
     header: 'Coffee',
@@ -135,6 +202,12 @@ const columns = [
     id: 'dialedIn',
     header: '',
     cell: DialedInCell,
+    enableSorting: false,
+  }),
+  columnHelper.display({
+    id: 'actions',
+    header: '',
+    cell: ActionsCell,
     enableSorting: false,
   }),
 ]
