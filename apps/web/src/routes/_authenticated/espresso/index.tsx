@@ -111,9 +111,14 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
   const shot = row.original
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center justify-end gap-1">
       <Link to="/espresso/$shotId/edit" params={{ shotId: shot.id }}>
-        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit shot">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          aria-label="Edit shot"
+        >
           <Pencil className="h-4 w-4" />
         </Button>
       </Link>
