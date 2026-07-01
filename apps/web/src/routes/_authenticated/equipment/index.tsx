@@ -51,12 +51,82 @@ type Grinder = {
 
 const columnHelper = createColumnHelper<Grinder>()
 
+function GrinderActionsCell({ row }: CellContext<Grinder, unknown>) {
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+  const deleteGrinder = useMutation(
+    trpc.grinder.delete.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.grinder.list.queryOptions())
+      },
+    }),
+  )
+
+  const grinder = row.original
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <Link
+        to="/equipment/grinders/$grinderId/edit"
+        params={{ grinderId: grinder.id }}
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          aria-label="Edit grinder"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </Link>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            aria-label="Delete grinder"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete grinder</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{grinder.name}&quot;? This
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter showCloseButton>
+            <DialogClose asChild>
+              <Button
+                variant="destructive"
+                disabled={deleteGrinder.isPending}
+                onClick={() => deleteGrinder.mutate(grinder.id)}
+              >
+                Delete
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
 const columns = [
   columnHelper.accessor('name', {
     header: 'Name',
   }),
   columnHelper.accessor('brand', {
     header: 'Brand',
+  }),
+  columnHelper.display({
+    id: 'actions',
+    header: '',
+    cell: GrinderActionsCell,
+    enableSorting: false,
   }),
 ]
 
