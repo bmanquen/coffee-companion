@@ -41,18 +41,31 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
         onInteractOutside={(e) => e.preventDefault()}
       >
         <nav className="flex flex-col gap-2 mt-10 h-full">
-          <Link className="hover:bg-primary p-2 rounded-sm" to="/">
+          <Link
+            className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary/50 data-[status=active]:font-medium"
+            to="/"
+            activeOptions={{ exact: true }}
+          >
             Home
           </Link>
           {session && (
             <>
-              <Link className="hover:bg-primary p-2 rounded-sm" to="/coffees">
+              <Link
+                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary/50 data-[status=active]:font-medium"
+                to="/coffees"
+              >
                 Coffee
               </Link>
-              <Link className="hover:bg-primary p-2 rounded-sm" to="/espresso">
+              <Link
+                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary/50 data-[status=active]:font-medium"
+                to="/espresso"
+              >
                 Espresso
               </Link>
-              <Link className="hover:bg-primary p-2 rounded-sm" to="/equipment">
+              <Link
+                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary/50 data-[status=active]:font-medium"
+                to="/equipment"
+              >
                 Equipment
               </Link>
             </>
