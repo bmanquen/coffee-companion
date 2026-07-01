@@ -105,7 +105,7 @@ describe('SearchSelect', () => {
       })
     })
     await act(async () => {
-      fireEvent.mouseDown(screen.getByRole('button', { name: /Add/ }))
+      fireEvent.click(screen.getByRole('button', { name: /Add/ }))
     })
     expect(onAddItem).toHaveBeenCalledWith('Heart')
   })
