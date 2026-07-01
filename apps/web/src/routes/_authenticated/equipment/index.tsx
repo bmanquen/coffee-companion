@@ -7,6 +7,7 @@ import {
   createColumnHelper,
   getCoreRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
@@ -30,6 +31,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/_authenticated/equipment/')({
   loader: ({ context }) => {
@@ -233,11 +235,13 @@ function GrindersSection() {
     data: grinders as Array<Grinder>,
     columns,
     state: { sorting, globalFilter },
+    initialState: { pagination: { pageSize: 10 } },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   })
 
   return (
@@ -267,7 +271,7 @@ function GrindersSection() {
             onChange={(e) => setGlobalFilter(e.target.value)}
             className="w-full"
           />
-          <DataTable table={table} />
+          <DataTable table={table} paginated />
         </>
       )}
     </Card>
@@ -288,11 +292,13 @@ function BrewingDevicesSection() {
     data: devices as Array<BrewingDevice>,
     columns: deviceColumns,
     state: { sorting, globalFilter },
+    initialState: { pagination: { pageSize: 10 } },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   })
 
   return (
@@ -322,19 +328,55 @@ function BrewingDevicesSection() {
             onChange={(e) => setGlobalFilter(e.target.value)}
             className="w-full"
           />
-          <DataTable table={table} />
+          <DataTable table={table} paginated />
         </>
       )}
     </Card>
   )
 }
 
+type EquipmentType = 'grinders' | 'brewing-devices'
+
+const equipmentTypes: Array<{ value: EquipmentType; label: string }> = [
+  { value: 'grinders', label: 'Grinders' },
+  { value: 'brewing-devices', label: 'Brewing Devices' },
+]
+
 function EquipmentIndex() {
+  const [selectedType, setSelectedType] = useState<EquipmentType>('grinders')
+
   return (
     <div className="flex flex-col items-center w-full max-w-4xl mx-auto gap-8">
       <H1 className="w-full">Equipment</H1>
-      <GrindersSection />
-      <BrewingDevicesSection />
+      <div className="flex flex-col w-full">
+        <div className="flex gap-1 pl-3 -mb-px" role="tablist">
+          {equipmentTypes.map((type) => {
+            const isActive = selectedType === type.value
+            return (
+              <button
+                key={type.value}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setSelectedType(type.value)}
+                className={cn(
+                  'relative rounded-t-lg border px-4 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'z-10 border-border border-b-transparent bg-white text-foreground shadow-sm'
+                    : 'border-transparent bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                {type.label}
+              </button>
+            )
+          })}
+        </div>
+        {selectedType === 'grinders' ? (
+          <GrindersSection />
+        ) : (
+          <BrewingDevicesSection />
+        )}
+      </div>
     </div>
   )
 }
