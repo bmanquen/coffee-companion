@@ -114,6 +114,8 @@ export function SearchSelect({
           </PopoverTrigger>
           <PopoverContent
             align="start"
+            side="bottom"
+            avoidCollisions={false}
             className="w-[var(--radix-popover-trigger-width)] p-0"
           >
             <Command shouldFilter={true}>
