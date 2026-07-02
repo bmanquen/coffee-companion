@@ -38,7 +38,8 @@ import {
 } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
-import { brewRatio, formatBrewRatio, isDialedIn } from '@/lib/brew-ratio'
+import { daysOffRoast } from '@/lib/brew'
+import { brewRatio, formatBrewRatio } from '@/lib/brew-ratio'
 
 export const Route = createFileRoute('/_authenticated/espresso/')({
   loader: ({ context }) => {
@@ -52,12 +53,15 @@ export const Route = createFileRoute('/_authenticated/espresso/')({
 type Shot = {
   id: string
   coffeeId: string
+  isDialedIn: boolean
+  roastDate: string | null
+  createdAt: Date
   dose: string | null
   yield: string | null
   time: number | null
   grindSetting: string | null
   notes: string | null
-  coffee: { name: string; dialedInShotId: string | null }
+  coffee: { name: string }
   grinder: { name: string; brand: string }
   brewingDevice: { name: string; brand: string; type: { name: string } }
 }
@@ -77,7 +81,7 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
   )
 
   const shot = row.original
-  const dialedIn = isDialedIn(shot)
+  const dialedIn = shot.isDialedIn
 
   return (
     <Button
@@ -161,6 +165,16 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
 const columns = [
   columnHelper.accessor('coffee.name', {
     header: 'Coffee',
+    meta: { cardTitle: true },
+  }),
+  columnHelper.accessor((row) => daysOffRoast(row.roastDate, row.createdAt), {
+    id: 'daysOffRoast',
+    header: 'Days off roast',
+    cell: (info) => (info.getValue() != null ? `${info.getValue()}d` : '-'),
+    sortingFn: (a, b) =>
+      (daysOffRoast(a.original.roastDate, a.original.createdAt) ?? -1) -
+      (daysOffRoast(b.original.roastDate, b.original.createdAt) ?? -1),
+    meta: { cardExpandedOnly: true },
   }),
   columnHelper.accessor('dose', {
     header: 'Dose',
@@ -183,6 +197,7 @@ const columns = [
       const ratioB = brewRatio(b.original.dose, b.original.yield) ?? 0
       return ratioA - ratioB
     },
+    meta: { cardExpandedOnly: true },
   }),
   columnHelper.accessor('time', {
     header: 'Time',
@@ -190,9 +205,11 @@ const columns = [
   }),
   columnHelper.accessor('grinder.name', {
     header: 'Grinder',
+    meta: { cardExpandedOnly: true },
   }),
   columnHelper.accessor('brewingDevice.name', {
     header: 'Device',
+    meta: { cardExpandedOnly: true },
   }),
   columnHelper.accessor('grindSetting', {
     header: 'Grind',
@@ -202,18 +219,21 @@ const columns = [
     header: 'Notes',
     cell: (info) => info.getValue() ?? '-',
     enableSorting: false,
+    meta: { cardExpandedOnly: true },
   }),
   columnHelper.display({
     id: 'dialedIn',
     header: '',
     cell: DialedInCell,
     enableSorting: false,
+    meta: { cardHideLabel: true },
   }),
   columnHelper.display({
     id: 'actions',
     header: '',
     cell: ActionsCell,
     enableSorting: false,
+    meta: { cardHideLabel: true },
   }),
 ]
 
@@ -307,7 +327,7 @@ function EspressoIndex() {
         />
       </div>
       <div className="w-full">
-        <DataTable table={table} />
+        <DataTable table={table} cardExpandable />
       </div>
     </div>
   )

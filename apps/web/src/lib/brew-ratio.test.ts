@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { brewRatio, formatBrewRatio, isDialedIn } from './brew-ratio'
+import { brewRatio, formatBrewRatio } from './brew-ratio'
 
 describe('brewRatio', () => {
   it('computes yield / dose', () => {
@@ -28,22 +28,5 @@ describe('formatBrewRatio', () => {
   it('returns "-" when dose or yield is missing', () => {
     expect(formatBrewRatio(null, '36')).toBe('-')
     expect(formatBrewRatio('18', null)).toBe('-')
-  })
-})
-
-describe('isDialedIn', () => {
-  it('is true when the shot is its coffee’s dialed-in shot', () => {
-    expect(
-      isDialedIn({ id: 'shot-1', coffee: { dialedInShotId: 'shot-1' } }),
-    ).toBe(true)
-  })
-
-  it('is false otherwise', () => {
-    expect(
-      isDialedIn({ id: 'shot-1', coffee: { dialedInShotId: 'shot-2' } }),
-    ).toBe(false)
-    expect(isDialedIn({ id: 'shot-1', coffee: { dialedInShotId: null } })).toBe(
-      false,
-    )
   })
 })

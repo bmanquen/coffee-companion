@@ -3,11 +3,8 @@ import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
 import { espressoShots } from '../db/schema'
-import {
-  ESPRESSO_DEVICE_TYPE,
-  insertEspressoShotSchema,
-  isEspressoDevice,
-} from '../db/zod'
+import { insertEspressoShotSchema } from '../db/zod'
+import { ESPRESSO_DEVICE_TYPE, isEspressoDevice } from '../lib/espresso'
 import { authedProcedure, createTRPCRouter } from './init'
 
 // Espresso shots must be brewed on an Espresso-type device. Throws if the
@@ -62,20 +59,16 @@ export const espressoShotRouter = createTRPCRouter({
   getDialedIn: authedProcedure
     .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
     .query(async ({ ctx, input }) => {
-      const coffeesWithDialedIn = await db.query.coffees.findMany({
-        where: { userId: ctx.session.user.id, dialedInShotId: { isNotNull: true } },
+      return db.query.espressoShots.findMany({
+        where: { userId: ctx.session.user.id, isDialedIn: true },
+        orderBy: { createdAt: 'desc' },
         with: {
-          dialedInShot: {
-            with: { grinder: true, brewingDevice: { with: { type: true } } },
-          },
+          coffee: true,
+          grinder: true,
+          brewingDevice: { with: { type: true } },
         },
+        limit: input?.limit,
       })
-      return coffeesWithDialedIn
-        .flatMap(({ dialedInShot, ...coffee }) =>
-          dialedInShot ? [{ ...dialedInShot, coffee }] : [],
-        )
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-        .slice(0, input?.limit)
     }),
 
   getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {

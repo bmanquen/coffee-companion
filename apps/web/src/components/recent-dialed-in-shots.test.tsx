@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { MAX_SHOTS, RecentDialedInShots } from './recent-dialed-in-shots'
 import { createTestProviders } from '@/test/providers'
@@ -25,14 +25,16 @@ describe('RecentDialedInShots', () => {
     render(<RecentDialedInShots />, { wrapper: Wrapper })
 
     expect(screen.getByText('Recent Dialed In')).toBeTruthy()
-    const cell = screen.getByText('Ethiopia Guji')
+    // Scope to the desktop <table>; the mobile card layout renders in parallel.
+    const table = within(screen.getByRole('table'))
+    const cell = table.getByText('Ethiopia Guji')
     expect(cell).toBeTruthy()
 
     // Expand the row to reveal ShotDetails (which formats the brew ratio).
     await act(async () => {
       fireEvent.click(cell.closest('tr')!)
     })
-    expect(screen.getByText('1:2.0')).toBeTruthy()
-    expect(screen.getByText(/Niche Zero/)).toBeTruthy()
+    expect(table.getByText('1:2.0')).toBeTruthy()
+    expect(table.getByText(/Niche Zero/)).toBeTruthy()
   })
 })

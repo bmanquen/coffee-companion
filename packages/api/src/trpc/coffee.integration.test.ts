@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes } from '../db/schema'
-import { ESPRESSO_DEVICE_TYPE } from '../db/zod'
+import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import { UNKNOWN_UUID, callerFor, seedUsers, uniqFor } from '../../test/trpc'
 
 const USER_A = 'coffee-user-a'
@@ -163,26 +163,26 @@ describe('coffee.getRecent', () => {
 
 describe('coffee.setDialedIn', () => {
   it('sets and clears the dialed-in shot', async () => {
+    const coffee = await asA.coffee.create({ name: uniq('Dial-in') })
     const shot = await asA.espressoShot.create({
-      coffeeId: coffeeAId,
+      coffeeId: coffee.id,
       grinderId,
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
     })
-    const coffee = await asA.coffee.create({ name: uniq('Dial-in') })
 
-    const dialedIn = await asA.coffee.setDialedIn({
-      coffeeId: coffee.id,
-      shotId: shot.id,
-    })
-    expect(dialedIn.dialedInShotId).toBe(shot.id)
+    await asA.coffee.setDialedIn({ coffeeId: coffee.id, shotId: shot.id })
+    const afterSet = await asA.coffee.getAll()
+    expect(afterSet.find((c) => c.id === coffee.id)?.dialedInShot?.id).toBe(
+      shot.id,
+    )
 
-    const cleared = await asA.coffee.setDialedIn({
-      coffeeId: coffee.id,
-      shotId: null,
-    })
-    expect(cleared.dialedInShotId).toBeNull()
+    await asA.coffee.setDialedIn({ coffeeId: coffee.id, shotId: null })
+    const afterClear = await asA.coffee.getAll()
+    expect(
+      afterClear.find((c) => c.id === coffee.id)?.dialedInShot,
+    ).toBeNull()
   })
 
   it('will not dial in a coffee owned by another user', async () => {

@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes } from '../db/schema'
-import { ESPRESSO_DEVICE_TYPE } from '../db/zod'
+import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import { UNKNOWN_UUID, callerFor, seedUsers, uniqFor } from '../../test/trpc'
 
 const USER_A = 'espresso-user-a'
@@ -240,9 +240,10 @@ describe('espressoShot.delete', () => {
 
     await asA.espressoShot.delete(shot.id)
 
-    // The FK is ON DELETE SET NULL, so the coffee survives with no reference.
-    const refreshed = await asA.coffee.getById(coffee.id)
-    expect(refreshed.dialedInShotId).toBeNull()
+    // Deleting the shot removes the only dialed-in shot, so the coffee is left
+    // with none.
+    const coffees = await asA.coffee.getAll()
+    expect(coffees.find((c) => c.id === coffee.id)?.dialedInShot).toBeNull()
   })
 
   it('throws NOT_FOUND for an unknown id', async () => {
@@ -323,8 +324,8 @@ describe('espressoShot.getDialedIn', () => {
     expect(entry!.brewingDevice.type).toBeTruthy()
 
     expect(dialedIn.some((s) => s.id === otherShot.id)).toBe(false)
-    // Every returned shot is the dialed-in reference for its own coffee.
-    expect(dialedIn.every((s) => s.coffee.dialedInShotId === s.id)).toBe(true)
+    // Every returned shot is flagged as a dialed-in reference.
+    expect(dialedIn.every((s) => s.isDialedIn)).toBe(true)
   })
 
   it('returns shots ordered most recent first', async () => {

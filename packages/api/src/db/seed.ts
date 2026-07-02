@@ -498,6 +498,7 @@ async function seed() {
       process: coffeeProcess,
       country,
       region,
+      roastDate,
       ...coffeeData
     } = coffee
 
@@ -524,28 +525,18 @@ async function seed() {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!insertedCoffee) continue
 
-    const insertedShots = await db
-      .insert(espressoShots)
-      .values(
-        shots.map((shot) => ({
-          ...shot,
-          userId: SEED_USER_ID,
-          coffeeId: insertedCoffee.id,
-          grinderId,
-          brewingDeviceId,
-        })),
-      )
-      .returning()
-
-    const dialedInShot = insertedShots[dialedInShotIndex]
-    // Index access can fall outside the inserted rows at runtime.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (dialedInShot) {
-      await db
-        .update(coffees)
-        .set({ dialedInShotId: dialedInShot.id })
-        .where(eq(coffees.id, insertedCoffee.id))
-    }
+    await db.insert(espressoShots).values(
+      shots.map((shot, index) => ({
+        ...shot,
+        userId: SEED_USER_ID,
+        coffeeId: insertedCoffee.id,
+        grinderId,
+        brewingDeviceId,
+        roastDate,
+        // One dialed-in shot per coffee (enforced by a partial unique index).
+        isDialedIn: index === dialedInShotIndex,
+      })),
+    )
 
     for (const varietyName of coffeeVarieties) {
       const varietyId = varietyMap.get(varietyName)

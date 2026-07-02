@@ -17,18 +17,13 @@ const PAGE_SIZE = 5
 type Coffee = {
   id: string
   name: string
-  roastDate: string | null
   notes: string | null
 }
 
 const columnHelper = createColumnHelper<Coffee>()
 
 const columns = [
-  columnHelper.accessor('name', { header: 'Name' }),
-  columnHelper.accessor('roastDate', {
-    header: 'Roast Date',
-    cell: (info) => info.getValue() ?? '-',
-  }),
+  columnHelper.accessor('name', { header: 'Name', meta: { cardTitle: true } }),
   columnHelper.accessor('notes', {
     header: 'Notes',
     cell: (info) => info.getValue() ?? '-',

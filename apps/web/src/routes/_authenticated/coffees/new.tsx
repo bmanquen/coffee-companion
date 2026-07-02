@@ -84,7 +84,6 @@ function NewCoffeeComponent() {
     name: '',
     roasterId: null,
     roastLevelId: null,
-    roastDate: null,
     countryId: null,
     regionId: null,
     processId: null,
@@ -162,9 +161,6 @@ function NewCoffeeComponent() {
           {(field) => (
             <field.SearchSelect label="Roast Level" {...roastLevel} />
           )}
-        </form.AppField>
-        <form.AppField name="roastDate">
-          {(field) => <field.DatePicker label="Roast Date" />}
         </form.AppField>
         <form.AppField name="countryId">
           {(field) => <field.SearchSelect label="Country" {...country} />}

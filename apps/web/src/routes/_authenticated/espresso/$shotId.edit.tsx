@@ -1,7 +1,5 @@
-import {
-  ESPRESSO_DEVICE_TYPE,
-  insertEspressoShotSchema,
-} from '@coffee-companion/api/db/zod'
+import { insertEspressoShotSchema } from '@coffee-companion/api/db/zod'
+import { ESPRESSO_DEVICE_TYPE } from '@coffee-companion/api/lib/espresso'
 import {
   useMutation,
   useQueryClient,
@@ -77,6 +75,7 @@ function EditEspressoShot() {
     coffeeId: shot.coffeeId,
     grinderId: shot.grinderId,
     brewingDeviceId: shot.brewingDeviceId,
+    roastDate: shot.roastDate,
     dose: shot.dose,
     yield: shot.yield,
     time: shot.time,
@@ -114,6 +113,9 @@ function EditEspressoShot() {
           {(field) => (
             <field.SearchSelect label="Brewing Device" {...brewingDevice} />
           )}
+        </form.AppField>
+        <form.AppField name="roastDate">
+          {(field) => <field.DatePicker label="Roast Date" />}
         </form.AppField>
         <form.AppField name="dose">
           {(field) => (

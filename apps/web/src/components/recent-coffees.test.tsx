@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { RecentCoffees } from './recent-coffees'
 import type * as ReactRouter from '@tanstack/react-router'
@@ -43,6 +43,9 @@ describe('RecentCoffees', () => {
     )
     render(<RecentCoffees />, { wrapper: Wrapper })
     expect(screen.getByText('Recent Coffees')).toBeTruthy()
-    expect(screen.getByText('Ethiopia Guji')).toBeTruthy()
+    // Scope to the desktop <table>; the mobile card layout renders in parallel.
+    expect(
+      within(screen.getByRole('table')).getByText('Ethiopia Guji'),
+    ).toBeTruthy()
   })
 })

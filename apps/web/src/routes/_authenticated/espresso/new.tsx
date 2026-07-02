@@ -1,7 +1,5 @@
-import {
-  ESPRESSO_DEVICE_TYPE,
-  insertEspressoShotSchema,
-} from '@coffee-companion/api/db/zod'
+import { insertEspressoShotSchema } from '@coffee-companion/api/db/zod'
+import { ESPRESSO_DEVICE_TYPE } from '@coffee-companion/api/lib/espresso'
 import {
   useMutation,
   useQueryClient,
@@ -28,6 +26,10 @@ export const Route = createFileRoute('/_authenticated/espresso/new')({
     await context.queryClient.ensureQueryData(
       context.trpc.brewingDevice.list.queryOptions(),
     )
+    // Used to prefill the form from the coffee's most recent shot.
+    await context.queryClient.ensureQueryData(
+      context.trpc.espressoShot.getAll.queryOptions(),
+    )
   },
   component: NewEspressoShot,
 })
@@ -39,6 +41,10 @@ function NewEspressoShot() {
 
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
   const coffee = useSearchSelectResource(coffees)
+
+  const { data: shots } = useSuspenseQuery(
+    trpc.espressoShot.getAll.queryOptions(),
+  )
 
   const { data: grinders } = useSuspenseQuery(trpc.grinder.list.queryOptions())
   const grinder = useSearchSelectResource(grinders)
@@ -66,6 +72,7 @@ function NewEspressoShot() {
     coffeeId: '',
     grinderId: '',
     brewingDeviceId: '',
+    roastDate: null,
     dose: null,
     yield: null,
     time: null,
@@ -93,7 +100,21 @@ function NewEspressoShot() {
           form.handleSubmit()
         }}
       >
-        <form.AppField name="coffeeId">
+        <form.AppField
+          name="coffeeId"
+          listeners={{
+            // Carry the setup and roast date forward from the coffee's most
+            // recent shot. The recipe (dose/yield/time/grind) is left blank so
+            // it's entered fresh each shot.
+            onChange: ({ value }) => {
+              const latest = shots.find((s) => s.coffeeId === value)
+              if (!latest) return
+              form.setFieldValue('grinderId', latest.grinderId)
+              form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
+              form.setFieldValue('roastDate', latest.roastDate)
+            },
+          }}
+        >
           {(field) => <field.SearchSelect label="Coffee" {...coffee} />}
         </form.AppField>
         <form.AppField name="grinderId">
@@ -103,6 +124,9 @@ function NewEspressoShot() {
           {(field) => (
             <field.SearchSelect label="Brewing Device" {...brewingDevice} />
           )}
+        </form.AppField>
+        <form.AppField name="roastDate">
+          {(field) => <field.DatePicker label="Roast Date" />}
         </form.AppField>
         <form.AppField name="dose">
           {(field) => (

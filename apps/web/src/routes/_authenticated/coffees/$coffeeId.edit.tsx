@@ -95,7 +95,6 @@ function EditCoffeeComponent() {
     name: coffee.name,
     roasterId: coffee.roasterId,
     roastLevelId: coffee.roastLevelId,
-    roastDate: coffee.roastDate,
     countryId: coffee.countryId,
     regionId: coffee.regionId,
     processId: coffee.processId,
@@ -173,9 +172,6 @@ function EditCoffeeComponent() {
           {(field) => (
             <field.SearchSelect label="Roast Level" {...roastLevel} />
           )}
-        </form.AppField>
-        <form.AppField name="roastDate">
-          {(field) => <field.DatePicker label="Roast Date" />}
         </form.AppField>
         <form.AppField name="countryId">
           {(field) => <field.SearchSelect label="Country" {...country} />}

@@ -87,7 +87,7 @@ function Coffee() {
       </div>
       {coffees.map((coffee) => (
         <Card key={coffee.id} className="w-full p-4">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div className="flex flex-col md:flex-row flex-wrap md:items-center gap-x-4 gap-y-1">
             <h2 className="text-lg font-semibold">{coffee.name}</h2>
             {coffee.country && (
               <p className="text-muted-foreground text-sm">

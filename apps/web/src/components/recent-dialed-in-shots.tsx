@@ -11,6 +11,7 @@ import type { EspressoShotWithRelations } from '@/types'
 import type { Row } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
+import { daysOffRoast } from '@/lib/brew'
 import { formatBrewRatio } from '@/lib/brew-ratio'
 import { cn } from '@/lib/utils'
 
@@ -19,7 +20,15 @@ export const MAX_SHOTS = 5
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 
 const columns = [
-  columnHelper.accessor('coffee.name', { header: 'Coffee' }),
+  columnHelper.accessor('coffee.name', {
+    header: 'Coffee',
+    meta: { cardTitle: true },
+  }),
+  columnHelper.accessor((row) => daysOffRoast(row.roastDate, row.createdAt), {
+    id: 'daysOffRoast',
+    header: 'Days off roast',
+    cell: (info) => (info.getValue() != null ? `${info.getValue()}d` : '-'),
+  }),
   columnHelper.accessor('dose', {
     header: 'Dose',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
@@ -47,13 +56,15 @@ const columns = [
         )}
       />
     ),
+    // Desktop uses this chevron column; the mobile card renders its own.
+    meta: { cardHidden: true },
   }),
 ]
 
 function ShotDetails({ row }: { row: Row<EspressoShotWithRelations> }) {
   const shot = row.original
   return (
-    <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm py-1">
+    <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm py-1 sm:grid-cols-2">
       <div>
         <dt className="inline font-medium">Grinder: </dt>
         <dd className="inline text-muted-foreground">

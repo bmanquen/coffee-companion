@@ -118,17 +118,21 @@ function GrinderActionsCell({ row }: CellContext<Grinder, unknown>) {
 }
 
 const columns = [
-  columnHelper.accessor('name', {
-    header: 'Name',
-  }),
+  // Card layout: Brand + Name make up the card title (see cardTitle); no body.
   columnHelper.accessor('brand', {
     header: 'Brand',
+    meta: { cardTitle: true },
+  }),
+  columnHelper.accessor('name', {
+    header: 'Name',
+    meta: { cardTitle: true },
   }),
   columnHelper.display({
     id: 'actions',
     header: '',
     cell: GrinderActionsCell,
     enableSorting: false,
+    meta: { cardHideLabel: true },
   }),
 ]
 
@@ -206,20 +210,26 @@ function DeviceActionsCell({ row }: CellContext<BrewingDevice, unknown>) {
 }
 
 const deviceColumns = [
-  deviceColumnHelper.accessor('name', {
-    header: 'Name',
-  }),
+  // Card layout: Brand + Name make up the card title (see cardTitle); Type is
+  // desktop-only (cardHidden) so the card stays to just the title.
   deviceColumnHelper.accessor('brand', {
     header: 'Brand',
+    meta: { cardTitle: true },
+  }),
+  deviceColumnHelper.accessor('name', {
+    header: 'Name',
+    meta: { cardTitle: true },
   }),
   deviceColumnHelper.accessor('type.name', {
     header: 'Type',
+    meta: { cardHidden: true },
   }),
   deviceColumnHelper.display({
     id: 'actions',
     header: '',
     cell: DeviceActionsCell,
     enableSorting: false,
+    meta: { cardHideLabel: true },
   }),
 ]
 

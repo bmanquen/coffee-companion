@@ -3,7 +3,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { DataTable } from './data-table'
 
@@ -26,6 +26,9 @@ function DataTableHarness({ data }: { data: Array<CoffeeRow> }) {
 }
 
 describe('DataTable', () => {
+  // The component renders two layouts at once — a real table (>= md) and a
+  // card list (< md). jsdom applies no CSS, so both are in the DOM; scope
+  // desktop assertions to the <table> to avoid duplicate matches.
   it('renders a header and a row per item', () => {
     render(
       <DataTableHarness
@@ -35,14 +38,15 @@ describe('DataTable', () => {
         ]}
       />,
     )
-    expect(screen.getByText('Coffee')).toBeTruthy()
-    expect(screen.getByText('Roaster')).toBeTruthy()
-    expect(screen.getByText('Ethiopia Guji')).toBeTruthy()
-    expect(screen.getByText('Colombia El Paraiso')).toBeTruthy()
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('Coffee')).toBeTruthy()
+    expect(table.getByText('Roaster')).toBeTruthy()
+    expect(table.getByText('Ethiopia Guji')).toBeTruthy()
+    expect(table.getByText('Colombia El Paraiso')).toBeTruthy()
   })
 
   it('shows an empty state when there are no rows', () => {
     render(<DataTableHarness data={[]} />)
-    expect(screen.getByText('No results.')).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('No results.')).toBeTruthy()
   })
 })

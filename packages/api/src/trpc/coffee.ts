@@ -2,17 +2,27 @@ import { and, count, eq } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
-import { coffees } from '../db/schema'
+import { coffees, espressoShots } from '../db/schema'
 import { insertCoffeeSchema } from '../db/zod'
 import { authedProcedure, createTRPCRouter } from './init'
 
 export const coffeeRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
-    return db.query.coffees.findMany({
+    const rows = await db.query.coffees.findMany({
       where: { userId: ctx.session.user.id },
       orderBy: { updatedAt: 'desc' },
-      with: { dialedInShot: true, country: true, region: true, process: true },
+      with: {
+        country: true,
+        region: true,
+        process: true,
+        // The coffee's dialed-in espresso shot, if one is set.
+        espressoShots: { where: { isDialedIn: true }, limit: 1 },
+      },
     })
+    return rows.map(({ espressoShots: dialedIn, ...coffee }) => ({
+      ...coffee,
+      dialedInShot: dialedIn.at(0) ?? null,
+    }))
   }),
 
   getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {
@@ -88,16 +98,32 @@ export const coffeeRouter = createTRPCRouter({
   setDialedIn: authedProcedure
     .input(z.object({ coffeeId: z.string(), shotId: z.string().nullable() }))
     .mutation(async ({ ctx, input }) => {
-      const [coffee] = await db
-        .update(coffees)
-        .set({ dialedInShotId: input.shotId })
-        .where(
-          and(
-            eq(coffees.id, input.coffeeId),
-            eq(coffees.userId, ctx.session.user.id),
-          ),
-        )
-        .returning()
-      return coffee
+      const userId = ctx.session.user.id
+      await db.transaction(async (tx) => {
+        // Clear the coffee's current dialed-in espresso shot, if any. The
+        // partial unique index allows only one dialed-in shot per coffee, so
+        // this must run before flagging a new one.
+        await tx
+          .update(espressoShots)
+          .set({ isDialedIn: false })
+          .where(
+            and(
+              eq(espressoShots.coffeeId, input.coffeeId),
+              eq(espressoShots.userId, userId),
+              eq(espressoShots.isDialedIn, true),
+            ),
+          )
+        if (input.shotId) {
+          await tx
+            .update(espressoShots)
+            .set({ isDialedIn: true })
+            .where(
+              and(
+                eq(espressoShots.id, input.shotId),
+                eq(espressoShots.userId, userId),
+              ),
+            )
+        }
+      })
     }),
 })

@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ESPRESSO_DEVICE_TYPE,
   insertBrewingDeviceSchema,
   insertEspressoShotSchema,
   insertGrinderSchema,
-  isEspressoDevice,
 } from './zod'
 
 const uuid = '00000000-0000-4000-8000-000000000000'
@@ -84,12 +82,5 @@ describe('insertBrewingDeviceSchema', () => {
         typeId: 'not-a-uuid',
       }).success,
     ).toBe(false)
-  })
-})
-
-describe('isEspressoDevice', () => {
-  it('is true only for the espresso device type', () => {
-    expect(isEspressoDevice({ type: { name: ESPRESSO_DEVICE_TYPE } })).toBe(true)
-    expect(isEspressoDevice({ type: { name: 'Pour Over' } })).toBe(false)
   })
 })

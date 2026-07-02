@@ -1,5 +1,5 @@
-// Pure helpers for espresso shot brew ratios and dialed-in state. Extracted
-// from the espresso table route so they can be unit tested in isolation.
+// Pure helpers for espresso shot brew ratios. Extracted from the espresso table
+// route so they can be unit tested in isolation.
 
 // The numeric brew ratio (yield / dose), or null when either value is missing.
 // Dose and yield are stored as decimal strings, e.g. "18", "36.5".
@@ -19,12 +19,4 @@ export function formatBrewRatio(
   const ratio = brewRatio(dose, yld)
   if (ratio === null) return '-'
   return `1:${ratio.toFixed(1)}`
-}
-
-// Whether a shot is the dialed-in reference shot for its coffee.
-export function isDialedIn(shot: {
-  id: string
-  coffee: { dialedInShotId: string | null }
-}): boolean {
-  return shot.coffee.dialedInShotId === shot.id
 }

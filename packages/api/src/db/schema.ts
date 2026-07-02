@@ -14,7 +14,6 @@ import {
 } from 'drizzle-orm/pg-core'
 import { defineRelations, sql } from 'drizzle-orm'
 import { account, session, user } from './auth-schema'
-import type {AnyPgColumn} from 'drizzle-orm/pg-core';
 
 export * from './auth-schema'
 
@@ -126,16 +125,11 @@ export const coffees = pgTable(
     name: text().notNull(),
     roasterId: uuid('roaster_id').references(() => roasters.id),
     roastLevelId: uuid('roast_level_id').references(() => roastLevels.id),
-    roastDate: date(),
     countryId: uuid('country_id').references(() => countries.id),
     regionId: uuid('region_id').references(() => regions.id),
     processId: uuid('process_id').references(() => coffeeProcesses.id),
     notes: text(),
     isActive: boolean('is_active'),
-    dialedInShotId: uuid('dialed_in_shot_id').references(
-      (): AnyPgColumn => espressoShots.id,
-      { onDelete: 'set null' },
-    ),
     ...timestamps,
   },
   (table) => [
@@ -252,32 +246,45 @@ export const brewingDevices = pgTable(
   ],
 )
 
+// Columns shared by every brewing-method table. Each method gets its own table
+// (espresso_shots, and future pour_over_brews, etc.) so it can store its own
+// typed settings; these base columns are spread in like `timestamps`.
+const brewBase = {
+  id: uuid().primaryKey().defaultRandom(),
+  userId: text('user_id')
+    .references(() => user.id, { onDelete: 'cascade' })
+    .notNull(),
+  coffeeId: uuid('coffee_id')
+    .references(() => coffees.id, { onDelete: 'cascade' })
+    .notNull(),
+  roastDate: date('roast_date'),
+  grinderId: uuid('grinder_id')
+    .references(() => grinders.id, { onDelete: 'cascade' })
+    .notNull(),
+  brewingDeviceId: uuid('brewing_device_id')
+    .references(() => brewingDevices.id, { onDelete: 'cascade' })
+    .notNull(),
+  grindSetting: text('grind_setting'),
+  notes: text(),
+  isDialedIn: boolean('is_dialed_in').notNull().default(false),
+  ...timestamps,
+}
+
 export const espressoShots = pgTable(
   'espresso_shots',
   {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id')
-      .references(() => user.id, { onDelete: 'cascade' })
-      .notNull(),
-    coffeeId: uuid('coffee_id')
-      .references(() => coffees.id, { onDelete: 'cascade' })
-      .notNull(),
-    grinderId: uuid('grinder_id')
-      .references(() => grinders.id, { onDelete: 'cascade' })
-      .notNull(),
-    brewingDeviceId: uuid('brewing_device_id')
-      .references(() => brewingDevices.id, { onDelete: 'cascade' })
-      .notNull(),
+    ...brewBase,
     dose: numeric(),
     yield: numeric(),
     time: integer(),
-    grindSetting: text('grind_setting'),
-    notes: text(),
-    ...timestamps,
   },
   (table) => [
     index('espresso_shots_user_idx').on(table.userId),
     index('espresso_shots_user_coffee_idx').on(table.userId, table.coffeeId),
+    // At most one dialed-in espresso shot per coffee.
+    uniqueIndex('espresso_shots_dialed_in_idx')
+      .on(table.coffeeId)
+      .where(sql`is_dialed_in`),
   ],
 )
 
@@ -354,7 +361,6 @@ export const relations = defineRelations(
       region: r.one.regions({ from: r.coffees.regionId, to: r.regions.id }),
       roastLevel: r.one.roastLevels({ from: r.coffees.roastLevelId, to: r.roastLevels.id }),
       process: r.one.coffeeProcesses({ from: r.coffees.processId, to: r.coffeeProcesses.id }),
-      dialedInShot: r.one.espressoShots({ from: r.coffees.dialedInShotId, to: r.espressoShots.id }),
       coffeesVarieties: r.many.coffeesVarieties(),
       espressoShots: r.many.espressoShots(),
     },
