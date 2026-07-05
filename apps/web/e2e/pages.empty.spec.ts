@@ -18,6 +18,9 @@ test('equipment page shows empty grinder and device sections', async ({
 }) => {
   await page.goto('/equipment')
   await expect(page.getByRole('heading', { name: 'Equipment' })).toBeVisible()
+  // Grinders tab (default) empty state.
   await expect(page.getByText(/No grinders yet/i)).toBeVisible()
+  // Brewing Devices empty state lives behind its own tab.
+  await page.getByRole('tab', { name: 'Brewing Devices' }).click()
   await expect(page.getByText(/No brewing devices yet/i)).toBeVisible()
 })

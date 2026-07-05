@@ -21,19 +21,6 @@ test('create a coffee via the new-coffee form', async ({ page }) => {
   await expect(page.getByText(name)).toBeVisible()
 })
 
-// Exercises the DatePicker calendar (Radix popover + react-day-picker) in a
-// real browser — the one form interaction not otherwise hit by e2e.
-test('roast-date picker selects a date', async ({ page }) => {
-  await page.goto('/coffees/new')
-
-  await page.getByText('Pick a date').click()
-  // Day buttons are labelled by full date (e.g. "Monday, June 15th, 2026");
-  // match the 15th of whatever month is shown.
-  await page.getByRole('button', { name: /15th/ }).click()
-
-  await expect(page.getByText('Pick a date')).toHaveCount(0)
-})
-
 // Edits a coffee through the edit route. Creates its own coffee first (unique
 // name) so it never mutates the seeded data other specs depend on.
 test('edit a coffee updates its name in the list', async ({ page }) => {

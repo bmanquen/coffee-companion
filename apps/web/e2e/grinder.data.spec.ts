@@ -11,7 +11,9 @@ async function createGrinder(page: Page, name: string) {
   await page.getByPlaceholder('e.g. Niche', { exact: true }).fill('Test Brand')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/equipment$/)
-  await expect(page.getByText(name)).toBeVisible()
+  // Grinders is the default tab. Match exactly: the mobile card also renders the
+  // name (as "Brand Name"), so a substring match would hit two elements.
+  await expect(page.getByText(name, { exact: true })).toBeVisible()
 }
 
 test('create a grinder via the new-grinder form', async ({ page }) => {
@@ -34,7 +36,7 @@ test('edit a grinder updates its name in the list', async ({ page }) => {
   await page.getByRole('button', { name: 'Save' }).click()
 
   await expect(page).toHaveURL(/\/equipment$/)
-  await expect(page.getByText(updated)).toBeVisible()
+  await expect(page.getByText(updated, { exact: true })).toBeVisible()
   // The original name no longer appears on its own.
   await expect(page.getByText(name, { exact: true })).toHaveCount(0)
 })

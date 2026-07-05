@@ -17,7 +17,10 @@ async function createDevice(page: Page, name: string) {
 
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/equipment$/)
-  await expect(page.getByText(name)).toBeVisible()
+  // /equipment defaults to the Grinders tab; devices live behind their own tab.
+  // Match exactly: the mobile card also renders the name (as "Brand Name").
+  await page.getByRole('tab', { name: 'Brewing Devices' }).click()
+  await expect(page.getByText(name, { exact: true })).toBeVisible()
 }
 
 test('create a brewing device via the new-device form', async ({ page }) => {
@@ -40,7 +43,8 @@ test('edit a brewing device updates its name in the list', async ({ page }) => {
   await page.getByRole('button', { name: 'Save' }).click()
 
   await expect(page).toHaveURL(/\/equipment$/)
-  await expect(page.getByText(updated)).toBeVisible()
+  await page.getByRole('tab', { name: 'Brewing Devices' }).click()
+  await expect(page.getByText(updated, { exact: true })).toBeVisible()
   // The original name no longer appears on its own.
   await expect(page.getByText(name, { exact: true })).toHaveCount(0)
 })

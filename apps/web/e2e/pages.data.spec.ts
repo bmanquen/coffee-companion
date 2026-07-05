@@ -21,6 +21,10 @@ test('coffees page lists coffees', async ({ page }) => {
 test('equipment page lists grinders and brewing devices', async ({ page }) => {
   await page.goto('/equipment')
   await expect(page.getByRole('heading', { name: 'Equipment' })).toBeVisible()
-  await expect(page.getByText('Niche Zero')).toBeVisible()
-  await expect(page.getByText('Linea Mini')).toBeVisible()
+  // Grinders tab (default) shows the seeded grinder; exact match avoids the
+  // mobile card's duplicate "Brand Name" text.
+  await expect(page.getByText('Niche Zero', { exact: true })).toBeVisible()
+  // The seeded device lives behind the Brewing Devices tab.
+  await page.getByRole('tab', { name: 'Brewing Devices' }).click()
+  await expect(page.getByText('Linea Mini', { exact: true })).toBeVisible()
 })
