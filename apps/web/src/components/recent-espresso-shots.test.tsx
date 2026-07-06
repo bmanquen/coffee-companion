@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { RecentEspressoShots } from './recent-espresso-shots'
 import type * as ReactRouter from '@tanstack/react-router'
 import { createTestProviders } from '@/test/providers'
-import { makeRecentShot } from '@/test/factories'
+import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
@@ -56,6 +56,44 @@ describe('RecentEspressoShots', () => {
     })
     expect(table.getByText('1:2.0')).toBeTruthy()
     expect(table.getByText(/Niche Zero/)).toBeTruthy()
+  })
+
+  it('advances to the next page of shots', async () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    // total > PAGE_SIZE so a second page (and the controls) exist. Seed both
+    // pages so the swap is instant and we can assert the new rows render.
+    queryClient.setQueryData(
+      trpc.espressoShot.getRecent.queryKey({ limit: 5, offset: 0 }),
+      {
+        items: [makeRecentShot({ coffee: makeRecentCoffee({ name: 'Ethiopia Guji' }) })],
+        total: 6,
+      },
+    )
+    queryClient.setQueryData(
+      trpc.espressoShot.getRecent.queryKey({ limit: 5, offset: 5 }),
+      {
+        items: [
+          makeRecentShot({
+            id: 's2',
+            coffee: makeRecentCoffee({ id: 'c2', name: 'Kenya AA' }),
+          }),
+        ],
+        total: 6,
+      },
+    )
+    render(<RecentEspressoShots />, { wrapper: Wrapper })
+
+    expect(screen.getByText('1 of 2')).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('Ethiopia Guji')).toBeTruthy()
+
+    // The next-page control is the last button in the pagination row.
+    const controls = screen.getByText('1 of 2').parentElement!
+    const buttons = within(controls).getAllByRole('button')
+    fireEvent.click(buttons[buttons.length - 1])
+
+    expect(await screen.findByText('2 of 2')).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('Kenya AA')).toBeTruthy()
+    expect(within(screen.getByRole('table')).queryByText('Ethiopia Guji')).toBeNull()
   })
 
   it('renders dashes for missing dose/yield/time values', () => {

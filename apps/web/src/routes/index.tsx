@@ -4,8 +4,14 @@ import { getForwardedHeaders } from '@/lib/request-headers'
 import { Button } from '@/components/ui/button'
 import { H1 } from '@/components/typography/h1'
 import { RecentDialedInShots } from '@/components/recent-dialed-in-shots'
-import { RecentEspressoShots } from '@/components/recent-espresso-shots'
-import { RecentCoffees } from '@/components/recent-coffees'
+import {
+  RecentEspressoShots,
+  PAGE_SIZE as SHOT_PAGE_SIZE,
+} from '@/components/recent-espresso-shots'
+import {
+  PAGE_SIZE as COFFEE_PAGE_SIZE,
+  RecentCoffees,
+} from '@/components/recent-coffees'
 
 export const Route = createFileRoute('/')({
   beforeLoad: async () => {
@@ -14,6 +20,26 @@ export const Route = createFileRoute('/')({
       fetchOptions: { headers },
     })
     return { session }
+  },
+  // The paginated dashboard tables use useQuery (not useSuspenseQuery), so warm
+  // their first page here to keep it server-rendered instead of flashing a
+  // spinner on load. RecentDialedInShots still suspends and hydrates on its own.
+  loader: async ({ context }) => {
+    if (!context.session) return
+    await Promise.all([
+      context.queryClient.ensureQueryData(
+        context.trpc.espressoShot.getRecent.queryOptions({
+          limit: SHOT_PAGE_SIZE,
+          offset: 0,
+        }),
+      ),
+      context.queryClient.ensureQueryData(
+        context.trpc.coffee.getRecent.queryOptions({
+          limit: COFFEE_PAGE_SIZE,
+          offset: 0,
+        }),
+      ),
+    ])
   },
   component: Home,
 })

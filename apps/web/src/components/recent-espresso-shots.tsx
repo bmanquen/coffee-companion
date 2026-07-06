@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
@@ -6,7 +6,7 @@ import {
   getExpandedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Card } from './ui/card'
 import type { EspressoShotWithRelations } from '@/types'
@@ -14,12 +14,13 @@ import type { Row } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
 import { PaginationControls } from '@/components/pagination-controls'
 import { Button } from '@/components/ui/button'
+import { useDelayedFlag } from '@/hooks/use-delayed-flag'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast } from '@/lib/brew'
 import { formatBrewRatio } from '@/lib/brew-ratio'
 import { cn } from '@/lib/utils'
 
-const PAGE_SIZE = 5
+export const PAGE_SIZE = 5
 
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 
@@ -99,17 +100,21 @@ export function RecentEspressoShots() {
   const trpc = useTRPC()
   const [page, setPage] = useState(0)
 
-  const { data } = useSuspenseQuery(
-    trpc.espressoShot.getRecent.queryOptions({
-      limit: PAGE_SIZE,
-      offset: page * PAGE_SIZE,
-    }),
+  const { data, isLoading, isPlaceholderData } = useQuery(
+    trpc.espressoShot.getRecent.queryOptions(
+      { limit: PAGE_SIZE, offset: page * PAGE_SIZE },
+      { placeholderData: keepPreviousData },
+    ),
   )
 
-  const totalPages = Math.ceil(data.total / PAGE_SIZE)
+  // Only true while a genuine, uncached fetch is in flight (cached pages swap
+  // in instantly). The delay keeps quick fetches from flashing the spinner.
+  const showLoader = useDelayedFlag(isPlaceholderData)
+
+  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
 
   const table = useReactTable<EspressoShotWithRelations>({
-    data: data.items,
+    data: data?.items ?? [],
     columns,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
@@ -128,7 +133,11 @@ export function RecentEspressoShots() {
             </Button>
           </Link>
         </div>
-        {data.items.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : !data || data.items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No espresso shots yet.{' '}
             <Link to="/espresso/new" className="underline">
@@ -138,10 +147,27 @@ export function RecentEspressoShots() {
           </p>
         ) : (
           <>
-            <DataTable
-              table={table}
-              renderSubComponent={(row) => <ShotDetails row={row} />}
-            />
+            <div className="relative">
+              <div
+                className={cn(
+                  'transition-opacity duration-200',
+                  showLoader && 'opacity-50',
+                )}
+              >
+                <DataTable
+                  table={table}
+                  renderSubComponent={(row) => <ShotDetails row={row} />}
+                />
+              </div>
+              <div
+                className={cn(
+                  'pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-200',
+                  showLoader ? 'opacity-100' : 'opacity-0',
+                )}
+              >
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            </div>
             <PaginationControls
               page={page}
               totalPages={totalPages}

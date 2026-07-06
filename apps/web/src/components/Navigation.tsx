@@ -42,7 +42,7 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
       >
         <nav className="flex flex-col gap-2 mt-10 h-full">
           <Link
-            className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary/50 data-[status=active]:font-medium"
+            className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
             to="/"
             activeOptions={{ exact: true }}
           >
@@ -51,19 +51,19 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
           {session && (
             <>
               <Link
-                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary/50 data-[status=active]:font-medium"
+                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
                 to="/coffees"
               >
                 Coffee
               </Link>
               <Link
-                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary/50 data-[status=active]:font-medium"
+                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
                 to="/espresso"
               >
                 Espresso
               </Link>
               <Link
-                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary/50 data-[status=active]:font-medium"
+                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
                 to="/equipment"
               >
                 Equipment

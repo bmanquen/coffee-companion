@@ -1,18 +1,21 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
   useReactTable,
 } from '@tanstack/react-table'
+import { Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Card } from './ui/card'
 import { useTRPC } from '@/integrations/trpc/react'
 import { Button } from '@/components/ui/button'
 import { PaginationControls } from '@/components/pagination-controls'
 import { DataTable } from '@/components/data-table'
+import { useDelayedFlag } from '@/hooks/use-delayed-flag'
+import { cn } from '@/lib/utils'
 
-const PAGE_SIZE = 5
+export const PAGE_SIZE = 5
 
 type Coffee = {
   id: string
@@ -34,17 +37,21 @@ export function RecentCoffees() {
   const trpc = useTRPC()
   const [page, setPage] = useState(0)
 
-  const { data } = useSuspenseQuery(
-    trpc.coffee.getRecent.queryOptions({
-      limit: PAGE_SIZE,
-      offset: page * PAGE_SIZE,
-    }),
+  const { data, isLoading, isPlaceholderData } = useQuery(
+    trpc.coffee.getRecent.queryOptions(
+      { limit: PAGE_SIZE, offset: page * PAGE_SIZE },
+      { placeholderData: keepPreviousData },
+    ),
   )
 
-  const totalPages = Math.ceil(data.total / PAGE_SIZE)
+  // Only true while a genuine, uncached fetch is in flight (cached pages swap
+  // in instantly). The delay keeps quick fetches from flashing the spinner.
+  const showLoader = useDelayedFlag(isPlaceholderData)
+
+  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
 
   const table = useReactTable({
-    data: data.items,
+    data: data?.items ?? [],
     columns,
     getCoreRowModel: getCoreRowModel(),
     enableSorting: false,
@@ -61,7 +68,11 @@ export function RecentCoffees() {
             </Button>
           </Link>
         </div>
-        {data.items.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : !data || data.items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No coffees yet.{' '}
             <Link to="/coffees/new" className="underline">
@@ -71,7 +82,24 @@ export function RecentCoffees() {
           </p>
         ) : (
           <>
-            <DataTable table={table} />
+            <div className="relative">
+              <div
+                className={cn(
+                  'transition-opacity duration-200',
+                  showLoader && 'opacity-50',
+                )}
+              >
+                <DataTable table={table} />
+              </div>
+              <div
+                className={cn(
+                  'pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-200',
+                  showLoader ? 'opacity-100' : 'opacity-0',
+                )}
+              >
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            </div>
             <PaginationControls
               page={page}
               totalPages={totalPages}
