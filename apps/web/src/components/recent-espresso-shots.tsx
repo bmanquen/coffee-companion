@@ -6,7 +6,7 @@ import {
   getExpandedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { ChevronDown, Loader2 } from 'lucide-react'
+import { ChevronDown, Crosshair, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Card } from './ui/card'
 import type { EspressoShotWithRelations } from '@/types'
@@ -27,6 +27,17 @@ const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 const columns = [
   columnHelper.accessor('coffee.name', {
     header: 'Coffee',
+    cell: (info) => (
+      <span className="flex items-center gap-1.5">
+        {info.row.original.isDialedIn && (
+          <Crosshair
+            aria-label="Dialed in"
+            className="h-4 w-4 shrink-0 text-primary"
+          />
+        )}
+        {info.getValue()}
+      </span>
+    ),
     meta: { cardTitle: true },
   }),
   columnHelper.accessor((row) => daysOffRoast(row.roastDate, row.createdAt), {
@@ -157,6 +168,11 @@ export function RecentEspressoShots() {
                 <DataTable
                   table={table}
                   renderSubComponent={(row) => <ShotDetails row={row} />}
+                  rowClassName={(row) =>
+                    row.original.isDialedIn
+                      ? 'bg-primary/10 hover:bg-primary/15'
+                      : undefined
+                  }
                 />
               </div>
               <div

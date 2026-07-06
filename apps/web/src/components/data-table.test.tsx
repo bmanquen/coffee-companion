@@ -6,6 +6,7 @@ import {
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { DataTable } from './data-table'
+import type { Row } from '@tanstack/react-table'
 
 type CoffeeRow = { name: string; roaster: string }
 
@@ -16,13 +17,19 @@ const columns = [
 ]
 
 // DataTable takes a built TanStack Table instance; this wrapper supplies one.
-function DataTableHarness({ data }: { data: Array<CoffeeRow> }) {
+function DataTableHarness({
+  data,
+  rowClassName,
+}: {
+  data: Array<CoffeeRow>
+  rowClassName?: (row: Row<CoffeeRow>) => string | undefined
+}) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
   })
-  return <DataTable table={table} />
+  return <DataTable table={table} rowClassName={rowClassName} />
 }
 
 describe('DataTable', () => {
@@ -48,5 +55,24 @@ describe('DataTable', () => {
   it('shows an empty state when there are no rows', () => {
     render(<DataTableHarness data={[]} />)
     expect(within(screen.getByRole('table')).getByText('No results.')).toBeTruthy()
+  })
+
+  it('applies rowClassName only to rows the predicate matches', () => {
+    render(
+      <DataTableHarness
+        data={[
+          { name: 'Ethiopia Guji', roaster: 'Sey' },
+          { name: 'Colombia El Paraiso', roaster: 'Onyx' },
+        ]}
+        rowClassName={(row) =>
+          row.original.roaster === 'Sey' ? 'bg-primary/10' : undefined
+        }
+      />,
+    )
+    const table = within(screen.getByRole('table'))
+    const matched = table.getByText('Ethiopia Guji').closest('tr')!
+    const unmatched = table.getByText('Colombia El Paraiso').closest('tr')!
+    expect(matched.className).toContain('bg-primary/10')
+    expect(unmatched.className).not.toContain('bg-primary/10')
   })
 })

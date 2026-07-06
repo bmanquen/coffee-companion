@@ -81,10 +81,12 @@ function DataCard<T>({
   row,
   renderSubComponent,
   cardExpandable,
+  className,
 }: {
   row: Row<T>
   renderSubComponent?: (row: Row<T>) => ReactNode
   cardExpandable?: boolean
+  className?: string
 }) {
   'use no memo'
   // Card-local expansion for cardExpandable mode; ignored when the table itself
@@ -122,6 +124,7 @@ function DataCard<T>({
       className={cn(
         'rounded-lg border bg-card p-4',
         canExpand && 'cursor-pointer',
+        className,
       )}
       onClick={canExpand ? toggle : undefined}
     >
@@ -190,6 +193,9 @@ interface DataTableProps<T> {
   // does NOT touch the desktop table — use it when the desktop table already
   // shows every column but the mobile card should stay compact.
   cardExpandable?: boolean
+  // Extra classes applied per row (desktop <tr>) and per card (mobile), derived
+  // from the row's data — e.g. to highlight rows that match some condition.
+  rowClassName?: (row: Row<T>) => string | undefined
 }
 
 export function DataTable<T>({
@@ -197,6 +203,7 @@ export function DataTable<T>({
   renderSubComponent,
   paginated,
   cardExpandable,
+  rowClassName,
 }: DataTableProps<T>) {
   // TanStack Table's instance is a stable, mutable object; React Compiler would
   // otherwise memoize getHeaderGroups()/getRowModel() and never re-derive rows
@@ -260,7 +267,10 @@ export function DataTable<T>({
           rows.map((row) => (
             <Fragment key={row.id}>
               <TableRow
-                className={cn(renderSubComponent && 'cursor-pointer')}
+                className={cn(
+                  renderSubComponent && 'cursor-pointer',
+                  rowClassName?.(row),
+                )}
                 onClick={
                   renderSubComponent
                     ? row.getToggleExpandedHandler()
@@ -302,6 +312,7 @@ export function DataTable<T>({
               row={row}
               renderSubComponent={renderSubComponent}
               cardExpandable={cardExpandable}
+              className={rowClassName?.(row)}
             />
           ))
         )}

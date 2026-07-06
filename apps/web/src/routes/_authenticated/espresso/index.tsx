@@ -88,6 +88,8 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
       variant={dialedIn ? 'default' : 'ghost'}
       size="icon"
       className="h-8 w-8"
+      aria-label={dialedIn ? 'Dialed in — clear' : 'Mark as dialed in'}
+      aria-pressed={dialedIn}
       onClick={() =>
         setDialedIn.mutate({
           coffeeId: shot.coffeeId,
@@ -163,6 +165,13 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
 }
 
 const columns = [
+  columnHelper.display({
+    id: 'dialedIn',
+    header: '',
+    cell: DialedInCell,
+    enableSorting: false,
+    meta: { cardHideLabel: true },
+  }),
   columnHelper.accessor('coffee.name', {
     header: 'Coffee',
     meta: { cardTitle: true },
@@ -220,13 +229,6 @@ const columns = [
     cell: (info) => info.getValue() ?? '-',
     enableSorting: false,
     meta: { cardExpandedOnly: true },
-  }),
-  columnHelper.display({
-    id: 'dialedIn',
-    header: '',
-    cell: DialedInCell,
-    enableSorting: false,
-    meta: { cardHideLabel: true },
   }),
   columnHelper.display({
     id: 'actions',
@@ -327,7 +329,15 @@ function EspressoIndex() {
         />
       </div>
       <div className="w-full">
-        <DataTable table={table} cardExpandable />
+        <DataTable
+          table={table}
+          cardExpandable
+          rowClassName={(row) =>
+            row.original.isDialedIn
+              ? 'bg-primary/10 hover:bg-primary/15'
+              : undefined
+          }
+        />
       </div>
     </div>
   )

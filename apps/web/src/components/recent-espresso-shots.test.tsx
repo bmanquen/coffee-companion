@@ -96,6 +96,29 @@ describe('RecentEspressoShots', () => {
     expect(within(screen.getByRole('table')).queryByText('Ethiopia Guji')).toBeNull()
   })
 
+  it('marks a dialed-in shot with the dialed-in icon', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(
+      trpc.espressoShot.getRecent.queryKey({ limit: 5, offset: 0 }),
+      { items: [makeRecentShot({ isDialedIn: true })], total: 1 },
+    )
+    render(<RecentEspressoShots />, { wrapper: Wrapper })
+    // Scope to the desktop table so the parallel mobile card isn't a 2nd match.
+    const table = within(screen.getByRole('table'))
+    expect(table.getByLabelText('Dialed in')).toBeTruthy()
+  })
+
+  it('does not show the dialed-in icon for a regular shot', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(
+      trpc.espressoShot.getRecent.queryKey({ limit: 5, offset: 0 }),
+      { items: [makeRecentShot({ isDialedIn: false })], total: 1 },
+    )
+    render(<RecentEspressoShots />, { wrapper: Wrapper })
+    const table = within(screen.getByRole('table'))
+    expect(table.queryByLabelText('Dialed in')).toBeNull()
+  })
+
   it('renders dashes for missing dose/yield/time values', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(
