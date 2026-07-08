@@ -1,4 +1,6 @@
 import type {
+  AeropressBrew,
+  AeropressMethod,
   BrewingDevice,
   BrewingDeviceType,
   Coffee,
@@ -13,4 +15,14 @@ export interface EspressoShotWithRelations extends EspressoShot {
   coffee: Coffee
   grinder: Grinder
   brewingDevice: BrewingDevice & { type: BrewingDeviceType }
+}
+
+// An aeropress brew with its coffee, grinder, brewing device, and method
+// relations joined in — the shape returned by the aeropress brew list queries
+// (getAll / getRecent / getDialedIn) and rendered by the tables and dashboard.
+export interface AeropressBrewWithRelations extends AeropressBrew {
+  coffee: Coffee
+  grinder: Grinder
+  brewingDevice: BrewingDevice & { type: BrewingDeviceType }
+  method: AeropressMethod
 }

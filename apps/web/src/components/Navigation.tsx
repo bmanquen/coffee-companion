@@ -1,5 +1,5 @@
 import { Link, useNavigate } from '@tanstack/react-router'
-import { Menu } from 'lucide-react'
+import { Bean, Coffee, Home, Menu, Wrench } from 'lucide-react'
 import { Avatar, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet'
@@ -30,7 +30,7 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
           variant="ghost"
           size="icon"
           aria-label="Open menu"
-          className="hidden md:inline-flex"
+          className="hidden lg:inline-flex"
         >
           <Menu className="h-5 w-5" />
         </Button>
@@ -42,30 +42,38 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
       >
         <nav className="flex flex-col gap-2 mt-10 h-full">
           <Link
-            className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
+            className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
             to="/"
             activeOptions={{ exact: true }}
+            onClick={() => setOpen(false)}
           >
+            <Home className="h-5 w-5" />
             Home
           </Link>
           {session && (
             <>
               <Link
-                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
+                className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
                 to="/coffees"
+                onClick={() => setOpen(false)}
               >
+                <Bean className="h-5 w-5" />
                 Coffee
               </Link>
               <Link
-                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
-                to="/espresso"
+                className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
+                to="/brews"
+                onClick={() => setOpen(false)}
               >
-                Espresso
+                <Coffee className="h-5 w-5" />
+                Brews
               </Link>
               <Link
-                className="rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
+                className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
                 to="/equipment"
+                onClick={() => setOpen(false)}
               >
+                <Wrench className="h-5 w-5" />
                 Equipment
               </Link>
             </>

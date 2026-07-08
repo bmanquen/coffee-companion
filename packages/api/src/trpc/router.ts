@@ -1,3 +1,5 @@
+import { aeropressBrewRouter } from './aeropressBrew'
+import { aeropressMethodRouter } from './aeropressMethod'
 import { brewingDeviceRouter } from './brewingDevice'
 import { brewingDeviceTypeRouter } from './brewingDeviceType'
 import { coffeeRouter } from './coffee'
@@ -21,5 +23,7 @@ export const trpcRouter = createTRPCRouter({
   brewingDeviceType: brewingDeviceTypeRouter,
   brewingDevice: brewingDeviceRouter,
   espressoShot: espressoShotRouter,
+  aeropressMethod: aeropressMethodRouter,
+  aeropressBrew: aeropressBrewRouter,
 })
 export type TRPCRouter = typeof trpcRouter

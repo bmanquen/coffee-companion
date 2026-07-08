@@ -21,8 +21,17 @@ vi.mock('@/lib/auth-client', () => ({
 }))
 
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ to, children }: { to: string; children: ReactNode }) => (
-    <a href={to}>{children}</a>
+  Link: ({
+    to,
+    children,
+    ...props
+  }: {
+    to: string
+    children: ReactNode
+  }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
   ),
   useNavigate: () => mocks.navigate,
 }))
@@ -49,7 +58,7 @@ describe('Navigation', () => {
     render(<Navigation open setOpen={() => {}} />)
 
     expect(screen.getByRole('link', { name: 'Coffee' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Espresso' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Brews' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Equipment' })).toBeTruthy()
     expect(screen.getByText('Test User')).toBeTruthy()
 
@@ -57,6 +66,18 @@ describe('Navigation', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }))
     })
     expect(mocks.signOut).toHaveBeenCalled()
+  })
+
+  it('closes the drawer when any nav link is selected', () => {
+    authState.session = { user: { name: 'Test User', image: null } }
+    const setOpen = vi.fn()
+    render(<Navigation open setOpen={setOpen} />)
+
+    for (const name of ['Home', 'Coffee', 'Brews', 'Equipment']) {
+      fireEvent.click(screen.getByRole('link', { name }))
+    }
+    expect(setOpen).toHaveBeenCalledTimes(4)
+    expect(setOpen).toHaveBeenCalledWith(false)
   })
 
   it('shows sign-in and no authenticated links when signed out', async () => {

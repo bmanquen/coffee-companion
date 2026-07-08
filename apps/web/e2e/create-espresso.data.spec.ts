@@ -19,8 +19,8 @@ test('log an espresso shot via the new-shot form', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Log', exact: true }).click()
 
-  await expect(page).toHaveURL(/\/espresso$/)
-  await expect(page.getByRole('heading', { name: 'Espresso' })).toBeVisible()
+  await expect(page).toHaveURL(/\/brews$/)
+  await expect(page.getByRole('heading', { name: 'Brews' })).toBeVisible()
 })
 
 // Exercises the DatePicker calendar (Radix popover + react-day-picker) in a

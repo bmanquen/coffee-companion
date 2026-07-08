@@ -3,7 +3,7 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from '@tanstack/react-query'
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -11,13 +11,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { CoffeeIcon, Crosshair, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Crosshair, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
+import type { AeropressBrewWithRelations } from '@/types'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
-import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogClose,
@@ -28,72 +29,47 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast } from '@/lib/brew'
-import { brewRatio, formatBrewRatio } from '@/lib/brew-ratio'
+import { formatBrewRatio } from '@/lib/brew-ratio'
 
-export const Route = createFileRoute('/_authenticated/espresso/')({
-  loader: ({ context }) => {
-    context.queryClient.ensureQueryData(
-      context.trpc.espressoShot.getAll.queryOptions(),
-    )
-  },
-  component: EspressoIndex,
-})
+type Brew = AeropressBrewWithRelations
 
-type Shot = {
-  id: string
-  coffeeId: string
-  isDialedIn: boolean
-  roastDate: string | null
-  createdAt: Date
-  dose: string | null
-  yield: string | null
-  time: number | null
-  grindSetting: string | null
-  notes: string | null
-  coffee: { name: string }
-  grinder: { name: string; brand: string }
-  brewingDevice: { name: string; brand: string; type: { name: string } }
-}
+const columnHelper = createColumnHelper<Brew>()
 
-const columnHelper = createColumnHelper<Shot>()
-
-function DialedInCell({ row }: CellContext<Shot, unknown>) {
+function DialedInCell({ row }: CellContext<Brew, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const setDialedIn = useMutation(
-    trpc.coffee.setDialedIn.mutationOptions({
+    trpc.aeropressBrew.setDialedIn.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
-        queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
+        queryClient.invalidateQueries(trpc.aeropressBrew.getAll.queryOptions())
       },
     }),
   )
 
-  const shot = row.original
-  const dialedIn = shot.isDialedIn
+  const brew = row.original
+  const dialedIn = brew.isDialedIn
 
   return (
     <Button
       variant={dialedIn ? 'default' : 'ghost'}
       size="icon"
       className="h-8 w-8"
-      aria-label={dialedIn ? 'Dialed in — clear' : 'Mark as dialed in'}
+      aria-label={
+        dialedIn
+          ? `Dialed in for ${brew.method.name} — clear`
+          : `Mark as dialed in for ${brew.method.name}`
+      }
       aria-pressed={dialedIn}
       onClick={() =>
+        // Dialing in is scoped per method: this only replaces the coffee's
+        // dialed-in brew for *this* brew's method.
         setDialedIn.mutate({
-          coffeeId: shot.coffeeId,
-          shotId: dialedIn ? null : shot.id,
+          coffeeId: brew.coffeeId,
+          methodId: brew.methodId,
+          brewId: dialedIn ? null : brew.id,
         })
       }
     >
@@ -102,28 +78,27 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
   )
 }
 
-function ActionsCell({ row }: CellContext<Shot, unknown>) {
+function ActionsCell({ row }: CellContext<Brew, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
-  const deleteShot = useMutation(
-    trpc.espressoShot.delete.mutationOptions({
+  const deleteBrew = useMutation(
+    trpc.aeropressBrew.delete.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
-        queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
+        queryClient.invalidateQueries(trpc.aeropressBrew.getAll.queryOptions())
       },
     }),
   )
 
-  const shot = row.original
+  const brew = row.original
 
   return (
     <div className="flex items-center justify-end gap-1">
-      <Link to="/espresso/$shotId/edit" params={{ shotId: shot.id }}>
+      <Link to="/aeropress/$brewId/edit" params={{ brewId: brew.id }}>
         <Button
           variant="ghost"
           size="icon"
           className="h-8 w-8"
-          aria-label="Edit shot"
+          aria-label="Edit brew"
         >
           <Pencil className="h-4 w-4" />
         </Button>
@@ -134,25 +109,25 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            aria-label="Delete shot"
+            aria-label="Delete brew"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete shot</DialogTitle>
+            <DialogTitle>Delete brew</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this shot for &quot;
-              {shot.coffee.name}&quot;? This action cannot be undone.
+              Are you sure you want to delete this brew for &quot;
+              {brew.coffee.name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter showCloseButton>
             <DialogClose asChild>
               <Button
                 variant="destructive"
-                disabled={deleteShot.isPending}
-                onClick={() => deleteShot.mutate(shot.id)}
+                disabled={deleteBrew.isPending}
+                onClick={() => deleteBrew.mutate(brew.id)}
               >
                 Delete
               </Button>
@@ -176,6 +151,9 @@ const columns = [
     header: 'Coffee',
     meta: { cardTitle: true },
   }),
+  columnHelper.accessor('method.name', {
+    header: 'Method',
+  }),
   columnHelper.accessor((row) => daysOffRoast(row.roastDate, row.createdAt), {
     id: 'daysOffRoast',
     header: 'Days off roast',
@@ -191,33 +169,25 @@ const columns = [
     sortingFn: (a, b) =>
       Number(a.original.dose ?? 0) - Number(b.original.dose ?? 0),
   }),
-  columnHelper.accessor('yield', {
-    header: 'Yield',
+  columnHelper.accessor('water', {
+    header: 'Water',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
     sortingFn: (a, b) =>
-      Number(a.original.yield ?? 0) - Number(b.original.yield ?? 0),
+      Number(a.original.water ?? 0) - Number(b.original.water ?? 0),
   }),
   columnHelper.display({
     id: 'ratio',
     header: 'Ratio',
-    cell: ({ row }) => formatBrewRatio(row.original.dose, row.original.yield),
-    sortingFn: (a, b) => {
-      const ratioA = brewRatio(a.original.dose, a.original.yield) ?? 0
-      const ratioB = brewRatio(b.original.dose, b.original.yield) ?? 0
-      return ratioA - ratioB
-    },
+    cell: ({ row }) => formatBrewRatio(row.original.dose, row.original.water),
+    // Display columns aren't sortable in TanStack, so no sortingFn here.
     meta: { cardExpandedOnly: true },
   }),
-  columnHelper.accessor('time', {
-    header: 'Time',
+  columnHelper.accessor('steepTime', {
+    header: 'Steep',
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
   }),
   columnHelper.accessor('grinder.name', {
     header: 'Grinder',
-    meta: { cardExpandedOnly: true },
-  }),
-  columnHelper.accessor('brewingDevice.name', {
-    header: 'Device',
     meta: { cardExpandedOnly: true },
   }),
   columnHelper.accessor('grindSetting', {
@@ -239,11 +209,13 @@ const columns = [
   }),
 ]
 
-function EspressoIndex() {
+// The AeroPress brew log — one tab of the /brews page. Mirrors the equipment
+// page's section components (heading + add button + filters + table).
+export function AeropressBrewsSection() {
   'use no memo'
   const trpc = useTRPC()
-  const { data: shots } = useSuspenseQuery(
-    trpc.espressoShot.getAll.queryOptions(),
+  const { data: brews } = useSuspenseQuery(
+    trpc.aeropressBrew.getAll.queryOptions(),
   )
 
   const [sorting, setSorting] = useState<SortingState>([])
@@ -254,23 +226,22 @@ function EspressoIndex() {
   const coffeeOptions = useMemo(
     () =>
       Array.from(
-        new Map(shots.map((s) => [s.coffeeId, s.coffee.name])).entries(),
+        new Map(brews.map((b) => [b.coffeeId, b.coffee.name])).entries(),
       )
         .map(([value, label]) => ({ value, label }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [shots],
+    [brews],
   )
 
-  // Memoized so the filtered array keeps a stable reference between renders.
-  // Passing a fresh array to the table on every render trips its default
-  // autoReset* state updates and spins into an infinite render loop.
-  const visibleShots = useMemo(
-    () => (coffeeId ? shots.filter((s) => s.coffeeId === coffeeId) : shots),
-    [shots, coffeeId],
+  // Memoized so the filtered array keeps a stable reference between renders
+  // (a fresh array each render trips the table's autoReset into a render loop).
+  const visibleBrews = useMemo(
+    () => (coffeeId ? brews.filter((b) => b.coffeeId === coffeeId) : brews),
+    [brews, coffeeId],
   )
 
   const table = useReactTable({
-    data: visibleShots,
+    data: visibleBrews,
     columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
@@ -280,65 +251,51 @@ function EspressoIndex() {
     getFilteredRowModel: getFilteredRowModel(),
   })
 
-  if (shots.length === 0) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <CoffeeIcon />
-          </EmptyMedia>
-          <EmptyTitle>No Espresso Shots Yet</EmptyTitle>
-          <EmptyDescription>
-            Start dialing in your espresso by logging your first shot.
-          </EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <Link to="/espresso/new">
-            <Button>
-              <Plus />
-              Log Shot
-            </Button>
-          </Link>
-        </EmptyContent>
-      </Empty>
-    )
-  }
-
   return (
-    <div className="flex flex-col items-center p-4 gap-4">
+    <Card className="flex flex-col gap-4 w-full bg-white p-6">
       <div className="flex justify-between items-center w-full">
-        <H1>Espresso</H1>
-        <Link to="/espresso/new">
+        <h2 className="text-lg font-semibold">AeroPress</h2>
+        <Link to="/aeropress/new">
           <Button>
             <Plus />
-            Log Shot
+            Log Brew
           </Button>
         </Link>
       </div>
-      <div className="flex w-full flex-col gap-2 sm:flex-row">
-        <CoffeeFilter
-          options={coffeeOptions}
-          value={coffeeId}
-          onChange={setCoffeeId}
-        />
-        <Input
-          placeholder="Filter shots..."
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          className="flex-1"
-        />
-      </div>
-      <div className="w-full">
-        <DataTable
-          table={table}
-          cardExpandable
-          rowClassName={(row) =>
-            row.original.isDialedIn
-              ? 'bg-primary/10 hover:bg-primary/15'
-              : undefined
-          }
-        />
-      </div>
-    </div>
+      {brews.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No aeropress brews yet.{' '}
+          <Link to="/aeropress/new" className="underline">
+            Log your first brew
+          </Link>
+          .
+        </p>
+      ) : (
+        <>
+          <div className="flex w-full flex-col gap-2 sm:flex-row">
+            <CoffeeFilter
+              options={coffeeOptions}
+              value={coffeeId}
+              onChange={setCoffeeId}
+            />
+            <Input
+              placeholder="Filter brews..."
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="flex-1"
+            />
+          </div>
+          <DataTable
+            table={table}
+            cardExpandable
+            rowClassName={(row) =>
+              row.original.isDialedIn
+                ? 'bg-primary/10 hover:bg-primary/15'
+                : undefined
+            }
+          />
+        </>
+      )}
+    </Card>
   )
 }

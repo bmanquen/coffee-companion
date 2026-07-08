@@ -24,7 +24,7 @@ export default function MobileHeader() {
   const initial = session?.user.name.charAt(0).toUpperCase() ?? '?'
 
   return (
-    <header className="sticky top-0 z-30 mb-4 flex h-14 items-center justify-between border-b border-border bg-background/95 px-3 backdrop-blur md:hidden">
+    <header className="sticky top-0 z-30 mb-4 flex h-14 items-center justify-between border-b border-border bg-background/95 px-3 backdrop-blur lg:hidden">
       <span className="font-semibold">Coffee Companion</span>
       {session ? (
         <Popover>

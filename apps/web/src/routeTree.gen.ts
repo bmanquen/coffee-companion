@@ -11,17 +11,19 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedEspressoIndexRouteImport } from './routes/_authenticated/espresso/index'
 import { Route as AuthenticatedEquipmentIndexRouteImport } from './routes/_authenticated/equipment/index'
 import { Route as AuthenticatedCoffeesIndexRouteImport } from './routes/_authenticated/coffees/index'
+import { Route as AuthenticatedBrewsIndexRouteImport } from './routes/_authenticated/brews/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AuthenticatedEspressoNewRouteImport } from './routes/_authenticated/espresso/new'
 import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
+import { Route as AuthenticatedAeropressNewRouteImport } from './routes/_authenticated/aeropress/new'
 import { Route as AuthenticatedEspressoShotIdEditRouteImport } from './routes/_authenticated/espresso/$shotId.edit'
 import { Route as AuthenticatedEquipmentGrindersNewRouteImport } from './routes/_authenticated/equipment/grinders/new'
 import { Route as AuthenticatedEquipmentBrewingDevicesNewRouteImport } from './routes/_authenticated/equipment/brewing-devices/new'
 import { Route as AuthenticatedCoffeesCoffeeIdEditRouteImport } from './routes/_authenticated/coffees/$coffeeId.edit'
+import { Route as AuthenticatedAeropressBrewIdEditRouteImport } from './routes/_authenticated/aeropress/$brewId.edit'
 import { Route as AuthenticatedEquipmentGrindersGrinderIdEditRouteImport } from './routes/_authenticated/equipment/grinders/$grinderId.edit'
 import { Route as AuthenticatedEquipmentBrewingDevicesDeviceIdEditRouteImport } from './routes/_authenticated/equipment/brewing-devices/$deviceId.edit'
 
@@ -34,12 +36,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedEspressoIndexRoute =
-  AuthenticatedEspressoIndexRouteImport.update({
-    id: '/espresso/',
-    path: '/espresso/',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedEquipmentIndexRoute =
   AuthenticatedEquipmentIndexRouteImport.update({
     id: '/equipment/',
@@ -52,6 +48,11 @@ const AuthenticatedCoffeesIndexRoute =
     path: '/coffees/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedBrewsIndexRoute = AuthenticatedBrewsIndexRouteImport.update({
+  id: '/brews/',
+  path: '/brews/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
   id: '/api/trpc/$',
   path: '/api/trpc/$',
@@ -73,6 +74,12 @@ const AuthenticatedCoffeesNewRoute = AuthenticatedCoffeesNewRouteImport.update({
   path: '/coffees/new',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAeropressNewRoute =
+  AuthenticatedAeropressNewRouteImport.update({
+    id: '/aeropress/new',
+    path: '/aeropress/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedEspressoShotIdEditRoute =
   AuthenticatedEspressoShotIdEditRouteImport.update({
     id: '/espresso/$shotId/edit',
@@ -97,6 +104,12 @@ const AuthenticatedCoffeesCoffeeIdEditRoute =
     path: '/coffees/$coffeeId/edit',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAeropressBrewIdEditRoute =
+  AuthenticatedAeropressBrewIdEditRouteImport.update({
+    id: '/aeropress/$brewId/edit',
+    path: '/aeropress/$brewId/edit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedEquipmentGrindersGrinderIdEditRoute =
   AuthenticatedEquipmentGrindersGrinderIdEditRouteImport.update({
     id: '/equipment/grinders/$grinderId/edit',
@@ -112,13 +125,15 @@ const AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/espresso/new': typeof AuthenticatedEspressoNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/brews/': typeof AuthenticatedBrewsIndexRoute
   '/coffees/': typeof AuthenticatedCoffeesIndexRoute
   '/equipment/': typeof AuthenticatedEquipmentIndexRoute
-  '/espresso/': typeof AuthenticatedEspressoIndexRoute
+  '/aeropress/$brewId/edit': typeof AuthenticatedAeropressBrewIdEditRoute
   '/coffees/$coffeeId/edit': typeof AuthenticatedCoffeesCoffeeIdEditRoute
   '/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
@@ -128,13 +143,15 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/espresso/new': typeof AuthenticatedEspressoNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/brews': typeof AuthenticatedBrewsIndexRoute
   '/coffees': typeof AuthenticatedCoffeesIndexRoute
   '/equipment': typeof AuthenticatedEquipmentIndexRoute
-  '/espresso': typeof AuthenticatedEspressoIndexRoute
+  '/aeropress/$brewId/edit': typeof AuthenticatedAeropressBrewIdEditRoute
   '/coffees/$coffeeId/edit': typeof AuthenticatedCoffeesCoffeeIdEditRoute
   '/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
@@ -146,13 +163,15 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/_authenticated/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/_authenticated/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/_authenticated/espresso/new': typeof AuthenticatedEspressoNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/_authenticated/brews/': typeof AuthenticatedBrewsIndexRoute
   '/_authenticated/coffees/': typeof AuthenticatedCoffeesIndexRoute
   '/_authenticated/equipment/': typeof AuthenticatedEquipmentIndexRoute
-  '/_authenticated/espresso/': typeof AuthenticatedEspressoIndexRoute
+  '/_authenticated/aeropress/$brewId/edit': typeof AuthenticatedAeropressBrewIdEditRoute
   '/_authenticated/coffees/$coffeeId/edit': typeof AuthenticatedCoffeesCoffeeIdEditRoute
   '/_authenticated/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/_authenticated/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
@@ -164,13 +183,15 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/aeropress/new'
     | '/coffees/new'
     | '/espresso/new'
     | '/api/auth/$'
     | '/api/trpc/$'
+    | '/brews/'
     | '/coffees/'
     | '/equipment/'
-    | '/espresso/'
+    | '/aeropress/$brewId/edit'
     | '/coffees/$coffeeId/edit'
     | '/equipment/brewing-devices/new'
     | '/equipment/grinders/new'
@@ -180,13 +201,15 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/aeropress/new'
     | '/coffees/new'
     | '/espresso/new'
     | '/api/auth/$'
     | '/api/trpc/$'
+    | '/brews'
     | '/coffees'
     | '/equipment'
-    | '/espresso'
+    | '/aeropress/$brewId/edit'
     | '/coffees/$coffeeId/edit'
     | '/equipment/brewing-devices/new'
     | '/equipment/grinders/new'
@@ -197,13 +220,15 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/_authenticated/aeropress/new'
     | '/_authenticated/coffees/new'
     | '/_authenticated/espresso/new'
     | '/api/auth/$'
     | '/api/trpc/$'
+    | '/_authenticated/brews/'
     | '/_authenticated/coffees/'
     | '/_authenticated/equipment/'
-    | '/_authenticated/espresso/'
+    | '/_authenticated/aeropress/$brewId/edit'
     | '/_authenticated/coffees/$coffeeId/edit'
     | '/_authenticated/equipment/brewing-devices/new'
     | '/_authenticated/equipment/grinders/new'
@@ -235,13 +260,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/espresso/': {
-      id: '/_authenticated/espresso/'
-      path: '/espresso'
-      fullPath: '/espresso/'
-      preLoaderRoute: typeof AuthenticatedEspressoIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/equipment/': {
       id: '/_authenticated/equipment/'
       path: '/equipment'
@@ -254,6 +272,13 @@ declare module '@tanstack/react-router' {
       path: '/coffees'
       fullPath: '/coffees/'
       preLoaderRoute: typeof AuthenticatedCoffeesIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/brews/': {
+      id: '/_authenticated/brews/'
+      path: '/brews'
+      fullPath: '/brews/'
+      preLoaderRoute: typeof AuthenticatedBrewsIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/api/trpc/$': {
@@ -284,6 +309,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCoffeesNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/aeropress/new': {
+      id: '/_authenticated/aeropress/new'
+      path: '/aeropress/new'
+      fullPath: '/aeropress/new'
+      preLoaderRoute: typeof AuthenticatedAeropressNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/espresso/$shotId/edit': {
       id: '/_authenticated/espresso/$shotId/edit'
       path: '/espresso/$shotId/edit'
@@ -312,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCoffeesCoffeeIdEditRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/aeropress/$brewId/edit': {
+      id: '/_authenticated/aeropress/$brewId/edit'
+      path: '/aeropress/$brewId/edit'
+      fullPath: '/aeropress/$brewId/edit'
+      preLoaderRoute: typeof AuthenticatedAeropressBrewIdEditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/equipment/grinders/$grinderId/edit': {
       id: '/_authenticated/equipment/grinders/$grinderId/edit'
       path: '/equipment/grinders/$grinderId/edit'
@@ -330,11 +369,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAeropressNewRoute: typeof AuthenticatedAeropressNewRoute
   AuthenticatedCoffeesNewRoute: typeof AuthenticatedCoffeesNewRoute
   AuthenticatedEspressoNewRoute: typeof AuthenticatedEspressoNewRoute
+  AuthenticatedBrewsIndexRoute: typeof AuthenticatedBrewsIndexRoute
   AuthenticatedCoffeesIndexRoute: typeof AuthenticatedCoffeesIndexRoute
   AuthenticatedEquipmentIndexRoute: typeof AuthenticatedEquipmentIndexRoute
-  AuthenticatedEspressoIndexRoute: typeof AuthenticatedEspressoIndexRoute
+  AuthenticatedAeropressBrewIdEditRoute: typeof AuthenticatedAeropressBrewIdEditRoute
   AuthenticatedCoffeesCoffeeIdEditRoute: typeof AuthenticatedCoffeesCoffeeIdEditRoute
   AuthenticatedEquipmentBrewingDevicesNewRoute: typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   AuthenticatedEquipmentGrindersNewRoute: typeof AuthenticatedEquipmentGrindersNewRoute
@@ -344,11 +385,13 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAeropressNewRoute: AuthenticatedAeropressNewRoute,
   AuthenticatedCoffeesNewRoute: AuthenticatedCoffeesNewRoute,
   AuthenticatedEspressoNewRoute: AuthenticatedEspressoNewRoute,
+  AuthenticatedBrewsIndexRoute: AuthenticatedBrewsIndexRoute,
   AuthenticatedCoffeesIndexRoute: AuthenticatedCoffeesIndexRoute,
   AuthenticatedEquipmentIndexRoute: AuthenticatedEquipmentIndexRoute,
-  AuthenticatedEspressoIndexRoute: AuthenticatedEspressoIndexRoute,
+  AuthenticatedAeropressBrewIdEditRoute: AuthenticatedAeropressBrewIdEditRoute,
   AuthenticatedCoffeesCoffeeIdEditRoute: AuthenticatedCoffeesCoffeeIdEditRoute,
   AuthenticatedEquipmentBrewingDevicesNewRoute:
     AuthenticatedEquipmentBrewingDevicesNewRoute,

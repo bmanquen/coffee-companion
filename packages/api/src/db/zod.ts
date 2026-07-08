@@ -1,6 +1,8 @@
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 import { z } from 'zod'
 import {
+  aeropressBrews,
+  aeropressMethods,
   brewingDeviceTypes,
   brewingDevices,
   coffeeProcesses,
@@ -141,3 +143,29 @@ export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
 export const selectEspressoShotSchema = createSelectSchema(espressoShots)
 export type InsertEspressoShot = z.infer<typeof insertEspressoShotSchema>
 export type EspressoShot = z.infer<typeof selectEspressoShotSchema>
+
+// AeroPress Methods (system-defaults + user lookup, like brewing device types)
+export const insertAeropressMethodSchema = createInsertSchema(aeropressMethods, {
+  name: (schema) => schema.min(1),
+})
+export const selectAeropressMethodSchema = createSelectSchema(aeropressMethods)
+export type InsertAeropressMethod = z.infer<typeof insertAeropressMethodSchema>
+export type AeropressMethod = z.infer<typeof selectAeropressMethodSchema>
+
+// AeroPress Brews. Weights (dose/water) are decimal strings like espresso
+// dose/yield; steep time is whole seconds.
+export const insertAeropressBrewSchema = createInsertSchema(aeropressBrews, {
+  dose: decimalString,
+  water: decimalString,
+  coffeeId: () => z.uuid('Select a coffee'),
+  grinderId: () => z.uuid('Select a grinder'),
+  brewingDeviceId: () => z.uuid('Select a brewing device'),
+  methodId: () => z.uuid('Select a method'),
+}).omit({
+  id: true,
+  userId: true,
+  isDialedIn: true,
+})
+export const selectAeropressBrewSchema = createSelectSchema(aeropressBrews)
+export type InsertAeropressBrew = z.infer<typeof insertAeropressBrewSchema>
+export type AeropressBrew = z.infer<typeof selectAeropressBrewSchema>

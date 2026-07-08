@@ -63,7 +63,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Navigation open={navOpen} setOpen={setNavOpen} />
         <MobileHeader />
         <main
-          className={`transition-all duration-300 ${navOpen ? 'md:ml-64' : ''} px-3 pb-20 md:pb-0`}
+          className={`transition-all duration-300 ${navOpen ? 'lg:ml-64' : ''} px-3 pb-20 lg:pb-0`}
         >
           {children}
         </main>

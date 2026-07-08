@@ -11,7 +11,7 @@ async function createDevice(page: Page, name: string) {
   await page.getByPlaceholder('e.g. La Marzocco').fill('Test Brand')
 
   // Type SearchSelect — pick the seeded Espresso type. Scope to the dropdown
-  // option; "Espresso" also appears as a (viewport-hidden) bottom-nav label.
+  // option so we match the type, not any other "Espresso" text on the page.
   await page.getByText('Select Type').click()
   await page.getByRole('option', { name: 'Espresso', exact: true }).click()
 

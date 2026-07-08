@@ -4,12 +4,21 @@ import { expect, test } from '@playwright/test'
 // cookie for the seeded user). The SSR cookie-forwarding fix lets these routes
 // load directly via page.goto.
 
-test('espresso page shows the shots table', async ({ page }) => {
-  await page.goto('/espresso')
-  await expect(page.getByRole('heading', { name: 'Espresso' })).toBeVisible()
+test('brews page shows the espresso log', async ({ page }) => {
+  await page.goto('/brews')
+  await expect(page.getByRole('heading', { name: 'Brews' })).toBeVisible()
+  // The Espresso tab is selected by default.
   // .first(): the create-espresso flow can add another shot for this coffee,
   // so tolerate more than one row (tests share the seeded user/DB).
   await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()
+})
+
+test('brews page AeroPress tab shows the aeropress log', async ({ page }) => {
+  await page.goto('/brews')
+  await page.getByRole('tab', { name: 'AeroPress' }).click()
+  // The seeded dialed-in AeroPress brew for Ethiopia Guji, on the Standard method.
+  await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()
+  await expect(page.getByText('Standard').first()).toBeVisible()
 })
 
 test('coffees page lists coffees', async ({ page }) => {

@@ -13,7 +13,7 @@ test('nav menu shows the authenticated links', async ({ page }) => {
     page.getByRole('link', { name: 'Coffee', exact: true }),
   ).toBeVisible()
   await expect(
-    page.getByRole('link', { name: 'Espresso', exact: true }),
+    page.getByRole('link', { name: 'Brews', exact: true }),
   ).toBeVisible()
   await expect(
     page.getByRole('link', { name: 'Equipment', exact: true }),

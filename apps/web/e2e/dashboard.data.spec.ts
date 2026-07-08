@@ -11,3 +11,15 @@ test('authenticated home renders the dashboard', async ({ page }) => {
     page.getByRole('button', { name: 'Sign in with Google' }),
   ).toHaveCount(0)
 })
+
+test('dashboard shows the dialed-in aeropress section grouped by method', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  // The seeded dialed-in AeroPress brew renders this section with its method.
+  await expect(
+    page.getByRole('heading', { name: 'Dialed In AeroPress' }),
+  ).toBeVisible()
+  await expect(page.getByText('Standard').first()).toBeVisible()
+})

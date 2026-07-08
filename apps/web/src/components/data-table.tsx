@@ -27,7 +27,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-// Controls how each column renders in the mobile card layout (< md).
+// Controls how each column renders in the card layout (< lg: phones + tablets).
 // Columns with no meta become a labeled value row by default.
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
@@ -214,7 +214,7 @@ export function DataTable<T>({
   return (
     <>
       {/* Desktop: real table */}
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
       <Table>
       <TableHeader>
         {table.getHeaderGroups().map((headerGroup) => (
@@ -300,7 +300,7 @@ export function DataTable<T>({
     </Table>
       </div>
       {/* Mobile: one card per row */}
-      <div className="flex flex-col gap-3 md:hidden">
+      <div className="flex flex-col gap-3 lg:hidden">
         {rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             No results.

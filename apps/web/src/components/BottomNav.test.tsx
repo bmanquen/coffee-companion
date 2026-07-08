@@ -33,7 +33,7 @@ describe('BottomNav', () => {
     const tabs: Array<[string, string]> = [
       ['Home', '/'],
       ['Coffee', '/coffees'],
-      ['Espresso', '/espresso'],
+      ['Brews', '/brews'],
       ['Equipment', '/equipment'],
     ]
     for (const [name, href] of tabs) {

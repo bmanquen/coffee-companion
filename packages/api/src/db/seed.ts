@@ -1,5 +1,8 @@
 import { eq } from 'drizzle-orm'
+import { AEROPRESS_METHOD_DEFAULTS } from '../lib/aeropress'
 import {
+  aeropressBrews,
+  aeropressMethods,
   brewingDeviceTypes,
   brewingDevices,
   coffeeProcesses,
@@ -79,6 +82,7 @@ const brewingDevicesData = [
   { name: 'Linea Mini', brand: 'La Marzocco', type: 'Espresso' },
   { name: 'Pro 600', brand: 'Profitec', type: 'Espresso' },
   { name: 'Bianca', brand: 'Lelit', type: 'Espresso' },
+  { name: 'AeroPress Go', brand: 'AeroPress', type: 'AeroPress' },
 ]
 
 const roastLevelsData = [
@@ -434,6 +438,16 @@ async function seed() {
     (await db.select().from(brewingDeviceTypes)).map((t) => [t.name, t.id]),
   )
 
+  // AeroPress brew methods are system defaults (userId null), upserted by name.
+  await db
+    .insert(aeropressMethods)
+    .values(AEROPRESS_METHOD_DEFAULTS.map((name) => ({ name })))
+    .onConflictDoNothing()
+  const aeropressMethodMap = new Map(
+    (await db.select().from(aeropressMethods)).map((m) => [m.name, m.id]),
+  )
+  const standardMethodId = aeropressMethodMap.get('Standard')!
+
   // Brewing devices are user-owned and were cleared above, so insert fresh.
   await db.insert(brewingDevices).values(
     brewingDevicesData.map((d) => ({
@@ -451,9 +465,12 @@ async function seed() {
         .where(eq(brewingDevices.userId, SEED_USER_ID))
     ).map((d) => [d.name, d.id]),
   )
-  const brewingDeviceIds = brewingDevicesData.map(
-    (d) => brewingDeviceMap.get(d.name)!,
-  )
+  // Espresso shots must go on espresso devices; aeropress brews on the
+  // AeroPress. Keep the id lists separate so each method gets a valid device.
+  const espressoDeviceIds = brewingDevicesData
+    .filter((d) => d.type === 'Espresso')
+    .map((d) => brewingDeviceMap.get(d.name)!)
+  const aeropressDeviceId = brewingDeviceMap.get('AeroPress Go')!
 
   for (const coffee of greenCoffeesData) {
     const {
@@ -504,7 +521,7 @@ async function seed() {
 
     const grinderId = grinderIds[coffeeIndex % grinderIds.length]
     const brewingDeviceId =
-      brewingDeviceIds[coffeeIndex % brewingDeviceIds.length]
+      espressoDeviceIds[coffeeIndex % espressoDeviceIds.length]
 
     const [insertedCoffee] = await db
       .insert(coffees)
@@ -537,6 +554,25 @@ async function seed() {
         isDialedIn: index === dialedInShotIndex,
       })),
     )
+
+    // Give the first few coffees a dialed-in Standard AeroPress brew so the
+    // aeropress views have data to show out of the box.
+    if (coffeeIndex < 3) {
+      await db.insert(aeropressBrews).values({
+        userId: SEED_USER_ID,
+        coffeeId: insertedCoffee.id,
+        grinderId,
+        brewingDeviceId: aeropressDeviceId,
+        methodId: standardMethodId,
+        roastDate,
+        dose: '15.0',
+        water: '220',
+        steepTime: 90,
+        grindSetting: '18',
+        notes: 'Bright and clean, medium grind',
+        isDialedIn: true,
+      })
+    }
 
     for (const varietyName of coffeeVarieties) {
       const varietyId = varietyMap.get(varietyName)

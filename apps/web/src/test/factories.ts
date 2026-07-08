@@ -6,6 +6,11 @@ import type { TRPCRouter } from '@coffee-companion/api/trpc/router'
 type RouterOutputs = inferRouterOutputs<TRPCRouter>
 type RecentShot = RouterOutputs['espressoShot']['getRecent']['items'][number]
 type RecentCoffee = RouterOutputs['coffee']['getRecent']['items'][number]
+type AeropressBrew = RouterOutputs['aeropressBrew']['getDialedIn'][number]
+type CoffeeOption = RouterOutputs['coffee']['getAll'][number]
+type MethodOption = RouterOutputs['aeropressMethod']['list'][number]
+type GrinderOption = RouterOutputs['grinder']['list'][number]
+type DeviceOption = RouterOutputs['brewingDevice']['list'][number]
 
 const createdAt = new Date('2026-06-01T08:00:00.000Z')
 const updatedAt = new Date('2026-06-15T10:30:00.000Z')
@@ -73,6 +78,116 @@ export function makeRecentCoffee(
     isActive: false,
     createdAt,
     updatedAt,
+    ...overrides,
+  }
+}
+
+export function makeAeropressBrew(
+  overrides: Partial<AeropressBrew> = {},
+): AeropressBrew {
+  return {
+    id: 'a1',
+    userId: 'u1',
+    coffeeId: 'c1',
+    grinderId: 'g1',
+    brewingDeviceId: 'd1',
+    methodId: 'm1',
+    roastDate: null,
+    isDialedIn: true,
+    dose: '15',
+    water: '220',
+    steepTime: 90,
+    grindSetting: '18',
+    notes: 'bright and clean',
+    createdAt,
+    updatedAt,
+    coffee: makeRecentCoffee({ id: 'c1' }),
+    grinder: {
+      id: 'g1',
+      userId: 'u1',
+      name: 'Ode',
+      brand: 'Fellow',
+      createdAt,
+      updatedAt,
+    },
+    brewingDevice: {
+      id: 'd1',
+      userId: 'u1',
+      name: 'AeroPress Go',
+      brand: 'AeroPress',
+      typeId: 't1',
+      createdAt,
+      updatedAt,
+      type: {
+        id: 't1',
+        userId: null,
+        name: 'AeroPress',
+        createdAt,
+        updatedAt,
+      },
+    },
+    method: {
+      id: 'm1',
+      userId: null,
+      name: 'Standard',
+      createdAt,
+      updatedAt,
+    },
+    ...overrides,
+  }
+}
+
+// The following back the SearchSelect option lists that the brew forms load.
+export function makeCoffee(overrides: Partial<CoffeeOption> = {}): CoffeeOption {
+  return {
+    ...makeRecentCoffee(),
+    country: null,
+    region: null,
+    process: null,
+    dialedInShot: null,
+    ...overrides,
+  }
+}
+
+export function makeAeropressMethod(
+  overrides: Partial<MethodOption> = {},
+): MethodOption {
+  return {
+    id: 'm1',
+    userId: null,
+    name: 'Standard',
+    createdAt,
+    updatedAt,
+    ...overrides,
+  }
+}
+
+export function makeGrinder(
+  overrides: Partial<GrinderOption> = {},
+): GrinderOption {
+  return {
+    id: 'g1',
+    userId: 'u1',
+    name: 'Ode',
+    brand: 'Fellow',
+    createdAt,
+    updatedAt,
+    ...overrides,
+  }
+}
+
+export function makeBrewingDevice(
+  overrides: Partial<DeviceOption> = {},
+): DeviceOption {
+  return {
+    id: 'd1',
+    userId: 'u1',
+    name: 'AeroPress Go',
+    brand: 'AeroPress',
+    typeId: 't1',
+    createdAt,
+    updatedAt,
+    type: { id: 't1', userId: null, name: 'AeroPress', createdAt, updatedAt },
     ...overrides,
   }
 }

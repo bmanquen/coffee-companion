@@ -3,9 +3,16 @@ import { expect, test } from '@playwright/test'
 // Empty-state page tests. Run in the `authed-empty` project (bypass cookie for
 // an unseeded user), so every authenticated page renders its empty state.
 
-test('espresso page shows the empty state', async ({ page }) => {
-  await page.goto('/espresso')
-  await expect(page.getByText('No Espresso Shots Yet')).toBeVisible()
+test('brews page shows the espresso empty state', async ({ page }) => {
+  await page.goto('/brews')
+  // The Espresso tab is selected by default.
+  await expect(page.getByText(/No espresso shots yet/i)).toBeVisible()
+})
+
+test('brews page shows the aeropress empty state', async ({ page }) => {
+  await page.goto('/brews')
+  await page.getByRole('tab', { name: 'AeroPress' }).click()
+  await expect(page.getByText(/No aeropress brews yet/i)).toBeVisible()
 })
 
 test('coffees page shows the empty state', async ({ page }) => {
