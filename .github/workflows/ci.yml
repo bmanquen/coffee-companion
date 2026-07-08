@@ -161,3 +161,39 @@ jobs:
           path: apps/web/playwright-report
           retention-days: 7
           if-no-files-found: ignore
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    # Release phase: deploy-time tasks that must run once, after every check
+    # passes on a push to main (never on PRs). Currently just applies pending
+    # database migrations so the live schema is up to date before the new app
+    # version rolls out (the app deploy itself is handled by Railway). Keep
+    # migrations backward-compatible (expand-then-contract) so the
+    # currently-running version tolerates the new schema during rollout.
+    needs: [lint, typecheck, unit, integration-e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Scopes the DB secret to the 'production' environment (add required
+    # reviewers there if you want a manual gate before the release runs).
+    environment: production
+    env:
+      # Set DATABASE_URL as a 'production' environment secret pointing at the
+      # live database.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply database migrations
+        run: pnpm db:migrate
