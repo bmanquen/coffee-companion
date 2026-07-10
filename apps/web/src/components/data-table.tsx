@@ -3,11 +3,10 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
-import { Fragment, useState } from 'react'
+import { Fragment } from 'react'
 import type {
   Cell,
   Column,
@@ -16,6 +15,7 @@ import type {
   Table as TanstackTable,
 } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -24,7 +24,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 // Controls how each column renders in the card layout (< lg: phones + tablets).
@@ -36,9 +35,9 @@ declare module '@tanstack/react-table' {
     // Render this column's value without a label, in the card's top-right
     // (e.g. an actions column, or an expand chevron).
     cardHideLabel?: boolean
-    // Keep this labeled value out of the card's collapsed summary; only show it
-    // once the card is expanded. Only meaningful with renderSubComponent.
-    cardExpandedOnly?: boolean
+    // Render this column as its own full-width row below the columned body,
+    // with the label above the value (e.g. long free-text notes).
+    cardFullWidth?: boolean
     // Omit this column from the card layout entirely.
     cardHidden?: boolean
   }
@@ -61,13 +60,16 @@ function CardRows<T>({
 }) {
   'use no memo'
   return (
-    <dl className={cn('flex flex-col gap-1', className)}>
+    <dl className={cn('gap-x-6 columns-2', className)}>
       {cells.map((cell) => (
-        <div key={cell.id} className="flex justify-between gap-4 text-sm">
-          <dt className="text-muted-foreground">{cardLabel(cell.column)}</dt>
-          <dd className="text-right">
-            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-          </dd>
+        <div
+          key={cell.id}
+          className="flex break-inside-avoid gap-2 pb-1 text-sm"
+        >
+          <dt className="whitespace-nowrap text-muted-foreground">
+            {cardLabel(cell.column)}
+          </dt>
+          <dd>{flexRender(cell.column.columnDef.cell, cell.getContext())}</dd>
         </div>
       ))}
     </dl>
@@ -75,59 +77,42 @@ function CardRows<T>({
 }
 
 // One row rendered as a card in the mobile layout. Splits cells into a heading
-// (cardTitle), top-right icons (cardHideLabel), a collapsed summary, and an
-// expanded section (cardExpandedOnly columns + renderSubComponent).
+// (cardTitle), top-right icons (cardHideLabel), and a body of labeled values
+// (everything else + renderSubComponent). The body flows in columns that wrap
+// to keep the card short; nothing is collapsed — all information is visible.
 function DataCard<T>({
   row,
   renderSubComponent,
-  cardExpandable,
   className,
 }: {
   row: Row<T>
   renderSubComponent?: (row: Row<T>) => ReactNode
-  cardExpandable?: boolean
   className?: string
 }) {
   'use no memo'
-  // Card-local expansion for cardExpandable mode; ignored when the table itself
-  // drives expansion via renderSubComponent.
-  const [localExpanded, setLocalExpanded] = useState(false)
-
   const cells = row.getVisibleCells()
-  const titleCells = cells.filter((cell) => cell.column.columnDef.meta?.cardTitle)
+  const titleCells = cells.filter(
+    (cell) => cell.column.columnDef.meta?.cardTitle,
+  )
   const actionCells = cells.filter(
     (cell) => cell.column.columnDef.meta?.cardHideLabel,
   )
+  const fullWidthCells = cells.filter(
+    (cell) => cell.column.columnDef.meta?.cardFullWidth,
+  )
   const bodyCells = cells.filter((cell) => {
     const meta = cell.column.columnDef.meta
-    return !meta?.cardTitle && !meta?.cardHideLabel && !meta?.cardHidden
+    return (
+      !meta?.cardTitle &&
+      !meta?.cardHideLabel &&
+      !meta?.cardFullWidth &&
+      !meta?.cardHidden
+    )
   })
-  const summaryCells = bodyCells.filter(
-    (cell) => !cell.column.columnDef.meta?.cardExpandedOnly,
-  )
-  const expandedCells = bodyCells.filter(
-    (cell) => cell.column.columnDef.meta?.cardExpandedOnly,
-  )
-
-  const tableExpandable = Boolean(renderSubComponent)
-  const canExpand =
-    tableExpandable || (Boolean(cardExpandable) && expandedCells.length > 0)
-  const expanded = tableExpandable ? row.getIsExpanded() : localExpanded
-  const toggle = () => {
-    if (tableExpandable) row.toggleExpanded()
-    else setLocalExpanded((value) => !value)
-  }
   const hasHeader = titleCells.length > 0 || actionCells.length > 0
 
   return (
-    <div
-      className={cn(
-        'rounded-lg border bg-card p-4',
-        canExpand && 'cursor-pointer',
-        className,
-      )}
-      onClick={canExpand ? toggle : undefined}
-    >
+    <div className={cn('rounded-lg border bg-card p-4', className)}>
       {hasHeader && (
         <div className="flex items-start justify-between gap-2">
           <div className="font-medium">
@@ -139,12 +124,7 @@ function DataCard<T>({
             ))}
           </div>
           {actionCells.length > 0 && (
-            // Actions toggle their own behaviour; don't let the click bubble
-            // up and expand/collapse the card.
-            <div
-              className="flex items-center gap-1"
-              onClick={(event) => event.stopPropagation()}
-            >
+            <div className="flex items-center gap-1">
               {actionCells.map((cell) => (
                 <Fragment key={cell.id}>
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -154,25 +134,25 @@ function DataCard<T>({
           )}
         </div>
       )}
-      {summaryCells.length > 0 && (
-        <CardRows cells={summaryCells} className={cn(hasHeader && 'mt-2')} />
+      {bodyCells.length > 0 && (
+        <CardRows cells={bodyCells} className={cn(hasHeader && 'mt-2')} />
       )}
-      {expanded && (expandedCells.length > 0 || renderSubComponent) && (
-        <div className="mt-3 flex flex-col gap-2 border-t pt-3">
-          {expandedCells.length > 0 && <CardRows cells={expandedCells} />}
-          {renderSubComponent?.(row)}
-        </div>
+      {fullWidthCells.length > 0 && (
+        <dl className={cn((hasHeader || bodyCells.length > 0) && 'mt-2')}>
+          {fullWidthCells.map((cell) => (
+            <div key={cell.id} className="pb-1 text-sm">
+              <dt className="text-muted-foreground">
+                {cardLabel(cell.column)}
+              </dt>
+              <dd className="whitespace-pre-wrap break-words">
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </dd>
+            </div>
+          ))}
+        </dl>
       )}
-      {canExpand && (
-        <div className="mt-2 flex justify-center">
-          <ChevronDown
-            aria-hidden
-            className={cn(
-              'h-5 w-5 text-muted-foreground transition-transform',
-              expanded && 'rotate-180',
-            )}
-          />
-        </div>
+      {renderSubComponent && (
+        <div className="mt-2">{renderSubComponent(row)}</div>
       )}
     </div>
   )
@@ -188,11 +168,6 @@ interface DataTableProps<T> {
   // blank rows so the table keeps a constant height that fits a full page.
   // Requires the table to enable pagination (getPaginationRowModel).
   paginated?: boolean
-  // When true, the mobile card layout collapses cardExpandedOnly columns behind
-  // a chevron, expanded via card-local state. Unlike renderSubComponent this
-  // does NOT touch the desktop table — use it when the desktop table already
-  // shows every column but the mobile card should stay compact.
-  cardExpandable?: boolean
   // Extra classes applied per row (desktop <tr>) and per card (mobile), derived
   // from the row's data — e.g. to highlight rows that match some condition.
   rowClassName?: (row: Row<T>) => string | undefined
@@ -202,7 +177,6 @@ export function DataTable<T>({
   table,
   renderSubComponent,
   paginated,
-  cardExpandable,
   rowClassName,
 }: DataTableProps<T>) {
   // TanStack Table's instance is a stable, mutable object; React Compiler would
@@ -215,89 +189,92 @@ export function DataTable<T>({
     <>
       {/* Desktop: real table */}
       <div className="hidden lg:block">
-      <Table>
-      <TableHeader>
-        {table.getHeaderGroups().map((headerGroup) => (
-          <TableRow key={headerGroup.id}>
-            {headerGroup.headers.map((header) => {
-              const canSort = header.column.getCanSort()
-              const sorted = header.column.getIsSorted()
-              return (
-                <TableHead
-                  key={header.id}
-                  className={cn(canSort && 'cursor-pointer select-none')}
-                  onClick={header.column.getToggleSortingHandler()}
-                >
-                  {header.isPlaceholder ? null : (
-                    <div className="flex items-center gap-1">
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                      {canSort && (
-                        <span className="h-4 w-4">
-                          {sorted === 'asc' ? (
-                            <ArrowUp className="h-4 w-4" />
-                          ) : sorted === 'desc' ? (
-                            <ArrowDown className="h-4 w-4" />
-                          ) : (
-                            <ArrowUpDown className="h-4 w-4 text-muted-foreground/50" />
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  const canSort = header.column.getCanSort()
+                  const sorted = header.column.getIsSorted()
+                  return (
+                    <TableHead
+                      key={header.id}
+                      className={cn(canSort && 'cursor-pointer select-none')}
+                      onClick={header.column.getToggleSortingHandler()}
+                    >
+                      {header.isPlaceholder ? null : (
+                        <div className="flex items-center gap-1">
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
                           )}
-                        </span>
+                          {canSort && (
+                            <span className="h-4 w-4">
+                              {sorted === 'asc' ? (
+                                <ArrowUp className="h-4 w-4" />
+                              ) : sorted === 'desc' ? (
+                                <ArrowDown className="h-4 w-4" />
+                              ) : (
+                                <ArrowUpDown className="h-4 w-4 text-muted-foreground/50" />
+                              )}
+                            </span>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
-                </TableHead>
-              )
-            })}
-          </TableRow>
-        ))}
-      </TableHeader>
-      <TableBody>
-        {rows.length === 0 ? (
-          <TableRow>
-            <TableCell
-              colSpan={colCount}
-              className="h-24 text-center text-muted-foreground"
-            >
-              No results.
-            </TableCell>
-          </TableRow>
-        ) : (
-          rows.map((row) => (
-            <Fragment key={row.id}>
-              <TableRow
-                className={cn(
-                  renderSubComponent && 'cursor-pointer',
-                  rowClassName?.(row),
-                )}
-                onClick={
-                  renderSubComponent
-                    ? row.getToggleExpandedHandler()
-                    : undefined
-                }
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
+                    </TableHead>
+                  )
+                })}
               </TableRow>
-              {renderSubComponent && row.getIsExpanded() && (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={row.getVisibleCells().length}
-                    className="bg-muted/50"
+            ))}
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={colCount}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  No results.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((row) => (
+                <Fragment key={row.id}>
+                  <TableRow
+                    className={cn(
+                      renderSubComponent && 'cursor-pointer',
+                      rowClassName?.(row),
+                    )}
+                    onClick={
+                      renderSubComponent
+                        ? row.getToggleExpandedHandler()
+                        : undefined
+                    }
                   >
-                    {renderSubComponent(row)}
-                  </TableCell>
-                </TableRow>
-              )}
-            </Fragment>
-          ))
-        )}
-      </TableBody>
-    </Table>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  {renderSubComponent && row.getIsExpanded() && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell
+                        colSpan={row.getVisibleCells().length}
+                        className="bg-muted/50"
+                      >
+                        {renderSubComponent(row)}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
       {/* Mobile: one card per row */}
       <div className="flex flex-col gap-3 lg:hidden">
@@ -311,7 +288,6 @@ export function DataTable<T>({
               key={row.id}
               row={row}
               renderSubComponent={renderSubComponent}
-              cardExpandable={cardExpandable}
               className={rowClassName?.(row)}
             />
           ))

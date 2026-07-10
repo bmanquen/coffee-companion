@@ -166,7 +166,6 @@ const columns = [
     sortingFn: (a, b) =>
       (daysOffRoast(a.original.roastDate, a.original.createdAt) ?? -1) -
       (daysOffRoast(b.original.roastDate, b.original.createdAt) ?? -1),
-    meta: { cardExpandedOnly: true },
   }),
   columnHelper.accessor('dose', {
     header: 'Dose',
@@ -185,7 +184,6 @@ const columns = [
     header: 'Ratio',
     cell: ({ row }) => formatBrewRatio(row.original.dose, row.original.yield),
     // Display columns aren't sortable in TanStack, so no sortingFn here.
-    meta: { cardExpandedOnly: true },
   }),
   columnHelper.accessor('time', {
     header: 'Time',
@@ -193,11 +191,9 @@ const columns = [
   }),
   columnHelper.accessor('grinder.name', {
     header: 'Grinder',
-    meta: { cardExpandedOnly: true },
   }),
   columnHelper.accessor('brewingDevice.name', {
     header: 'Device',
-    meta: { cardExpandedOnly: true },
   }),
   columnHelper.accessor('grindSetting', {
     header: 'Grind',
@@ -207,7 +203,7 @@ const columns = [
     header: 'Notes',
     cell: (info) => info.getValue() ?? '-',
     enableSorting: false,
-    meta: { cardExpandedOnly: true },
+    meta: { cardFullWidth: true },
   }),
   columnHelper.display({
     id: 'actions',
@@ -297,7 +293,6 @@ export function EspressoBrewsSection() {
           </div>
           <DataTable
             table={table}
-            cardExpandable
             rowClassName={(row) =>
               row.original.isDialedIn
                 ? 'bg-primary/10 hover:bg-primary/15'
