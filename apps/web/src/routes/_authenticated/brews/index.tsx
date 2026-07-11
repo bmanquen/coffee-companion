@@ -28,7 +28,7 @@ function BrewsIndex() {
   const [selectedMethod, setSelectedMethod] = useState<BrewMethod>('espresso')
 
   return (
-    <div className="flex flex-col items-center w-full max-w-4xl mx-auto gap-8">
+    <div className="flex flex-col items-center w-full max-w-6xl mx-auto gap-8">
       <H1 className="w-full">Brews</H1>
       <div className="flex flex-col w-full">
         <div className="flex gap-1 pl-3 -mb-px" role="tablist">

@@ -203,7 +203,7 @@ export function DataTable<T>({
                       onClick={header.column.getToggleSortingHandler()}
                     >
                       {header.isPlaceholder ? null : (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center justify-center gap-1">
                           {flexRender(
                             header.column.columnDef.header,
                             header.getContext(),
