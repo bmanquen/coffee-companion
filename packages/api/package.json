@@ -26,7 +26,8 @@
     "./lib/auth": "./src/lib/auth.ts",
     "./lib/e2e-auth": "./src/lib/e2e-auth.ts",
     "./lib/espresso": "./src/lib/espresso.ts",
-    "./lib/aeropress": "./src/lib/aeropress.ts"
+    "./lib/aeropress": "./src/lib/aeropress.ts",
+    "./lib/pourover": "./src/lib/pourover.ts"
   },
   "dependencies": {
     "@trpc/server": "^11.8.1",

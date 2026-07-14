@@ -14,6 +14,8 @@ import {
   greenCoffees,
   greenCoffeesVarieties,
   grinders,
+  pouroverBrews,
+  pouroverMethods,
   regions,
   roastLevels,
   roasters,
@@ -83,6 +85,7 @@ const brewingDevicesData = [
   { name: 'Pro 600', brand: 'Profitec', type: 'Espresso' },
   { name: 'Bianca', brand: 'Lelit', type: 'Espresso' },
   { name: 'AeroPress Go', brand: 'AeroPress', type: 'AeroPress' },
+  { name: 'V60', brand: 'Hario', type: 'Pour Over' },
 ]
 
 const roastLevelsData = [
@@ -448,6 +451,18 @@ async function seed() {
   )
   const standardMethodId = aeropressMethodMap.get('Standard')!
 
+  // Pour over brew methods are system defaults (userId null), upserted by name.
+  // The canonical list lives in the seed migration; re-inserting here keeps a
+  // fresh dev DB idempotent.
+  await db
+    .insert(pouroverMethods)
+    .values({ name: 'Standard' })
+    .onConflictDoNothing()
+  const pouroverMethodMap = new Map(
+    (await db.select().from(pouroverMethods)).map((m) => [m.name, m.id]),
+  )
+  const pouroverStandardMethodId = pouroverMethodMap.get('Standard')!
+
   // Brewing devices are user-owned and were cleared above, so insert fresh.
   await db.insert(brewingDevices).values(
     brewingDevicesData.map((d) => ({
@@ -471,6 +486,7 @@ async function seed() {
     .filter((d) => d.type === 'Espresso')
     .map((d) => brewingDeviceMap.get(d.name)!)
   const aeropressDeviceId = brewingDeviceMap.get('AeroPress Go')!
+  const pouroverDeviceId = brewingDeviceMap.get('V60')!
 
   for (const coffee of greenCoffeesData) {
     const {
@@ -570,6 +586,26 @@ async function seed() {
         steepTime: 90,
         grindSetting: '18',
         notes: 'Bright and clean, medium grind',
+        isDialedIn: true,
+      })
+    }
+
+    // Likewise seed a dialed-in Standard pour over brew so the pour over views
+    // have data out of the box.
+    if (coffeeIndex < 3) {
+      await db.insert(pouroverBrews).values({
+        userId: SEED_USER_ID,
+        coffeeId: insertedCoffee.id,
+        grinderId,
+        brewingDeviceId: pouroverDeviceId,
+        methodId: pouroverStandardMethodId,
+        roastDate,
+        dose: '18.0',
+        water: '300',
+        brewTime: 165,
+        waterTemp: 94,
+        grindSetting: '22',
+        notes: 'Even drawdown, sweet and floral',
         isDialedIn: true,
       })
     }

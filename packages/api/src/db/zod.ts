@@ -12,6 +12,8 @@ import {
   farms,
   greenCoffees,
   grinders,
+  pouroverBrews,
+  pouroverMethods,
   regions,
   roastLevels,
   roasters,
@@ -169,3 +171,29 @@ export const insertAeropressBrewSchema = createInsertSchema(aeropressBrews, {
 export const selectAeropressBrewSchema = createSelectSchema(aeropressBrews)
 export type InsertAeropressBrew = z.infer<typeof insertAeropressBrewSchema>
 export type AeropressBrew = z.infer<typeof selectAeropressBrewSchema>
+
+// Pour Over Methods (system-defaults + user lookup, like aeropress methods)
+export const insertPouroverMethodSchema = createInsertSchema(pouroverMethods, {
+  name: (schema) => schema.min(1),
+})
+export const selectPouroverMethodSchema = createSelectSchema(pouroverMethods)
+export type InsertPouroverMethod = z.infer<typeof insertPouroverMethodSchema>
+export type PouroverMethod = z.infer<typeof selectPouroverMethodSchema>
+
+// Pour Over Brews. Weights (dose/water) are decimal strings like aeropress;
+// brew time is whole seconds and water temp is whole degrees Celsius.
+export const insertPouroverBrewSchema = createInsertSchema(pouroverBrews, {
+  dose: decimalString,
+  water: decimalString,
+  coffeeId: () => z.uuid('Select a coffee'),
+  grinderId: () => z.uuid('Select a grinder'),
+  brewingDeviceId: () => z.uuid('Select a brewing device'),
+  methodId: () => z.uuid('Select a method'),
+}).omit({
+  id: true,
+  userId: true,
+  isDialedIn: true,
+})
+export const selectPouroverBrewSchema = createSelectSchema(pouroverBrews)
+export type InsertPouroverBrew = z.infer<typeof insertPouroverBrewSchema>
+export type PouroverBrew = z.infer<typeof selectPouroverBrewSchema>

@@ -7,8 +7,10 @@ type RouterOutputs = inferRouterOutputs<TRPCRouter>
 type RecentShot = RouterOutputs['espressoShot']['getRecent']['items'][number]
 type RecentCoffee = RouterOutputs['coffee']['getRecent']['items'][number]
 type AeropressBrew = RouterOutputs['aeropressBrew']['getDialedIn'][number]
+type PouroverBrew = RouterOutputs['pouroverBrew']['getDialedIn'][number]
 type CoffeeOption = RouterOutputs['coffee']['getAll'][number]
 type MethodOption = RouterOutputs['aeropressMethod']['list'][number]
+type PouroverMethodOption = RouterOutputs['pouroverMethod']['list'][number]
 type GrinderOption = RouterOutputs['grinder']['list'][number]
 type DeviceOption = RouterOutputs['brewingDevice']['list'][number]
 
@@ -137,6 +139,62 @@ export function makeAeropressBrew(
   }
 }
 
+export function makePouroverBrew(
+  overrides: Partial<PouroverBrew> = {},
+): PouroverBrew {
+  return {
+    id: 'p1',
+    userId: 'u1',
+    coffeeId: 'c1',
+    grinderId: 'g1',
+    brewingDeviceId: 'd1',
+    methodId: 'm1',
+    roastDate: null,
+    isDialedIn: true,
+    dose: '18',
+    water: '300',
+    brewTime: 165,
+    waterTemp: 94,
+    grindSetting: '22',
+    notes: 'sweet and floral',
+    createdAt,
+    updatedAt,
+    coffee: makeRecentCoffee({ id: 'c1' }),
+    grinder: {
+      id: 'g1',
+      userId: 'u1',
+      name: 'Ode',
+      brand: 'Fellow',
+      createdAt,
+      updatedAt,
+    },
+    brewingDevice: {
+      id: 'd1',
+      userId: 'u1',
+      name: 'V60',
+      brand: 'Hario',
+      typeId: 't3',
+      createdAt,
+      updatedAt,
+      type: {
+        id: 't3',
+        userId: null,
+        name: 'Pour Over',
+        createdAt,
+        updatedAt,
+      },
+    },
+    method: {
+      id: 'm1',
+      userId: null,
+      name: 'Standard',
+      createdAt,
+      updatedAt,
+    },
+    ...overrides,
+  }
+}
+
 // The following back the SearchSelect option lists that the brew forms load.
 export function makeCoffee(overrides: Partial<CoffeeOption> = {}): CoffeeOption {
   return {
@@ -152,6 +210,19 @@ export function makeCoffee(overrides: Partial<CoffeeOption> = {}): CoffeeOption 
 export function makeAeropressMethod(
   overrides: Partial<MethodOption> = {},
 ): MethodOption {
+  return {
+    id: 'm1',
+    userId: null,
+    name: 'Standard',
+    createdAt,
+    updatedAt,
+    ...overrides,
+  }
+}
+
+export function makePouroverMethod(
+  overrides: Partial<PouroverMethodOption> = {},
+): PouroverMethodOption {
   return {
     id: 'm1',
     userId: null,

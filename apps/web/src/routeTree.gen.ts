@@ -16,9 +16,11 @@ import { Route as AuthenticatedCoffeesIndexRouteImport } from './routes/_authent
 import { Route as AuthenticatedBrewsIndexRouteImport } from './routes/_authenticated/brews/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
+import { Route as AuthenticatedPouroverNewRouteImport } from './routes/_authenticated/pourover/new'
 import { Route as AuthenticatedEspressoNewRouteImport } from './routes/_authenticated/espresso/new'
 import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
 import { Route as AuthenticatedAeropressNewRouteImport } from './routes/_authenticated/aeropress/new'
+import { Route as AuthenticatedPouroverBrewIdEditRouteImport } from './routes/_authenticated/pourover/$brewId.edit'
 import { Route as AuthenticatedEspressoShotIdEditRouteImport } from './routes/_authenticated/espresso/$shotId.edit'
 import { Route as AuthenticatedEquipmentGrindersNewRouteImport } from './routes/_authenticated/equipment/grinders/new'
 import { Route as AuthenticatedEquipmentBrewingDevicesNewRouteImport } from './routes/_authenticated/equipment/brewing-devices/new'
@@ -63,6 +65,12 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedPouroverNewRoute =
+  AuthenticatedPouroverNewRouteImport.update({
+    id: '/pourover/new',
+    path: '/pourover/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedEspressoNewRoute =
   AuthenticatedEspressoNewRouteImport.update({
     id: '/espresso/new',
@@ -78,6 +86,12 @@ const AuthenticatedAeropressNewRoute =
   AuthenticatedAeropressNewRouteImport.update({
     id: '/aeropress/new',
     path: '/aeropress/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPouroverBrewIdEditRoute =
+  AuthenticatedPouroverBrewIdEditRouteImport.update({
+    id: '/pourover/$brewId/edit',
+    path: '/pourover/$brewId/edit',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedEspressoShotIdEditRoute =
@@ -128,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/espresso/new': typeof AuthenticatedEspressoNewRoute
+  '/pourover/new': typeof AuthenticatedPouroverNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/brews/': typeof AuthenticatedBrewsIndexRoute
@@ -138,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
   '/espresso/$shotId/edit': typeof AuthenticatedEspressoShotIdEditRoute
+  '/pourover/$brewId/edit': typeof AuthenticatedPouroverBrewIdEditRoute
   '/equipment/brewing-devices/$deviceId/edit': typeof AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute
   '/equipment/grinders/$grinderId/edit': typeof AuthenticatedEquipmentGrindersGrinderIdEditRoute
 }
@@ -146,6 +162,7 @@ export interface FileRoutesByTo {
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/espresso/new': typeof AuthenticatedEspressoNewRoute
+  '/pourover/new': typeof AuthenticatedPouroverNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/brews': typeof AuthenticatedBrewsIndexRoute
@@ -156,6 +173,7 @@ export interface FileRoutesByTo {
   '/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
   '/espresso/$shotId/edit': typeof AuthenticatedEspressoShotIdEditRoute
+  '/pourover/$brewId/edit': typeof AuthenticatedPouroverBrewIdEditRoute
   '/equipment/brewing-devices/$deviceId/edit': typeof AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute
   '/equipment/grinders/$grinderId/edit': typeof AuthenticatedEquipmentGrindersGrinderIdEditRoute
 }
@@ -166,6 +184,7 @@ export interface FileRoutesById {
   '/_authenticated/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/_authenticated/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/_authenticated/espresso/new': typeof AuthenticatedEspressoNewRoute
+  '/_authenticated/pourover/new': typeof AuthenticatedPouroverNewRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/_authenticated/brews/': typeof AuthenticatedBrewsIndexRoute
@@ -176,6 +195,7 @@ export interface FileRoutesById {
   '/_authenticated/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/_authenticated/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
   '/_authenticated/espresso/$shotId/edit': typeof AuthenticatedEspressoShotIdEditRoute
+  '/_authenticated/pourover/$brewId/edit': typeof AuthenticatedPouroverBrewIdEditRoute
   '/_authenticated/equipment/brewing-devices/$deviceId/edit': typeof AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute
   '/_authenticated/equipment/grinders/$grinderId/edit': typeof AuthenticatedEquipmentGrindersGrinderIdEditRoute
 }
@@ -186,6 +206,7 @@ export interface FileRouteTypes {
     | '/aeropress/new'
     | '/coffees/new'
     | '/espresso/new'
+    | '/pourover/new'
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/brews/'
@@ -196,6 +217,7 @@ export interface FileRouteTypes {
     | '/equipment/brewing-devices/new'
     | '/equipment/grinders/new'
     | '/espresso/$shotId/edit'
+    | '/pourover/$brewId/edit'
     | '/equipment/brewing-devices/$deviceId/edit'
     | '/equipment/grinders/$grinderId/edit'
   fileRoutesByTo: FileRoutesByTo
@@ -204,6 +226,7 @@ export interface FileRouteTypes {
     | '/aeropress/new'
     | '/coffees/new'
     | '/espresso/new'
+    | '/pourover/new'
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/brews'
@@ -214,6 +237,7 @@ export interface FileRouteTypes {
     | '/equipment/brewing-devices/new'
     | '/equipment/grinders/new'
     | '/espresso/$shotId/edit'
+    | '/pourover/$brewId/edit'
     | '/equipment/brewing-devices/$deviceId/edit'
     | '/equipment/grinders/$grinderId/edit'
   id:
@@ -223,6 +247,7 @@ export interface FileRouteTypes {
     | '/_authenticated/aeropress/new'
     | '/_authenticated/coffees/new'
     | '/_authenticated/espresso/new'
+    | '/_authenticated/pourover/new'
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/_authenticated/brews/'
@@ -233,6 +258,7 @@ export interface FileRouteTypes {
     | '/_authenticated/equipment/brewing-devices/new'
     | '/_authenticated/equipment/grinders/new'
     | '/_authenticated/espresso/$shotId/edit'
+    | '/_authenticated/pourover/$brewId/edit'
     | '/_authenticated/equipment/brewing-devices/$deviceId/edit'
     | '/_authenticated/equipment/grinders/$grinderId/edit'
   fileRoutesById: FileRoutesById
@@ -295,6 +321,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/pourover/new': {
+      id: '/_authenticated/pourover/new'
+      path: '/pourover/new'
+      fullPath: '/pourover/new'
+      preLoaderRoute: typeof AuthenticatedPouroverNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/espresso/new': {
       id: '/_authenticated/espresso/new'
       path: '/espresso/new'
@@ -314,6 +347,13 @@ declare module '@tanstack/react-router' {
       path: '/aeropress/new'
       fullPath: '/aeropress/new'
       preLoaderRoute: typeof AuthenticatedAeropressNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/pourover/$brewId/edit': {
+      id: '/_authenticated/pourover/$brewId/edit'
+      path: '/pourover/$brewId/edit'
+      fullPath: '/pourover/$brewId/edit'
+      preLoaderRoute: typeof AuthenticatedPouroverBrewIdEditRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/espresso/$shotId/edit': {
@@ -372,6 +412,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAeropressNewRoute: typeof AuthenticatedAeropressNewRoute
   AuthenticatedCoffeesNewRoute: typeof AuthenticatedCoffeesNewRoute
   AuthenticatedEspressoNewRoute: typeof AuthenticatedEspressoNewRoute
+  AuthenticatedPouroverNewRoute: typeof AuthenticatedPouroverNewRoute
   AuthenticatedBrewsIndexRoute: typeof AuthenticatedBrewsIndexRoute
   AuthenticatedCoffeesIndexRoute: typeof AuthenticatedCoffeesIndexRoute
   AuthenticatedEquipmentIndexRoute: typeof AuthenticatedEquipmentIndexRoute
@@ -380,6 +421,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedEquipmentBrewingDevicesNewRoute: typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   AuthenticatedEquipmentGrindersNewRoute: typeof AuthenticatedEquipmentGrindersNewRoute
   AuthenticatedEspressoShotIdEditRoute: typeof AuthenticatedEspressoShotIdEditRoute
+  AuthenticatedPouroverBrewIdEditRoute: typeof AuthenticatedPouroverBrewIdEditRoute
   AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute: typeof AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute
   AuthenticatedEquipmentGrindersGrinderIdEditRoute: typeof AuthenticatedEquipmentGrindersGrinderIdEditRoute
 }
@@ -388,6 +430,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAeropressNewRoute: AuthenticatedAeropressNewRoute,
   AuthenticatedCoffeesNewRoute: AuthenticatedCoffeesNewRoute,
   AuthenticatedEspressoNewRoute: AuthenticatedEspressoNewRoute,
+  AuthenticatedPouroverNewRoute: AuthenticatedPouroverNewRoute,
   AuthenticatedBrewsIndexRoute: AuthenticatedBrewsIndexRoute,
   AuthenticatedCoffeesIndexRoute: AuthenticatedCoffeesIndexRoute,
   AuthenticatedEquipmentIndexRoute: AuthenticatedEquipmentIndexRoute,
@@ -398,6 +441,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedEquipmentGrindersNewRoute:
     AuthenticatedEquipmentGrindersNewRoute,
   AuthenticatedEspressoShotIdEditRoute: AuthenticatedEspressoShotIdEditRoute,
+  AuthenticatedPouroverBrewIdEditRoute: AuthenticatedPouroverBrewIdEditRoute,
   AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute:
     AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute,
   AuthenticatedEquipmentGrindersGrinderIdEditRoute:

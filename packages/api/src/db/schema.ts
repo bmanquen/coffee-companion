@@ -329,10 +329,51 @@ export const aeropressBrews = pgTable(
   ],
 )
 
+// Pour Over brew method (e.g. Standard). Same system-defaults + user lookup as
+// aeropressMethods: rows with a null userId are shared defaults; users can add
+// their own. Kept as a lookup (not an enum) so it stays user-extensible.
+export const pouroverMethods = pgTable(
+  'pourover_methods',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('pourover_methods_name_idx').on(table.name)],
+)
+
+export const pouroverBrews = pgTable(
+  'pourover_brews',
+  {
+    ...brewBase,
+    methodId: uuid('method_id')
+      .references(() => pouroverMethods.id)
+      .notNull(),
+    // Weights are grams, stored as numeric (decimal strings) like aeropress
+    // dose/water; ratio (water / dose) is derived in the app, not stored.
+    dose: numeric(),
+    water: numeric(),
+    // brewTime is total drawdown in whole seconds (the pour-over analogue of
+    // aeropress steep time). waterTemp is whole degrees Celsius.
+    brewTime: integer('brew_time'),
+    waterTemp: integer('water_temp'),
+  },
+  (table) => [
+    index('pourover_brews_user_idx').on(table.userId),
+    index('pourover_brews_user_coffee_idx').on(table.userId, table.coffeeId),
+    // At most one dialed-in pour over brew per coffee *per method*, independent
+    // of the dialed-in espresso shot and aeropress brews.
+    uniqueIndex('pourover_brews_dialed_in_idx')
+      .on(table.coffeeId, table.methodId)
+      .where(sql`is_dialed_in`),
+  ],
+)
+
 // Relations
 
 export const relations = defineRelations(
-  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews },
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews },
   (r) => ({
     user: {
       sessions: r.many.session(),
@@ -352,6 +393,8 @@ export const relations = defineRelations(
       espressoShots: r.many.espressoShots(),
       aeropressMethods: r.many.aeropressMethods(),
       aeropressBrews: r.many.aeropressBrews(),
+      pouroverMethods: r.many.pouroverMethods(),
+      pouroverBrews: r.many.pouroverBrews(),
     },
     countries: {
       user: r.one.user({ from: r.countries.userId, to: r.user.id }),
@@ -407,6 +450,7 @@ export const relations = defineRelations(
       coffeesVarieties: r.many.coffeesVarieties(),
       espressoShots: r.many.espressoShots(),
       aeropressBrews: r.many.aeropressBrews(),
+      pouroverBrews: r.many.pouroverBrews(),
     },
     coffeesVarieties: {
       coffee: r.one.coffees({ from: r.coffeesVarieties.coffeeId, to: r.coffees.id }),
@@ -420,6 +464,7 @@ export const relations = defineRelations(
       user: r.one.user({ from: r.grinders.userId, to: r.user.id, optional: false }),
       espressoShots: r.many.espressoShots(),
       aeropressBrews: r.many.aeropressBrews(),
+      pouroverBrews: r.many.pouroverBrews(),
     },
     brewingDeviceTypes: {
       user: r.one.user({ from: r.brewingDeviceTypes.userId, to: r.user.id }),
@@ -430,6 +475,7 @@ export const relations = defineRelations(
       type: r.one.brewingDeviceTypes({ from: r.brewingDevices.typeId, to: r.brewingDeviceTypes.id, optional: false }),
       espressoShots: r.many.espressoShots(),
       aeropressBrews: r.many.aeropressBrews(),
+      pouroverBrews: r.many.pouroverBrews(),
     },
     espressoShots: {
       user: r.one.user({ from: r.espressoShots.userId, to: r.user.id, optional: false }),
@@ -447,6 +493,17 @@ export const relations = defineRelations(
       grinder: r.one.grinders({ from: r.aeropressBrews.grinderId, to: r.grinders.id, optional: false }),
       brewingDevice: r.one.brewingDevices({ from: r.aeropressBrews.brewingDeviceId, to: r.brewingDevices.id, optional: false }),
       method: r.one.aeropressMethods({ from: r.aeropressBrews.methodId, to: r.aeropressMethods.id, optional: false }),
+    },
+    pouroverMethods: {
+      user: r.one.user({ from: r.pouroverMethods.userId, to: r.user.id }),
+      pouroverBrews: r.many.pouroverBrews(),
+    },
+    pouroverBrews: {
+      user: r.one.user({ from: r.pouroverBrews.userId, to: r.user.id, optional: false }),
+      coffee: r.one.coffees({ from: r.pouroverBrews.coffeeId, to: r.coffees.id, optional: false }),
+      grinder: r.one.grinders({ from: r.pouroverBrews.grinderId, to: r.grinders.id, optional: false }),
+      brewingDevice: r.one.brewingDevices({ from: r.pouroverBrews.brewingDeviceId, to: r.brewingDevices.id, optional: false }),
+      method: r.one.pouroverMethods({ from: r.pouroverBrews.methodId, to: r.pouroverMethods.id, optional: false }),
     },
     session: {
       user: r.one.user({ from: r.session.userId, to: r.user.id }),

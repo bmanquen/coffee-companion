@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { AeropressBrewsSection } from '@/components/brews/aeropress-brews-section'
 import { EspressoBrewsSection } from '@/components/brews/espresso-brews-section'
+import { PouroverBrewsSection } from '@/components/brews/pourover-brews-section'
 import { H1 } from '@/components/typography/h1'
 import { cn } from '@/lib/utils'
 
@@ -13,15 +14,19 @@ export const Route = createFileRoute('/_authenticated/brews/')({
     context.queryClient.ensureQueryData(
       context.trpc.aeropressBrew.getAll.queryOptions(),
     )
+    context.queryClient.ensureQueryData(
+      context.trpc.pouroverBrew.getAll.queryOptions(),
+    )
   },
   component: BrewsIndex,
 })
 
-type BrewMethod = 'espresso' | 'aeropress'
+type BrewMethod = 'espresso' | 'aeropress' | 'pourover'
 
 const brewMethods: Array<{ value: BrewMethod; label: string }> = [
   { value: 'espresso', label: 'Espresso' },
   { value: 'aeropress', label: 'AeroPress' },
+  { value: 'pourover', label: 'Pour Over' },
 ]
 
 function BrewsIndex() {
@@ -53,11 +58,9 @@ function BrewsIndex() {
             )
           })}
         </div>
-        {selectedMethod === 'espresso' ? (
-          <EspressoBrewsSection />
-        ) : (
-          <AeropressBrewsSection />
-        )}
+        {selectedMethod === 'espresso' && <EspressoBrewsSection />}
+        {selectedMethod === 'aeropress' && <AeropressBrewsSection />}
+        {selectedMethod === 'pourover' && <PouroverBrewsSection />}
       </div>
     </div>
   )
