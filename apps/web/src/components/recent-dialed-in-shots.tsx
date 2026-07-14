@@ -64,7 +64,7 @@ const columns = [
 function ShotDetails({ row }: { row: Row<EspressoShotWithRelations> }) {
   const shot = row.original
   return (
-    <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm py-1 sm:grid-cols-2">
+    <dl className="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-2 text-sm py-1 text-left sm:grid-cols-2">
       <div>
         <dt className="inline font-medium">Grinder: </dt>
         <dd className="inline text-muted-foreground">
