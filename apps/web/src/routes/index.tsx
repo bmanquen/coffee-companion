@@ -6,6 +6,7 @@ import { H1 } from '@/components/typography/h1'
 import { RecentDialedInShots } from '@/components/recent-dialed-in-shots'
 import { DialedInAeropressBrews } from '@/components/dialed-in-aeropress-brews'
 import { DialedInPouroverBrews } from '@/components/dialed-in-pourover-brews'
+import { DialedInFrenchpressBrews } from '@/components/dialed-in-frenchpress-brews'
 import {
   RecentEspressoShots,
   PAGE_SIZE as SHOT_PAGE_SIZE,
@@ -81,6 +82,7 @@ function Dashboard() {
       <RecentDialedInShots />
       <DialedInAeropressBrews />
       <DialedInPouroverBrews />
+      <DialedInFrenchpressBrews />
       <RecentEspressoShots />
       <RecentCoffees />
     </div>

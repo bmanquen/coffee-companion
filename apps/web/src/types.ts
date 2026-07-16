@@ -5,6 +5,8 @@ import type {
   BrewingDeviceType,
   Coffee,
   EspressoShot,
+  FrenchpressBrew,
+  FrenchpressMethod,
   Grinder,
   PouroverBrew,
   PouroverMethod,
@@ -37,4 +39,14 @@ export interface PouroverBrewWithRelations extends PouroverBrew {
   grinder: Grinder
   brewingDevice: BrewingDevice & { type: BrewingDeviceType }
   method: PouroverMethod
+}
+
+// A french press brew with its coffee, grinder, brewing device, and method
+// relations joined in — the shape returned by the french press brew list queries
+// (getAll / getRecent / getDialedIn) and rendered by the tables and dashboard.
+export interface FrenchpressBrewWithRelations extends FrenchpressBrew {
+  coffee: Coffee
+  grinder: Grinder
+  brewingDevice: BrewingDevice & { type: BrewingDeviceType }
+  method: FrenchpressMethod
 }

@@ -11,6 +11,8 @@ import {
   countries,
   espressoShots,
   farms,
+  frenchpressBrews,
+  frenchpressMethods,
   greenCoffees,
   greenCoffeesVarieties,
   grinders,
@@ -86,6 +88,7 @@ const brewingDevicesData = [
   { name: 'Bianca', brand: 'Lelit', type: 'Espresso' },
   { name: 'AeroPress Go', brand: 'AeroPress', type: 'AeroPress' },
   { name: 'V60', brand: 'Hario', type: 'Pour Over' },
+  { name: 'Chambord', brand: 'Bodum', type: 'French Press' },
 ]
 
 const roastLevelsData = [
@@ -463,6 +466,18 @@ async function seed() {
   )
   const pouroverStandardMethodId = pouroverMethodMap.get('Standard')!
 
+  // French press brew methods are system defaults (userId null), upserted by
+  // name. The canonical list lives in the seed migration; re-inserting here
+  // keeps a fresh dev DB idempotent.
+  await db
+    .insert(frenchpressMethods)
+    .values({ name: 'Standard' })
+    .onConflictDoNothing()
+  const frenchpressMethodMap = new Map(
+    (await db.select().from(frenchpressMethods)).map((m) => [m.name, m.id]),
+  )
+  const frenchpressStandardMethodId = frenchpressMethodMap.get('Standard')!
+
   // Brewing devices are user-owned and were cleared above, so insert fresh.
   await db.insert(brewingDevices).values(
     brewingDevicesData.map((d) => ({
@@ -487,6 +502,7 @@ async function seed() {
     .map((d) => brewingDeviceMap.get(d.name)!)
   const aeropressDeviceId = brewingDeviceMap.get('AeroPress Go')!
   const pouroverDeviceId = brewingDeviceMap.get('V60')!
+  const frenchpressDeviceId = brewingDeviceMap.get('Chambord')!
 
   for (const coffee of greenCoffeesData) {
     const {
@@ -606,6 +622,26 @@ async function seed() {
         waterTemp: 94,
         grindSetting: '22',
         notes: 'Even drawdown, sweet and floral',
+        isDialedIn: true,
+      })
+    }
+
+    // Likewise seed a dialed-in Standard french press brew so the french press
+    // views have data out of the box.
+    if (coffeeIndex < 3) {
+      await db.insert(frenchpressBrews).values({
+        userId: SEED_USER_ID,
+        coffeeId: insertedCoffee.id,
+        grinderId,
+        brewingDeviceId: frenchpressDeviceId,
+        methodId: frenchpressStandardMethodId,
+        roastDate,
+        dose: '30.0',
+        water: '500',
+        steepTime: 240,
+        waterTemp: 95,
+        grindSetting: '30',
+        notes: 'Coarse grind, full body, break the crust at 4:00',
         isDialedIn: true,
       })
     }

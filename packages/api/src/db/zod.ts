@@ -10,6 +10,8 @@ import {
   countries,
   espressoShots,
   farms,
+  frenchpressBrews,
+  frenchpressMethods,
   greenCoffees,
   grinders,
   pouroverBrews,
@@ -197,3 +199,35 @@ export const insertPouroverBrewSchema = createInsertSchema(pouroverBrews, {
 export const selectPouroverBrewSchema = createSelectSchema(pouroverBrews)
 export type InsertPouroverBrew = z.infer<typeof insertPouroverBrewSchema>
 export type PouroverBrew = z.infer<typeof selectPouroverBrewSchema>
+
+// French Press Methods (system-defaults + user lookup, like pourover methods)
+export const insertFrenchpressMethodSchema = createInsertSchema(
+  frenchpressMethods,
+  {
+    name: (schema) => schema.min(1),
+  },
+)
+export const selectFrenchpressMethodSchema =
+  createSelectSchema(frenchpressMethods)
+export type InsertFrenchpressMethod = z.infer<
+  typeof insertFrenchpressMethodSchema
+>
+export type FrenchpressMethod = z.infer<typeof selectFrenchpressMethodSchema>
+
+// French Press Brews. Weights (dose/water) are decimal strings like pourover;
+// steep time is whole seconds and water temp is whole degrees Celsius.
+export const insertFrenchpressBrewSchema = createInsertSchema(frenchpressBrews, {
+  dose: decimalString,
+  water: decimalString,
+  coffeeId: () => z.uuid('Select a coffee'),
+  grinderId: () => z.uuid('Select a grinder'),
+  brewingDeviceId: () => z.uuid('Select a brewing device'),
+  methodId: () => z.uuid('Select a method'),
+}).omit({
+  id: true,
+  userId: true,
+  isDialedIn: true,
+})
+export const selectFrenchpressBrewSchema = createSelectSchema(frenchpressBrews)
+export type InsertFrenchpressBrew = z.infer<typeof insertFrenchpressBrewSchema>
+export type FrenchpressBrew = z.infer<typeof selectFrenchpressBrewSchema>

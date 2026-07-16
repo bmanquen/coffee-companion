@@ -8,9 +8,11 @@ type RecentShot = RouterOutputs['espressoShot']['getRecent']['items'][number]
 type RecentCoffee = RouterOutputs['coffee']['getRecent']['items'][number]
 type AeropressBrew = RouterOutputs['aeropressBrew']['getDialedIn'][number]
 type PouroverBrew = RouterOutputs['pouroverBrew']['getDialedIn'][number]
+type FrenchpressBrew = RouterOutputs['frenchpressBrew']['getDialedIn'][number]
 type CoffeeOption = RouterOutputs['coffee']['getAll'][number]
 type MethodOption = RouterOutputs['aeropressMethod']['list'][number]
 type PouroverMethodOption = RouterOutputs['pouroverMethod']['list'][number]
+type FrenchpressMethodOption = RouterOutputs['frenchpressMethod']['list'][number]
 type GrinderOption = RouterOutputs['grinder']['list'][number]
 type DeviceOption = RouterOutputs['brewingDevice']['list'][number]
 
@@ -195,6 +197,62 @@ export function makePouroverBrew(
   }
 }
 
+export function makeFrenchpressBrew(
+  overrides: Partial<FrenchpressBrew> = {},
+): FrenchpressBrew {
+  return {
+    id: 'f1',
+    userId: 'u1',
+    coffeeId: 'c1',
+    grinderId: 'g1',
+    brewingDeviceId: 'd1',
+    methodId: 'm1',
+    roastDate: null,
+    isDialedIn: true,
+    dose: '30',
+    water: '500',
+    steepTime: 240,
+    waterTemp: 95,
+    grindSetting: '30',
+    notes: 'coarse and full-bodied',
+    createdAt,
+    updatedAt,
+    coffee: makeRecentCoffee({ id: 'c1' }),
+    grinder: {
+      id: 'g1',
+      userId: 'u1',
+      name: 'Ode',
+      brand: 'Fellow',
+      createdAt,
+      updatedAt,
+    },
+    brewingDevice: {
+      id: 'd1',
+      userId: 'u1',
+      name: 'Chambord',
+      brand: 'Bodum',
+      typeId: 't4',
+      createdAt,
+      updatedAt,
+      type: {
+        id: 't4',
+        userId: null,
+        name: 'French Press',
+        createdAt,
+        updatedAt,
+      },
+    },
+    method: {
+      id: 'm1',
+      userId: null,
+      name: 'Standard',
+      createdAt,
+      updatedAt,
+    },
+    ...overrides,
+  }
+}
+
 // The following back the SearchSelect option lists that the brew forms load.
 export function makeCoffee(overrides: Partial<CoffeeOption> = {}): CoffeeOption {
   return {
@@ -223,6 +281,19 @@ export function makeAeropressMethod(
 export function makePouroverMethod(
   overrides: Partial<PouroverMethodOption> = {},
 ): PouroverMethodOption {
+  return {
+    id: 'm1',
+    userId: null,
+    name: 'Standard',
+    createdAt,
+    updatedAt,
+    ...overrides,
+  }
+}
+
+export function makeFrenchpressMethod(
+  overrides: Partial<FrenchpressMethodOption> = {},
+): FrenchpressMethodOption {
   return {
     id: 'm1',
     userId: null,

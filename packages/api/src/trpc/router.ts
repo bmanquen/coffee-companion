@@ -6,6 +6,8 @@ import { coffeeRouter } from './coffee'
 import { coffeeProcessRouter } from './coffeeProcess'
 import { countryRouter } from './country'
 import { espressoShotRouter } from './espressoShot'
+import { frenchpressBrewRouter } from './frenchpressBrew'
+import { frenchpressMethodRouter } from './frenchpressMethod'
 import { grinderRouter } from './grinder'
 import { createTRPCRouter } from './init'
 import { pouroverBrewRouter } from './pouroverBrew'
@@ -29,5 +31,7 @@ export const trpcRouter = createTRPCRouter({
   aeropressBrew: aeropressBrewRouter,
   pouroverMethod: pouroverMethodRouter,
   pouroverBrew: pouroverBrewRouter,
+  frenchpressMethod: frenchpressMethodRouter,
+  frenchpressBrew: frenchpressBrewRouter,
 })
 export type TRPCRouter = typeof trpcRouter
