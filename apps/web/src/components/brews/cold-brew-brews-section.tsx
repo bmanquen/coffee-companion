@@ -1,4 +1,8 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
@@ -7,9 +11,9 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
+import { Crosshair, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import type { SortingState } from '@tanstack/react-table'
+import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { ColdBrewBrewWithRelations } from '@/types'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
@@ -17,25 +21,55 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
-import { daysOffRoast } from '@/lib/brew'
+import { daysOffRoast, formatSteepMinutes } from '@/lib/brew'
 import { formatBrewRatio } from '@/lib/brew-ratio'
 
 type Brew = ColdBrewBrewWithRelations
 
-// Cold brew steeps for hours, stored as whole minutes. Render it the way it's
-// entered: hours and minutes (e.g. 1080 -> "18h", 90 -> "1h 30m").
-function formatSteepTime(minutes: number | null): string {
-  if (minutes == null) return '-'
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  if (hours === 0) return `${mins}m`
-  if (mins === 0) return `${hours}h`
-  return `${hours}h ${mins}m`
+function DialedInCell({ row }: CellContext<Brew, unknown>) {
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+  const setDialedIn = useMutation(
+    trpc.coldBrewBrew.setDialedIn.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.coldBrewBrew.getAll.queryOptions())
+      },
+    }),
+  )
+
+  const brew = row.original
+  const dialedIn = brew.isDialedIn
+
+  return (
+    <Button
+      variant={dialedIn ? 'default' : 'ghost'}
+      size="icon"
+      className="h-8 w-8"
+      aria-label={dialedIn ? 'Dialed in — clear' : 'Mark as dialed in'}
+      aria-pressed={dialedIn}
+      onClick={() =>
+        // Cold brew is methodless, so dialing in is scoped to the coffee alone.
+        setDialedIn.mutate({
+          coffeeId: brew.coffeeId,
+          brewId: dialedIn ? null : brew.id,
+        })
+      }
+    >
+      <Crosshair className="h-4 w-4" />
+    </Button>
+  )
 }
 
 const columnHelper = createColumnHelper<Brew>()
 
 const columns = [
+  columnHelper.display({
+    id: 'dialedIn',
+    header: '',
+    cell: DialedInCell,
+    enableSorting: false,
+    meta: { cardHideLabel: true },
+  }),
   columnHelper.accessor('coffee.name', {
     header: 'Coffee',
     meta: { cardTitle: true },
@@ -68,7 +102,7 @@ const columns = [
   }),
   columnHelper.accessor('steepTime', {
     header: 'Steep',
-    cell: (info) => formatSteepTime(info.getValue()),
+    cell: (info) => formatSteepMinutes(info.getValue()),
   }),
   columnHelper.accessor('brewEnvironment', {
     header: 'Environment',
@@ -94,8 +128,8 @@ const columns = [
 ]
 
 // The Cold Brew log — one tab of the /brews page. Mirrors the other brew
-// sections. Dial-in (highlight + toggle) and row actions (edit/delete) arrive
-// in later tickets, so this is display-only for now.
+// sections: a per-coffee dialed-in toggle and the recipe columns. Row actions
+// (edit/delete) arrive in later tickets, so there is no actions column yet.
 export function ColdBrewBrewsSection() {
   'use no memo'
   const trpc = useTRPC()
@@ -170,7 +204,14 @@ export function ColdBrewBrewsSection() {
               className="flex-1"
             />
           </div>
-          <DataTable table={table} />
+          <DataTable
+            table={table}
+            rowClassName={(row) =>
+              row.original.isDialedIn
+                ? 'bg-primary/10 hover:bg-primary/15'
+                : undefined
+            }
+          />
         </>
       )}
     </Card>

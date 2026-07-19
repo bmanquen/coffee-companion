@@ -1,3 +1,4 @@
+import { and, eq } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
@@ -63,5 +64,56 @@ export const coldBrewBrewRouter = createTRPCRouter({
         .values({ ...input, userId: ctx.session.user.id })
         .returning()
       return brew
+    }),
+
+  // Brews that are the dialed-in reference for their coffee, most recent first.
+  // An optional limit caps the result; omitting it returns all of them.
+  getDialedIn: authedProcedure
+    .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      return db.query.coldBrewBrews.findMany({
+        where: { userId: ctx.session.user.id, isDialedIn: true },
+        orderBy: { createdAt: 'desc' },
+        with: withRelations,
+        limit: input?.limit,
+      })
+    }),
+
+  // Set (or clear, with brewId null) the dialed-in cold brew for a coffee.
+  // Cold brew is methodless (ADR-0001), so this is scoped to the coffee alone —
+  // at most one dialed-in cold brew per coffee — and never touches another
+  // method's dialed-in brew for the same coffee.
+  setDialedIn: authedProcedure
+    .input(
+      z.object({
+        coffeeId: z.uuid(),
+        brewId: z.uuid().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id
+      await db.transaction(async (tx) => {
+        await tx
+          .update(coldBrewBrews)
+          .set({ isDialedIn: false })
+          .where(
+            and(
+              eq(coldBrewBrews.coffeeId, input.coffeeId),
+              eq(coldBrewBrews.userId, userId),
+              eq(coldBrewBrews.isDialedIn, true),
+            ),
+          )
+        if (input.brewId) {
+          await tx
+            .update(coldBrewBrews)
+            .set({ isDialedIn: true })
+            .where(
+              and(
+                eq(coldBrewBrews.id, input.brewId),
+                eq(coldBrewBrews.userId, userId),
+              ),
+            )
+        }
+      })
     }),
 })

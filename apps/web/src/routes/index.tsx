@@ -7,6 +7,7 @@ import { RecentDialedInShots } from '@/components/recent-dialed-in-shots'
 import { DialedInAeropressBrews } from '@/components/dialed-in-aeropress-brews'
 import { DialedInPouroverBrews } from '@/components/dialed-in-pourover-brews'
 import { DialedInFrenchpressBrews } from '@/components/dialed-in-frenchpress-brews'
+import { DialedInColdBrewBrews } from '@/components/dialed-in-cold-brew-brews'
 import {
   RecentEspressoShots,
   PAGE_SIZE as SHOT_PAGE_SIZE,
@@ -83,6 +84,7 @@ function Dashboard() {
       <DialedInAeropressBrews />
       <DialedInPouroverBrews />
       <DialedInFrenchpressBrews />
+      <DialedInColdBrewBrews />
       <RecentEspressoShots />
       <RecentCoffees />
     </div>
