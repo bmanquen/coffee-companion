@@ -162,4 +162,19 @@ describe('coldBrewBrew.getAll', () => {
     expect(brews[0].grinder).toBeTruthy()
     expect(brews[0].brewingDevice.type).toBeTruthy()
   })
+
+  it('returns brews most recent first', async () => {
+    const older = await asA.coldBrewBrew.create(baseBrew())
+    const newer = await asA.coldBrewBrew.create(baseBrew())
+    const brews = await asA.coldBrewBrew.getAll()
+    const olderIdx = brews.findIndex((b) => b.id === older.id)
+    const newerIdx = brews.findIndex((b) => b.id === newer.id)
+    expect(newerIdx).toBeGreaterThanOrEqual(0)
+    expect(newerIdx).toBeLessThan(olderIdx)
+  })
+
+  it('does not return another user’s brews', async () => {
+    const brews = await asB.coldBrewBrew.getAll()
+    expect(brews.every((b) => b.userId === USER_B)).toBe(true)
+  })
 })

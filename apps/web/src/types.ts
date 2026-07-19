@@ -4,6 +4,7 @@ import type {
   BrewingDevice,
   BrewingDeviceType,
   Coffee,
+  ColdBrewBrew,
   EspressoShot,
   FrenchpressBrew,
   FrenchpressMethod,
@@ -49,4 +50,13 @@ export interface FrenchpressBrewWithRelations extends FrenchpressBrew {
   grinder: Grinder
   brewingDevice: BrewingDevice & { type: BrewingDeviceType }
   method: FrenchpressMethod
+}
+
+// A cold brew with its coffee, grinder, and brewing device relations joined in —
+// the shape returned by the cold brew list queries and rendered by the table.
+// Methodless (ADR-0001), so there is no method relation.
+export interface ColdBrewBrewWithRelations extends ColdBrewBrew {
+  coffee: Coffee
+  grinder: Grinder
+  brewingDevice: BrewingDevice & { type: BrewingDeviceType }
 }
