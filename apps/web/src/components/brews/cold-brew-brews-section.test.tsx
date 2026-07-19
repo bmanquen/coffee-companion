@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ColdBrewBrewsSection } from './cold-brew-brews-section'
 import type * as ReactRouter from '@tanstack/react-router'
@@ -148,5 +154,128 @@ describe('ColdBrewBrewsSection', () => {
 
     expect(table.queryByText('Ethiopia Guji')).toBeNull()
     expect(table.getByText('Colombia Huila')).toBeTruthy()
+  })
+
+  it('reflects each brew’s dialed-in state on the crosshair toggle', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+      makeColdBrewBrew({
+        id: 'cb1',
+        isDialedIn: true,
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      }),
+      makeColdBrewBrew({
+        id: 'cb2',
+        isDialedIn: false,
+        coffeeId: 'c2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+      }),
+    ])
+
+    render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    const dialed = table.getByRole('button', { name: 'Dialed in — clear' })
+    expect(dialed.getAttribute('aria-pressed')).toBe('true')
+    const notDialed = table.getByRole('button', { name: 'Mark as dialed in' })
+    expect(notDialed.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('highlights the dialed-in row and not the others', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+      makeColdBrewBrew({
+        id: 'cb1',
+        isDialedIn: true,
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      }),
+      makeColdBrewBrew({
+        id: 'cb2',
+        isDialedIn: false,
+        coffeeId: 'c2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+      }),
+    ])
+
+    render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    const dialedRow = table.getByText('Ethiopia Guji').closest('tr')!
+    const otherRow = table.getByText('Colombia Huila').closest('tr')!
+    expect(dialedRow.className).toContain('bg-primary')
+    expect(otherRow.className).not.toContain('bg-primary')
+  })
+
+  it('fires setDialedIn with the coffee and brew (no method) when toggled on', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response('[]', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+        makeColdBrewBrew({
+          id: 'cb1',
+          isDialedIn: false,
+          coffeeId: 'c1',
+          coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        }),
+      ])
+
+      render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+      const table = within(screen.getByRole('table'))
+      fireEvent.click(table.getByRole('button', { name: 'Mark as dialed in' }))
+
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      const [url, init] = fetchSpy.mock.calls[0]
+      expect(String(url)).toContain('coldBrewBrew.setDialedIn')
+      const body = String(init?.body ?? '')
+      expect(body).toContain('cb1')
+      expect(body).toContain('c1')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('clears the dialed-in brew (null brewId) when toggled off', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response('[]', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+        makeColdBrewBrew({
+          id: 'cb1',
+          isDialedIn: true,
+          coffeeId: 'c1',
+          coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        }),
+      ])
+
+      render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+      const table = within(screen.getByRole('table'))
+      fireEvent.click(table.getByRole('button', { name: 'Dialed in — clear' }))
+
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      const [url, init] = fetchSpy.mock.calls[0]
+      expect(String(url)).toContain('coldBrewBrew.setDialedIn')
+      const body = String(init?.body ?? '')
+      // Clearing scopes to the coffee but sends no brew id.
+      expect(body).toContain('c1')
+      expect(body).not.toContain('cb1')
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })

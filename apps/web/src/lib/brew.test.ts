@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { daysOffRoast } from './brew'
+import { daysOffRoast, formatSteepMinutes } from './brew'
 
 describe('daysOffRoast', () => {
   it('counts whole days from roast date to brew time', () => {
@@ -16,5 +16,23 @@ describe('daysOffRoast', () => {
 
   it('clamps to 0 when brewed before the roast date', () => {
     expect(daysOffRoast('2026-06-10', new Date('2026-06-01T08:00:00Z'))).toBe(0)
+  })
+})
+
+describe('formatSteepMinutes', () => {
+  it('renders whole hours without minutes', () => {
+    expect(formatSteepMinutes(1080)).toBe('18h')
+  })
+
+  it('renders hours and minutes together', () => {
+    expect(formatSteepMinutes(90)).toBe('1h 30m')
+  })
+
+  it('renders sub-hour steeps as minutes only', () => {
+    expect(formatSteepMinutes(45)).toBe('45m')
+  })
+
+  it('is a dash when unknown', () => {
+    expect(formatSteepMinutes(null)).toBe('-')
   })
 })
