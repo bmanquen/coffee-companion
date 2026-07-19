@@ -7,6 +7,7 @@ import {
   brewingDevices,
   coffeeProcesses,
   coffees,
+  coldBrewBrews,
   countries,
   espressoShots,
   farms,
@@ -231,3 +232,22 @@ export const insertFrenchpressBrewSchema = createInsertSchema(frenchpressBrews, 
 export const selectFrenchpressBrewSchema = createSelectSchema(frenchpressBrews)
 export type InsertFrenchpressBrew = z.infer<typeof insertFrenchpressBrewSchema>
 export type FrenchpressBrew = z.infer<typeof selectFrenchpressBrewSchema>
+
+// Cold Brew Brews. Methodless (no methodId) per ADR-0001. Weights (dose/water)
+// are decimal strings like the other immersion methods; steepTime is whole
+// MINUTES (not seconds); brewEnvironment is the Counter/Fridge enum (mapped
+// automatically from the pgEnum column), optional.
+export const insertColdBrewBrewSchema = createInsertSchema(coldBrewBrews, {
+  dose: decimalString,
+  water: decimalString,
+  coffeeId: () => z.uuid('Select a coffee'),
+  grinderId: () => z.uuid('Select a grinder'),
+  brewingDeviceId: () => z.uuid('Select a brewing device'),
+}).omit({
+  id: true,
+  userId: true,
+  isDialedIn: true,
+})
+export const selectColdBrewBrewSchema = createSelectSchema(coldBrewBrews)
+export type InsertColdBrewBrew = z.infer<typeof insertColdBrewBrewSchema>
+export type ColdBrewBrew = z.infer<typeof selectColdBrewBrewSchema>

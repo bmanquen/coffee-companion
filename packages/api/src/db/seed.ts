@@ -89,6 +89,7 @@ const brewingDevicesData = [
   { name: 'AeroPress Go', brand: 'AeroPress', type: 'AeroPress' },
   { name: 'V60', brand: 'Hario', type: 'Pour Over' },
   { name: 'Chambord', brand: 'Bodum', type: 'French Press' },
+  { name: 'Toddy', brand: 'Toddy', type: 'Cold Brew' },
 ]
 
 const roastLevelsData = [

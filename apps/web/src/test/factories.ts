@@ -9,6 +9,7 @@ type RecentCoffee = RouterOutputs['coffee']['getRecent']['items'][number]
 type AeropressBrew = RouterOutputs['aeropressBrew']['getDialedIn'][number]
 type PouroverBrew = RouterOutputs['pouroverBrew']['getDialedIn'][number]
 type FrenchpressBrew = RouterOutputs['frenchpressBrew']['getDialedIn'][number]
+type ColdBrewBrew = RouterOutputs['coldBrewBrew']['getAll'][number]
 type CoffeeOption = RouterOutputs['coffee']['getAll'][number]
 type MethodOption = RouterOutputs['aeropressMethod']['list'][number]
 type PouroverMethodOption = RouterOutputs['pouroverMethod']['list'][number]
@@ -248,6 +249,56 @@ export function makeFrenchpressBrew(
       name: 'Standard',
       createdAt,
       updatedAt,
+    },
+    ...overrides,
+  }
+}
+
+// Cold brew is methodless (ADR-0001), so no method relation. steepTime is
+// whole minutes (1080 = 18h) and brewEnvironment is the Counter/Fridge enum.
+export function makeColdBrewBrew(
+  overrides: Partial<ColdBrewBrew> = {},
+): ColdBrewBrew {
+  return {
+    id: 'cb1',
+    userId: 'u1',
+    coffeeId: 'c1',
+    grinderId: 'g1',
+    brewingDeviceId: 'd1',
+    roastDate: null,
+    isDialedIn: false,
+    dose: '50',
+    water: '500',
+    steepTime: 1080,
+    brewEnvironment: 'Fridge',
+    grindSetting: 'coarse',
+    notes: 'smooth and sweet',
+    createdAt,
+    updatedAt,
+    coffee: makeRecentCoffee({ id: 'c1' }),
+    grinder: {
+      id: 'g1',
+      userId: 'u1',
+      name: 'Ode',
+      brand: 'Fellow',
+      createdAt,
+      updatedAt,
+    },
+    brewingDevice: {
+      id: 'd1',
+      userId: 'u1',
+      name: 'Toddy',
+      brand: 'Toddy',
+      typeId: 't5',
+      createdAt,
+      updatedAt,
+      type: {
+        id: 't5',
+        userId: null,
+        name: 'Cold Brew',
+        createdAt,
+        updatedAt,
+      },
     },
     ...overrides,
   }
