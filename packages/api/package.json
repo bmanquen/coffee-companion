@@ -28,7 +28,8 @@
     "./lib/espresso": "./src/lib/espresso.ts",
     "./lib/aeropress": "./src/lib/aeropress.ts",
     "./lib/pourover": "./src/lib/pourover.ts",
-    "./lib/frenchpress": "./src/lib/frenchpress.ts"
+    "./lib/frenchpress": "./src/lib/frenchpress.ts",
+    "./lib/cold-brew": "./src/lib/cold-brew.ts"
   },
   "dependencies": {
     "@trpc/server": "^11.8.1",

@@ -19,6 +19,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AuthenticatedPouroverNewRouteImport } from './routes/_authenticated/pourover/new'
 import { Route as AuthenticatedFrenchpressNewRouteImport } from './routes/_authenticated/frenchpress/new'
 import { Route as AuthenticatedEspressoNewRouteImport } from './routes/_authenticated/espresso/new'
+import { Route as AuthenticatedColdBrewNewRouteImport } from './routes/_authenticated/cold-brew/new'
 import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
 import { Route as AuthenticatedAeropressNewRouteImport } from './routes/_authenticated/aeropress/new'
 import { Route as AuthenticatedPouroverBrewIdEditRouteImport } from './routes/_authenticated/pourover/$brewId.edit'
@@ -83,6 +84,12 @@ const AuthenticatedEspressoNewRoute =
   AuthenticatedEspressoNewRouteImport.update({
     id: '/espresso/new',
     path: '/espresso/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedColdBrewNewRoute =
+  AuthenticatedColdBrewNewRouteImport.update({
+    id: '/cold-brew/new',
+    path: '/cold-brew/new',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedCoffeesNewRoute = AuthenticatedCoffeesNewRouteImport.update({
@@ -155,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
+  '/cold-brew/new': typeof AuthenticatedColdBrewNewRoute
   '/espresso/new': typeof AuthenticatedEspressoNewRoute
   '/frenchpress/new': typeof AuthenticatedFrenchpressNewRoute
   '/pourover/new': typeof AuthenticatedPouroverNewRoute
@@ -177,6 +185,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
+  '/cold-brew/new': typeof AuthenticatedColdBrewNewRoute
   '/espresso/new': typeof AuthenticatedEspressoNewRoute
   '/frenchpress/new': typeof AuthenticatedFrenchpressNewRoute
   '/pourover/new': typeof AuthenticatedPouroverNewRoute
@@ -201,6 +210,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_authenticated/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/_authenticated/coffees/new': typeof AuthenticatedCoffeesNewRoute
+  '/_authenticated/cold-brew/new': typeof AuthenticatedColdBrewNewRoute
   '/_authenticated/espresso/new': typeof AuthenticatedEspressoNewRoute
   '/_authenticated/frenchpress/new': typeof AuthenticatedFrenchpressNewRoute
   '/_authenticated/pourover/new': typeof AuthenticatedPouroverNewRoute
@@ -225,6 +235,7 @@ export interface FileRouteTypes {
     | '/'
     | '/aeropress/new'
     | '/coffees/new'
+    | '/cold-brew/new'
     | '/espresso/new'
     | '/frenchpress/new'
     | '/pourover/new'
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '/'
     | '/aeropress/new'
     | '/coffees/new'
+    | '/cold-brew/new'
     | '/espresso/new'
     | '/frenchpress/new'
     | '/pourover/new'
@@ -270,6 +282,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/_authenticated/aeropress/new'
     | '/_authenticated/coffees/new'
+    | '/_authenticated/cold-brew/new'
     | '/_authenticated/espresso/new'
     | '/_authenticated/frenchpress/new'
     | '/_authenticated/pourover/new'
@@ -368,6 +381,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEspressoNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/cold-brew/new': {
+      id: '/_authenticated/cold-brew/new'
+      path: '/cold-brew/new'
+      fullPath: '/cold-brew/new'
+      preLoaderRoute: typeof AuthenticatedColdBrewNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/coffees/new': {
       id: '/_authenticated/coffees/new'
       path: '/coffees/new'
@@ -451,6 +471,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedAeropressNewRoute: typeof AuthenticatedAeropressNewRoute
   AuthenticatedCoffeesNewRoute: typeof AuthenticatedCoffeesNewRoute
+  AuthenticatedColdBrewNewRoute: typeof AuthenticatedColdBrewNewRoute
   AuthenticatedEspressoNewRoute: typeof AuthenticatedEspressoNewRoute
   AuthenticatedFrenchpressNewRoute: typeof AuthenticatedFrenchpressNewRoute
   AuthenticatedPouroverNewRoute: typeof AuthenticatedPouroverNewRoute
@@ -471,6 +492,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAeropressNewRoute: AuthenticatedAeropressNewRoute,
   AuthenticatedCoffeesNewRoute: AuthenticatedCoffeesNewRoute,
+  AuthenticatedColdBrewNewRoute: AuthenticatedColdBrewNewRoute,
   AuthenticatedEspressoNewRoute: AuthenticatedEspressoNewRoute,
   AuthenticatedFrenchpressNewRoute: AuthenticatedFrenchpressNewRoute,
   AuthenticatedPouroverNewRoute: AuthenticatedPouroverNewRoute,

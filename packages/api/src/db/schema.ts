@@ -1,10 +1,11 @@
 import {
-  
+
   boolean,
   date,
   index,
   integer,
   numeric,
+  pgEnum,
   pgTable,
   primaryKey,
   text,
@@ -405,10 +406,46 @@ export const frenchpressBrews = pgTable(
   ],
 )
 
+// Where a cold brew steeps. Room temperature (counter) vs. refrigerated
+// (fridge) is the real extraction choice for cold brew, in place of a hot
+// method's water temperature. A fixed, non-user-extensible set, so it is a
+// Postgres enum rather than a lookup table.
+export const brewEnvironmentEnum = pgEnum('brew_environment', [
+  'Counter',
+  'Fridge',
+])
+
+// Cold Brew brew method. Unlike every other method, Cold Brew has no method
+// lookup and no methodId — it has one real technique (immersion), so a variant
+// lookup would be ceremony (see docs/adr/0001-cold-brew-is-methodless.md).
+export const coldBrewBrews = pgTable(
+  'cold_brew_brews',
+  {
+    ...brewBase,
+    dose: numeric(),
+    water: numeric(),
+    // Immersion cold brew steeps for hours, so steepTime is whole MINUTES
+    // (e.g. 1080 = 18h) — unlike the other immersion methods' seconds, for
+    // which hour-scale steeps would be impractical. brewEnvironment is optional.
+    steepTime: integer('steep_time'),
+    brewEnvironment: brewEnvironmentEnum('brew_environment'),
+  },
+  (table) => [
+    index('cold_brew_brews_user_idx').on(table.userId),
+    index('cold_brew_brews_user_coffee_idx').on(table.userId, table.coffeeId),
+    // At most one dialed-in cold brew per coffee. Cold brew is methodless, so
+    // this is scoped to the coffee alone (not coffee+method), independent of
+    // every other method's dialed-in brew.
+    uniqueIndex('cold_brew_brews_dialed_in_idx')
+      .on(table.coffeeId)
+      .where(sql`is_dialed_in`),
+  ],
+)
+
 // Relations
 
 export const relations = defineRelations(
-  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews },
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews },
   (r) => ({
     user: {
       sessions: r.many.session(),
@@ -432,6 +469,7 @@ export const relations = defineRelations(
       pouroverBrews: r.many.pouroverBrews(),
       frenchpressMethods: r.many.frenchpressMethods(),
       frenchpressBrews: r.many.frenchpressBrews(),
+      coldBrewBrews: r.many.coldBrewBrews(),
     },
     countries: {
       user: r.one.user({ from: r.countries.userId, to: r.user.id }),
@@ -489,6 +527,7 @@ export const relations = defineRelations(
       aeropressBrews: r.many.aeropressBrews(),
       pouroverBrews: r.many.pouroverBrews(),
       frenchpressBrews: r.many.frenchpressBrews(),
+      coldBrewBrews: r.many.coldBrewBrews(),
     },
     coffeesVarieties: {
       coffee: r.one.coffees({ from: r.coffeesVarieties.coffeeId, to: r.coffees.id }),
@@ -504,6 +543,7 @@ export const relations = defineRelations(
       aeropressBrews: r.many.aeropressBrews(),
       pouroverBrews: r.many.pouroverBrews(),
       frenchpressBrews: r.many.frenchpressBrews(),
+      coldBrewBrews: r.many.coldBrewBrews(),
     },
     brewingDeviceTypes: {
       user: r.one.user({ from: r.brewingDeviceTypes.userId, to: r.user.id }),
@@ -516,6 +556,7 @@ export const relations = defineRelations(
       aeropressBrews: r.many.aeropressBrews(),
       pouroverBrews: r.many.pouroverBrews(),
       frenchpressBrews: r.many.frenchpressBrews(),
+      coldBrewBrews: r.many.coldBrewBrews(),
     },
     espressoShots: {
       user: r.one.user({ from: r.espressoShots.userId, to: r.user.id, optional: false }),
@@ -555,6 +596,12 @@ export const relations = defineRelations(
       grinder: r.one.grinders({ from: r.frenchpressBrews.grinderId, to: r.grinders.id, optional: false }),
       brewingDevice: r.one.brewingDevices({ from: r.frenchpressBrews.brewingDeviceId, to: r.brewingDevices.id, optional: false }),
       method: r.one.frenchpressMethods({ from: r.frenchpressBrews.methodId, to: r.frenchpressMethods.id, optional: false }),
+    },
+    coldBrewBrews: {
+      user: r.one.user({ from: r.coldBrewBrews.userId, to: r.user.id, optional: false }),
+      coffee: r.one.coffees({ from: r.coldBrewBrews.coffeeId, to: r.coffees.id, optional: false }),
+      grinder: r.one.grinders({ from: r.coldBrewBrews.grinderId, to: r.grinders.id, optional: false }),
+      brewingDevice: r.one.brewingDevices({ from: r.coldBrewBrews.brewingDeviceId, to: r.brewingDevices.id, optional: false }),
     },
     session: {
       user: r.one.user({ from: r.session.userId, to: r.user.id }),
