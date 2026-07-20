@@ -177,7 +177,8 @@ const columns = [
   }),
   columnHelper.accessor('brewEnvironment', {
     header: 'Environment',
-    cell: (info) => info.getValue() ?? '-',
+    // Optional categorical field: render blank (not "-") when unset.
+    cell: (info) => info.getValue() ?? '',
   }),
   columnHelper.accessor('grinder.name', {
     header: 'Grinder',
@@ -188,11 +189,13 @@ const columns = [
   }),
   columnHelper.accessor('notes', {
     header: 'Notes',
-    cell: (info) => (
-      <span className="block whitespace-pre-wrap break-words lg:mx-auto lg:max-w-[16rem]">
-        {info.getValue() ?? '-'}
-      </span>
-    ),
+    // Free text: render blank (not "-") when there are no notes.
+    cell: (info) =>
+      info.getValue() ? (
+        <span className="block whitespace-pre-wrap break-words lg:mx-auto lg:max-w-[16rem]">
+          {info.getValue()}
+        </span>
+      ) : null,
     enableSorting: false,
     meta: { cardFullWidth: true },
   }),

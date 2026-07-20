@@ -92,11 +92,12 @@ describe('ColdBrewBrewsSection', () => {
     expect(table.getByText('1h 30m')).toBeTruthy()
   })
 
-  it('falls back to a dash for missing recipe values', () => {
+  it('renders a dash for missing recipe values, but blank for environment and notes', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
       makeColdBrewBrew({
         id: 'cb1',
+        roastDate: null,
         dose: null,
         water: null,
         steepTime: null,
@@ -109,8 +110,10 @@ describe('ColdBrewBrewsSection', () => {
     render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Empty dose/water/steep/environment/grind/notes/ratio all render as "-".
-    expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(6)
+    // Exactly six "-": days-off-roast, dose, water, steep, grind, and the ratio
+    // (derived from the missing dose/water). Environment and notes render blank
+    // instead — so a 7th/8th dash here would mean one of them regressed.
+    expect(table.getAllByText('-')).toHaveLength(6)
   })
 
   it('links the header to the new cold brew form', () => {
