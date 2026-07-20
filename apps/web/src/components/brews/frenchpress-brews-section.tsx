@@ -11,26 +11,17 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { FrenchpressBrewWithRelations } from '@/types'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
+import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast } from '@/lib/brew'
@@ -101,38 +92,12 @@ function ActionsCell({ row }: CellContext<Brew, unknown>) {
           <Pencil className="h-4 w-4" />
         </Button>
       </Link>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            aria-label="Delete brew"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete brew</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this brew for &quot;
-              {brew.coffee.name}&quot;? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter showCloseButton>
-            <DialogClose asChild>
-              <Button
-                variant="destructive"
-                disabled={deleteBrew.isPending}
-                onClick={() => deleteBrew.mutate(brew.id)}
-              >
-                Delete
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteBrewDialog
+        noun="brew"
+        coffeeName={brew.coffee.name}
+        isPending={deleteBrew.isPending}
+        onDelete={() => deleteBrew.mutate(brew.id)}
+      />
     </div>
   )
 }

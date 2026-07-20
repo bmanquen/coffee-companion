@@ -11,25 +11,16 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
+import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast } from '@/lib/brew'
@@ -109,38 +100,12 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
           <Pencil className="h-4 w-4" />
         </Button>
       </Link>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            aria-label="Delete shot"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete shot</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this shot for &quot;
-              {shot.coffee.name}&quot;? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter showCloseButton>
-            <DialogClose asChild>
-              <Button
-                variant="destructive"
-                disabled={deleteShot.isPending}
-                onClick={() => deleteShot.mutate(shot.id)}
-              >
-                Delete
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteBrewDialog
+        noun="shot"
+        coffeeName={shot.coffee.name}
+        isPending={deleteShot.isPending}
+        onDelete={() => deleteShot.mutate(shot.id)}
+      />
     </div>
   )
 }
