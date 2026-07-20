@@ -13,6 +13,10 @@ import {
   PAGE_SIZE as SHOT_PAGE_SIZE,
 } from '@/components/recent-espresso-shots'
 import {
+  PAGE_SIZE as COLD_BREW_PAGE_SIZE,
+  RecentColdBrewBrews,
+} from '@/components/recent-cold-brew-brews'
+import {
   PAGE_SIZE as COFFEE_PAGE_SIZE,
   RecentCoffees,
 } from '@/components/recent-coffees'
@@ -40,6 +44,12 @@ export const Route = createFileRoute('/')({
       context.queryClient.ensureQueryData(
         context.trpc.coffee.getRecent.queryOptions({
           limit: COFFEE_PAGE_SIZE,
+          offset: 0,
+        }),
+      ),
+      context.queryClient.ensureQueryData(
+        context.trpc.coldBrewBrew.getRecent.queryOptions({
+          limit: COLD_BREW_PAGE_SIZE,
           offset: 0,
         }),
       ),
@@ -86,6 +96,7 @@ function Dashboard() {
       <DialedInFrenchpressBrews />
       <DialedInColdBrewBrews />
       <RecentEspressoShots />
+      <RecentColdBrewBrews />
       <RecentCoffees />
     </div>
   )

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, count, eq } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
@@ -43,6 +43,27 @@ export const coldBrewBrewRouter = createTRPCRouter({
       with: withRelations,
     })
   }),
+
+  getRecent: authedProcedure
+    .input(
+      z.object({ limit: z.number().min(1).max(50), offset: z.number().min(0) }),
+    )
+    .query(async ({ ctx, input }) => {
+      const [items, [{ total }]] = await Promise.all([
+        db.query.coldBrewBrews.findMany({
+          where: { userId: ctx.session.user.id },
+          orderBy: { createdAt: 'desc' },
+          with: withRelations,
+          limit: input.limit,
+          offset: input.offset,
+        }),
+        db
+          .select({ total: count() })
+          .from(coldBrewBrews)
+          .where(eq(coldBrewBrews.userId, ctx.session.user.id)),
+      ])
+      return { items, total }
+    }),
 
   getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {
     const brew = await db.query.coldBrewBrews.findFirst({
