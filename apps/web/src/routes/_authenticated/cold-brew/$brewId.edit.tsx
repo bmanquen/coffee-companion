@@ -1,8 +1,12 @@
 import { insertColdBrewBrewSchema } from '@coffee-companion/api/db/zod'
 import { COLD_BREW_DEVICE_TYPE } from '@coffee-companion/api/lib/cold-brew'
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
+import { Check } from 'lucide-react'
 import type { InsertColdBrewBrew } from '@coffee-companion/api/db/zod'
 import { SteepMinutesInput } from '@/components/form/steep-minutes-input'
 import { H1 } from '@/components/typography/h1'
@@ -12,8 +16,11 @@ import { useAppForm } from '@/hooks/form'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 
-export const Route = createFileRoute('/_authenticated/cold-brew/new')({
-  loader: async ({ context }) => {
+export const Route = createFileRoute('/_authenticated/cold-brew/$brewId/edit')({
+  loader: async ({ context, params }) => {
+    await context.queryClient.ensureQueryData(
+      context.trpc.coldBrewBrew.getById.queryOptions(params.brewId),
+    )
     await context.queryClient.ensureQueryData(
       context.trpc.coffee.getAll.queryOptions(),
     )
@@ -23,31 +30,28 @@ export const Route = createFileRoute('/_authenticated/cold-brew/new')({
     await context.queryClient.ensureQueryData(
       context.trpc.brewingDevice.list.queryOptions(),
     )
-    // Used to prefill the form from the coffee's most recent brew.
-    await context.queryClient.ensureQueryData(
-      context.trpc.coldBrewBrew.getAll.queryOptions(),
-    )
   },
-  component: NewColdBrewBrew,
+  component: EditColdBrewBrew,
 })
 
-function NewColdBrewBrew() {
+function EditColdBrewBrew() {
+  const { brewId } = Route.useParams()
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
+  const { data: brew } = useSuspenseQuery(
+    trpc.coldBrewBrew.getById.queryOptions(brewId),
+  )
+
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
   const coffee = useSearchSelectResource(coffees)
-
-  const { data: brews } = useSuspenseQuery(
-    trpc.coldBrewBrew.getAll.queryOptions(),
-  )
 
   const { data: grinders } = useSuspenseQuery(trpc.grinder.list.queryOptions())
   const grinder = useSearchSelectResource(grinders)
 
   // Cold brews must be logged on a Cold Brew-type device (enforced again
-  // server-side in coldBrewBrew.create).
+  // server-side in coldBrewBrew.update).
   const { data: brewingDevices } = useSuspenseQuery(
     trpc.brewingDevice.list.queryOptions(),
   )
@@ -56,26 +60,29 @@ function NewColdBrewBrew() {
   )
   const brewingDevice = useSearchSelectResource(coldBrewDevices)
 
-  const createBrew = useMutation(
-    trpc.coldBrewBrew.create.mutationOptions({
+  const updateBrew = useMutation(
+    trpc.coldBrewBrew.update.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.coldBrewBrew.getAll.queryOptions())
+        queryClient.invalidateQueries(
+          trpc.coldBrewBrew.getById.queryOptions(brewId),
+        )
         navigate({ to: '/brews' })
       },
     }),
   )
 
   const defaultBrew: InsertColdBrewBrew = {
-    coffeeId: '',
-    grinderId: '',
-    brewingDeviceId: '',
-    roastDate: null,
-    dose: null,
-    water: null,
-    steepTime: null,
-    brewEnvironment: null,
-    grindSetting: null,
-    notes: null,
+    coffeeId: brew.coffeeId,
+    grinderId: brew.grinderId,
+    brewingDeviceId: brew.brewingDeviceId,
+    roastDate: brew.roastDate,
+    dose: brew.dose,
+    water: brew.water,
+    steepTime: brew.steepTime,
+    brewEnvironment: brew.brewEnvironment,
+    grindSetting: brew.grindSetting,
+    notes: brew.notes,
   }
 
   const form = useAppForm({
@@ -84,13 +91,13 @@ function NewColdBrewBrew() {
       onChange: insertColdBrewBrewSchema,
     },
     onSubmit: ({ value }) => {
-      createBrew.mutate(value)
+      updateBrew.mutate({ ...value, id: brewId })
     },
   })
 
   return (
     <Card className="flex flex-col items-center w-full max-w-2xl mx-auto p-4">
-      <H1 className="text-start w-full max-w-md">Log Cold Brew</H1>
+      <H1 className="text-start w-full max-w-md">Edit Cold Brew</H1>
       <form
         className="w-full max-w-md flex flex-col gap-2"
         onSubmit={(e) => {
@@ -98,22 +105,7 @@ function NewColdBrewBrew() {
           form.handleSubmit()
         }}
       >
-        <form.AppField
-          name="coffeeId"
-          listeners={{
-            // Carry the setup and roast date forward from the coffee's most
-            // recent brew. The recipe (dose/water/steep time/environment/grind)
-            // is left blank so it's entered fresh each brew. Cold brew is
-            // methodless, so there is no method to carry forward.
-            onChange: ({ value }) => {
-              const latest = brews.find((b) => b.coffeeId === value)
-              if (!latest) return
-              form.setFieldValue('grinderId', latest.grinderId)
-              form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
-              form.setFieldValue('roastDate', latest.roastDate)
-            },
-          }}
-        >
+        <form.AppField name="coffeeId">
           {(field) => <field.SearchSelect label="Coffee" {...coffee} />}
         </form.AppField>
         <form.AppField name="grinderId">
@@ -191,8 +183,8 @@ function NewColdBrewBrew() {
           )}
         </form.AppField>
         <Button type="submit">
-          Log
-          <Plus />
+          Save
+          <Check />
         </Button>
       </form>
     </Card>

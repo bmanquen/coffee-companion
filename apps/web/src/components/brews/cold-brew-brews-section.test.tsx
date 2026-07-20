@@ -278,4 +278,75 @@ describe('ColdBrewBrewsSection', () => {
       fetchSpy.mockRestore()
     }
   })
+
+  it('links each row to its edit page and the header to the new-brew form', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+      makeColdBrewBrew({ id: 'cb1' }),
+    ])
+
+    render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    const editAnchor = table
+      .getByRole('button', { name: 'Edit brew' })
+      .closest('a')
+    expect(editAnchor?.getAttribute('href')).toBe('/cold-brew/cb1/edit')
+    const logAnchor = screen
+      .getByRole('button', { name: 'Log Brew' })
+      .closest('a')
+    expect(logAnchor?.getAttribute('href')).toBe('/cold-brew/new')
+  })
+
+  it('opens a delete confirmation dialog naming the coffee', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+      makeColdBrewBrew({
+        id: 'cb1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      }),
+    ])
+
+    render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    fireEvent.click(table.getByRole('button', { name: 'Delete brew' }))
+
+    const dialog = within(screen.getByRole('dialog'))
+    expect(
+      dialog.getByText(/Are you sure you want to delete this brew/i),
+    ).toBeTruthy()
+    expect(dialog.getByText(/Ethiopia Guji/)).toBeTruthy()
+    expect(dialog.getByRole('button', { name: 'Delete' })).toBeTruthy()
+  })
+
+  it('deletes the brew when the confirmation dialog is confirmed', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response('[]', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+        makeColdBrewBrew({ id: 'cb1' }),
+      ])
+
+      render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+      const table = within(screen.getByRole('table'))
+      fireEvent.click(table.getByRole('button', { name: 'Delete brew' }))
+      const dialog = within(screen.getByRole('dialog'))
+      fireEvent.click(dialog.getByRole('button', { name: 'Delete' }))
+
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      const [url, init] = fetchSpy.mock.calls[0]
+      expect(String(url)).toContain('coldBrewBrew.delete')
+      expect(String(init?.body ?? '')).toContain('cb1')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })

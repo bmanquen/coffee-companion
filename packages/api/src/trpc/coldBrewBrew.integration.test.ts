@@ -170,6 +170,84 @@ describe('coldBrewBrew.getById', () => {
   })
 })
 
+describe('coldBrewBrew.update', () => {
+  it('updates fields on the user’s brew', async () => {
+    const created = await asA.coldBrewBrew.create(baseBrew())
+    const updated = await asA.coldBrewBrew.update({
+      ...baseBrew(),
+      id: created.id,
+      dose: '55',
+      water: '520',
+      steepTime: 1200,
+      brewEnvironment: 'Counter',
+    })
+    expect(updated.dose).toBe('55')
+    expect(updated.water).toBe('520')
+    expect(updated.steepTime).toBe(1200)
+    expect(updated.brewEnvironment).toBe('Counter')
+  })
+
+  it('rejects a non-cold brew brewing device', async () => {
+    const created = await asA.coldBrewBrew.create(baseBrew())
+    await expect(
+      asA.coldBrewBrew.update({
+        ...baseBrew(),
+        id: created.id,
+        brewingDeviceId: espressoDeviceId,
+      }),
+    ).rejects.toThrow(/Cold Brew/)
+  })
+
+  it('rejects an unknown brewing device', async () => {
+    const created = await asA.coldBrewBrew.create(baseBrew())
+    await expect(
+      asA.coldBrewBrew.update({
+        ...baseBrew(),
+        id: created.id,
+        brewingDeviceId: UNKNOWN_UUID,
+      }),
+    ).rejects.toThrow(/not found/i)
+  })
+
+  it('throws NOT_FOUND for an unknown id', async () => {
+    await expect(
+      asA.coldBrewBrew.update({ ...baseBrew(), id: UNKNOWN_UUID }),
+    ).rejects.toThrow(/not found/i)
+  })
+
+  it('will not update another user’s brew', async () => {
+    const created = await asA.coldBrewBrew.create(baseBrew())
+    await expect(
+      asB.coldBrewBrew.update({ ...baseBrew(), id: created.id, dose: '99' }),
+    ).rejects.toThrow(/not found/i)
+  })
+})
+
+describe('coldBrewBrew.delete', () => {
+  it('deletes the user’s brew', async () => {
+    const created = await asA.coldBrewBrew.create(baseBrew())
+    const deleted = await asA.coldBrewBrew.delete(created.id)
+    expect(deleted.id).toBe(created.id)
+    await expect(asA.coldBrewBrew.getById(created.id)).rejects.toThrow(
+      /not found/i,
+    )
+  })
+
+  it('throws NOT_FOUND for an unknown id', async () => {
+    await expect(asA.coldBrewBrew.delete(UNKNOWN_UUID)).rejects.toThrow(
+      /not found/i,
+    )
+  })
+
+  it('will not delete another user’s brew', async () => {
+    const created = await asA.coldBrewBrew.create(baseBrew())
+    await expect(asB.coldBrewBrew.delete(created.id)).rejects.toThrow(
+      /not found/i,
+    )
+    expect((await asA.coldBrewBrew.getById(created.id)).id).toBe(created.id)
+  })
+})
+
 describe('coldBrewBrew.getAll', () => {
   it('returns the user brews with relations, scoped to the user', async () => {
     await asA.coldBrewBrew.create(baseBrew())

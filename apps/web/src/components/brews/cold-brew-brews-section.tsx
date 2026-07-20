@@ -11,7 +11,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { Crosshair, Plus } from 'lucide-react'
+import { Crosshair, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { ColdBrewBrewWithRelations } from '@/types'
@@ -19,6 +19,16 @@ import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast, formatSteepMinutes } from '@/lib/brew'
@@ -57,6 +67,67 @@ function DialedInCell({ row }: CellContext<Brew, unknown>) {
     >
       <Crosshair className="h-4 w-4" />
     </Button>
+  )
+}
+
+function ActionsCell({ row }: CellContext<Brew, unknown>) {
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+  const deleteBrew = useMutation(
+    trpc.coldBrewBrew.delete.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.coldBrewBrew.getAll.queryOptions())
+      },
+    }),
+  )
+
+  const brew = row.original
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <Link to="/cold-brew/$brewId/edit" params={{ brewId: brew.id }}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          aria-label="Edit brew"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </Link>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            aria-label="Delete brew"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete brew</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this brew for &quot;
+              {brew.coffee.name}&quot;? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter showCloseButton>
+            <DialogClose asChild>
+              <Button
+                variant="destructive"
+                disabled={deleteBrew.isPending}
+                onClick={() => deleteBrew.mutate(brew.id)}
+              >
+                Delete
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
 
@@ -125,11 +196,18 @@ const columns = [
     enableSorting: false,
     meta: { cardFullWidth: true },
   }),
+  columnHelper.display({
+    id: 'actions',
+    header: '',
+    cell: ActionsCell,
+    enableSorting: false,
+    meta: { cardHideLabel: true },
+  }),
 ]
 
 // The Cold Brew log — one tab of the /brews page. Mirrors the other brew
-// sections: a per-coffee dialed-in toggle and the recipe columns. Row actions
-// (edit/delete) arrive in later tickets, so there is no actions column yet.
+// sections: a per-coffee dialed-in toggle, the recipe columns, and per-row
+// edit/delete actions.
 export function ColdBrewBrewsSection() {
   'use no memo'
   const trpc = useTRPC()
