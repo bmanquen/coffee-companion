@@ -15,6 +15,7 @@ import { Crosshair, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { ColdBrewBrewWithRelations } from '@/types'
+import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
@@ -263,13 +264,11 @@ export function ColdBrewBrewsSection() {
         </Link>
       </div>
       {brews.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No cold brews yet.{' '}
-          <Link to="/cold-brew/new" className="underline">
-            Log your first brew
-          </Link>
-          .
-        </p>
+        <BrewsEmptyState
+          message="No cold brews yet."
+          to="/cold-brew/new"
+          linkLabel="Log your first brew"
+        />
       ) : (
         <>
           <div className="flex w-full flex-col gap-2 sm:flex-row">
