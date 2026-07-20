@@ -11,11 +11,12 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { Crosshair, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { ColdBrewBrewWithRelations } from '@/types'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
+import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
@@ -52,22 +53,18 @@ function DialedInCell({ row }: CellContext<Brew, unknown>) {
   const dialedIn = brew.isDialedIn
 
   return (
-    <Button
-      variant={dialedIn ? 'default' : 'ghost'}
-      size="icon"
-      className="h-8 w-8"
-      aria-label={dialedIn ? 'Dialed in — clear' : 'Mark as dialed in'}
-      aria-pressed={dialedIn}
-      onClick={() =>
-        // Cold brew is methodless, so dialing in is scoped to the coffee alone.
+    <DialedInToggleCell
+      dialedIn={dialedIn}
+      onLabel={`Dialed in ${brew.coffee.name} — clear`}
+      offLabel={`Mark ${brew.coffee.name} as dialed in`}
+      // Cold brew is methodless, so dialing in is scoped to the coffee alone.
+      onToggle={() =>
         setDialedIn.mutate({
           coffeeId: brew.coffeeId,
           brewId: dialedIn ? null : brew.id,
         })
       }
-    >
-      <Crosshair className="h-4 w-4" />
-    </Button>
+    />
   )
 }
 

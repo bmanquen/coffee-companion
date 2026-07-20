@@ -285,11 +285,11 @@ describe('AeropressBrewsSection', () => {
     const table = within(screen.getByRole('table'))
     // Labels are scoped per method so the toggle reads clearly for each row.
     const dialed = table.getByRole('button', {
-      name: 'Dialed in for Standard — clear',
+      name: 'Dialed in Ethiopia Guji for Standard — clear',
     })
     expect(dialed.getAttribute('aria-pressed')).toBe('true')
     const notDialed = table.getByRole('button', {
-      name: 'Mark as dialed in for Standard',
+      name: 'Mark Colombia Huila as dialed in for Standard',
     })
     expect(notDialed.getAttribute('aria-pressed')).toBe('false')
   })
@@ -317,14 +317,12 @@ describe('AeropressBrewsSection', () => {
   })
 
   it('fires setDialedIn with the coffee, method, and brew when toggled on', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [
@@ -340,7 +338,9 @@ describe('AeropressBrewsSection', () => {
       render(<AeropressBrewsSection />, { wrapper: Wrapper })
       const table = within(screen.getByRole('table'))
       fireEvent.click(
-        table.getByRole('button', { name: 'Mark as dialed in for Standard' }),
+        table.getByRole('button', {
+          name: 'Mark Ethiopia Guji as dialed in for Standard',
+        }),
       )
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
@@ -356,14 +356,12 @@ describe('AeropressBrewsSection', () => {
   })
 
   it('clears the dialed-in brew (null brewId) when toggled off', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [
@@ -379,7 +377,9 @@ describe('AeropressBrewsSection', () => {
       render(<AeropressBrewsSection />, { wrapper: Wrapper })
       const table = within(screen.getByRole('table'))
       fireEvent.click(
-        table.getByRole('button', { name: 'Dialed in for Standard — clear' }),
+        table.getByRole('button', {
+          name: 'Dialed in Ethiopia Guji for Standard — clear',
+        }),
       )
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
@@ -396,14 +396,12 @@ describe('AeropressBrewsSection', () => {
   })
 
   it('deletes the brew when the confirmation dialog is confirmed', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [
