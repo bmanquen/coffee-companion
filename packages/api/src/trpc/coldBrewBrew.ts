@@ -163,15 +163,30 @@ export const coldBrewBrewRouter = createTRPCRouter({
             ),
           )
         if (input.brewId) {
-          await tx
+          // Constrain the set to the same coffee: a brewId belonging to a
+          // different coffee must not be flagged here, or that coffee's existing
+          // dialed-in brew would be left untouched and trip the per-coffee unique
+          // index with a raw DB error. On a mismatch no row updates; throw so the
+          // transaction rolls back the clear above and the caller gets a clean
+          // NOT_FOUND. Cold brew is methodless (ADR-0001), so this is scoped to
+          // the coffee alone.
+          const updated = await tx
             .update(coldBrewBrews)
             .set({ isDialedIn: true })
             .where(
               and(
                 eq(coldBrewBrews.id, input.brewId),
                 eq(coldBrewBrews.userId, userId),
+                eq(coldBrewBrews.coffeeId, input.coffeeId),
               ),
             )
+            .returning()
+          if (updated.length === 0) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Brew not found for this coffee',
+            })
+          }
         }
       })
     }),

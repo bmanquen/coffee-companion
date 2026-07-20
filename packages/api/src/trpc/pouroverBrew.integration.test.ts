@@ -341,6 +341,49 @@ describe('pouroverBrew.setDialedIn / getDialedIn', () => {
     expect((await asA.pouroverBrew.getById(brew.id)).isDialedIn).toBe(false)
   })
 
+  it('rejects dialing in a brew from a different coffee without disturbing state', async () => {
+    const coffeeX = await asA.coffee.create({ name: uniq('Guard X') })
+    const coffeeY = await asA.coffee.create({ name: uniq('Guard Y') })
+    const xDialed = await asA.pouroverBrew.create({
+      ...baseBrew(),
+      coffeeId: coffeeX.id,
+      methodId: standardMethodId,
+    })
+    const yDialed = await asA.pouroverBrew.create({
+      ...baseBrew(),
+      coffeeId: coffeeY.id,
+      methodId: standardMethodId,
+    })
+    const yOther = await asA.pouroverBrew.create({
+      ...baseBrew(),
+      coffeeId: coffeeY.id,
+      methodId: standardMethodId,
+    })
+    await asA.pouroverBrew.setDialedIn({
+      coffeeId: coffeeX.id,
+      methodId: standardMethodId,
+      brewId: xDialed.id,
+    })
+    await asA.pouroverBrew.setDialedIn({
+      coffeeId: coffeeY.id,
+      methodId: standardMethodId,
+      brewId: yDialed.id,
+    })
+    // Dialing coffeeY's *other* brew in under coffeeX would set a second
+    // dialed-in brew for coffeeY (tripping the unique index) and wrongly clear
+    // coffeeX's. Now it's a clean NOT_FOUND with the transaction rolled back.
+    await expect(
+      asA.pouroverBrew.setDialedIn({
+        coffeeId: coffeeX.id,
+        methodId: standardMethodId,
+        brewId: yOther.id,
+      }),
+    ).rejects.toThrow(/not found/i)
+    expect((await asA.pouroverBrew.getById(xDialed.id)).isDialedIn).toBe(true)
+    expect((await asA.pouroverBrew.getById(yDialed.id)).isDialedIn).toBe(true)
+    expect((await asA.pouroverBrew.getById(yOther.id)).isDialedIn).toBe(false)
+  })
+
   it('does not return another user’s dialed-in brews', async () => {
     const dialedIn = await asB.pouroverBrew.getDialedIn()
     expect(dialedIn.every((b) => b.userId === USER_B)).toBe(true)
