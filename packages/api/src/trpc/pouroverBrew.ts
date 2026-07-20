@@ -183,15 +183,30 @@ export const pouroverBrewRouter = createTRPCRouter({
             ),
           )
         if (input.brewId) {
-          await tx
+          // Constrain the set to the same coffee + method: a brewId belonging to
+          // a different coffee must not be flagged here, or the real coffee's
+          // existing dialed-in brew would be left untouched and trip the
+          // per-(coffee, method) unique index with a raw DB error. On a mismatch
+          // no row updates; throw so the transaction rolls back the clear above
+          // and the caller gets a clean NOT_FOUND.
+          const updated = await tx
             .update(pouroverBrews)
             .set({ isDialedIn: true })
             .where(
               and(
                 eq(pouroverBrews.id, input.brewId),
                 eq(pouroverBrews.userId, userId),
+                eq(pouroverBrews.coffeeId, input.coffeeId),
+                eq(pouroverBrews.methodId, input.methodId),
               ),
             )
+            .returning()
+          if (updated.length === 0) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Brew not found for this coffee and method',
+            })
+          }
         }
       })
     }),
