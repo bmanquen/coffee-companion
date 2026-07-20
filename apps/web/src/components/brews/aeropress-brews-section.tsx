@@ -15,6 +15,7 @@ import { Crosshair, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { AeropressBrewWithRelations } from '@/types'
+import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
@@ -264,13 +265,11 @@ export function AeropressBrewsSection() {
         </Link>
       </div>
       {brews.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No aeropress brews yet.{' '}
-          <Link to="/aeropress/new" className="underline">
-            Log your first brew
-          </Link>
-          .
-        </p>
+        <BrewsEmptyState
+          message="No aeropress brews yet."
+          to="/aeropress/new"
+          linkLabel="Log your first brew"
+        />
       ) : (
         <>
           <div className="flex w-full flex-col gap-2 sm:flex-row">

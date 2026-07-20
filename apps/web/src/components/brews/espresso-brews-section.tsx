@@ -14,6 +14,7 @@ import {
 import { Crosshair, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
+import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
@@ -273,13 +274,11 @@ export function EspressoBrewsSection() {
         </Link>
       </div>
       {shots.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No espresso shots yet.{' '}
-          <Link to="/espresso/new" className="underline">
-            Log your first shot
-          </Link>
-          .
-        </p>
+        <BrewsEmptyState
+          message="No espresso shots yet."
+          to="/espresso/new"
+          linkLabel="Log your first shot"
+        />
       ) : (
         <>
           <div className="flex w-full flex-col gap-2 sm:flex-row">
