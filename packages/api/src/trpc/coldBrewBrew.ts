@@ -66,6 +66,44 @@ export const coldBrewBrewRouter = createTRPCRouter({
       return brew
     }),
 
+  update: authedProcedure
+    .input(insertColdBrewBrewSchema.extend({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input
+      await assertColdBrewDevice(data.brewingDeviceId, ctx.session.user.id)
+
+      const updated = await db
+        .update(coldBrewBrews)
+        .set(data)
+        .where(
+          and(
+            eq(coldBrewBrews.id, id),
+            eq(coldBrewBrews.userId, ctx.session.user.id),
+          ),
+        )
+        .returning()
+      if (updated.length === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
+      }
+      return updated[0]
+    }),
+
+  delete: authedProcedure.input(z.uuid()).mutation(async ({ ctx, input }) => {
+    const deleted = await db
+      .delete(coldBrewBrews)
+      .where(
+        and(
+          eq(coldBrewBrews.id, input),
+          eq(coldBrewBrews.userId, ctx.session.user.id),
+        ),
+      )
+      .returning()
+    if (deleted.length === 0) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
+    }
+    return deleted[0]
+  }),
+
   // Brews that are the dialed-in reference for their coffee, most recent first.
   // An optional limit caps the result; omitting it returns all of them.
   getDialedIn: authedProcedure

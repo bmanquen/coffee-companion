@@ -27,6 +27,7 @@ import { Route as AuthenticatedFrenchpressBrewIdEditRouteImport } from './routes
 import { Route as AuthenticatedEspressoShotIdEditRouteImport } from './routes/_authenticated/espresso/$shotId.edit'
 import { Route as AuthenticatedEquipmentGrindersNewRouteImport } from './routes/_authenticated/equipment/grinders/new'
 import { Route as AuthenticatedEquipmentBrewingDevicesNewRouteImport } from './routes/_authenticated/equipment/brewing-devices/new'
+import { Route as AuthenticatedColdBrewBrewIdEditRouteImport } from './routes/_authenticated/cold-brew/$brewId.edit'
 import { Route as AuthenticatedCoffeesCoffeeIdEditRouteImport } from './routes/_authenticated/coffees/$coffeeId.edit'
 import { Route as AuthenticatedAeropressBrewIdEditRouteImport } from './routes/_authenticated/aeropress/$brewId.edit'
 import { Route as AuthenticatedEquipmentGrindersGrinderIdEditRouteImport } from './routes/_authenticated/equipment/grinders/$grinderId.edit'
@@ -133,6 +134,12 @@ const AuthenticatedEquipmentBrewingDevicesNewRoute =
     path: '/equipment/brewing-devices/new',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedColdBrewBrewIdEditRoute =
+  AuthenticatedColdBrewBrewIdEditRouteImport.update({
+    id: '/cold-brew/$brewId/edit',
+    path: '/cold-brew/$brewId/edit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCoffeesCoffeeIdEditRoute =
   AuthenticatedCoffeesCoffeeIdEditRouteImport.update({
     id: '/coffees/$coffeeId/edit',
@@ -173,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/equipment/': typeof AuthenticatedEquipmentIndexRoute
   '/aeropress/$brewId/edit': typeof AuthenticatedAeropressBrewIdEditRoute
   '/coffees/$coffeeId/edit': typeof AuthenticatedCoffeesCoffeeIdEditRoute
+  '/cold-brew/$brewId/edit': typeof AuthenticatedColdBrewBrewIdEditRoute
   '/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
   '/espresso/$shotId/edit': typeof AuthenticatedEspressoShotIdEditRoute
@@ -196,6 +204,7 @@ export interface FileRoutesByTo {
   '/equipment': typeof AuthenticatedEquipmentIndexRoute
   '/aeropress/$brewId/edit': typeof AuthenticatedAeropressBrewIdEditRoute
   '/coffees/$coffeeId/edit': typeof AuthenticatedCoffeesCoffeeIdEditRoute
+  '/cold-brew/$brewId/edit': typeof AuthenticatedColdBrewBrewIdEditRoute
   '/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
   '/espresso/$shotId/edit': typeof AuthenticatedEspressoShotIdEditRoute
@@ -221,6 +230,7 @@ export interface FileRoutesById {
   '/_authenticated/equipment/': typeof AuthenticatedEquipmentIndexRoute
   '/_authenticated/aeropress/$brewId/edit': typeof AuthenticatedAeropressBrewIdEditRoute
   '/_authenticated/coffees/$coffeeId/edit': typeof AuthenticatedCoffeesCoffeeIdEditRoute
+  '/_authenticated/cold-brew/$brewId/edit': typeof AuthenticatedColdBrewBrewIdEditRoute
   '/_authenticated/equipment/brewing-devices/new': typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   '/_authenticated/equipment/grinders/new': typeof AuthenticatedEquipmentGrindersNewRoute
   '/_authenticated/espresso/$shotId/edit': typeof AuthenticatedEspressoShotIdEditRoute
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/equipment/'
     | '/aeropress/$brewId/edit'
     | '/coffees/$coffeeId/edit'
+    | '/cold-brew/$brewId/edit'
     | '/equipment/brewing-devices/new'
     | '/equipment/grinders/new'
     | '/espresso/$shotId/edit'
@@ -269,6 +280,7 @@ export interface FileRouteTypes {
     | '/equipment'
     | '/aeropress/$brewId/edit'
     | '/coffees/$coffeeId/edit'
+    | '/cold-brew/$brewId/edit'
     | '/equipment/brewing-devices/new'
     | '/equipment/grinders/new'
     | '/espresso/$shotId/edit'
@@ -293,6 +305,7 @@ export interface FileRouteTypes {
     | '/_authenticated/equipment/'
     | '/_authenticated/aeropress/$brewId/edit'
     | '/_authenticated/coffees/$coffeeId/edit'
+    | '/_authenticated/cold-brew/$brewId/edit'
     | '/_authenticated/equipment/brewing-devices/new'
     | '/_authenticated/equipment/grinders/new'
     | '/_authenticated/espresso/$shotId/edit'
@@ -437,6 +450,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEquipmentBrewingDevicesNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/cold-brew/$brewId/edit': {
+      id: '/_authenticated/cold-brew/$brewId/edit'
+      path: '/cold-brew/$brewId/edit'
+      fullPath: '/cold-brew/$brewId/edit'
+      preLoaderRoute: typeof AuthenticatedColdBrewBrewIdEditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/coffees/$coffeeId/edit': {
       id: '/_authenticated/coffees/$coffeeId/edit'
       path: '/coffees/$coffeeId/edit'
@@ -480,6 +500,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedEquipmentIndexRoute: typeof AuthenticatedEquipmentIndexRoute
   AuthenticatedAeropressBrewIdEditRoute: typeof AuthenticatedAeropressBrewIdEditRoute
   AuthenticatedCoffeesCoffeeIdEditRoute: typeof AuthenticatedCoffeesCoffeeIdEditRoute
+  AuthenticatedColdBrewBrewIdEditRoute: typeof AuthenticatedColdBrewBrewIdEditRoute
   AuthenticatedEquipmentBrewingDevicesNewRoute: typeof AuthenticatedEquipmentBrewingDevicesNewRoute
   AuthenticatedEquipmentGrindersNewRoute: typeof AuthenticatedEquipmentGrindersNewRoute
   AuthenticatedEspressoShotIdEditRoute: typeof AuthenticatedEspressoShotIdEditRoute
@@ -501,6 +522,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedEquipmentIndexRoute: AuthenticatedEquipmentIndexRoute,
   AuthenticatedAeropressBrewIdEditRoute: AuthenticatedAeropressBrewIdEditRoute,
   AuthenticatedCoffeesCoffeeIdEditRoute: AuthenticatedCoffeesCoffeeIdEditRoute,
+  AuthenticatedColdBrewBrewIdEditRoute: AuthenticatedColdBrewBrewIdEditRoute,
   AuthenticatedEquipmentBrewingDevicesNewRoute:
     AuthenticatedEquipmentBrewingDevicesNewRoute,
   AuthenticatedEquipmentGrindersNewRoute:
