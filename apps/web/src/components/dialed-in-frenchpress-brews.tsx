@@ -5,15 +5,16 @@ import {
   getExpandedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { ChevronDown } from 'lucide-react'
 import { Card } from './ui/card'
 import type { FrenchpressBrewWithRelations } from '@/types'
-import type { Row } from '@tanstack/react-table'
+import {
+  BrewDetails,
+  brewExpanderColumn,
+} from '@/components/brews/brew-details'
 import { DataTable } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast } from '@/lib/brew'
 import { formatBrewRatio } from '@/lib/brew-ratio'
-import { cn } from '@/lib/utils'
 
 export const MAX_BREWS = 10
 
@@ -48,57 +49,8 @@ const columns = [
     header: 'Grind',
     cell: (info) => info.getValue() ?? '-',
   }),
-  columnHelper.display({
-    id: 'expander',
-    header: '',
-    cell: ({ row }) => (
-      <ChevronDown
-        className={cn(
-          'h-4 w-4 text-muted-foreground transition-transform',
-          row.getIsExpanded() && 'rotate-180',
-        )}
-      />
-    ),
-    // Desktop uses this chevron column; the mobile card renders its own.
-    meta: { cardHidden: true },
-  }),
+  brewExpanderColumn<FrenchpressBrewWithRelations>(),
 ]
-
-function BrewDetails({ row }: { row: Row<FrenchpressBrewWithRelations> }) {
-  const brew = row.original
-  return (
-    <dl className="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-2 text-sm py-1 text-left sm:grid-cols-2">
-      <div>
-        <dt className="inline font-medium">Grinder: </dt>
-        <dd className="inline text-muted-foreground">
-          {brew.grinder.name} ({brew.grinder.brand})
-        </dd>
-      </div>
-      <div>
-        <dt className="inline font-medium">Device: </dt>
-        <dd className="inline text-muted-foreground">
-          {brew.brewingDevice.name} ({brew.brewingDevice.brand})
-        </dd>
-      </div>
-      <div>
-        <dt className="inline font-medium">Ratio: </dt>
-        <dd className="inline text-muted-foreground">
-          {formatBrewRatio(brew.dose, brew.water)}
-        </dd>
-      </div>
-      <div>
-        <dt className="inline font-medium">Water temp: </dt>
-        <dd className="inline text-muted-foreground">
-          {brew.waterTemp != null ? `${brew.waterTemp}°C` : '-'}
-        </dd>
-      </div>
-      <div className="col-span-2">
-        <dt className="inline font-medium">Notes: </dt>
-        <dd className="inline text-muted-foreground">{brew.notes ?? '-'}</dd>
-      </div>
-    </dl>
-  )
-}
 
 // The coffee's dialed-in french press brews on the dashboard, one row per method
 // — a coffee can have a dialed-in brew per method.
@@ -127,7 +79,21 @@ export function DialedInFrenchpressBrews() {
         <h2 className="text-lg font-semibold">Dialed In French Press</h2>
         <DataTable
           table={table}
-          renderSubComponent={(row) => <BrewDetails row={row} />}
+          renderSubComponent={(row) => (
+            <BrewDetails
+              grinder={row.original.grinder}
+              device={row.original.brewingDevice}
+              ratio={formatBrewRatio(row.original.dose, row.original.water)}
+              extra={{
+                label: 'Water temp',
+                value:
+                  row.original.waterTemp != null
+                    ? `${row.original.waterTemp}°C`
+                    : '-',
+              }}
+              notes={row.original.notes}
+            />
+          )}
         />
       </div>
     </Card>

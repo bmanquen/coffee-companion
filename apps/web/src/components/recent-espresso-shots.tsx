@@ -6,11 +6,14 @@ import {
   getExpandedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { ChevronDown, Crosshair, Loader2 } from 'lucide-react'
+import { Crosshair, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Card } from './ui/card'
 import type { EspressoShotWithRelations } from '@/types'
-import type { Row } from '@tanstack/react-table'
+import {
+  BrewDetails,
+  brewExpanderColumn,
+} from '@/components/brews/brew-details'
 import { DataTable } from '@/components/data-table'
 import { PaginationControls } from '@/components/pagination-controls'
 import { Button } from '@/components/ui/button'
@@ -61,51 +64,8 @@ const columns = [
     header: 'Grind',
     cell: (info) => info.getValue() ?? '-',
   }),
-  columnHelper.display({
-    id: 'expander',
-    header: '',
-    cell: ({ row }) => (
-      <ChevronDown
-        className={cn(
-          'h-4 w-4 text-muted-foreground transition-transform',
-          row.getIsExpanded() && 'rotate-180',
-        )}
-      />
-    ),
-    // Desktop uses this chevron column; the mobile card renders its own.
-    meta: { cardHidden: true },
-  }),
+  brewExpanderColumn<EspressoShotWithRelations>(),
 ]
-
-function ShotDetails({ row }: { row: Row<EspressoShotWithRelations> }) {
-  const shot = row.original
-  return (
-    <dl className="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-2 text-sm py-1 text-left sm:grid-cols-2">
-      <div>
-        <dt className="inline font-medium">Grinder: </dt>
-        <dd className="inline text-muted-foreground">
-          {shot.grinder.name} ({shot.grinder.brand})
-        </dd>
-      </div>
-      <div>
-        <dt className="inline font-medium">Device: </dt>
-        <dd className="inline text-muted-foreground">
-          {shot.brewingDevice.name} ({shot.brewingDevice.brand})
-        </dd>
-      </div>
-      <div>
-        <dt className="inline font-medium">Ratio: </dt>
-        <dd className="inline text-muted-foreground">
-          {formatBrewRatio(shot.dose, shot.yield)}
-        </dd>
-      </div>
-      <div className="col-span-2">
-        <dt className="inline font-medium">Notes: </dt>
-        <dd className="inline text-muted-foreground">{shot.notes ?? '-'}</dd>
-      </div>
-    </dl>
-  )
-}
 
 export function RecentEspressoShots() {
   const trpc = useTRPC()
@@ -167,7 +127,17 @@ export function RecentEspressoShots() {
               >
                 <DataTable
                   table={table}
-                  renderSubComponent={(row) => <ShotDetails row={row} />}
+                  renderSubComponent={(row) => (
+                    <BrewDetails
+                      grinder={row.original.grinder}
+                      device={row.original.brewingDevice}
+                      ratio={formatBrewRatio(
+                        row.original.dose,
+                        row.original.yield,
+                      )}
+                      notes={row.original.notes}
+                    />
+                  )}
                   rowClassName={(row) =>
                     row.original.isDialedIn
                       ? 'bg-primary/10 hover:bg-primary/15'

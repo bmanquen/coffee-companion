@@ -1,6 +1,9 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { DialedInFrenchpressBrews, MAX_BREWS } from './dialed-in-frenchpress-brews'
+import {
+  DialedInFrenchpressBrews,
+  MAX_BREWS,
+} from './dialed-in-frenchpress-brews'
 import { createTestProviders } from '@/test/providers'
 import { makeFrenchpressBrew } from '@/test/factories'
 
