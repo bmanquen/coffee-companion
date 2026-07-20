@@ -11,11 +11,12 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { Crosshair, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { FrenchpressBrewWithRelations } from '@/types'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
+import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
@@ -45,7 +46,9 @@ function DialedInCell({ row }: CellContext<Brew, unknown>) {
   const setDialedIn = useMutation(
     trpc.frenchpressBrew.setDialedIn.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.frenchpressBrew.getAll.queryOptions())
+        queryClient.invalidateQueries(
+          trpc.frenchpressBrew.getAll.queryOptions(),
+        )
       },
     }),
   )
@@ -54,28 +57,20 @@ function DialedInCell({ row }: CellContext<Brew, unknown>) {
   const dialedIn = brew.isDialedIn
 
   return (
-    <Button
-      variant={dialedIn ? 'default' : 'ghost'}
-      size="icon"
-      className="h-8 w-8"
-      aria-label={
-        dialedIn
-          ? `Dialed in for ${brew.method.name} — clear`
-          : `Mark as dialed in for ${brew.method.name}`
-      }
-      aria-pressed={dialedIn}
-      onClick={() =>
-        // Dialing in is scoped per method: this only replaces the coffee's
-        // dialed-in brew for *this* brew's method.
+    <DialedInToggleCell
+      dialedIn={dialedIn}
+      onLabel={`Dialed in ${brew.coffee.name} for ${brew.method.name} — clear`}
+      offLabel={`Mark ${brew.coffee.name} as dialed in for ${brew.method.name}`}
+      // Dialing in is scoped per method: this only replaces the coffee's
+      // dialed-in brew for *this* brew's method.
+      onToggle={() =>
         setDialedIn.mutate({
           coffeeId: brew.coffeeId,
           methodId: brew.methodId,
           brewId: dialedIn ? null : brew.id,
         })
       }
-    >
-      <Crosshair className="h-4 w-4" />
-    </Button>
+    />
   )
 }
 
@@ -85,7 +80,9 @@ function ActionsCell({ row }: CellContext<Brew, unknown>) {
   const deleteBrew = useMutation(
     trpc.frenchpressBrew.delete.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.frenchpressBrew.getAll.queryOptions())
+        queryClient.invalidateQueries(
+          trpc.frenchpressBrew.getAll.queryOptions(),
+        )
       },
     }),
   )

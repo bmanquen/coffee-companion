@@ -11,10 +11,11 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { Crosshair, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
+import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
@@ -68,21 +69,17 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
   const dialedIn = shot.isDialedIn
 
   return (
-    <Button
-      variant={dialedIn ? 'default' : 'ghost'}
-      size="icon"
-      className="h-8 w-8"
-      aria-label={dialedIn ? 'Dialed in — clear' : 'Mark as dialed in'}
-      aria-pressed={dialedIn}
-      onClick={() =>
+    <DialedInToggleCell
+      dialedIn={dialedIn}
+      onLabel={`Dialed in ${shot.coffee.name} — clear`}
+      offLabel={`Mark ${shot.coffee.name} as dialed in`}
+      onToggle={() =>
         setDialedIn.mutate({
           coffeeId: shot.coffeeId,
           shotId: dialedIn ? null : shot.id,
         })
       }
-    >
-      <Crosshair className="h-4 w-4" />
-    </Button>
+    />
   )
 }
 
