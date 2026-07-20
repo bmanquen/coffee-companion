@@ -275,6 +275,35 @@ describe('coldBrewBrew.getAll', () => {
   })
 })
 
+describe('coldBrewBrew.getRecent', () => {
+  it('paginates with a limit/offset window and a total count', async () => {
+    for (let i = 0; i < 3; i++) {
+      await asA.coldBrewBrew.create(baseBrew())
+    }
+    const page1 = await asA.coldBrewBrew.getRecent({ limit: 2, offset: 0 })
+    expect(page1.items.length).toBe(2)
+    expect(page1.total).toBeGreaterThanOrEqual(3)
+
+    const page2 = await asA.coldBrewBrew.getRecent({ limit: 2, offset: 2 })
+    expect(page2.items.length).toBeGreaterThanOrEqual(1)
+    // Same total regardless of the page window.
+    expect(page2.total).toBe(page1.total)
+    // The offset window advances: the two pages share no brews.
+    const page1Ids = new Set(page1.items.map((b) => b.id))
+    expect(page2.items.some((b) => page1Ids.has(b.id))).toBe(false)
+  })
+
+  it('scopes both items and total to the user', async () => {
+    // USER_A has several brews from the other tests; USER_B has none.
+    const aPage = await asA.coldBrewBrew.getRecent({ limit: 5, offset: 0 })
+    const bPage = await asB.coldBrewBrew.getRecent({ limit: 5, offset: 0 })
+    expect(bPage.items.every((b) => b.userId === USER_B)).toBe(true)
+    // total is per-user, not a global row count, so B's is strictly smaller.
+    expect(aPage.total).toBeGreaterThan(0)
+    expect(bPage.total).toBeLessThan(aPage.total)
+  })
+})
+
 describe('coldBrewBrew.setDialedIn / getDialedIn', () => {
   it('dials in at most one cold brew per coffee, replacing the previous', async () => {
     const coffee = await asA.coffee.create({ name: uniq('One Per Coffee') })
