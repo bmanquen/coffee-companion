@@ -1,10 +1,12 @@
 import { createColumnHelper } from '@tanstack/react-table'
-import { ChevronDown } from 'lucide-react'
 import type { Row } from '@tanstack/react-table'
 import type { ColdBrewBrewWithRelations } from '@/types'
+import {
+  BrewDetails,
+  brewExpanderColumn,
+} from '@/components/brews/brew-details'
 import { daysOffRoast, formatSteepMinutes } from '@/lib/brew'
 import { formatBrewRatio } from '@/lib/brew-ratio'
-import { cn } from '@/lib/utils'
 
 // Shared table pieces for the two dashboard cold-brew cards — the dialed-in card
 // and the recent-brews card. Both render the same recipe columns and the same
@@ -40,21 +42,11 @@ export const coldBrewSummaryColumns = [
   }),
 ]
 
-export const coldBrewExpanderColumn = coldBrewColumnHelper.display({
-  id: 'expander',
-  header: '',
-  cell: ({ row }) => (
-    <ChevronDown
-      className={cn(
-        'h-4 w-4 text-muted-foreground transition-transform',
-        row.getIsExpanded() && 'rotate-180',
-      )}
-    />
-  ),
-  // Desktop uses this chevron column; the mobile card renders its own.
-  meta: { cardHidden: true },
-})
+export const coldBrewExpanderColumn =
+  brewExpanderColumn<ColdBrewBrewWithRelations>()
 
+// Cold brew's detail sub-row: the shared BrewDetails with the Environment slot
+// (in place of the hot methods' water temperature).
 export function ColdBrewDetails({
   row,
 }: {
@@ -62,35 +54,12 @@ export function ColdBrewDetails({
 }) {
   const brew = row.original
   return (
-    <dl className="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-2 text-sm py-1 text-left sm:grid-cols-2">
-      <div>
-        <dt className="inline font-medium">Grinder: </dt>
-        <dd className="inline text-muted-foreground">
-          {brew.grinder.name} ({brew.grinder.brand})
-        </dd>
-      </div>
-      <div>
-        <dt className="inline font-medium">Device: </dt>
-        <dd className="inline text-muted-foreground">
-          {brew.brewingDevice.name} ({brew.brewingDevice.brand})
-        </dd>
-      </div>
-      <div>
-        <dt className="inline font-medium">Ratio: </dt>
-        <dd className="inline text-muted-foreground">
-          {formatBrewRatio(brew.dose, brew.water)}
-        </dd>
-      </div>
-      <div>
-        <dt className="inline font-medium">Environment: </dt>
-        <dd className="inline text-muted-foreground">
-          {brew.brewEnvironment ?? '-'}
-        </dd>
-      </div>
-      <div className="col-span-2">
-        <dt className="inline font-medium">Notes: </dt>
-        <dd className="inline text-muted-foreground">{brew.notes ?? '-'}</dd>
-      </div>
-    </dl>
+    <BrewDetails
+      grinder={brew.grinder}
+      device={brew.brewingDevice}
+      ratio={formatBrewRatio(brew.dose, brew.water)}
+      extra={{ label: 'Environment', value: brew.brewEnvironment ?? '-' }}
+      notes={brew.notes}
+    />
   )
 }

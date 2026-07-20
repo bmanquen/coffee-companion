@@ -63,7 +63,9 @@ describe('DataTable', () => {
 
   it('shows an empty state when there are no rows', () => {
     render(<DataTableHarness data={[]} />)
-    expect(within(screen.getByRole('table')).getByText('No results.')).toBeTruthy()
+    expect(
+      within(screen.getByRole('table')).getByText('No results.'),
+    ).toBeTruthy()
   })
 
   it('applies rowClassName only to rows the predicate matches', () => {
@@ -87,7 +89,10 @@ describe('DataTable', () => {
 
   describe('card layout — cardFullWidth', () => {
     const cardColumns = [
-      columnHelper.accessor('name', { header: 'Coffee', meta: { cardTitle: true } }),
+      columnHelper.accessor('name', {
+        header: 'Coffee',
+        meta: { cardTitle: true },
+      }),
       columnHelper.accessor('roaster', { header: 'Roaster' }),
       columnHelper.accessor('notes', {
         header: 'Notes',
@@ -116,7 +121,9 @@ describe('DataTable', () => {
       const notesLabel = card.getByText('Notes')
       const notesDl = notesLabel.closest('dl')!
       expect(notesDl.className).not.toContain('columns-2')
-      expect(within(notesDl).getByText('Juicy, floral, long finish.')).toBeTruthy()
+      expect(
+        within(notesDl).getByText('Juicy, floral, long finish.'),
+      ).toBeTruthy()
 
       // A normal field stays in the two-column body.
       const roasterDl = card.getByText('Roaster').closest('dl')!

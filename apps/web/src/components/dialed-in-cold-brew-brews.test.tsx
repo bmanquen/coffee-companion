@@ -11,7 +11,9 @@ describe('DialedInColdBrewBrews', () => {
       trpc.coldBrewBrew.getDialedIn.queryKey({ limit: MAX_BREWS }),
       [],
     )
-    const { container } = render(<DialedInColdBrewBrews />, { wrapper: Wrapper })
+    const { container } = render(<DialedInColdBrewBrews />, {
+      wrapper: Wrapper,
+    })
     expect(container.firstChild).toBeNull()
     expect(screen.queryByText('Dialed In Cold Brew')).toBeNull()
   })
