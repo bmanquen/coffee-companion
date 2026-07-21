@@ -5,6 +5,10 @@ import { getForwardedHeaders } from '@/lib/request-headers'
 import { Button } from '@/components/ui/button'
 import { H1 } from '@/components/typography/h1'
 import { EspressoBrewFeed } from '@/components/dashboard/espresso-brew-feed'
+import { PouroverBrewFeed } from '@/components/dashboard/pourover-brew-feed'
+import { FrenchpressBrewFeed } from '@/components/dashboard/frenchpress-brew-feed'
+import { AeropressBrewFeed } from '@/components/dashboard/aeropress-brew-feed'
+import { ColdBrewBrewFeed } from '@/components/dashboard/cold-brew-brew-feed'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/')({
@@ -15,14 +19,28 @@ export const Route = createFileRoute('/')({
     })
     return { session }
   },
-  // Warm the selected method's full brew history so the first tab renders
-  // server-side instead of flashing a spinner. The feed reads it with
+  // Warm every method's full brew history so any tab renders server-side
+  // instead of flashing a spinner when selected. Each feed reads its own with
   // useSuspenseQuery.
   loader: async ({ context }) => {
     if (!context.session) return
-    await context.queryClient.ensureQueryData(
-      context.trpc.espressoShot.getAll.queryOptions(),
-    )
+    await Promise.all([
+      context.queryClient.ensureQueryData(
+        context.trpc.espressoShot.getAll.queryOptions(),
+      ),
+      context.queryClient.ensureQueryData(
+        context.trpc.pouroverBrew.getAll.queryOptions(),
+      ),
+      context.queryClient.ensureQueryData(
+        context.trpc.frenchpressBrew.getAll.queryOptions(),
+      ),
+      context.queryClient.ensureQueryData(
+        context.trpc.aeropressBrew.getAll.queryOptions(),
+      ),
+      context.queryClient.ensureQueryData(
+        context.trpc.coldBrewBrew.getAll.queryOptions(),
+      ),
+    ])
   },
   component: Home,
 })
@@ -55,9 +73,9 @@ export function LandingPage() {
   )
 }
 
-// The dashboard is method-first: a switcher over one per-method Brew feed.
-// The switcher only lists methods that are wired, so for now that's Espresso
-// alone; the remaining methods arrive in a follow-up ticket.
+// The dashboard is method-first: a switcher over one per-method Brew feed. The
+// tabs run in the agreed order — Espresso, Pour Over, French Press, AeroPress,
+// Cold Brew — each rendering its own method's reference-only feed.
 type DashboardMethod =
   | 'espresso'
   | 'pourover'
@@ -67,6 +85,10 @@ type DashboardMethod =
 
 const dashboardMethods: Array<{ value: DashboardMethod; label: string }> = [
   { value: 'espresso', label: 'Espresso' },
+  { value: 'pourover', label: 'Pour Over' },
+  { value: 'frenchpress', label: 'French Press' },
+  { value: 'aeropress', label: 'AeroPress' },
+  { value: 'coldbrew', label: 'Cold Brew' },
 ]
 
 export function Dashboard() {
@@ -100,6 +122,10 @@ export function Dashboard() {
           })}
         </div>
         {selectedMethod === 'espresso' && <EspressoBrewFeed />}
+        {selectedMethod === 'pourover' && <PouroverBrewFeed />}
+        {selectedMethod === 'frenchpress' && <FrenchpressBrewFeed />}
+        {selectedMethod === 'aeropress' && <AeropressBrewFeed />}
+        {selectedMethod === 'coldbrew' && <ColdBrewBrewFeed />}
       </div>
     </div>
   )
