@@ -1,17 +1,11 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import {
-  createColumnHelper,
-  getCoreRowModel,
-  getExpandedRowModel,
-  useReactTable,
-} from '@tanstack/react-table'
-import { Card } from './ui/card'
+import { createColumnHelper } from '@tanstack/react-table'
 import type { AeropressBrewWithRelations } from '@/types'
 import {
   BrewDetails,
   brewExpanderColumn,
 } from '@/components/brews/brew-details'
-import { DataTable } from '@/components/data-table'
+import { DialedInBrewsCard } from '@/components/brews/dialed-in-brews-card'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast } from '@/lib/brew'
 import { formatBrewRatio } from '@/lib/brew-ratio'
@@ -61,34 +55,19 @@ export function DialedInAeropressBrews() {
     trpc.aeropressBrew.getDialedIn.queryOptions({ limit: MAX_BREWS }),
   )
 
-  const table = useReactTable<AeropressBrewWithRelations>({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
-    getRowCanExpand: () => true,
-    enableSorting: false,
-  })
-
-  // Nothing dialed in yet — keep the dashboard uncluttered.
-  if (data.length === 0) return null
-
   return (
-    <Card className="flex flex-row items-center gap-4 p-4">
-      <div className="flex flex-col gap-3 flex-1 min-w-0">
-        <h2 className="text-lg font-semibold">Dialed In AeroPress</h2>
-        <DataTable
-          table={table}
-          renderSubComponent={(row) => (
-            <BrewDetails
-              grinder={row.original.grinder}
-              device={row.original.brewingDevice}
-              ratio={formatBrewRatio(row.original.dose, row.original.water)}
-              notes={row.original.notes}
-            />
-          )}
+    <DialedInBrewsCard
+      title="Dialed In AeroPress"
+      data={data}
+      columns={columns}
+      renderDetails={(row) => (
+        <BrewDetails
+          grinder={row.original.grinder}
+          device={row.original.brewingDevice}
+          ratio={formatBrewRatio(row.original.dose, row.original.water)}
+          notes={row.original.notes}
         />
-      </div>
-    </Card>
+      )}
+    />
   )
 }
