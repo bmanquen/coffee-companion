@@ -4,7 +4,14 @@ import { Dashboard, LandingPage } from './index'
 import type * as ReactRouter from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { createTestProviders } from '@/test/providers'
-import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
+import {
+  makeAeropressBrew,
+  makeColdBrewBrew,
+  makeFrenchpressBrew,
+  makePouroverBrew,
+  makeRecentCoffee,
+  makeRecentShot,
+} from '@/test/factories'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
@@ -49,11 +56,36 @@ vi.mock('@/components/ui/command', () => ({
   ),
 }))
 
-function seed(shots: Array<ReturnType<typeof makeRecentShot>>) {
+// Seed every method's getAll so any tab can render; each defaults to empty and
+// is overridden per test. Espresso accepts the bare-array shorthand the older
+// tests already pass.
+function seed(
+  shots: Array<ReturnType<typeof makeRecentShot>>,
+  others: {
+    pourover?: Array<ReturnType<typeof makePouroverBrew>>
+    frenchpress?: Array<ReturnType<typeof makeFrenchpressBrew>>
+    aeropress?: Array<ReturnType<typeof makeAeropressBrew>>
+    coldbrew?: Array<ReturnType<typeof makeColdBrewBrew>>
+  } = {},
+) {
   const providers = createTestProviders()
-  providers.queryClient.setQueryData(
-    providers.trpc.espressoShot.getAll.queryKey(),
-    shots,
+  const { queryClient, trpc } = providers
+  queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), shots)
+  queryClient.setQueryData(
+    trpc.pouroverBrew.getAll.queryKey(),
+    others.pourover ?? [],
+  )
+  queryClient.setQueryData(
+    trpc.frenchpressBrew.getAll.queryKey(),
+    others.frenchpress ?? [],
+  )
+  queryClient.setQueryData(
+    trpc.aeropressBrew.getAll.queryKey(),
+    others.aeropress ?? [],
+  )
+  queryClient.setQueryData(
+    trpc.coldBrewBrew.getAll.queryKey(),
+    others.coldbrew ?? [],
   )
   return providers
 }
@@ -210,6 +242,142 @@ describe('Dashboard', () => {
 
     expect(screen.getByText('Page 2 of 2')).toBeTruthy()
     expect(within(screen.getByRole('table')).getByText('Coffee 6')).toBeTruthy()
+  })
+
+  it('shows all five method tabs in the agreed order', () => {
+    const { Wrapper } = seed([makeRecentShot()])
+    render(<Dashboard />, { wrapper: Wrapper })
+
+    const tabs = screen.getAllByRole('tab').map((t) => t.textContent)
+    expect(tabs).toEqual([
+      'Espresso',
+      'Pour Over',
+      'French Press',
+      'AeroPress',
+      'Cold Brew',
+    ])
+  })
+
+  it('swaps to the Pour Over feed with its own log button and cards', async () => {
+    const { Wrapper } = seed([makeRecentShot()], {
+      pourover: [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ id: 'c9', name: 'Colombia Huila' }),
+        }),
+      ],
+    })
+    render(<Dashboard />, { wrapper: Wrapper })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'Pour Over' }))
+    })
+
+    // The feed, its log button, and its card all belong to Pour Over now.
+    expect(
+      screen.getByRole('link', { name: /Log Brew/i }).getAttribute('href'),
+    ).toBe('/pourover/new')
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('Colombia Huila')).toBeTruthy()
+    // Hero ratio is water:dose (300 / 18 = 16.7), on the face.
+    expect(table.getByText('1:16.7')).toBeTruthy()
+    // The Method Variant shows for methods that have one.
+    expect(table.getByText('Standard')).toBeTruthy()
+  })
+
+  it('swaps to the French Press feed', async () => {
+    const { Wrapper } = seed([makeRecentShot()], {
+      frenchpress: [
+        makeFrenchpressBrew({
+          coffee: makeRecentCoffee({ id: 'c8', name: 'Brazil Cerrado' }),
+        }),
+      ],
+    })
+    render(<Dashboard />, { wrapper: Wrapper })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'French Press' }))
+    })
+
+    expect(
+      screen.getByRole('link', { name: /Log Brew/i }).getAttribute('href'),
+    ).toBe('/frenchpress/new')
+    expect(
+      within(screen.getByRole('table')).getByText('Brazil Cerrado'),
+    ).toBeTruthy()
+  })
+
+  it('swaps to the AeroPress feed', async () => {
+    const { Wrapper } = seed([makeRecentShot()], {
+      aeropress: [
+        makeAeropressBrew({
+          coffee: makeRecentCoffee({ id: 'c7', name: 'Guatemala Antigua' }),
+        }),
+      ],
+    })
+    render(<Dashboard />, { wrapper: Wrapper })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'AeroPress' }))
+    })
+
+    expect(
+      screen.getByRole('link', { name: /Log Brew/i }).getAttribute('href'),
+    ).toBe('/aeropress/new')
+    expect(
+      within(screen.getByRole('table')).getByText('Guatemala Antigua'),
+    ).toBeTruthy()
+  })
+
+  it('shows Cold Brew with no Method Variant, minute-scale steep, and Brew Environment', async () => {
+    const { Wrapper } = seed([makeRecentShot()], {
+      coldbrew: [
+        makeColdBrewBrew({
+          coffee: makeRecentCoffee({ id: 'c6', name: 'Peru Cajamarca' }),
+        }),
+      ],
+    })
+    render(<Dashboard />, { wrapper: Wrapper })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'Cold Brew' }))
+    })
+
+    expect(
+      screen.getByRole('link', { name: /Log Brew/i }).getAttribute('href'),
+    ).toBe('/cold-brew/new')
+    const table = within(screen.getByRole('table'))
+    // Methodless: no "Method" header column.
+    expect(table.queryByText('Method')).toBeNull()
+    // Steep reads in hours/minutes, not seconds (1080 min = 18h).
+    expect(table.getByText('18h')).toBeTruthy()
+
+    // Brew Environment surfaces in the expander.
+    await act(async () => {
+      fireEvent.click(table.getByText('Peru Cajamarca').closest('tr')!)
+    })
+    expect(table.getByText(/Brew Environment/)).toBeTruthy()
+    expect(table.getByText('Fridge')).toBeTruthy()
+  })
+
+  it('shows a per-method empty state on each new tab', async () => {
+    const { Wrapper } = seed([makeRecentShot()])
+    render(<Dashboard />, { wrapper: Wrapper })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'Pour Over' }))
+    })
+    expect(screen.getByText(/No pour over brews yet/i)).toBeTruthy()
+    expect(
+      screen.getByRole('link', { name: /Log your first pour over brew/i }),
+    ).toBeTruthy()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'Cold Brew' }))
+    })
+    expect(screen.getByText(/No cold brews yet/i)).toBeTruthy()
+    expect(
+      screen.getByRole('link', { name: /Log your first cold brew/i }),
+    ).toBeTruthy()
   })
 })
 
