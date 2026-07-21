@@ -6,18 +6,22 @@ import { cn } from '@/lib/utils'
 // dialed-in and recent cards for all five methods). The common fields —
 // grinder, device, ratio, notes — are always shown; `extra` is the one
 // method-specific slot (Water temp for pour over/french press, Environment for
-// cold brew; espresso and aeropress omit it).
+// cold brew; espresso and aeropress omit it). `daysOffRoast` is optional: the
+// method-first dashboard feed passes it so freshness shows in the expander,
+// while the older cards omit it (undefined -> row hidden).
 export function BrewDetails({
   grinder,
   device,
   ratio,
   extra,
+  daysOffRoast,
   notes,
 }: {
   grinder: { name: string; brand: string }
   device: { name: string; brand: string }
   ratio: string
   extra?: { label: string; value: string }
+  daysOffRoast?: number | null
   notes: string | null
 }) {
   return (
@@ -42,6 +46,14 @@ export function BrewDetails({
         <div>
           <dt className="inline font-medium">{extra.label}: </dt>
           <dd className="inline text-muted-foreground">{extra.value}</dd>
+        </div>
+      )}
+      {daysOffRoast !== undefined && (
+        <div>
+          <dt className="inline font-medium">Days off roast: </dt>
+          <dd className="inline text-muted-foreground">
+            {daysOffRoast != null ? `${daysOffRoast}d` : '-'}
+          </dd>
         </div>
       )}
       <div className="col-span-2">
