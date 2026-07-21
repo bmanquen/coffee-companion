@@ -12,6 +12,7 @@ import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
+import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 
@@ -71,13 +72,7 @@ function NewFrenchpressBrew() {
 
   // French press brews must be logged on a French Press-type device (enforced
   // again server-side in frenchpressBrew.create).
-  const { data: brewingDevices } = useSuspenseQuery(
-    trpc.brewingDevice.list.queryOptions(),
-  )
-  const frenchpressDevices = brewingDevices.filter(
-    (device) => device.type.name === FRENCH_PRESS_DEVICE_TYPE,
-  )
-  const brewingDevice = useSearchSelectResource(frenchpressDevices)
+  const brewingDevice = useBrewingDeviceSelect(FRENCH_PRESS_DEVICE_TYPE)
 
   const createBrew = useMutation(
     trpc.frenchpressBrew.create.mutationOptions({

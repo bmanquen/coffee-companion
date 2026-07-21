@@ -12,6 +12,7 @@ import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
+import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 
@@ -69,13 +70,7 @@ function NewAeropressBrew() {
 
   // AeroPress brews must be logged on an AeroPress-type device (enforced again
   // server-side in aeropressBrew.create).
-  const { data: brewingDevices } = useSuspenseQuery(
-    trpc.brewingDevice.list.queryOptions(),
-  )
-  const aeropressDevices = brewingDevices.filter(
-    (device) => device.type.name === AEROPRESS_DEVICE_TYPE,
-  )
-  const brewingDevice = useSearchSelectResource(aeropressDevices)
+  const brewingDevice = useBrewingDeviceSelect(AEROPRESS_DEVICE_TYPE)
 
   const createBrew = useMutation(
     trpc.aeropressBrew.create.mutationOptions({
