@@ -1,25 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
 import { authClient } from '@/lib/auth-client'
 import { getForwardedHeaders } from '@/lib/request-headers'
 import { Button } from '@/components/ui/button'
 import { H1 } from '@/components/typography/h1'
-import { RecentDialedInShots } from '@/components/recent-dialed-in-shots'
-import { DialedInAeropressBrews } from '@/components/dialed-in-aeropress-brews'
-import { DialedInPouroverBrews } from '@/components/dialed-in-pourover-brews'
-import { DialedInFrenchpressBrews } from '@/components/dialed-in-frenchpress-brews'
-import { DialedInColdBrewBrews } from '@/components/dialed-in-cold-brew-brews'
-import {
-  RecentEspressoShots,
-  PAGE_SIZE as SHOT_PAGE_SIZE,
-} from '@/components/recent-espresso-shots'
-import {
-  PAGE_SIZE as COLD_BREW_PAGE_SIZE,
-  RecentColdBrewBrews,
-} from '@/components/recent-cold-brew-brews'
-import {
-  PAGE_SIZE as COFFEE_PAGE_SIZE,
-  RecentCoffees,
-} from '@/components/recent-coffees'
+import { EspressoBrewFeed } from '@/components/dashboard/espresso-brew-feed'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/')({
   beforeLoad: async () => {
@@ -29,31 +15,14 @@ export const Route = createFileRoute('/')({
     })
     return { session }
   },
-  // The paginated dashboard tables use useQuery (not useSuspenseQuery), so warm
-  // their first page here to keep it server-rendered instead of flashing a
-  // spinner on load. RecentDialedInShots still suspends and hydrates on its own.
+  // Warm the selected method's full brew history so the first tab renders
+  // server-side instead of flashing a spinner. The feed reads it with
+  // useSuspenseQuery.
   loader: async ({ context }) => {
     if (!context.session) return
-    await Promise.all([
-      context.queryClient.ensureQueryData(
-        context.trpc.espressoShot.getRecent.queryOptions({
-          limit: SHOT_PAGE_SIZE,
-          offset: 0,
-        }),
-      ),
-      context.queryClient.ensureQueryData(
-        context.trpc.coffee.getRecent.queryOptions({
-          limit: COFFEE_PAGE_SIZE,
-          offset: 0,
-        }),
-      ),
-      context.queryClient.ensureQueryData(
-        context.trpc.coldBrewBrew.getRecent.queryOptions({
-          limit: COLD_BREW_PAGE_SIZE,
-          offset: 0,
-        }),
-      ),
-    ])
+    await context.queryClient.ensureQueryData(
+      context.trpc.espressoShot.getAll.queryOptions(),
+    )
   },
   component: Home,
 })
@@ -68,7 +37,7 @@ function Home() {
   return <Dashboard />
 }
 
-function LandingPage() {
+export function LandingPage() {
   const handleSignIn = () => {
     authClient.signIn.social({ provider: 'google' })
   }
@@ -86,18 +55,52 @@ function LandingPage() {
   )
 }
 
-function Dashboard() {
+// The dashboard is method-first: a switcher over one per-method Brew feed.
+// The switcher only lists methods that are wired, so for now that's Espresso
+// alone; the remaining methods arrive in a follow-up ticket.
+type DashboardMethod =
+  | 'espresso'
+  | 'pourover'
+  | 'frenchpress'
+  | 'aeropress'
+  | 'coldbrew'
+
+const dashboardMethods: Array<{ value: DashboardMethod; label: string }> = [
+  { value: 'espresso', label: 'Espresso' },
+]
+
+export function Dashboard() {
+  const [selectedMethod, setSelectedMethod] =
+    useState<DashboardMethod>('espresso')
+
   return (
     <div className="flex flex-col w-full max-w-4xl mx-auto gap-8 py-6">
       <H1>Dashboard</H1>
-      <RecentDialedInShots />
-      <DialedInAeropressBrews />
-      <DialedInPouroverBrews />
-      <DialedInFrenchpressBrews />
-      <DialedInColdBrewBrews />
-      <RecentEspressoShots />
-      <RecentColdBrewBrews />
-      <RecentCoffees />
+      <div className="flex flex-col w-full">
+        <div className="flex gap-1 pl-3 -mb-px" role="tablist">
+          {dashboardMethods.map((method) => {
+            const isActive = selectedMethod === method.value
+            return (
+              <button
+                key={method.value}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setSelectedMethod(method.value)}
+                className={cn(
+                  'relative rounded-t-lg border px-4 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'z-10 border-border border-b-transparent bg-white text-foreground shadow-sm'
+                    : 'border-transparent bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                {method.label}
+              </button>
+            )
+          })}
+        </div>
+        {selectedMethod === 'espresso' && <EspressoBrewFeed />}
+      </div>
     </div>
   )
 }

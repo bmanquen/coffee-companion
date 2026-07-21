@@ -31,16 +31,16 @@ export const Route = createFileRoute('/_authenticated/brews/')({
 
 type BrewMethod =
   | 'espresso'
-  | 'aeropress'
   | 'pourover'
   | 'frenchpress'
+  | 'aeropress'
   | 'coldbrew'
 
 const brewMethods: Array<{ value: BrewMethod; label: string }> = [
   { value: 'espresso', label: 'Espresso' },
-  { value: 'aeropress', label: 'AeroPress' },
   { value: 'pourover', label: 'Pour Over' },
   { value: 'frenchpress', label: 'French Press' },
+  { value: 'aeropress', label: 'AeroPress' },
   { value: 'coldbrew', label: 'Cold Brew' },
 ]
 
