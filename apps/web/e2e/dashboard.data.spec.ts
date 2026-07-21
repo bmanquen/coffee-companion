@@ -12,9 +12,7 @@ test('authenticated home renders the dashboard', async ({ page }) => {
   ).toHaveCount(0)
 })
 
-test('dashboard opens to the most-recent brew’s method and switches tabs', async ({
-  page,
-}) => {
+test('dashboard switches between method tabs', async ({ page }) => {
   await page.goto('/')
 
   // The method switcher lists all five methods in the agreed order.
@@ -26,19 +24,22 @@ test('dashboard opens to the most-recent brew’s method and switches tabs', asy
     'Cold Brew',
   ])
 
-  // The seeded AeroPress brew is logged after the espresso shot, so it's the
-  // most recent Brew — the dashboard opens straight to the AeroPress tab, whose
-  // feed shows the brew's Method Variant.
-  await expect(
-    page.getByRole('tab', { name: 'AeroPress', selected: true }),
-  ).toBeVisible()
+  // Exactly one tab is selected on load (the dashboard opens to the method of
+  // the most-recent Brew — which method that is depends on data other specs in
+  // this parallel project may add, so recency selection itself is asserted in
+  // the Dashboard component test rather than here).
+  await expect(page.getByRole('tab', { selected: true })).toHaveCount(1)
+
+  // Selecting AeroPress swaps in its feed — the seeded brew's Method Variant
+  // shows and the Log button points at /aeropress/new.
+  await page.getByRole('tab', { name: 'AeroPress' }).click()
   await expect(page.getByText('Standard').first()).toBeVisible()
   await expect(page.getByRole('link', { name: /Log Brew/i })).toHaveAttribute(
     'href',
     '/aeropress/new',
   )
 
-  // Manual selection still works — switching to Espresso swaps in its feed.
+  // Selecting Espresso swaps the feed and its log button back.
   await page.getByRole('tab', { name: 'Espresso' }).click()
   await expect(page.getByRole('link', { name: /Log Shot/i })).toHaveAttribute(
     'href',
