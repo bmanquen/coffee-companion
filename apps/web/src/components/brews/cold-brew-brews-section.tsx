@@ -15,6 +15,7 @@ import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { ColdBrewBrewWithRelations } from '@/types'
+import { BrewNotes } from '@/components/brews/brew-notes'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
@@ -152,13 +153,7 @@ const columns = [
   }),
   columnHelper.accessor('notes', {
     header: 'Notes',
-    // Free text: render blank (not "-") when there are no notes.
-    cell: (info) =>
-      info.getValue() ? (
-        <span className="block whitespace-pre-wrap break-words lg:mx-auto lg:max-w-[16rem]">
-          {info.getValue()}
-        </span>
-      ) : null,
+    cell: (info) => <BrewNotes notes={info.getValue()} />,
     enableSorting: false,
     meta: { cardFullWidth: true },
   }),

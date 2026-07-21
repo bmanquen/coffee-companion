@@ -186,8 +186,10 @@ describe('PouroverBrewsSection', () => {
     render(<PouroverBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Empty dose/water/brew/temp/grind/notes/ratio all render as "-".
+    // Empty dose/water/brew/temp/grind/ratio render as "-"; empty notes show
+    // the "No notes..." placeholder instead.
     expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(6)
+    expect(table.getByText('No notes...')).toBeTruthy()
   })
 
   it('highlights the dialed-in row and not the others', () => {

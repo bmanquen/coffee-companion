@@ -111,9 +111,10 @@ describe('ColdBrewBrewsSection', () => {
 
     const table = within(screen.getByRole('table'))
     // Exactly six "-": days-off-roast, dose, water, steep, grind, and the ratio
-    // (derived from the missing dose/water). Environment and notes render blank
-    // instead — so a 7th/8th dash here would mean one of them regressed.
+    // (derived from the missing dose/water). Environment renders blank and notes
+    // shows a "No notes..." placeholder — so a 7th/8th dash means a regression.
     expect(table.getAllByText('-')).toHaveLength(6)
+    expect(table.getByText('No notes...')).toBeTruthy()
   })
 
   it('links the header to the new cold brew form', () => {
