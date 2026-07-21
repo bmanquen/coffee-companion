@@ -64,9 +64,7 @@ describe('RecentCoffees', () => {
     render(<RecentCoffees />, { wrapper: Wrapper })
 
     expect(screen.getByText('1 of 2')).toBeTruthy()
-    expect(
-      within(screen.getByRole('table')).getByText('Ethiopia Guji'),
-    ).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('Ethiopia Guji')).toBeTruthy()
 
     // The next-page control is the last button in the pagination row.
     const controls = screen.getByText('1 of 2').parentElement!
@@ -75,8 +73,6 @@ describe('RecentCoffees', () => {
 
     expect(await screen.findByText('2 of 2')).toBeTruthy()
     expect(within(screen.getByRole('table')).getByText('Kenya AA')).toBeTruthy()
-    expect(
-      within(screen.getByRole('table')).queryByText('Ethiopia Guji'),
-    ).toBeNull()
+    expect(within(screen.getByRole('table')).queryByText('Ethiopia Guji')).toBeNull()
   })
 })

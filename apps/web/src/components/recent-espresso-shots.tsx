@@ -1,9 +1,12 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
-import { Crosshair } from 'lucide-react'
 import { useState } from 'react'
 import type { EspressoShotWithRelations } from '@/types'
-import { BrewDetails, brewExpanderColumn } from '@/components/brews/brew-details'
+import {
+  BrewDetails,
+  brewExpanderColumn,
+  dialedInCoffeeColumn,
+} from '@/components/brews/brew-details'
 import { RecentBrewsCard } from '@/components/brews/recent-brews-card'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast } from '@/lib/brew'
@@ -14,21 +17,7 @@ export const PAGE_SIZE = 5
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 
 const columns = [
-  columnHelper.accessor('coffee.name', {
-    header: 'Coffee',
-    cell: (info) => (
-      <span className="flex items-center gap-1.5">
-        {info.row.original.isDialedIn && (
-          <Crosshair
-            aria-label="Dialed in"
-            className="h-4 w-4 shrink-0 text-primary"
-          />
-        )}
-        {info.getValue()}
-      </span>
-    ),
-    meta: { cardTitle: true },
-  }),
+  dialedInCoffeeColumn<EspressoShotWithRelations>(),
   columnHelper.accessor((row) => daysOffRoast(row.roastDate, row.createdAt), {
     id: 'daysOffRoast',
     header: 'Days off roast',

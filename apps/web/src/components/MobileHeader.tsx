@@ -1,7 +1,11 @@
 import { useNavigate } from '@tanstack/react-router'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from './ui/popover'
 import { authClient } from '@/lib/auth-client'
 
 export default function MobileHeader() {
@@ -41,7 +45,9 @@ export default function MobileHeader() {
           <PopoverContent align="end" className="w-56">
             <div className="flex flex-col gap-3">
               <div className="flex flex-col">
-                <span className="text-sm font-medium">{session.user.name}</span>
+                <span className="text-sm font-medium">
+                  {session.user.name}
+                </span>
                 <span className="text-xs text-muted-foreground">
                   {session.user.email}
                 </span>

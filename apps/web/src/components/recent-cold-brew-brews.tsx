@@ -1,33 +1,19 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Crosshair } from 'lucide-react'
 import { useState } from 'react'
 import {
   ColdBrewDetails,
-  coldBrewColumnHelper,
   coldBrewExpanderColumn,
   coldBrewSummaryColumns,
 } from './cold-brew-summary'
+import type { ColdBrewBrewWithRelations } from '@/types'
+import { dialedInCoffeeColumn } from '@/components/brews/brew-details'
 import { RecentBrewsCard } from '@/components/brews/recent-brews-card'
 import { useTRPC } from '@/integrations/trpc/react'
 
 export const PAGE_SIZE = 5
 
 const columns = [
-  coldBrewColumnHelper.accessor('coffee.name', {
-    header: 'Coffee',
-    cell: (info) => (
-      <span className="flex items-center gap-1.5">
-        {info.row.original.isDialedIn && (
-          <Crosshair
-            aria-label="Dialed in"
-            className="h-4 w-4 shrink-0 text-primary"
-          />
-        )}
-        {info.getValue()}
-      </span>
-    ),
-    meta: { cardTitle: true },
-  }),
+  dialedInCoffeeColumn<ColdBrewBrewWithRelations>(),
   ...coldBrewSummaryColumns,
   coldBrewExpanderColumn,
 ]

@@ -1,5 +1,5 @@
 import { createColumnHelper } from '@tanstack/react-table'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Crosshair } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // The expandable detail sub-row shared by every dashboard brew card (the
@@ -50,6 +50,30 @@ export function BrewDetails({
       </div>
     </dl>
   )
+}
+
+// The "Coffee" column shared by the recent dashboard cards, prefixing the coffee
+// name with a dialed-in crosshair icon. (The dialed-in cards use a plain coffee
+// column, since every row there is dialed in.)
+export function dialedInCoffeeColumn<
+  T extends { isDialedIn: boolean; coffee: { name: string } },
+>() {
+  return createColumnHelper<T>().accessor((row) => row.coffee.name, {
+    id: 'coffee',
+    header: 'Coffee',
+    cell: (info) => (
+      <span className="flex items-center gap-1.5">
+        {info.row.original.isDialedIn && (
+          <Crosshair
+            aria-label="Dialed in"
+            className="h-4 w-4 shrink-0 text-primary"
+          />
+        )}
+        {info.getValue()}
+      </span>
+    ),
+    meta: { cardTitle: true },
+  })
 }
 
 // The chevron expander column shared by every dashboard brew card. Desktop uses
