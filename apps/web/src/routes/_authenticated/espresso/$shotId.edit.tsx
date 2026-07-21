@@ -12,6 +12,7 @@ import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
+import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 
@@ -51,13 +52,7 @@ function EditEspressoShot() {
 
   // Espresso shots must be brewed on an Espresso-type device (enforced again
   // server-side in espressoShot.update).
-  const { data: brewingDevices } = useSuspenseQuery(
-    trpc.brewingDevice.list.queryOptions(),
-  )
-  const espressoDevices = brewingDevices.filter(
-    (device) => device.type.name === ESPRESSO_DEVICE_TYPE,
-  )
-  const brewingDevice = useSearchSelectResource(espressoDevices)
+  const brewingDevice = useBrewingDeviceSelect(ESPRESSO_DEVICE_TYPE)
 
   const updateShot = useMutation(
     trpc.espressoShot.update.mutationOptions({
