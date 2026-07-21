@@ -24,7 +24,7 @@ describe('BrewDetails', () => {
     expect(screen.getByText('bright and clean')).toBeTruthy()
   })
 
-  it('omits the extra slot when not given and dashes empty notes', () => {
+  it('omits the extra slot when not given and renders empty notes blank', () => {
     render(
       <BrewDetails
         grinder={grinder}
@@ -35,8 +35,8 @@ describe('BrewDetails', () => {
     )
     expect(screen.queryByText(/Water temp/)).toBeNull()
     expect(screen.queryByText(/Environment/)).toBeNull()
-    // Notes falls back to a dash.
+    // Empty notes render blank, not a dash.
     const notesValue = screen.getByText('Notes:').closest('div')
-    expect(notesValue?.textContent).toContain('-')
+    expect(notesValue?.textContent).not.toContain('-')
   })
 })
