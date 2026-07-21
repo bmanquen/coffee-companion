@@ -29,12 +29,8 @@ vi.mock('@tanstack/react-router', () => ({
 // Render the Radix Popover inline so its content is queryable in jsdom.
 vi.mock('@/components/ui/popover', () => ({
   Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  PopoverContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
+  PopoverTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  PopoverContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }))
 
 vi.mock('@/components/ui/avatar', () => ({
