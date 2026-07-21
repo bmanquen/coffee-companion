@@ -183,8 +183,10 @@ describe('AeropressBrewsSection', () => {
     render(<AeropressBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Empty dose/water/steep/grind/notes/ratio all render as "-".
+    // Empty dose/water/steep/grind/ratio render as "-"; empty notes show the
+    // "No notes..." placeholder instead.
     expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(5)
+    expect(table.getByText('No notes...')).toBeTruthy()
   })
 
   it('highlights the dialed-in row and not the others', () => {
