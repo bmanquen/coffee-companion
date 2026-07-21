@@ -1,5 +1,7 @@
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
+import type { DashboardMethod } from '@/components/dashboard/methods'
 import { authClient } from '@/lib/auth-client'
 import { getForwardedHeaders } from '@/lib/request-headers'
 import { Button } from '@/components/ui/button'
@@ -9,6 +11,8 @@ import { PouroverBrewFeed } from '@/components/dashboard/pourover-brew-feed'
 import { FrenchpressBrewFeed } from '@/components/dashboard/frenchpress-brew-feed'
 import { AeropressBrewFeed } from '@/components/dashboard/aeropress-brew-feed'
 import { ColdBrewBrewFeed } from '@/components/dashboard/cold-brew-brew-feed'
+import { dashboardMethods, mostRecentMethod } from '@/components/dashboard/methods'
+import { useTRPC } from '@/integrations/trpc/react'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/')({
@@ -74,26 +78,39 @@ export function LandingPage() {
 }
 
 // The dashboard is method-first: a switcher over one per-method Brew feed. The
-// tabs run in the agreed order — Espresso, Pour Over, French Press, AeroPress,
-// Cold Brew — each rendering its own method's reference-only feed.
-type DashboardMethod =
-  | 'espresso'
-  | 'pourover'
-  | 'frenchpress'
-  | 'aeropress'
-  | 'coldbrew'
-
-const dashboardMethods: Array<{ value: DashboardMethod; label: string }> = [
-  { value: 'espresso', label: 'Espresso' },
-  { value: 'pourover', label: 'Pour Over' },
-  { value: 'frenchpress', label: 'French Press' },
-  { value: 'aeropress', label: 'AeroPress' },
-  { value: 'coldbrew', label: 'Cold Brew' },
-]
-
+// tabs run in the agreed order (see dashboardMethods), each rendering its own
+// method's reference-only feed. It opens to the method of your most recent Brew
+// across all five (the queries are warmed in the loader), falling back to
+// Espresso when you have no Brews yet.
 export function Dashboard() {
-  const [selectedMethod, setSelectedMethod] =
-    useState<DashboardMethod>('espresso')
+  const trpc = useTRPC()
+  const { data: espresso } = useSuspenseQuery(
+    trpc.espressoShot.getAll.queryOptions(),
+  )
+  const { data: pourover } = useSuspenseQuery(
+    trpc.pouroverBrew.getAll.queryOptions(),
+  )
+  const { data: frenchpress } = useSuspenseQuery(
+    trpc.frenchpressBrew.getAll.queryOptions(),
+  )
+  const { data: aeropress } = useSuspenseQuery(
+    trpc.aeropressBrew.getAll.queryOptions(),
+  )
+  const { data: coldbrew } = useSuspenseQuery(
+    trpc.coldBrewBrew.getAll.queryOptions(),
+  )
+
+  // Derived once, on mount: the initial tab follows the most recent Brew.
+  // Manual selection afterward is preserved by useState.
+  const [selectedMethod, setSelectedMethod] = useState<DashboardMethod>(() =>
+    mostRecentMethod([
+      { method: 'espresso', brews: espresso },
+      { method: 'pourover', brews: pourover },
+      { method: 'frenchpress', brews: frenchpress },
+      { method: 'aeropress', brews: aeropress },
+      { method: 'coldbrew', brews: coldbrew },
+    ]),
+  )
 
   return (
     <div className="flex flex-col w-full max-w-4xl mx-auto gap-8 py-6">

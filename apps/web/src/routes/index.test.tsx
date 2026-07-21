@@ -379,6 +379,84 @@ describe('Dashboard', () => {
       screen.getByRole('link', { name: /Log your first cold brew/i }),
     ).toBeTruthy()
   })
+
+  it('opens to the method of the most recent brew across all five methods', () => {
+    // Every method has a brew at a distinct time; French Press is the single
+    // most-recent one, so it wins over the other four.
+    const { Wrapper } = seed(
+      [makeRecentShot({ createdAt: new Date('2026-06-01T08:00:00Z') })],
+      {
+        pourover: [
+          makePouroverBrew({ createdAt: new Date('2026-06-03T08:00:00Z') }),
+        ],
+        aeropress: [
+          makeAeropressBrew({ createdAt: new Date('2026-06-05T08:00:00Z') }),
+        ],
+        coldbrew: [
+          makeColdBrewBrew({ createdAt: new Date('2026-06-10T08:00:00Z') }),
+        ],
+        frenchpress: [
+          makeFrenchpressBrew({
+            createdAt: new Date('2026-06-20T08:00:00Z'),
+            coffee: makeRecentCoffee({ id: 'c8', name: 'Brazil Cerrado' }),
+          }),
+        ],
+      },
+    )
+    render(<Dashboard />, { wrapper: Wrapper })
+
+    // The French Press tab is active on load, not the default Espresso one...
+    expect(
+      screen
+        .getByRole('tab', { name: 'French Press' })
+        .getAttribute('aria-selected'),
+    ).toBe('true')
+    expect(
+      screen.getByRole('tab', { name: 'Espresso' }).getAttribute('aria-selected'),
+    ).toBe('false')
+    // ...and its feed is what renders.
+    expect(
+      within(screen.getByRole('table')).getByText('Brazil Cerrado'),
+    ).toBeTruthy()
+  })
+
+  it('still lets you switch tabs after the recency-based default', async () => {
+    const { Wrapper } = seed(
+      [makeRecentShot({ createdAt: new Date('2026-06-01T08:00:00Z') })],
+      {
+        aeropress: [
+          makeAeropressBrew({ createdAt: new Date('2026-06-20T08:00:00Z') }),
+        ],
+      },
+    )
+    render(<Dashboard />, { wrapper: Wrapper })
+
+    // Defaults to AeroPress (its brew is newest)...
+    expect(
+      screen.getByRole('tab', { name: 'AeroPress' }).getAttribute('aria-selected'),
+    ).toBe('true')
+
+    // ...but manual selection still swaps the feed.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'Espresso' }))
+    })
+    expect(
+      screen.getByRole('tab', { name: 'Espresso' }).getAttribute('aria-selected'),
+    ).toBe('true')
+    expect(
+      screen.getByRole('link', { name: /Log Shot/i }).getAttribute('href'),
+    ).toBe('/espresso/new')
+  })
+
+  it('falls back to the Espresso tab when there are no brews at all', () => {
+    const { Wrapper } = seed([])
+    render(<Dashboard />, { wrapper: Wrapper })
+
+    expect(
+      screen.getByRole('tab', { name: 'Espresso' }).getAttribute('aria-selected'),
+    ).toBe('true')
+    expect(screen.getByText(/No espresso shots yet/i)).toBeTruthy()
+  })
 })
 
 describe('LandingPage', () => {
