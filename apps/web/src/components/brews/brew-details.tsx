@@ -46,7 +46,8 @@ export function BrewDetails({
       )}
       <div className="col-span-2">
         <dt className="inline font-medium">Notes: </dt>
-        <dd className="inline text-muted-foreground">{notes ?? '-'}</dd>
+        {/* Free text: render blank (not "-") when there are no notes. */}
+        <dd className="inline text-muted-foreground">{notes}</dd>
       </div>
     </dl>
   )

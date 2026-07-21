@@ -38,7 +38,10 @@ describe('useBrewingDeviceSelect', () => {
       wrapper: Wrapper,
     })
 
-    expect(result.current.options.map((o) => o.label)).toEqual(['V60'])
+    const labels = result.current.options.map((o) => o.label)
+    expect(labels).toEqual(['V60'])
+    // The Espresso device is filtered out — only Pour Over devices remain.
+    expect(labels).not.toContain('Linea Mini')
     // No createFn passed, so devices are not user-addable on the fly.
     expect(result.current.onAddItem).toBeUndefined()
   })
