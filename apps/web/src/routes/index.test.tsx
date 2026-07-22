@@ -4,6 +4,7 @@ import { Dashboard, LandingPage } from './index'
 import type * as ReactRouter from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import type { DashboardMethod } from '@/components/dashboard/methods'
+import { dashboardMethods } from '@/components/dashboard/methods'
 import { createTestProviders } from '@/test/providers'
 import {
   makeAeropressBrew,
@@ -91,11 +92,16 @@ function seed(
   return providers
 }
 
+// A fixed "now" for relative-time assertions; the default factory createdAt is
+// 2026-06-01T08:00, so this reads as "2d ago".
+const NOW = new Date('2026-06-03T08:00:00Z')
+
 // Render the prop-driven Dashboard at a given selected method. The selection is
 // owned by the route in production; here we pass it directly and hand back a spy
-// so tests can assert what a tab click requests. Which method is selected by
+// so tests can assert what a picker choice requests. Which method is selected by
 // default (URL param vs. most-recent) is covered by resolveSelectedMethod's unit
-// tests and the e2e spec, not here.
+// tests and the e2e spec, not here. `feeds` mirrors the seeded data so the picker
+// rows and the rendered feed agree.
 function renderDashboard(
   selectedMethod: DashboardMethod,
   shots: Array<ReturnType<typeof makeRecentShot>> = [],
@@ -103,22 +109,38 @@ function renderDashboard(
 ) {
   const providers = seed(shots, others)
   const onSelectMethod = vi.fn()
+  const feeds = [
+    { method: 'espresso' as const, brews: shots },
+    { method: 'pourover' as const, brews: others.pourover ?? [] },
+    { method: 'frenchpress' as const, brews: others.frenchpress ?? [] },
+    { method: 'aeropress' as const, brews: others.aeropress ?? [] },
+    { method: 'coldbrew' as const, brews: others.coldbrew ?? [] },
+  ]
   const utils = render(
     <Dashboard
       selectedMethod={selectedMethod}
       onSelectMethod={onSelectMethod}
+      feeds={feeds}
+      now={NOW}
     />,
     { wrapper: providers.Wrapper },
   )
-  return { ...providers, ...utils, onSelectMethod }
+  // Open the picker dropdown so its option rows are queryable. The trigger
+  // button's accessible name is the current method's label.
+  const currentLabel = dashboardMethods.find(
+    (m) => m.value === selectedMethod,
+  )!.label
+  const openPicker = () =>
+    fireEvent.click(screen.getByRole('button', { name: currentLabel }))
+  return { ...providers, ...utils, onSelectMethod, openPicker }
 }
 
 describe('Dashboard', () => {
-  it('renders a method switcher with the Espresso tab selected, and none of the old cards', () => {
+  it('shows the selected method on the picker trigger, and none of the old cards', () => {
     renderDashboard('espresso', [makeRecentShot()])
 
-    const tab = screen.getByRole('tab', { name: 'Espresso' })
-    expect(tab.getAttribute('aria-selected')).toBe('true')
+    // The collapsed picker reflects the current method.
+    expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
 
     // The eight previous stacked cards are gone.
     expect(screen.queryByText('Recent Espresso Shots')).toBeNull()
@@ -257,29 +279,37 @@ describe('Dashboard', () => {
     expect(within(screen.getByRole('table')).getByText('Coffee 6')).toBeTruthy()
   })
 
-  it('shows all five method tabs in the agreed order', () => {
-    renderDashboard('espresso', [makeRecentShot()])
+  it('lists every method alphabetically in the picker', () => {
+    const { openPicker } = renderDashboard('espresso', [makeRecentShot()])
+    openPicker()
 
-    const tabs = screen.getAllByRole('tab').map((t) => t.textContent)
-    expect(tabs).toEqual([
-      'Espresso',
-      'Pour Over',
-      'French Press',
-      'AeroPress',
-      'Cold Brew',
+    const options = screen
+      .getAllByRole('option')
+      // Each option row is "<label><relative time>"; take the label prefix.
+      .map((o) => o.textContent)
+    expect(options).toEqual([
+      'AeroPressNo brews yet',
+      'Cold BrewNo brews yet',
+      'Espresso2d ago',
+      'French PressNo brews yet',
+      'Pour OverNo brews yet',
     ])
   })
 
-  it('requests the chosen method via onSelectMethod when a tab is clicked', async () => {
-    const { onSelectMethod } = renderDashboard('espresso', [makeRecentShot()])
+  it('requests the chosen method via onSelectMethod when a picker row is chosen', async () => {
+    const { onSelectMethod, openPicker } = renderDashboard('espresso', [
+      makeRecentShot(),
+    ])
 
+    openPicker()
     await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: 'Pour Over' }))
+      fireEvent.click(screen.getByRole('option', { name: /Pour Over/ }))
     })
     expect(onSelectMethod).toHaveBeenCalledWith('pourover')
 
+    openPicker()
     await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: 'Cold Brew' }))
+      fireEvent.click(screen.getByRole('option', { name: /Cold Brew/ }))
     })
     expect(onSelectMethod).toHaveBeenCalledWith('coldbrew')
   })

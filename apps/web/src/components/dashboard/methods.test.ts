@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { isDashboardMethod, mostRecentMethod, resolveSelectedMethod } from './methods'
+import {
+  formatLastBrewed,
+  isDashboardMethod,
+  methodPickerItems,
+  mostRecentMethod,
+  resolveSelectedMethod,
+} from './methods'
 
 // Small helper: a feed entry with a single brew at the given ISO time.
 function at(iso: string) {
@@ -105,5 +111,74 @@ describe('resolveSelectedMethod', () => {
         { method: 'pourover', brews: [] },
       ]),
     ).toBe('espresso')
+  })
+})
+
+describe('methodPickerItems', () => {
+  it('lists every method alphabetically by label', () => {
+    const items = methodPickerItems([
+      { method: 'espresso', brews: at('2026-06-02T08:00:00Z') },
+    ])
+    expect(items.map((i) => i.label)).toEqual([
+      'AeroPress',
+      'Cold Brew',
+      'Espresso',
+      'French Press',
+      'Pour Over',
+    ])
+  })
+
+  it('carries each method’s newest brew time, and null for never-brewed', () => {
+    const items = methodPickerItems([
+      { method: 'espresso', brews: at('2026-06-02T08:00:00Z') },
+      { method: 'pourover', brews: [] },
+    ])
+    const byMethod = Object.fromEntries(items.map((i) => [i.method, i]))
+    expect(byMethod.espresso.lastBrewedAt).toEqual(
+      new Date('2026-06-02T08:00:00Z'),
+    )
+    // Explicitly empty and entirely-absent methods both read as never-brewed.
+    expect(byMethod.pourover.lastBrewedAt).toBeNull()
+    expect(byMethod.aeropress.lastBrewedAt).toBeNull()
+  })
+
+  it('uses each feed’s newest (first) brew, since feeds are newest-first', () => {
+    const items = methodPickerItems([
+      {
+        method: 'coldbrew',
+        brews: [
+          { createdAt: new Date('2026-06-09T08:00:00Z') },
+          { createdAt: new Date('2026-06-01T08:00:00Z') },
+        ],
+      },
+    ])
+    const coldbrew = items.find((i) => i.method === 'coldbrew')!
+    expect(coldbrew.lastBrewedAt).toEqual(new Date('2026-06-09T08:00:00Z'))
+  })
+})
+
+describe('formatLastBrewed', () => {
+  const now = new Date('2026-06-10T12:00:00Z')
+
+  it('renders "No brews yet" for a null date', () => {
+    expect(formatLastBrewed(null, now)).toBe('No brews yet')
+  })
+
+  it('renders sub-minute times as "just now"', () => {
+    expect(formatLastBrewed(new Date('2026-06-10T11:59:30Z'), now)).toBe(
+      'just now',
+    )
+  })
+
+  it('renders minute-, hour-, and day-scale times', () => {
+    expect(formatLastBrewed(new Date('2026-06-10T11:30:00Z'), now)).toBe(
+      '30m ago',
+    )
+    expect(formatLastBrewed(new Date('2026-06-10T09:00:00Z'), now)).toBe(
+      '3h ago',
+    )
+    expect(formatLastBrewed(new Date('2026-06-08T12:00:00Z'), now)).toBe(
+      '2d ago',
+    )
   })
 })

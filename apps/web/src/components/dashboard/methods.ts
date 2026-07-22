@@ -66,3 +66,51 @@ export function resolveSelectedMethod(
   if (isDashboardMethod(param)) return param
   return mostRecentMethod(feeds)
 }
+
+// One row of the method picker: the method, its display label, and when it was
+// last brewed (null if never). Pure.
+export type MethodPickerItem = {
+  method: DashboardMethod
+  label: string
+  lastBrewedAt: Date | null
+}
+
+// The picker's rows: every known method (even ones with no feed or no Brews),
+// sorted alphabetically by label so a newly added method self-sorts into place.
+// Each feed is newest-first, so its first brew is the last-brewed one. Pure.
+export function methodPickerItems(
+  feeds: Array<MethodFeed>,
+): Array<MethodPickerItem> {
+  const brewsByMethod = new Map(feeds.map((feed) => [feed.method, feed.brews]))
+  return dashboardMethods
+    .map(({ value, label }) => ({
+      method: value,
+      label,
+      lastBrewedAt: brewsByMethod.get(value)?.[0]?.createdAt ?? null,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
+
+// A compact relative time for a method's last brew, e.g. "2d ago". Null renders
+// as "No brews yet". `now` is injected so the derivation stays pure/testable.
+export function formatLastBrewed(
+  lastBrewedAt: Date | null,
+  now: Date,
+): string {
+  if (lastBrewedAt === null) return 'No brews yet'
+
+  const seconds = Math.max(
+    0,
+    Math.floor((now.getTime() - lastBrewedAt.getTime()) / 1000),
+  )
+  if (seconds < 60) return 'just now'
+
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}

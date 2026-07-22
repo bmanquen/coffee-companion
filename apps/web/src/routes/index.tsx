@@ -1,6 +1,9 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import type { DashboardMethod } from '@/components/dashboard/methods'
+import type {
+  DashboardMethod,
+  MethodFeed,
+} from '@/components/dashboard/methods'
 import { authClient } from '@/lib/auth-client'
 import { getForwardedHeaders } from '@/lib/request-headers'
 import { Button } from '@/components/ui/button'
@@ -10,13 +13,12 @@ import { PouroverBrewFeed } from '@/components/dashboard/pourover-brew-feed'
 import { FrenchpressBrewFeed } from '@/components/dashboard/frenchpress-brew-feed'
 import { AeropressBrewFeed } from '@/components/dashboard/aeropress-brew-feed'
 import { ColdBrewBrewFeed } from '@/components/dashboard/cold-brew-brew-feed'
+import { MethodPicker } from '@/components/dashboard/method-picker'
 import {
-  dashboardMethods,
   isDashboardMethod,
   resolveSelectedMethod,
 } from '@/components/dashboard/methods'
 import { useTRPC } from '@/integrations/trpc/react'
-import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/')({
   // The selected method lives in the URL so it survives reload/back and can be
@@ -116,60 +118,53 @@ function DashboardContainer() {
   const { method } = Route.useSearch()
   const navigate = Route.useNavigate()
 
-  const selectedMethod = resolveSelectedMethod(method, [
+  const feeds: Array<MethodFeed> = [
     { method: 'espresso', brews: espresso },
     { method: 'pourover', brews: pourover },
     { method: 'frenchpress', brews: frenchpress },
     { method: 'aeropress', brews: aeropress },
     { method: 'coldbrew', brews: coldbrew },
-  ])
+  ]
+
+  const selectedMethod = resolveSelectedMethod(method, feeds)
 
   return (
     <Dashboard
       selectedMethod={selectedMethod}
       onSelectMethod={(next) => navigate({ search: { method: next } })}
+      feeds={feeds}
+      now={new Date()}
     />
   )
 }
 
-// The dashboard is method-first: a switcher over one per-method Brew feed. The
-// tabs run in the agreed order (see dashboardMethods), each rendering its own
-// method's reference-only feed. It is driven entirely by props — the selected
-// method and a callback to change it — so it holds no router or query state and
-// renders bare in tests.
+// The dashboard is method-first: a picker over one per-method Brew feed. The
+// picker lists every method (see MethodPicker), and the selected one renders its
+// own method's reference-only feed. Driven entirely by props — the selected
+// method, a callback to change it, the feeds behind the picker rows, and `now`
+// for relative times — so it holds no router or query state and renders bare in
+// tests.
 export function Dashboard({
   selectedMethod,
   onSelectMethod,
+  feeds,
+  now,
 }: {
   selectedMethod: DashboardMethod
   onSelectMethod: (method: DashboardMethod) => void
+  feeds: Array<MethodFeed>
+  now: Date
 }) {
   return (
     <div className="flex flex-col w-full max-w-4xl mx-auto gap-8 py-6">
       <H1>Dashboard</H1>
-      <div className="flex flex-col w-full">
-        <div className="flex gap-1 pl-3 -mb-px" role="tablist">
-          {dashboardMethods.map((method) => {
-            const isActive = selectedMethod === method.value
-            return (
-              <button
-                key={method.value}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => onSelectMethod(method.value)}
-                className={cn(
-                  'relative rounded-t-lg border px-4 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'z-10 border-border border-b-transparent bg-white text-foreground shadow-sm'
-                    : 'border-transparent bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
-                )}
-              >
-                {method.label}
-              </button>
-            )
-          })}
-        </div>
+      <div className="flex flex-col w-full gap-3">
+        <MethodPicker
+          selectedMethod={selectedMethod}
+          onSelectMethod={onSelectMethod}
+          feeds={feeds}
+          now={now}
+        />
         {selectedMethod === 'espresso' && <EspressoBrewFeed />}
         {selectedMethod === 'pourover' && <PouroverBrewFeed />}
         {selectedMethod === 'frenchpress' && <FrenchpressBrewFeed />}
