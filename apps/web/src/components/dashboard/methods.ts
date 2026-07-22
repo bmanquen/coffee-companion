@@ -29,9 +29,11 @@ export type MethodFeed = {
   brews: ReadonlyArray<{ createdAt: Date }>
 }
 
-// Whether an arbitrary value is one of the known dashboard methods. Used to
-// validate the URL search param before trusting it. Pure.
-export function isDashboardMethod(value: unknown): value is DashboardMethod {
+// Whether a raw URL-param value is one of the known dashboard methods. Used to
+// validate the search param before trusting it. Pure.
+export function isDashboardMethod(
+  value: string | undefined,
+): value is DashboardMethod {
   return dashboardMethods.some((m) => m.value === value)
 }
 
