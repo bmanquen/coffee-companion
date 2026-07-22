@@ -1,6 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
 import type { DashboardMethod } from '@/components/dashboard/methods'
 import { authClient } from '@/lib/auth-client'
 import { getForwardedHeaders } from '@/lib/request-headers'
@@ -11,11 +10,22 @@ import { PouroverBrewFeed } from '@/components/dashboard/pourover-brew-feed'
 import { FrenchpressBrewFeed } from '@/components/dashboard/frenchpress-brew-feed'
 import { AeropressBrewFeed } from '@/components/dashboard/aeropress-brew-feed'
 import { ColdBrewBrewFeed } from '@/components/dashboard/cold-brew-brew-feed'
-import { dashboardMethods, mostRecentMethod } from '@/components/dashboard/methods'
+import {
+  dashboardMethods,
+  isDashboardMethod,
+  resolveSelectedMethod,
+} from '@/components/dashboard/methods'
 import { useTRPC } from '@/integrations/trpc/react'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/')({
+  // The selected method lives in the URL so it survives reload/back and can be
+  // deep-linked. Anything not a known method is dropped, so a stale or malformed
+  // link falls back to the most-recent default rather than a broken screen.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { method?: DashboardMethod } =>
+    isDashboardMethod(search.method) ? { method: search.method } : {},
   beforeLoad: async () => {
     const headers = await getForwardedHeaders()
     const { data: session } = await authClient.getSession({
@@ -56,7 +66,7 @@ function Home() {
     return <LandingPage />
   }
 
-  return <Dashboard />
+  return <DashboardContainer />
 }
 
 export function LandingPage() {
@@ -77,12 +87,12 @@ export function LandingPage() {
   )
 }
 
-// The dashboard is method-first: a switcher over one per-method Brew feed. The
-// tabs run in the agreed order (see dashboardMethods), each rendering its own
-// method's reference-only feed. It opens to the method of your most recent Brew
-// across all five (the queries are warmed in the loader), falling back to
-// Espresso when you have no Brews yet.
-export function Dashboard() {
+// Router-aware wiring for the dashboard: reads the selected method from the URL
+// (falling back to the most-recent Brew), and writes it back on selection. Owns
+// the search param so the Dashboard component below stays router-free and easy
+// to test. The per-method feeds are warmed in the loader; the queries here just
+// supply the recency fallback when no method is in the URL.
+function DashboardContainer() {
   const trpc = useTRPC()
   const { data: espresso } = useSuspenseQuery(
     trpc.espressoShot.getAll.queryOptions(),
@@ -100,18 +110,37 @@ export function Dashboard() {
     trpc.coldBrewBrew.getAll.queryOptions(),
   )
 
-  // Derived once, on mount: the initial tab follows the most recent Brew.
-  // Manual selection afterward is preserved by useState.
-  const [selectedMethod, setSelectedMethod] = useState<DashboardMethod>(() =>
-    mostRecentMethod([
-      { method: 'espresso', brews: espresso },
-      { method: 'pourover', brews: pourover },
-      { method: 'frenchpress', brews: frenchpress },
-      { method: 'aeropress', brews: aeropress },
-      { method: 'coldbrew', brews: coldbrew },
-    ]),
-  )
+  const { method } = Route.useSearch()
+  const navigate = Route.useNavigate()
 
+  const selectedMethod = resolveSelectedMethod(method, [
+    { method: 'espresso', brews: espresso },
+    { method: 'pourover', brews: pourover },
+    { method: 'frenchpress', brews: frenchpress },
+    { method: 'aeropress', brews: aeropress },
+    { method: 'coldbrew', brews: coldbrew },
+  ])
+
+  return (
+    <Dashboard
+      selectedMethod={selectedMethod}
+      onSelectMethod={(next) => navigate({ search: { method: next } })}
+    />
+  )
+}
+
+// The dashboard is method-first: a switcher over one per-method Brew feed. The
+// tabs run in the agreed order (see dashboardMethods), each rendering its own
+// method's reference-only feed. It is driven entirely by props — the selected
+// method and a callback to change it — so it holds no router or query state and
+// renders bare in tests.
+export function Dashboard({
+  selectedMethod,
+  onSelectMethod,
+}: {
+  selectedMethod: DashboardMethod
+  onSelectMethod: (method: DashboardMethod) => void
+}) {
   return (
     <div className="flex flex-col w-full max-w-4xl mx-auto gap-8 py-6">
       <H1>Dashboard</H1>
@@ -125,7 +154,7 @@ export function Dashboard() {
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => setSelectedMethod(method.value)}
+                onClick={() => onSelectMethod(method.value)}
                 className={cn(
                   'relative rounded-t-lg border px-4 py-2 text-sm font-medium transition-colors',
                   isActive

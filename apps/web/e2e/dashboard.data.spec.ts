@@ -46,3 +46,53 @@ test('dashboard switches between method tabs', async ({ page }) => {
     '/espresso/new',
   )
 })
+
+test('deep-linking a method via the URL opens that method', async ({ page }) => {
+  // Cold Brew has no seeded data, so the URL param — not recency — is what
+  // selects it. This proves the param drives the selection.
+  await page.goto('/?method=coldbrew')
+
+  await expect(
+    page.getByRole('tab', { name: 'Cold Brew', selected: true }),
+  ).toBeVisible()
+  await expect(page.getByRole('link', { name: /Log Brew/i })).toHaveAttribute(
+    'href',
+    '/cold-brew/new',
+  )
+})
+
+test('selecting a method writes it to the URL', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByRole('tab', { name: 'Cold Brew' }).click()
+  await expect(page).toHaveURL(/[?&]method=coldbrew\b/)
+})
+
+test('a reload preserves the selected method', async ({ page }) => {
+  await page.goto('/?method=pourover')
+  await expect(
+    page.getByRole('tab', { name: 'Pour Over', selected: true }),
+  ).toBeVisible()
+
+  await page.reload()
+  await expect(
+    page.getByRole('tab', { name: 'Pour Over', selected: true }),
+  ).toBeVisible()
+})
+
+test('the back button returns to the previous method', async ({ page }) => {
+  await page.goto('/?method=espresso')
+  await expect(
+    page.getByRole('tab', { name: 'Espresso', selected: true }),
+  ).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Cold Brew' }).click()
+  await expect(
+    page.getByRole('tab', { name: 'Cold Brew', selected: true }),
+  ).toBeVisible()
+
+  await page.goBack()
+  await expect(
+    page.getByRole('tab', { name: 'Espresso', selected: true }),
+  ).toBeVisible()
+})
