@@ -22,17 +22,25 @@ export const dashboardMethods: Array<{
   { value: 'coldbrew', label: 'Cold Brew' },
 ]
 
+// A method paired with its newest-first Brew history — what the recency and
+// selection helpers below read. Each feed is already ordered newest-first.
+export type MethodFeed = {
+  method: DashboardMethod
+  brews: ReadonlyArray<{ createdAt: Date }>
+}
+
+// Whether an arbitrary value is one of the known dashboard methods. Used to
+// validate the URL search param before trusting it. Pure.
+export function isDashboardMethod(value: unknown): value is DashboardMethod {
+  return dashboardMethods.some((m) => m.value === value)
+}
+
 // Given each method's newest-first brew history, the method of the single most
 // recent Brew across all of them — what the dashboard should open to. Each
 // feed is already ordered newest-first, so only its first brew is compared.
 // Falls back to Espresso when there are no Brews at all; ties resolve toward
 // the earlier feed in the list. Pure so it can be unit tested.
-export function mostRecentMethod(
-  feeds: Array<{
-    method: DashboardMethod
-    brews: ReadonlyArray<{ createdAt: Date }>
-  }>,
-): DashboardMethod {
+export function mostRecentMethod(feeds: Array<MethodFeed>): DashboardMethod {
   let best: { method: DashboardMethod; at: number } | null = null
   for (const feed of feeds) {
     // Each feed is newest-first, so its first brew is the one to compare.
@@ -43,4 +51,16 @@ export function mostRecentMethod(
     }
   }
   return best?.method ?? 'espresso'
+}
+
+// The method the dashboard should show: a valid URL search param wins, so a
+// deep-linked or reloaded view is honoured. An absent, invalid, or unrecognized
+// param defers to the most-recent Brew (which itself falls back to Espresso when
+// there are no Brews). Pure so it can be unit tested.
+export function resolveSelectedMethod(
+  param: string | undefined,
+  feeds: Array<MethodFeed>,
+): DashboardMethod {
+  if (isDashboardMethod(param)) return param
+  return mostRecentMethod(feeds)
 }
