@@ -24,8 +24,11 @@ export const Route = createFileRoute('/')({
   // link falls back to the most-recent default rather than a broken screen.
   validateSearch: (
     search: Record<string, unknown>,
-  ): { method?: DashboardMethod } =>
-    isDashboardMethod(search.method) ? { method: search.method } : {},
+  ): { method?: DashboardMethod } => {
+    const method =
+      typeof search.method === 'string' ? search.method : undefined
+    return isDashboardMethod(method) ? { method } : {}
+  },
   beforeLoad: async () => {
     const headers = await getForwardedHeaders()
     const { data: session } = await authClient.getSession({

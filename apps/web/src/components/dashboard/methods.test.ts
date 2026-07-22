@@ -70,12 +70,10 @@ describe('isDashboardMethod', () => {
     }
   })
 
-  it('rejects unknown, empty, and non-string values', () => {
+  it('rejects unknown and empty values, and undefined', () => {
     expect(isDashboardMethod('mokapot')).toBe(false)
     expect(isDashboardMethod('')).toBe(false)
     expect(isDashboardMethod(undefined)).toBe(false)
-    expect(isDashboardMethod(null)).toBe(false)
-    expect(isDashboardMethod(42)).toBe(false)
   })
 })
 
