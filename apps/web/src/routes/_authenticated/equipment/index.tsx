@@ -210,8 +210,8 @@ function DeviceActionsCell({ row }: CellContext<BrewingDevice, unknown>) {
 }
 
 const deviceColumns = [
-  // Card layout: Brand + Name make up the card title (see cardTitle); Type is
-  // desktop-only (cardHidden) so the card stays to just the title.
+  // Card layout: Brand + Name make up the card title (see cardTitle); Type shows
+  // in the summary line. Equipment cards are flat — no expander (see grilling).
   deviceColumnHelper.accessor('brand', {
     header: 'Brand',
     meta: { cardTitle: true },
@@ -222,7 +222,7 @@ const deviceColumns = [
   }),
   deviceColumnHelper.accessor('type.name', {
     header: 'Type',
-    meta: { cardHidden: true },
+    meta: { cardSummary: true },
   }),
   deviceColumnHelper.display({
     id: 'actions',

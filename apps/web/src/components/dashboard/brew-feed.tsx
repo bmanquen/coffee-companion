@@ -15,6 +15,7 @@ import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 
 // The minimum a brew needs to expose to be shown in the feed: an id, whether
 // it's the dialed-in reference, and its coffee (for the highlight and filter).
@@ -59,6 +60,7 @@ export function BrewFeed<T extends BrewRow>({
   'use no memo'
   const [coffeeId, setCoffeeId] = useState('')
   const [dialedInOnly, setDialedInOnly] = useState(false)
+  const expansion = useAccordionExpansion()
 
   // Unique coffees that actually appear in this method's history, sorted by name.
   const coffeeOptions = useMemo(
@@ -86,6 +88,9 @@ export function BrewFeed<T extends BrewRow>({
   const table = useReactTable({
     data: visibleBrews,
     columns,
+    // Accordion: opening one brew collapses the others (see grilling decision).
+    state: { expanded: expansion.expanded },
+    onExpandedChange: expansion.onExpandedChange,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),

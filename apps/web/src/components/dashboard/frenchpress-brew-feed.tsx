@@ -4,6 +4,7 @@ import type { FrenchpressBrewWithRelations } from '@/types'
 import {
   BrewDetails,
   brewExpanderColumn,
+  brewRatioColumn,
   dialedInCoffeeColumn,
 } from '@/components/brews/brew-details'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
@@ -13,41 +14,40 @@ import { formatBrewRatio } from '@/lib/brew-ratio'
 
 const columnHelper = createColumnHelper<FrenchpressBrewWithRelations>()
 
-// Face columns: the coffee (with dialed-in crosshair), the Method Variant, a
-// hero water:dose ratio, then the core french press stats. Grinder, device,
-// water temp, days off roast and notes live in the expander (BrewDetails).
+// The dial-in summary (see ADR-0002): coffee identity, the Method Variant, then
+// the french press levers — grind, real weights (dose→water), steep time — with
+// a muted ratio hint. Grinder, device, water temp, days off roast and notes
+// live in the expander (BrewDetails).
 const columns = [
   dialedInCoffeeColumn<FrenchpressBrewWithRelations>(),
   columnHelper.accessor('method.name', {
     header: 'Method',
     cell: (info) => info.getValue(),
-  }),
-  columnHelper.display({
-    id: 'ratio',
-    header: 'Ratio',
-    // The hero metric — emphasised so it stands out against the muted stats.
-    cell: ({ row }) => (
-      <span className="font-semibold text-foreground">
-        {formatBrewRatio(row.original.dose, row.original.water)}
-      </span>
-    ),
-  }),
-  columnHelper.accessor('dose', {
-    header: 'Dose',
-    cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-  }),
-  columnHelper.accessor('water', {
-    header: 'Water',
-    cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-  }),
-  columnHelper.accessor('steepTime', {
-    header: 'Steep',
-    cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
+    meta: { cardSummary: true },
   }),
   columnHelper.accessor('grindSetting', {
     header: 'Grind',
     cell: (info) => info.getValue() ?? '-',
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
+  columnHelper.accessor('dose', {
+    header: 'Dose',
+    cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
+    meta: { cardSummary: true },
+  }),
+  columnHelper.accessor('water', {
+    header: 'Water',
+    cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
+    meta: { cardSummary: true },
+  }),
+  columnHelper.accessor('steepTime', {
+    header: 'Steep',
+    cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
+    meta: { cardSummary: true },
+  }),
+  brewRatioColumn<FrenchpressBrewWithRelations>((row) =>
+    formatBrewRatio(row.dose, row.water),
+  ),
   brewExpanderColumn<FrenchpressBrewWithRelations>(),
 ]
 
@@ -68,7 +68,6 @@ export function FrenchpressBrewFeed() {
         <BrewDetails
           grinder={row.original.grinder}
           device={row.original.brewingDevice}
-          ratio={formatBrewRatio(row.original.dose, row.original.water)}
           extra={
             row.original.waterTemp != null
               ? { label: 'Water temp', value: `${row.original.waterTemp}°C` }

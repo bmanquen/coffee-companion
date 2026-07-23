@@ -15,14 +15,21 @@ export const coffeeRouter = createTRPCRouter({
         country: true,
         region: true,
         process: true,
+        roaster: true,
+        roastLevel: true,
+        // Varieties are a many-to-many via the join table; flatten below.
+        coffeesVarieties: { with: { variety: true } },
         // The coffee's dialed-in espresso shot, if one is set.
         espressoShots: { where: { isDialedIn: true }, limit: 1 },
       },
     })
-    return rows.map(({ espressoShots: dialedIn, ...coffee }) => ({
-      ...coffee,
-      dialedInShot: dialedIn.at(0) ?? null,
-    }))
+    return rows.map(
+      ({ espressoShots: dialedIn, coffeesVarieties, ...coffee }) => ({
+        ...coffee,
+        varieties: coffeesVarieties.map((cv) => cv.variety),
+        dialedInShot: dialedIn.at(0) ?? null,
+      }),
+    )
   }),
 
   getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {

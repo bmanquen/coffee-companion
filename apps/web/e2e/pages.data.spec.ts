@@ -24,7 +24,9 @@ test('brews page AeroPress tab shows the aeropress log', async ({ page }) => {
 test('coffees page lists coffees', async ({ page }) => {
   await page.goto('/coffees')
   await expect(page.getByRole('heading', { name: 'Coffees' })).toBeVisible()
-  await expect(page.getByText('Ethiopia Guji')).toBeVisible()
+  // .first(): the coffees list renders both a desktop table row and a mobile
+  // card, so the name appears twice in the DOM.
+  await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()
 })
 
 test('equipment page lists grinders and brewing devices', async ({ page }) => {

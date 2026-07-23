@@ -2,24 +2,22 @@ import { createColumnHelper } from '@tanstack/react-table'
 import { ChevronDown, Crosshair } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// The expandable detail sub-row shared by every dashboard brew card (the
-// dialed-in and recent cards for all five methods). The common fields —
-// grinder, device, ratio, notes — are always shown; `extra` is the one
-// method-specific slot (Water temp for pour over/french press, Environment for
-// cold brew; espresso and aeropress omit it). `daysOffRoast` is optional: the
-// method-first dashboard feed passes it so freshness shows in the expander,
-// while the older cards omit it (undefined -> row hidden).
+// The expandable detail region shared by every dashboard brew card, revealed
+// when a card is expanded. Holds the fields demoted out of the minimal
+// summary: grinder, device, days off roast, notes, and the one method-specific
+// `extra` slot (Water temp for pour over/french press, Environment for cold
+// brew; espresso and aeropress omit it). The dial-in summary already carries
+// grind, weights, time and a muted ratio hint (see ADR-0002), so none of those
+// repeat here. `daysOffRoast` undefined -> its row is hidden.
 export function BrewDetails({
   grinder,
   device,
-  ratio,
   extra,
   daysOffRoast,
   notes,
 }: {
   grinder: { name: string; brand: string }
   device: { name: string; brand: string }
-  ratio: string
   extra?: { label: string; value: string }
   daysOffRoast?: number | null
   notes: string | null
@@ -37,10 +35,6 @@ export function BrewDetails({
         <dd className="inline text-muted-foreground">
           {device.name} ({device.brand})
         </dd>
-      </div>
-      <div>
-        <dt className="inline font-medium">Ratio: </dt>
-        <dd className="inline text-muted-foreground">{ratio}</dd>
       </div>
       {extra && (
         <div>
@@ -89,6 +83,21 @@ export function dialedInCoffeeColumn<
       </span>
     ),
     meta: { cardTitle: true },
+  })
+}
+
+// The muted ratio hint shared by every brew card's dial-in summary. Real
+// weights (dose→yield/water) lead the summary; the ratio rides along
+// de-emphasised for people who think in ratios (see ADR-0002). Rendered as a
+// summary cell with no label — a "1:2.1" is self-evident.
+export function brewRatioColumn<T>(getRatio: (row: T) => string) {
+  return createColumnHelper<T>().display({
+    id: 'ratio',
+    header: 'Ratio',
+    cell: ({ row }) => (
+      <span className="text-muted-foreground">{getRatio(row.original)}</span>
+    ),
+    meta: { cardSummary: true },
   })
 }
 
