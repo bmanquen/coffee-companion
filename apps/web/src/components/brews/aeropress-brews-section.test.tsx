@@ -72,7 +72,7 @@ describe('AeropressBrewsSection', () => {
     expect(table.getByText('220g')).toBeTruthy()
   })
 
-  it('renders the recipe columns and the derived ratio', () => {
+  it('renders the recipe columns', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [
       makeAeropressBrew({
@@ -91,8 +91,6 @@ describe('AeropressBrewsSection', () => {
     expect(table.getByText('220g')).toBeTruthy() // water
     expect(table.getByText('90s')).toBeTruthy() // steep
     expect(table.getByText('18')).toBeTruthy() // grind setting
-    // Ratio is water / dose = 220 / 15 ≈ 14.7, derived in the app.
-    expect(table.getByText('1:14.7')).toBeTruthy()
   })
 
   it('sorts by dose numerically (not lexicographically) on header click', () => {
@@ -183,7 +181,7 @@ describe('AeropressBrewsSection', () => {
     render(<AeropressBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Empty dose/water/steep/grind/ratio render as "-"; empty notes show the
+    // Empty dose/water/steep/grind and days-off-roast render as "-"; empty notes show the
     // "No notes..." placeholder instead.
     expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(5)
     expect(table.getByText('No notes...')).toBeTruthy()

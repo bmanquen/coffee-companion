@@ -28,7 +28,7 @@ describe('BrewDetails', () => {
     expect(screen.queryByText(/Environment/)).toBeNull()
     // Empty notes show a dimmed "No notes..." placeholder, not a dash.
     expect(screen.getByText('No notes...')).toBeTruthy()
-    const notesValue = screen.getByText('Notes:').closest('div')
+    const notesValue = screen.getByText('Notes').closest('div')
     expect(notesValue?.textContent).not.toContain('-')
   })
 })

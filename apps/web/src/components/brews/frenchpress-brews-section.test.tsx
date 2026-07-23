@@ -72,7 +72,7 @@ describe('FrenchpressBrewsSection', () => {
     expect(table.getByText('500g')).toBeTruthy()
   })
 
-  it('renders the recipe columns, steep time, water temp, and the derived ratio', () => {
+  it('renders the recipe columns, steep time, and water temp', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [
       makeFrenchpressBrew({
@@ -93,8 +93,6 @@ describe('FrenchpressBrewsSection', () => {
     expect(table.getByText('240s')).toBeTruthy() // steep time
     expect(table.getByText('95°C')).toBeTruthy() // water temp
     expect(table.getByText('30')).toBeTruthy() // grind setting
-    // Ratio is water / dose = 500 / 30 ≈ 16.7, derived in the app.
-    expect(table.getByText('1:16.7')).toBeTruthy()
   })
 
   it('sorts by dose numerically (not lexicographically) on header click', () => {
@@ -186,7 +184,7 @@ describe('FrenchpressBrewsSection', () => {
     render(<FrenchpressBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Empty dose/water/steep/temp/grind/ratio render as "-"; empty notes show
+    // Empty dose/water/steep/temp/grind and days-off-roast render as "-"; empty notes show
     // the "No notes..." placeholder instead.
     expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(6)
     expect(table.getByText('No notes...')).toBeTruthy()

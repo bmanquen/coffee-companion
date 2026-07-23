@@ -4,19 +4,17 @@ import type { EspressoShotWithRelations } from '@/types'
 import {
   BrewDetails,
   brewExpanderColumn,
-  brewRatioColumn,
   dialedInCoffeeColumn,
 } from '@/components/brews/brew-details'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast } from '@/lib/brew'
-import { formatBrewRatio } from '@/lib/brew-ratio'
 
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 
 // The dial-in summary (see ADR-0002): coffee identity, then the levers you turn
-// dialing in espresso — grind, real weights (dose→yield), time — with a muted
-// ratio hint. Grinder, device, days off roast and notes live in the expander
+// dialing in espresso — grind, real weights (dose→yield), and time. Grinder,
+// device, days off roast and notes live in the expander
 // (BrewDetails). On desktop these are scannable columns; on mobile they collapse
 // into the card's summary line, everything else revealed on expand.
 const columns = [
@@ -29,21 +27,18 @@ const columns = [
   columnHelper.accessor('dose', {
     header: 'Dose',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('yield', {
     header: 'Yield',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('time', {
     header: 'Time',
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  brewRatioColumn<EspressoShotWithRelations>((row) =>
-    formatBrewRatio(row.dose, row.yield),
-  ),
   brewExpanderColumn<EspressoShotWithRelations>(),
 ]
 

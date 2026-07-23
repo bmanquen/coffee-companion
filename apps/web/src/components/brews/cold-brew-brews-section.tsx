@@ -16,7 +16,6 @@ import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { ColdBrewBrewWithRelations } from '@/types'
-import { brewRatioColumn } from '@/components/brews/brew-details'
 import { BrewNotes } from '@/components/brews/brew-notes'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
@@ -29,7 +28,6 @@ import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast, formatSteepMinutes } from '@/lib/brew'
-import { formatBrewRatio } from '@/lib/brew-ratio'
 
 type Brew = ColdBrewBrewWithRelations
 
@@ -125,20 +123,19 @@ const columns = [
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
     sortingFn: (a, b) =>
       Number(a.original.dose ?? 0) - Number(b.original.dose ?? 0),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('water', {
     header: 'Water',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
     sortingFn: (a, b) =>
       Number(a.original.water ?? 0) - Number(b.original.water ?? 0),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  brewRatioColumn<Brew>((row) => formatBrewRatio(row.dose, row.water)),
   columnHelper.accessor('steepTime', {
     header: 'Steep',
     cell: (info) => formatSteepMinutes(info.getValue()),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('brewEnvironment', {
     header: 'Environment',

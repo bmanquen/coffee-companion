@@ -32,7 +32,7 @@ test.describe('dashboard brew cards', () => {
 
     // Detail region is collapsed (zero height) until the card is tapped.
     expect(await regionHeight(cards.first())).toBeLessThan(4)
-    await expect(cards.first().getByText('Grinder:', { exact: false })).toBeAttached()
+    await expect(cards.first().getByText('Grinder', { exact: false })).toBeAttached()
     await cards.first().click()
     await expect
       .poll(() => regionHeight(cards.first()))
@@ -63,10 +63,10 @@ test.describe('dashboard brew cards', () => {
 
     const table = page.locator('div.lg\\:block table')
     await expect(table).toBeVisible()
-    await expect(table.getByText('Grinder:', { exact: false })).toBeHidden()
+    await expect(table.getByText('Grinder', { exact: false })).toBeHidden()
 
     await table.locator('tbody tr').first().click()
-    await expect(table.getByText('Grinder:', { exact: false })).toBeVisible()
+    await expect(table.getByText('Grinder', { exact: false })).toBeVisible()
   })
 })
 

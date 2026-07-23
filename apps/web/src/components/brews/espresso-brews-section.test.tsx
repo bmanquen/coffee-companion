@@ -96,7 +96,7 @@ describe('EspressoBrewsSection', () => {
     expect(table.getByText('Colombia Huila')).toBeTruthy()
   })
 
-  it('renders the recipe columns and the derived ratio', () => {
+  it('renders the recipe columns', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
       makeRecentShot({
@@ -115,8 +115,6 @@ describe('EspressoBrewsSection', () => {
     expect(table.getByText('36g')).toBeTruthy() // yield
     expect(table.getByText('28s')).toBeTruthy() // time
     expect(table.getByText('4.5')).toBeTruthy() // grind setting
-    // Ratio is yield / dose = 36 / 18 = 2.0, derived in the app.
-    expect(table.getByText('1:2.0')).toBeTruthy()
   })
 
   it('sorts by dose numerically (not lexicographically) on header click', () => {
@@ -207,8 +205,8 @@ describe('EspressoBrewsSection', () => {
     render(<EspressoBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Empty dose/yield/time/grind/ratio render as "-"; empty notes show the
-    // "No notes..." placeholder instead.
+    // Empty dose/yield/time/grind and days-off-roast render as "-"; empty notes
+    // show the "No notes..." placeholder instead.
     expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(5)
     expect(table.getByText('No notes...')).toBeTruthy()
   })

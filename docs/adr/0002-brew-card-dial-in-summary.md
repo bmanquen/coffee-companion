@@ -6,7 +6,7 @@ the levers you actually turn when reproducing a brew, in a single uniform shape 
 five methods —
 
 ```
-⌖ Coffee (+ variant)   Grind · Dose→Yield/Water (1:x) · Time
+⌖ Coffee (+ variant)   Grind 12 · Dose 18g · Yield 38g · Time 27s
 ```
 
 Two choices here will look wrong to a future reader unless they read this, so please don't
@@ -21,11 +21,14 @@ Two choices here will look wrong to a future reader unless they read this, so pl
   promoting it only for the methods that do would break the consistent card shape, which is
   the whole point of this redesign. The lever is one tap away, not gone.
 
-- **The ratio is demoted from hero to a muted `(1:x)` hint; real weights lead.** The prior
-  dashboard feeds emphasised the ratio as the headline metric. A ratio hides *how much
-  coffee and how much water* — the concrete numbers you need to reproduce a brew — so the
-  summary now leads with actual grams (`18g → 38g`) and keeps the ratio only as a
-  low-emphasis aid for people who think in ratios.
+- **The ratio is gone; the real weights are the summary.** The prior dashboard feeds
+  emphasised the brew ratio as the headline metric. A ratio hides *how much coffee and how
+  much water* — the concrete numbers you need to reproduce a brew — so the summary shows the
+  actual, labelled weights as the user entered them (`Dose 18g · Yield 38g`) and no ratio at
+  all. (It started as a muted `1:x` hint beside the weights, then was dropped outright as
+  redundant with the real numbers — the `brew-ratio` helper went with it.) The stats carry
+  their labels (Grind, Dose, Yield, Time) so each number is unambiguous; only the
+  self-identifying method-variant goes unlabelled.
 
 Related presentation decisions from the same redesign (not domain-surprising, recorded here
 for context, not as commitments): grinder sits in the expander despite grind-setting being

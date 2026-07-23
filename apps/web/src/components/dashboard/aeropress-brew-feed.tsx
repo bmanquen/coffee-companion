@@ -4,19 +4,17 @@ import type { AeropressBrewWithRelations } from '@/types'
 import {
   BrewDetails,
   brewExpanderColumn,
-  brewRatioColumn,
   dialedInCoffeeColumn,
 } from '@/components/brews/brew-details'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast } from '@/lib/brew'
-import { formatBrewRatio } from '@/lib/brew-ratio'
 
 const columnHelper = createColumnHelper<AeropressBrewWithRelations>()
 
 // The dial-in summary (see ADR-0002): coffee identity, the Method Variant, then
-// the aeropress levers — grind, real weights (dose→water), steep time — with a
-// muted ratio hint. Grinder, device, days off roast and notes live in the
+// the aeropress levers — grind, real weights (dose→water), and steep time.
+// Grinder, device, days off roast and notes live in the
 // expander (BrewDetails). AeroPress has no water temp, so no extra field.
 const columns = [
   dialedInCoffeeColumn<AeropressBrewWithRelations>(),
@@ -33,21 +31,18 @@ const columns = [
   columnHelper.accessor('dose', {
     header: 'Dose',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('water', {
     header: 'Water',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('steepTime', {
     header: 'Steep',
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  brewRatioColumn<AeropressBrewWithRelations>((row) =>
-    formatBrewRatio(row.dose, row.water),
-  ),
   brewExpanderColumn<AeropressBrewWithRelations>(),
 ]
 

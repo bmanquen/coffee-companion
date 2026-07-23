@@ -4,19 +4,17 @@ import type { ColdBrewBrewWithRelations } from '@/types'
 import {
   BrewDetails,
   brewExpanderColumn,
-  brewRatioColumn,
   dialedInCoffeeColumn,
 } from '@/components/brews/brew-details'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast, formatSteepMinutes } from '@/lib/brew'
-import { formatBrewRatio } from '@/lib/brew-ratio'
 
 const columnHelper = createColumnHelper<ColdBrewBrewWithRelations>()
 
 // The dial-in summary (see ADR-0002): coffee identity, then the cold brew
 // levers — grind, real weights (dose→water), steep time (in hours/minutes, not
-// seconds) — with a muted ratio hint. Cold brew is methodless (ADR-0001), so no
+// seconds). Cold brew is methodless (ADR-0001), so no
 // Method Variant column. Grinder, device, Brew Environment, days off roast and
 // notes live in the expander (BrewDetails).
 const columns = [
@@ -29,22 +27,19 @@ const columns = [
   columnHelper.accessor('dose', {
     header: 'Dose',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('water', {
     header: 'Water',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('steepTime', {
     header: 'Steep',
     // Cold brew stores steep time as whole minutes, not seconds.
     cell: (info) => formatSteepMinutes(info.getValue()),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  brewRatioColumn<ColdBrewBrewWithRelations>((row) =>
-    formatBrewRatio(row.dose, row.water),
-  ),
   brewExpanderColumn<ColdBrewBrewWithRelations>(),
 ]
 

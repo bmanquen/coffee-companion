@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils'
 // summary: grinder, device, days off roast, notes, and the one method-specific
 // `extra` slot (Water temp for pour over/french press, Environment for cold
 // brew; espresso and aeropress omit it). The dial-in summary already carries
-// grind, weights, time and a muted ratio hint (see ADR-0002), so none of those
-// repeat here. `daysOffRoast` undefined -> its row is hidden.
+// grind, weights and time (see ADR-0002), so none of those repeat here.
+// `daysOffRoast` undefined -> its row is hidden.
 export function BrewDetails({
   grinder,
   device,
@@ -22,37 +22,32 @@ export function BrewDetails({
   daysOffRoast?: number | null
   notes: string | null
 }) {
+  const rows: Array<{ label: string; value: string }> = [
+    { label: 'Grinder', value: `${grinder.name} (${grinder.brand})` },
+    { label: 'Device', value: `${device.name} (${device.brand})` },
+    ...(extra ? [{ label: extra.label, value: extra.value }] : []),
+    ...(daysOffRoast !== undefined
+      ? [
+          {
+            label: 'Days off roast',
+            value: daysOffRoast != null ? `${daysOffRoast}d` : '-',
+          },
+        ]
+      : []),
+  ]
+
+  // One field per row, labels aligned in a fixed-width column so values line up.
   return (
-    <dl className="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-2 text-sm py-1 text-left sm:grid-cols-2">
-      <div>
-        <dt className="inline font-medium">Grinder: </dt>
-        <dd className="inline text-muted-foreground">
-          {grinder.name} ({grinder.brand})
-        </dd>
-      </div>
-      <div>
-        <dt className="inline font-medium">Device: </dt>
-        <dd className="inline text-muted-foreground">
-          {device.name} ({device.brand})
-        </dd>
-      </div>
-      {extra && (
-        <div>
-          <dt className="inline font-medium">{extra.label}: </dt>
-          <dd className="inline text-muted-foreground">{extra.value}</dd>
+    <dl className="flex flex-col gap-1.5 text-sm text-left">
+      {rows.map((row) => (
+        <div key={row.label} className="flex gap-3">
+          <dt className="w-32 shrink-0 text-muted-foreground">{row.label}</dt>
+          <dd className="text-foreground">{row.value}</dd>
         </div>
-      )}
-      {daysOffRoast !== undefined && (
-        <div>
-          <dt className="inline font-medium">Days off roast: </dt>
-          <dd className="inline text-muted-foreground">
-            {daysOffRoast != null ? `${daysOffRoast}d` : '-'}
-          </dd>
-        </div>
-      )}
-      <div className="col-span-2">
-        <dt className="inline font-medium">Notes: </dt>
-        <dd className="inline text-muted-foreground">
+      ))}
+      <div className="flex gap-3">
+        <dt className="w-32 shrink-0 text-muted-foreground">Notes</dt>
+        <dd className="text-foreground">
           {notes ?? (
             <span className="text-muted-foreground/60">No notes...</span>
           )}
@@ -83,21 +78,6 @@ export function dialedInCoffeeColumn<
       </span>
     ),
     meta: { cardTitle: true },
-  })
-}
-
-// The muted ratio hint shared by every brew card's dial-in summary. Real
-// weights (dose→yield/water) lead the summary; the ratio rides along
-// de-emphasised for people who think in ratios (see ADR-0002). Rendered as a
-// summary cell with no label — a "1:2.1" is self-evident.
-export function brewRatioColumn<T>(getRatio: (row: T) => string) {
-  return createColumnHelper<T>().display({
-    id: 'ratio',
-    header: 'Ratio',
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">{getRatio(row.original)}</span>
-    ),
-    meta: { cardSummary: true },
   })
 }
 
