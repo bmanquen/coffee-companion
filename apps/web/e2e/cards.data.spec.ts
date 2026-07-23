@@ -63,10 +63,13 @@ test.describe('dashboard brew cards', () => {
 
     const table = page.locator('div.lg\\:block table')
     await expect(table).toBeVisible()
-    await expect(table.getByText('Grinder', { exact: false })).toBeHidden()
+    // The detail sub-row is always present but collapsed to zero height until
+    // its row is clicked (it animates open).
+    const region = table.locator('tbody [class*="grid-rows-"]').first()
+    expect((await region.boundingBox())?.height ?? 0).toBeLessThan(4)
 
     await table.locator('tbody tr').first().click()
-    await expect(table.getByText('Grinder', { exact: false })).toBeVisible()
+    await expect.poll(() => region.boundingBox().then((b) => b?.height ?? 0)).toBeGreaterThan(20)
   })
 })
 
