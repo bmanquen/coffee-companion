@@ -36,18 +36,20 @@ export function BrewDetails({
       : []),
   ]
 
-  // One field per row, labels aligned in a fixed-width column so values line up.
+  // Labels aligned in a fixed-width column so values line up. One field per row
+  // on the mobile card; two per row on the wider desktop-table sub-row (lg).
+  // Notes always spans the full width.
   return (
-    <dl className="flex flex-col gap-1.5 text-sm text-left">
+    <dl className="grid grid-cols-1 gap-x-8 gap-y-1.5 text-sm text-left lg:grid-cols-2">
       {rows.map((row) => (
         <div key={row.label} className="flex gap-3">
           <dt className="w-32 shrink-0 text-muted-foreground">{row.label}</dt>
-          <dd className="text-foreground">{row.value}</dd>
+          <dd className="min-w-0 text-foreground">{row.value}</dd>
         </div>
       ))}
-      <div className="flex gap-3">
+      <div className="flex gap-3 lg:col-span-2">
         <dt className="w-32 shrink-0 text-muted-foreground">Notes</dt>
-        <dd className="text-foreground">
+        <dd className="min-w-0 text-foreground whitespace-pre-wrap break-words">
           {notes ?? (
             <span className="text-muted-foreground/60">No notes...</span>
           )}

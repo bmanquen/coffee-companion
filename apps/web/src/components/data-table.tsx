@@ -142,7 +142,7 @@ function DataCard<T>({
       onClick={hasDetail ? row.getToggleExpandedHandler() : undefined}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           {titleCells.length > 0 && (
             <div className="font-medium">
               {titleCells.map((cell, index) => (
@@ -154,28 +154,23 @@ function DataCard<T>({
             </div>
           )}
           {summaryCells.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-              {summaryCells.map((cell, index) => (
-                <Fragment key={cell.id}>
-                  {index > 0 && (
-                    <span aria-hidden className="text-muted-foreground/40">
-                      ·
+            // Each stat is a small centred block — label above its value —
+            // spread evenly across the row (no separators between them).
+            <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1 text-sm">
+              {summaryCells.map((cell) => (
+                <div
+                  key={cell.id}
+                  className="flex flex-col items-center text-center leading-tight"
+                >
+                  {cell.column.columnDef.meta?.cardSummaryLabel && (
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {cardLabel(cell.column)}
                     </span>
                   )}
-                  <span className="inline-flex items-center gap-1">
-                    {cell.column.columnDef.meta?.cardSummaryLabel && (
-                      <span className="text-muted-foreground">
-                        {cardLabel(cell.column)}
-                      </span>
-                    )}
-                    <span className="text-foreground">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </span>
+                  <span className="text-foreground">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </span>
-                </Fragment>
+                </div>
               ))}
             </div>
           )}
@@ -352,14 +347,28 @@ export function DataTable<T>({
                       </TableCell>
                     ))}
                   </TableRow>
-                  {renderSubComponent && row.getIsExpanded() && (
-                    <TableRow className="hover:bg-transparent">
+                  {/* Always rendered so the detail can animate its height open
+                      and closed (grid-rows 1fr↔0fr); collapsed it is 0-height
+                      and borderless, so it reads as absent. */}
+                  {renderSubComponent && (
+                    <TableRow className="border-0 hover:bg-transparent">
                       <TableCell
                         colSpan={row.getVisibleCells().length}
-                        className="bg-muted/50"
+                        className="border-0 p-0"
                       >
-                        <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-                          {renderSubComponent(row)}
+                        <div
+                          className={cn(
+                            'grid transition-all duration-200 ease-out',
+                            row.getIsExpanded()
+                              ? 'grid-rows-[1fr] opacity-100'
+                              : 'grid-rows-[0fr] opacity-0',
+                          )}
+                        >
+                          <div className="min-h-0 overflow-hidden">
+                            <div className="bg-muted/50 p-4">
+                              {renderSubComponent(row)}
+                            </div>
+                          </div>
                         </div>
                       </TableCell>
                     </TableRow>
