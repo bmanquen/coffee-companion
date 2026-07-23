@@ -21,7 +21,7 @@ export function useAccordionExpansion(): {
       const openKeys = (state: ExpandedState) =>
         state === true
           ? []
-          : Object.keys(state).filter((key) => (state as Record<string, boolean>)[key])
+          : Object.keys(state).filter((key) => (state)[key])
       const before = openKeys(old)
       const after = openKeys(next)
       const newlyOpened = after.find((key) => !before.includes(key))
