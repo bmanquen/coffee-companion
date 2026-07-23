@@ -15,7 +15,6 @@ import {
 import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
-import { brewRatioColumn } from '@/components/brews/brew-details'
 import { BrewNotes } from '@/components/brews/brew-notes'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
@@ -28,7 +27,6 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
 import { daysOffRoast } from '@/lib/brew'
-import { formatBrewRatio } from '@/lib/brew-ratio'
 
 type Shot = {
   id: string
@@ -139,20 +137,19 @@ const columns = [
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
     sortingFn: (a, b) =>
       Number(a.original.dose ?? 0) - Number(b.original.dose ?? 0),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('yield', {
     header: 'Yield',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
     sortingFn: (a, b) =>
       Number(a.original.yield ?? 0) - Number(b.original.yield ?? 0),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  brewRatioColumn<Shot>((row) => formatBrewRatio(row.dose, row.yield)),
   columnHelper.accessor('time', {
     header: 'Time',
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('grinder.name', {
     header: 'Grinder',

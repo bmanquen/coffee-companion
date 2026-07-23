@@ -1,5 +1,5 @@
 // General brew helpers, method-agnostic (roast date applies to any brew, not
-// just espresso). Espresso-shot ratio/dialed-in helpers live in brew-ratio.ts.
+// just espresso).
 
 // Whole days between when the beans were roasted and when a brew was pulled —
 // a fixed fact per brew (roast date → brew time), not "days since roast until

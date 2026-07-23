@@ -41,7 +41,8 @@ declare module '@tanstack/react-table' {
     // minimal, pre-expand info). Everything else is detail, hidden until expand.
     cardSummary?: boolean
     // Within the summary line, prefix this column's value with its label
-    // (e.g. "Grind 12"); omit for self-evident values (weights, a ratio).
+    // (e.g. "Grind 12", "Dose 18g"); omit where the value already identifies
+    // itself (a method-variant or origin name).
     cardSummaryLabel?: boolean
     // Render this column as its own full-width row in the detail region, with
     // the label above the value (e.g. long free-text notes).
@@ -58,7 +59,8 @@ function cardLabel<T>(column: Column<T, unknown>): string {
   return typeof header === 'string' ? header : column.id
 }
 
-// A stack of label/value rows for a card's expanded detail region.
+// A stack of label/value rows for a card's expanded detail region — one field
+// per row, with labels aligned in a fixed-width column so values line up.
 function CardRows<T>({
   cells,
   className,
@@ -68,16 +70,15 @@ function CardRows<T>({
 }) {
   'use no memo'
   return (
-    <dl className={cn('gap-x-6 columns-2', className)}>
+    <dl className={cn('flex flex-col gap-1.5 text-sm', className)}>
       {cells.map((cell) => (
-        <div
-          key={cell.id}
-          className="flex break-inside-avoid gap-2 pb-1 text-sm"
-        >
-          <dt className="whitespace-nowrap text-muted-foreground">
+        <div key={cell.id} className="flex gap-3">
+          <dt className="w-32 shrink-0 text-muted-foreground">
             {cardLabel(cell.column)}
           </dt>
-          <dd>{flexRender(cell.column.columnDef.cell, cell.getContext())}</dd>
+          <dd className="text-foreground">
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </dd>
         </div>
       ))}
     </dl>

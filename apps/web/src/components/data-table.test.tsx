@@ -114,16 +114,14 @@ describe('DataTable', () => {
       )
       const card = within(cardRegion(container))
 
-      // The full-width column's label/value live in a plain <dl>, not the
-      // columned body used for the other fields.
+      // The full-width column's label/value live in their own <dl>, separate
+      // from the one holding the other detail fields.
       const notesLabel = card.getByText('Notes')
       const notesDl = notesLabel.closest('dl')!
-      expect(notesDl.className).not.toContain('columns-2')
       expect(within(notesDl).getByText('Juicy, floral, long finish.')).toBeTruthy()
 
-      // A normal field stays in the two-column body.
+      // A normal detail field lives in a different <dl> than the full-width one.
       const roasterDl = card.getByText('Roaster').closest('dl')!
-      expect(roasterDl.className).toContain('columns-2')
       expect(roasterDl).not.toBe(notesDl)
     })
 

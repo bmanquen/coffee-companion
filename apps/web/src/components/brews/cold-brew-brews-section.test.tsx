@@ -51,7 +51,7 @@ describe('ColdBrewBrewsSection', () => {
     expect(screen.getByText(/No cold brews yet/i)).toBeTruthy()
   })
 
-  it('renders each brew with its recipe, steep time, environment, and derived ratio', () => {
+  it('renders each brew with its recipe, steep time, and environment', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
       makeColdBrewBrew({
@@ -76,8 +76,6 @@ describe('ColdBrewBrewsSection', () => {
     expect(table.getByText('18h')).toBeTruthy()
     expect(table.getByText('Fridge')).toBeTruthy() // brew environment
     expect(table.getByText('coarse')).toBeTruthy() // grind setting
-    // Ratio is water / dose = 500 / 50 = 10.0, derived in the app.
-    expect(table.getByText('1:10.0')).toBeTruthy()
   })
 
   it('formats a sub-hour steep with minutes', () => {
@@ -110,10 +108,10 @@ describe('ColdBrewBrewsSection', () => {
     render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Exactly six "-": days-off-roast, dose, water, steep, grind, and the ratio
-    // (derived from the missing dose/water). Environment renders blank and notes
-    // shows a "No notes..." placeholder — so a 7th/8th dash means a regression.
-    expect(table.getAllByText('-')).toHaveLength(6)
+    // Exactly five "-": days-off-roast, dose, water, steep, and grind.
+    // Environment renders blank and notes shows a "No notes..." placeholder —
+    // so a 6th dash means a regression.
+    expect(table.getAllByText('-')).toHaveLength(5)
     expect(table.getByText('No notes...')).toBeTruthy()
   })
 

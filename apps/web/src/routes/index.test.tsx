@@ -148,14 +148,13 @@ describe('Dashboard', () => {
     expect(screen.queryByText(/Dialed-in Shots/i)).toBeNull()
   })
 
-  it('shows each shot with a hero ratio and core stats on the face', () => {
+  it('shows each shot with its core stats on the face', () => {
     renderDashboard('espresso', [makeRecentShot()])
 
     // Scope to the desktop table; the mobile card layout renders in parallel.
     const table = within(screen.getByRole('table'))
     expect(table.getByText('Ethiopia Guji')).toBeTruthy()
-    // Hero ratio is on the face — no expansion needed.
-    expect(table.getByText('1:2.0')).toBeTruthy()
+    // Core weights are on the face — no expansion needed.
     expect(table.getByText('18g')).toBeTruthy()
     expect(table.getByText('36g')).toBeTruthy()
     expect(table.getByText('28s')).toBeTruthy()
@@ -329,8 +328,6 @@ describe('Dashboard', () => {
     ).toBe('/pourover/new')
     const table = within(screen.getByRole('table'))
     expect(table.getByText('Colombia Huila')).toBeTruthy()
-    // Hero ratio is water:dose (300 / 18 = 16.7), on the face.
-    expect(table.getByText('1:16.7')).toBeTruthy()
     // The Method Variant shows for methods that have one.
     expect(table.getByText('Standard')).toBeTruthy()
   })

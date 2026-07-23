@@ -72,7 +72,7 @@ describe('PouroverBrewsSection', () => {
     expect(table.getByText('300g')).toBeTruthy()
   })
 
-  it('renders the recipe columns, water temp, and the derived ratio', () => {
+  it('renders the recipe columns and water temp', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
       makePouroverBrew({
@@ -93,8 +93,6 @@ describe('PouroverBrewsSection', () => {
     expect(table.getByText('165s')).toBeTruthy() // brew time
     expect(table.getByText('94°C')).toBeTruthy() // water temp
     expect(table.getByText('22')).toBeTruthy() // grind setting
-    // Ratio is water / dose = 300 / 18 ≈ 16.7, derived in the app.
-    expect(table.getByText('1:16.7')).toBeTruthy()
   })
 
   it('sorts by dose numerically (not lexicographically) on header click', () => {
@@ -186,7 +184,7 @@ describe('PouroverBrewsSection', () => {
     render(<PouroverBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Empty dose/water/brew/temp/grind/ratio render as "-"; empty notes show
+    // Empty dose/water/brew/temp/grind and days-off-roast render as "-"; empty notes show
     // the "No notes..." placeholder instead.
     expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(6)
     expect(table.getByText('No notes...')).toBeTruthy()
