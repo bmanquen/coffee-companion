@@ -4,6 +4,7 @@ import type { EspressoShotWithRelations } from '@/types'
 import {
   BrewDetails,
   brewExpanderColumn,
+  brewRatioColumn,
   dialedInCoffeeColumn,
 } from '@/components/brews/brew-details'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
@@ -13,37 +14,36 @@ import { formatBrewRatio } from '@/lib/brew-ratio'
 
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 
-// Face columns: the coffee (with dialed-in crosshair), a hero ratio, then the
-// core espresso stats. Grinder, device, days off roast and notes live in the
-// expander (BrewDetails).
+// The dial-in summary (see ADR-0002): coffee identity, then the levers you turn
+// dialing in espresso — grind, real weights (dose→yield), time — with a muted
+// ratio hint. Grinder, device, days off roast and notes live in the expander
+// (BrewDetails). On desktop these are scannable columns; on mobile they collapse
+// into the card's summary line, everything else revealed on expand.
 const columns = [
   dialedInCoffeeColumn<EspressoShotWithRelations>(),
-  columnHelper.display({
-    id: 'ratio',
-    header: 'Ratio',
-    // The hero metric — emphasised so it reads first against the muted stats.
-    cell: ({ row }) => (
-      <span className="font-semibold text-foreground">
-        {formatBrewRatio(row.original.dose, row.original.yield)}
-      </span>
-    ),
+  columnHelper.accessor('grindSetting', {
+    header: 'Grind',
+    cell: (info) => info.getValue() ?? '-',
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('dose', {
     header: 'Dose',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
+    meta: { cardSummary: true },
   }),
   columnHelper.accessor('yield', {
     header: 'Yield',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
+    meta: { cardSummary: true },
   }),
   columnHelper.accessor('time', {
     header: 'Time',
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
+    meta: { cardSummary: true },
   }),
-  columnHelper.accessor('grindSetting', {
-    header: 'Grind',
-    cell: (info) => info.getValue() ?? '-',
-  }),
+  brewRatioColumn<EspressoShotWithRelations>((row) =>
+    formatBrewRatio(row.dose, row.yield),
+  ),
   brewExpanderColumn<EspressoShotWithRelations>(),
 ]
 
@@ -64,7 +64,6 @@ export function EspressoBrewFeed() {
         <BrewDetails
           grinder={row.original.grinder}
           device={row.original.brewingDevice}
-          ratio={formatBrewRatio(row.original.dose, row.original.yield)}
           daysOffRoast={daysOffRoast(row.original.roastDate, row.original.createdAt)}
           notes={row.original.notes}
         />

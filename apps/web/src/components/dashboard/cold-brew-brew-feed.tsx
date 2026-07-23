@@ -4,6 +4,7 @@ import type { ColdBrewBrewWithRelations } from '@/types'
 import {
   BrewDetails,
   brewExpanderColumn,
+  brewRatioColumn,
   dialedInCoffeeColumn,
 } from '@/components/brews/brew-details'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
@@ -13,40 +14,37 @@ import { formatBrewRatio } from '@/lib/brew-ratio'
 
 const columnHelper = createColumnHelper<ColdBrewBrewWithRelations>()
 
-// Face columns: the coffee (with dialed-in crosshair), a hero water:dose ratio,
-// then the core cold brew stats — steep time reads in hours/minutes, not
-// seconds. Cold brew is methodless (ADR-0001), so there's no Method Variant
-// column. Grinder, device, Brew Environment, days off roast and notes live in
-// the expander (BrewDetails).
+// The dial-in summary (see ADR-0002): coffee identity, then the cold brew
+// levers — grind, real weights (dose→water), steep time (in hours/minutes, not
+// seconds) — with a muted ratio hint. Cold brew is methodless (ADR-0001), so no
+// Method Variant column. Grinder, device, Brew Environment, days off roast and
+// notes live in the expander (BrewDetails).
 const columns = [
   dialedInCoffeeColumn<ColdBrewBrewWithRelations>(),
-  columnHelper.display({
-    id: 'ratio',
-    header: 'Ratio',
-    // The hero metric — emphasised so it reads first against the muted stats.
-    cell: ({ row }) => (
-      <span className="font-semibold text-foreground">
-        {formatBrewRatio(row.original.dose, row.original.water)}
-      </span>
-    ),
+  columnHelper.accessor('grindSetting', {
+    header: 'Grind',
+    cell: (info) => info.getValue() ?? '-',
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('dose', {
     header: 'Dose',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
+    meta: { cardSummary: true },
   }),
   columnHelper.accessor('water', {
     header: 'Water',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
+    meta: { cardSummary: true },
   }),
   columnHelper.accessor('steepTime', {
     header: 'Steep',
     // Cold brew stores steep time as whole minutes, not seconds.
     cell: (info) => formatSteepMinutes(info.getValue()),
+    meta: { cardSummary: true },
   }),
-  columnHelper.accessor('grindSetting', {
-    header: 'Grind',
-    cell: (info) => info.getValue() ?? '-',
-  }),
+  brewRatioColumn<ColdBrewBrewWithRelations>((row) =>
+    formatBrewRatio(row.dose, row.water),
+  ),
   brewExpanderColumn<ColdBrewBrewWithRelations>(),
 ]
 
@@ -67,7 +65,6 @@ export function ColdBrewBrewFeed() {
         <BrewDetails
           grinder={row.original.grinder}
           device={row.original.brewingDevice}
-          ratio={formatBrewRatio(row.original.dose, row.original.water)}
           extra={
             row.original.brewEnvironment
               ? {

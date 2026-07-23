@@ -7,6 +7,7 @@ import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
+  getExpandedRowModel,
   getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
@@ -14,12 +15,14 @@ import {
 import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
+import { brewRatioColumn } from '@/components/brews/brew-details'
 import { BrewNotes } from '@/components/brews/brew-notes'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
+import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -136,22 +139,20 @@ const columns = [
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
     sortingFn: (a, b) =>
       Number(a.original.dose ?? 0) - Number(b.original.dose ?? 0),
+    meta: { cardSummary: true },
   }),
   columnHelper.accessor('yield', {
     header: 'Yield',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
     sortingFn: (a, b) =>
       Number(a.original.yield ?? 0) - Number(b.original.yield ?? 0),
+    meta: { cardSummary: true },
   }),
-  columnHelper.display({
-    id: 'ratio',
-    header: 'Ratio',
-    cell: ({ row }) => formatBrewRatio(row.original.dose, row.original.yield),
-    // Display columns aren't sortable in TanStack, so no sortingFn here.
-  }),
+  brewRatioColumn<Shot>((row) => formatBrewRatio(row.dose, row.yield)),
   columnHelper.accessor('time', {
     header: 'Time',
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
+    meta: { cardSummary: true },
   }),
   columnHelper.accessor('grinder.name', {
     header: 'Grinder',
@@ -162,6 +163,7 @@ const columns = [
   columnHelper.accessor('grindSetting', {
     header: 'Grind',
     cell: (info) => info.getValue() ?? '-',
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('notes', {
     header: 'Notes',
@@ -190,6 +192,7 @@ export function EspressoBrewsSection() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [coffeeId, setCoffeeId] = useState('')
+  const expansion = useAccordionExpansion()
 
   // Unique coffees that actually appear in the log, sorted by name.
   const coffeeOptions = useMemo(
@@ -213,12 +216,17 @@ export function EspressoBrewsSection() {
   const table = useReactTable({
     data: visibleShots,
     columns,
-    state: { sorting, globalFilter },
+    // Mobile cards collapse to a dial-in summary; expansion (accordion) reveals
+    // grinder, device, days off roast and notes. Desktop shows them as columns.
+    state: { sorting, globalFilter, expanded: expansion.expanded },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onExpandedChange: expansion.onExpandedChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getRowCanExpand: () => true,
   })
 
   return (

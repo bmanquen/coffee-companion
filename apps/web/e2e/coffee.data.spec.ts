@@ -18,7 +18,9 @@ test('create a coffee via the new-coffee form', async ({ page }) => {
   await page.getByRole('button', { name: 'Add', exact: true }).click()
 
   await expect(page).toHaveURL(/\/coffees$/)
-  await expect(page.getByText(name)).toBeVisible()
+  // .first(): the list renders a desktop table row and a mobile card, so the
+  // name appears twice in the DOM.
+  await expect(page.getByText(name).first()).toBeVisible()
 })
 
 // Edits a coffee through the edit route. Creates its own coffee first (unique
@@ -31,10 +33,10 @@ test('edit a coffee updates its name in the list', async ({ page }) => {
   await page.getByPlaceholder('Name').fill(name)
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/coffees$/)
-  await expect(page.getByText(name)).toBeVisible()
+  await expect(page.getByText(name).first()).toBeVisible()
 
-  // Open the edit form from that coffee's card and rename it.
-  const card = page.locator('[data-slot="card"]', { hasText: name })
+  // Open the edit form from that coffee's desktop table row and rename it.
+  const card = page.locator('tr', { hasText: name })
   await card.getByRole('button', { name: 'Edit coffee' }).click()
   await expect(page.getByRole('heading', { name: 'Edit Coffee' })).toBeVisible()
 
@@ -42,7 +44,7 @@ test('edit a coffee updates its name in the list', async ({ page }) => {
   await page.getByRole('button', { name: 'Save' }).click()
 
   await expect(page).toHaveURL(/\/coffees$/)
-  await expect(page.getByText(updated)).toBeVisible()
+  await expect(page.getByText(updated).first()).toBeVisible()
   // The original name no longer appears on its own.
   await expect(page.getByText(name, { exact: true })).toHaveCount(0)
 })
@@ -56,9 +58,9 @@ test('delete a coffee removes it from the list', async ({ page }) => {
   await page.getByPlaceholder('Name').fill(name)
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/coffees$/)
-  await expect(page.getByText(name)).toBeVisible()
+  await expect(page.getByText(name).first()).toBeVisible()
 
-  const card = page.locator('[data-slot="card"]', { hasText: name })
+  const card = page.locator('tr', { hasText: name })
   await card.getByRole('button', { name: 'Delete coffee' }).click()
 
   // Confirm in the dialog (its button is named exactly "Delete", distinct from
