@@ -2,12 +2,14 @@ import { createColumnHelper } from '@tanstack/react-table'
 import { ChevronDown, Crosshair } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// The expandable detail region shared by every dashboard brew card, revealed
-// when a card is expanded. Holds the fields demoted out of the minimal
-// summary: grinder, device, days off roast, notes, and the one method-specific
-// `extra` slot (Water temp for pour over/french press, Environment for cold
-// brew; espresso and aeropress omit it). The dial-in summary already carries
-// grind, weights and time (see ADR-0002), so none of those repeat here.
+// The expandable detail region shared by every brew surface — the dashboard
+// feeds and the Brews-page method sections alike — revealed when a card or a
+// desktop table row is expanded (see ADR-0003: desktop tables mirror the card's
+// summary/expander split). Holds the fields demoted out of the minimal summary:
+// grinder, device, days off roast, notes, and the one method-specific `extra`
+// slot (Water temp for pour over/french press, Environment for cold brew;
+// espresso and aeropress omit it). The dial-in summary already carries grind,
+// weights and time (see ADR-0002), so none of those repeat here.
 // `daysOffRoast` undefined -> its row is hidden.
 export function BrewDetails({
   grinder,
@@ -83,8 +85,9 @@ export function dialedInCoffeeColumn<
   })
 }
 
-// The chevron expander column shared by every dashboard brew card. Desktop uses
-// this column; the mobile card renders its own toggle (hence cardHidden).
+// The chevron expander column shared by every expandable brew surface (dashboard
+// feeds and the Brews-page sections). Desktop uses this column; the mobile card
+// renders its own toggle (hence cardHidden).
 export function brewExpanderColumn<T>() {
   return createColumnHelper<T>().display({
     id: 'expander',

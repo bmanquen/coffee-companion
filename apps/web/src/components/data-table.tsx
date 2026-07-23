@@ -339,7 +339,17 @@ export function DataTable<T>({
                     }
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
+                      <TableCell
+                        key={cell.id}
+                        // Control cells (actions, dialed-in toggle) stop the
+                        // click so activating them doesn't also toggle the
+                        // row's expansion — mirrors the mobile card (above).
+                        onClick={
+                          cell.column.columnDef.meta?.cardHideLabel
+                            ? (e) => e.stopPropagation()
+                            : undefined
+                        }
+                      >
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext(),
