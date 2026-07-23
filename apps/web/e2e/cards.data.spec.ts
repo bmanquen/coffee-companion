@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import type { Locator } from '@playwright/test'
 
 // The expandable-card system at runtime (behaviours jsdom can't verify: CSS
 // breakpoints, tap-to-expand, accordion single-open). Runs under authed-data.
@@ -14,7 +15,7 @@ const mobileCards = 'div.lg\\:hidden > div.rounded-lg.border'
 // The collapsible detail region is a grid-rows wrapper that clips to zero height
 // when collapsed. Playwright's element visibility ignores ancestor overflow
 // clipping, so we measure the region's actual height instead.
-const regionHeight = async (card: import('@playwright/test').Locator) => {
+const regionHeight = async (card: Locator) => {
   const box = await card.locator('[class*="grid-rows-"]').boundingBox()
   return box?.height ?? 0
 }
