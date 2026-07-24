@@ -16,7 +16,10 @@ import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { FrenchpressBrewWithRelations } from '@/types'
-import { BrewNotes } from '@/components/brews/brew-notes'
+import {
+  BrewDetails,
+  brewExpanderColumn,
+} from '@/components/brews/brew-details'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
@@ -104,6 +107,10 @@ function ActionsCell({ row }: CellContext<Brew, unknown>) {
   )
 }
 
+// The dial-in summary (see ADR-0002): coffee identity, the Method Variant, then
+// the french press levers — Grind · Dose · Water · Steep. Grinder, device, water
+// temp, days off roast and notes are demoted to the expander (BrewDetails),
+// reached on both the mobile card and the desktop sub-row (see ADR-0003).
 const columns = [
   columnHelper.display({
     id: 'dialedIn',
@@ -120,13 +127,10 @@ const columns = [
     header: 'Method',
     meta: { cardSummary: true },
   }),
-  columnHelper.accessor((row) => daysOffRoast(row.roastDate, row.createdAt), {
-    id: 'daysOffRoast',
-    header: 'Days off roast',
-    cell: (info) => (info.getValue() != null ? `${info.getValue()}d` : '-'),
-    sortingFn: (a, b) =>
-      (daysOffRoast(a.original.roastDate, a.original.createdAt) ?? -1) -
-      (daysOffRoast(b.original.roastDate, b.original.createdAt) ?? -1),
+  columnHelper.accessor('grindSetting', {
+    header: 'Grind',
+    cell: (info) => info.getValue() ?? '-',
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('dose', {
     header: 'Dose',
@@ -147,24 +151,6 @@ const columns = [
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  columnHelper.accessor('waterTemp', {
-    header: 'Temp',
-    cell: (info) => (info.getValue() ? `${info.getValue()}°C` : '-'),
-  }),
-  columnHelper.accessor('grinder.name', {
-    header: 'Grinder',
-  }),
-  columnHelper.accessor('grindSetting', {
-    header: 'Grind',
-    cell: (info) => info.getValue() ?? '-',
-    meta: { cardSummary: true, cardSummaryLabel: true },
-  }),
-  columnHelper.accessor('notes', {
-    header: 'Notes',
-    cell: (info) => <BrewNotes notes={info.getValue()} />,
-    enableSorting: false,
-    meta: { cardFullWidth: true },
-  }),
   columnHelper.display({
     id: 'actions',
     header: '',
@@ -172,6 +158,7 @@ const columns = [
     enableSorting: false,
     meta: { cardHideLabel: true },
   }),
+  brewExpanderColumn<Brew>(),
 ]
 
 // The French Press brew log — one tab of the /brews page. Mirrors the equipment
@@ -209,6 +196,9 @@ export function FrenchpressBrewsSection() {
   const table = useReactTable({
     data: visibleBrews,
     columns,
+    // Both layouts collapse to the dial-in summary; expansion (accordion)
+    // reveals grinder, device, water temp, days off roast and notes via
+    // BrewDetails — a card detail region on mobile, a desktop sub-row (ADR-0003).
     state: { sorting, globalFilter, expanded: expansion.expanded },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
@@ -254,6 +244,25 @@ export function FrenchpressBrewsSection() {
           </div>
           <DataTable
             table={table}
+            renderSubComponent={(row) => (
+              <BrewDetails
+                grinder={row.original.grinder}
+                device={row.original.brewingDevice}
+                extra={
+                  row.original.waterTemp != null
+                    ? {
+                        label: 'Water temp',
+                        value: `${row.original.waterTemp}°C`,
+                      }
+                    : undefined
+                }
+                daysOffRoast={daysOffRoast(
+                  row.original.roastDate,
+                  row.original.createdAt,
+                )}
+                notes={row.original.notes}
+              />
+            )}
             rowClassName={(row) =>
               row.original.isDialedIn
                 ? 'bg-primary/10 hover:bg-primary/15'
