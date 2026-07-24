@@ -12,6 +12,8 @@ import {
 } from '@tanstack/react-table'
 import { CoffeeIcon, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { CellContext } from '@tanstack/react-table'
+import { brewExpanderColumn } from '@/components/brews/brew-details'
+import { CoffeeDetails } from '@/components/coffees/coffee-details'
 import { DataTable } from '@/components/data-table'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
@@ -46,7 +48,9 @@ export const Route = createFileRoute('/_authenticated/coffees/')({
   component: Coffee,
 })
 
-// The rows come from coffee.getAll; this narrows to the fields the card uses.
+// The rows come from coffee.getAll; this narrows to the identity summary and the
+// detail fields the card/row render (everything below name is shown in the
+// CoffeeDetails expander).
 type CoffeeRow = {
   id: string
   name: string
@@ -138,10 +142,12 @@ function CoffeeActionsCell({ row }: CellContext<CoffeeRow, unknown>) {
   )
 }
 
-// Coffee cards follow the same summary/detail split as brews, but a coffee is
-// not a brew — its summary is identity (name · roaster · origin) rather than a
-// dial-in triangle (see ADR-0002). Process, roast level, varieties, notes and
-// the dialed-in espresso recipe live in the expander.
+// Coffee cards/rows follow the same summary/detail split as brews, but a coffee
+// is not a brew — its summary is identity (name · roaster · country · region)
+// rather than a dial-in triangle (see ADR-0002). Process, roast level,
+// varieties, the dialed-in espresso recipe and notes are demoted to the expander
+// (CoffeeDetails), reached on both the mobile card and the desktop sub-row (see
+// ADR-0003). The trailing chevron is desktop-only.
 const columns = [
   columnHelper.accessor('name', {
     header: 'Name',
@@ -165,33 +171,6 @@ const columns = [
     cell: (info) => info.getValue() || '-',
     meta: { cardSummary: true },
   }),
-  columnHelper.accessor((row) => row.process?.name ?? '', {
-    id: 'process',
-    header: 'Process',
-    cell: (info) => info.getValue() || '-',
-  }),
-  columnHelper.accessor((row) => row.roastLevel?.name ?? '', {
-    id: 'roastLevel',
-    header: 'Roast level',
-    cell: (info) => info.getValue() || '-',
-  }),
-  columnHelper.accessor((row) => row.varieties.map((v) => v.name).join(', '), {
-    id: 'varieties',
-    header: 'Varieties',
-    cell: (info) => info.getValue() || '-',
-    enableSorting: false,
-  }),
-  columnHelper.display({
-    id: 'dialedIn',
-    header: 'Dialed-in espresso',
-    cell: ({ row }) => formatDialedInShot(row.original.dialedInShot),
-  }),
-  columnHelper.accessor('notes', {
-    header: 'Notes',
-    cell: (info) => info.getValue() ?? '-',
-    enableSorting: false,
-    meta: { cardFullWidth: true },
-  }),
   columnHelper.display({
     id: 'actions',
     header: '',
@@ -199,9 +178,12 @@ const columns = [
     enableSorting: false,
     meta: { cardHideLabel: true },
   }),
+  // The shared chevron expander column (generic despite the name; see the
+  // planned rename in the brew-detail consolidation follow-up).
+  brewExpanderColumn<CoffeeRow>(),
 ]
 
-function Coffee() {
+export function Coffee() {
   'use no memo'
   const trpc = useTRPC()
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
@@ -211,8 +193,10 @@ function Coffee() {
   const table = useReactTable({
     data: coffees as Array<CoffeeRow>,
     columns,
-    // Mobile cards collapse to name · roaster · origin; expansion (accordion)
-    // reveals process, roast level, varieties, notes and the dialed-in recipe.
+    // Both layouts collapse to the identity summary; expansion (accordion)
+    // reveals process, roast level, varieties, the dialed-in recipe and notes
+    // via CoffeeDetails — a card detail region on mobile, a desktop sub-row
+    // (see ADR-0003).
     state: { expanded: expansion.expanded },
     onExpandedChange: expansion.onExpandedChange,
     getCoreRowModel: getCoreRowModel(),
@@ -257,7 +241,18 @@ function Coffee() {
         </Link>
       </div>
       <Card className="flex flex-col gap-4 w-full bg-white p-6">
-        <DataTable table={table} />
+        <DataTable
+          table={table}
+          renderSubComponent={(row) => (
+            <CoffeeDetails
+              process={row.original.process?.name ?? null}
+              roastLevel={row.original.roastLevel?.name ?? null}
+              varieties={row.original.varieties.map((v) => v.name)}
+              dialedInEspresso={formatDialedInShot(row.original.dialedInShot)}
+              notes={row.original.notes}
+            />
+          )}
+        />
       </Card>
     </div>
   )
