@@ -156,23 +156,20 @@ describe('EspressoBrewsSection', () => {
     ).toBeTruthy()
   })
 
-  it('sorts the other custom-sorted columns without error', () => {
+  it('sorts yield via its custom sortingFn without error', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
       makeRecentShot({
         id: 's1',
-        dose: '15',
         yield: '40',
-        roastDate: '2026-05-01',
         coffeeId: 'c1',
         coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
       }),
-      // Null yield/roast-date exercises the sortingFns' `?? 0` / `?? -1` paths.
+      // Null yield exercises the sortingFn's `?? 0` path. (Days-off-roast is no
+      // longer a sortable column — it lives in the expander now; see ADR-0003.)
       makeRecentShot({
         id: 's2',
-        dose: null,
         yield: null,
-        roastDate: null,
         coffeeId: 'c2',
         coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
       }),
@@ -181,10 +178,7 @@ describe('EspressoBrewsSection', () => {
     render(<EspressoBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Each click runs that column's custom sortingFn (days-off-roast / yield).
-    for (const header of ['Days off roast', 'Yield']) {
-      fireEvent.click(table.getByText(header))
-    }
+    fireEvent.click(table.getByText('Yield'))
     expect(table.getByText('Ethiopia Guji')).toBeTruthy()
     expect(table.getByText('Colombia Huila')).toBeTruthy()
   })
@@ -205,9 +199,9 @@ describe('EspressoBrewsSection', () => {
     render(<EspressoBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Empty dose/yield/time/grind and days-off-roast render as "-"; empty notes
-    // show the "No notes..." placeholder instead.
-    expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(5)
+    // Empty grind/dose/yield/time summary columns render as "-"; empty notes
+    // show the "No notes..." placeholder in the expander (BrewDetails).
+    expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(4)
     expect(table.getByText('No notes...')).toBeTruthy()
   })
 
@@ -368,6 +362,118 @@ describe('EspressoBrewsSection', () => {
       const [url, init] = fetchSpy.mock.calls[0]
       expect(String(url)).toContain('espressoShot.delete')
       expect(String(init?.body ?? '')).toContain('s1')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  // The detail region for a row: its sibling sub-row's animating grid-rows wrap
+  // (grid-rows-[1fr] open, grid-rows-[0fr] collapsed). Always in the DOM.
+  const detailRegionFor = (name: string): HTMLElement => {
+    const dataRow = within(screen.getByRole('table')).getByText(name).closest('tr')!
+    return dataRow.nextElementSibling!.querySelector(
+      '[class*="grid-rows-"]',
+    ) as HTMLElement
+  }
+
+  it('expands a desktop row on click to reveal the brew detail', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+      makeRecentShot({
+        id: 's1',
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        notes: 'tasted bright',
+      }),
+    ])
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+    const row = within(screen.getByRole('table'))
+      .getByText('Ethiopia Guji')
+      .closest('tr')!
+    const region = detailRegionFor('Ethiopia Guji')
+    expect(region.className).toContain('grid-rows-[0fr]')
+
+    fireEvent.click(row)
+
+    expect(region.className).toContain('grid-rows-[1fr]')
+    const detail = within(region)
+    expect(detail.getByText('Grinder')).toBeTruthy()
+    expect(detail.getByText('Device')).toBeTruthy()
+    expect(detail.getByText('Days off roast')).toBeTruthy()
+    expect(detail.getByText('tasted bright')).toBeTruthy()
+
+    fireEvent.click(row)
+    expect(region.className).toContain('grid-rows-[0fr]')
+  })
+
+  it('keeps only one desktop row expanded at a time (accordion)', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+      makeRecentShot({
+        id: 's1',
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      }),
+      makeRecentShot({
+        id: 's2',
+        coffeeId: 'c2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+      }),
+    ])
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    const row1 = table.getByText('Ethiopia Guji').closest('tr')!
+    const row2 = table.getByText('Colombia Huila').closest('tr')!
+    const region1 = detailRegionFor('Ethiopia Guji')
+    const region2 = detailRegionFor('Colombia Huila')
+
+    fireEvent.click(row1)
+    expect(region1.className).toContain('grid-rows-[1fr]')
+
+    fireEvent.click(row2)
+    expect(region2.className).toContain('grid-rows-[1fr]')
+    expect(region1.className).toContain('grid-rows-[0fr]')
+  })
+
+  it('does not expand the row when a control is activated', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+        makeRecentShot({
+          id: 's1',
+          isDialedIn: false,
+          coffeeId: 'c1',
+          coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        }),
+      ])
+
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+      const table = within(screen.getByRole('table'))
+      const region = detailRegionFor('Ethiopia Guji')
+
+      // Dialed-in toggle, Edit link, and Delete trigger all sit in cardHideLabel
+      // control cells, whose clicks are stopped from bubbling to the row toggle.
+      fireEvent.click(
+        table.getByRole('button', { name: 'Mark Ethiopia Guji as dialed in' }),
+      )
+      expect(region.className).toContain('grid-rows-[0fr]')
+
+      fireEvent.click(table.getByRole('button', { name: 'Edit shot' }))
+      expect(region.className).toContain('grid-rows-[0fr]')
+
+      fireEvent.click(table.getByRole('button', { name: 'Delete shot' }))
+      expect(region.className).toContain('grid-rows-[0fr]')
     } finally {
       fetchSpy.mockRestore()
     }

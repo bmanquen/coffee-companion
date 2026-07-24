@@ -15,7 +15,10 @@ import {
 import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
-import { BrewNotes } from '@/components/brews/brew-notes'
+import {
+  BrewDetails,
+  brewExpanderColumn,
+} from '@/components/brews/brew-details'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
@@ -112,6 +115,11 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
   )
 }
 
+// The dial-in summary (see ADR-0002): coffee identity, then the levers you turn
+// dialing in — Grind · Dose · Yield · Time. Grinder, device, days off roast and
+// notes are demoted to the expander (BrewDetails), reached on both the mobile
+// card and the desktop sub-row (see ADR-0003). Leading dialed-in toggle and
+// trailing edit/delete are cardHideLabel controls; the chevron is desktop-only.
 const columns = [
   columnHelper.display({
     id: 'dialedIn',
@@ -124,13 +132,10 @@ const columns = [
     header: 'Coffee',
     meta: { cardTitle: true },
   }),
-  columnHelper.accessor((row) => daysOffRoast(row.roastDate, row.createdAt), {
-    id: 'daysOffRoast',
-    header: 'Days off roast',
-    cell: (info) => (info.getValue() != null ? `${info.getValue()}d` : '-'),
-    sortingFn: (a, b) =>
-      (daysOffRoast(a.original.roastDate, a.original.createdAt) ?? -1) -
-      (daysOffRoast(b.original.roastDate, b.original.createdAt) ?? -1),
+  columnHelper.accessor('grindSetting', {
+    header: 'Grind',
+    cell: (info) => info.getValue() ?? '-',
+    meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('dose', {
     header: 'Dose',
@@ -151,23 +156,6 @@ const columns = [
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  columnHelper.accessor('grinder.name', {
-    header: 'Grinder',
-  }),
-  columnHelper.accessor('brewingDevice.name', {
-    header: 'Device',
-  }),
-  columnHelper.accessor('grindSetting', {
-    header: 'Grind',
-    cell: (info) => info.getValue() ?? '-',
-    meta: { cardSummary: true, cardSummaryLabel: true },
-  }),
-  columnHelper.accessor('notes', {
-    header: 'Notes',
-    cell: (info) => <BrewNotes notes={info.getValue()} />,
-    enableSorting: false,
-    meta: { cardFullWidth: true },
-  }),
   columnHelper.display({
     id: 'actions',
     header: '',
@@ -175,6 +163,7 @@ const columns = [
     enableSorting: false,
     meta: { cardHideLabel: true },
   }),
+  brewExpanderColumn<Shot>(),
 ]
 
 // The Espresso brew log — one tab of the /brews page. Mirrors the equipment
@@ -213,8 +202,9 @@ export function EspressoBrewsSection() {
   const table = useReactTable({
     data: visibleShots,
     columns,
-    // Mobile cards collapse to a dial-in summary; expansion (accordion) reveals
-    // grinder, device, days off roast and notes. Desktop shows them as columns.
+    // Both layouts collapse to the dial-in summary; expansion (accordion)
+    // reveals grinder, device, days off roast and notes via BrewDetails — a
+    // card detail region on mobile, a desktop sub-row (see ADR-0003).
     state: { sorting, globalFilter, expanded: expansion.expanded },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
@@ -260,6 +250,17 @@ export function EspressoBrewsSection() {
           </div>
           <DataTable
             table={table}
+            renderSubComponent={(row) => (
+              <BrewDetails
+                grinder={row.original.grinder}
+                device={row.original.brewingDevice}
+                daysOffRoast={daysOffRoast(
+                  row.original.roastDate,
+                  row.original.createdAt,
+                )}
+                notes={row.original.notes}
+              />
+            )}
             rowClassName={(row) =>
               row.original.isDialedIn
                 ? 'bg-primary/10 hover:bg-primary/15'
