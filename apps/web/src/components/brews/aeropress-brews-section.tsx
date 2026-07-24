@@ -16,21 +16,17 @@ import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { AeropressBrewWithRelations } from '@/types'
-import {
-  BrewDetails,
-  brewExpanderColumn,
-} from '@/components/brews/brew-details'
+import { renderBrewDetails } from '@/components/brews/brew-details'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
-import { DataTable } from '@/components/data-table'
+import { DataTable, expanderColumn } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { useTRPC } from '@/integrations/trpc/react'
-import { daysOffRoast } from '@/lib/brew'
 
 type Brew = AeropressBrewWithRelations
 
@@ -155,7 +151,7 @@ const columns = [
     enableSorting: false,
     meta: { cardHideLabel: true },
   }),
-  brewExpanderColumn<Brew>(),
+  expanderColumn<Brew>(),
 ]
 
 // The AeroPress brew log — one tab of the /brews page. Mirrors the equipment
@@ -241,17 +237,7 @@ export function AeropressBrewsSection() {
           </div>
           <DataTable
             table={table}
-            renderSubComponent={(row) => (
-              <BrewDetails
-                grinder={row.original.grinder}
-                device={row.original.brewingDevice}
-                daysOffRoast={daysOffRoast(
-                  row.original.roastDate,
-                  row.original.createdAt,
-                )}
-                notes={row.original.notes}
-              />
-            )}
+            renderSubComponent={(row) => renderBrewDetails(row.original)}
             rowClassName={(row) =>
               row.original.isDialedIn
                 ? 'bg-primary/10 hover:bg-primary/15'

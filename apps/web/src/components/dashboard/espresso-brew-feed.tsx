@@ -2,13 +2,12 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
 import type { EspressoShotWithRelations } from '@/types'
 import {
-  BrewDetails,
-  brewExpanderColumn,
   dialedInCoffeeColumn,
+  renderBrewDetails,
 } from '@/components/brews/brew-details'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
+import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
-import { daysOffRoast } from '@/lib/brew'
 
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 
@@ -39,7 +38,7 @@ const columns = [
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  brewExpanderColumn<EspressoShotWithRelations>(),
+  expanderColumn<EspressoShotWithRelations>(),
 ]
 
 // The Espresso tab of the dashboard: the full espresso Shot history as a
@@ -55,14 +54,7 @@ export function EspressoBrewFeed() {
       title="Espresso"
       brews={shots}
       columns={columns}
-      renderDetails={(row) => (
-        <BrewDetails
-          grinder={row.original.grinder}
-          device={row.original.brewingDevice}
-          daysOffRoast={daysOffRoast(row.original.roastDate, row.original.createdAt)}
-          notes={row.original.notes}
-        />
-      )}
+      renderDetails={(row) => renderBrewDetails(row.original)}
       newTo="/espresso/new"
       logLabel="Log Shot"
       emptyMessage="No espresso shots yet."

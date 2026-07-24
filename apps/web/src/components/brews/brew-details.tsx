@@ -1,6 +1,7 @@
 import { createColumnHelper } from '@tanstack/react-table'
-import { ChevronDown, Crosshair } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Crosshair } from 'lucide-react'
+import { DetailList } from '@/components/detail-list'
+import { daysOffRoast as computeDaysOffRoast } from '@/lib/brew'
 
 // The expandable detail region shared by every brew surface — the dashboard
 // feeds and the Brews-page method sections alike — revealed when a card or a
@@ -38,27 +39,51 @@ export function BrewDetails({
       : []),
   ]
 
-  // Labels aligned in a fixed-width column so values line up. One field per row
-  // on the mobile card; two per row on the wider desktop-table sub-row (lg).
-  // Notes always spans the full width.
+  return <DetailList rows={rows} notes={notes} />
+}
+
+// The data a brew detail sub-row reads, kept structural so any surface's row type
+// (the Brews-page sections' narrow types and the dashboard feeds' *WithRelations)
+// satisfies it without adaptation.
+type BrewDetailData = {
+  grinder: { name: string; brand: string }
+  brewingDevice: { name: string; brand: string }
+  roastDate: string | null
+  createdAt: Date
+  notes: string | null
+}
+
+// Renders a brew's shared detail sub-row from any surface — a Brews-page section
+// or a dashboard feed. Centralises the grinder/device/days-off-roast/notes wiring
+// that is identical everywhere; `extra` carries the method's odd-one-out lever
+// (build it with waterTempExtra / brewEnvironmentExtra below).
+export function renderBrewDetails(
+  brew: BrewDetailData,
+  extra?: { label: string; value: string },
+) {
   return (
-    <dl className="grid grid-cols-1 gap-x-8 gap-y-1.5 text-sm text-left lg:grid-cols-2">
-      {rows.map((row) => (
-        <div key={row.label} className="flex gap-3">
-          <dt className="w-32 shrink-0 text-muted-foreground">{row.label}</dt>
-          <dd className="min-w-0 text-foreground">{row.value}</dd>
-        </div>
-      ))}
-      <div className="flex gap-3 lg:col-span-2">
-        <dt className="w-32 shrink-0 text-muted-foreground">Notes</dt>
-        <dd className="min-w-0 text-foreground whitespace-pre-wrap break-words">
-          {notes ?? (
-            <span className="text-muted-foreground/60">No notes...</span>
-          )}
-        </dd>
-      </div>
-    </dl>
+    <BrewDetails
+      grinder={brew.grinder}
+      device={brew.brewingDevice}
+      extra={extra}
+      daysOffRoast={computeDaysOffRoast(brew.roastDate, brew.createdAt)}
+      notes={brew.notes}
+    />
   )
+}
+
+// The Water temp lever (pour over / french press) — shown only when recorded.
+export function waterTempExtra(waterTemp: number | null) {
+  return waterTemp != null
+    ? { label: 'Water temp', value: `${waterTemp}°C` }
+    : undefined
+}
+
+// The Brew Environment lever (cold brew) — shown only when recorded.
+export function brewEnvironmentExtra(brewEnvironment: string | null) {
+  return brewEnvironment
+    ? { label: 'Brew Environment', value: brewEnvironment }
+    : undefined
 }
 
 // The "Coffee" column shared by the recent dashboard cards, prefixing the coffee
@@ -82,24 +107,5 @@ export function dialedInCoffeeColumn<
       </span>
     ),
     meta: { cardTitle: true },
-  })
-}
-
-// The chevron expander column shared by every expandable brew surface (dashboard
-// feeds and the Brews-page sections). Desktop uses this column; the mobile card
-// renders its own toggle (hence cardHidden).
-export function brewExpanderColumn<T>() {
-  return createColumnHelper<T>().display({
-    id: 'expander',
-    header: '',
-    cell: ({ row }) => (
-      <ChevronDown
-        className={cn(
-          'h-4 w-4 text-muted-foreground transition-transform',
-          row.getIsExpanded() && 'rotate-180',
-        )}
-      />
-    ),
-    meta: { cardHidden: true },
   })
 }

@@ -1,4 +1,4 @@
-import { flexRender } from '@tanstack/react-table'
+import { createColumnHelper, flexRender } from '@tanstack/react-table'
 import {
   ArrowDown,
   ArrowUp,
@@ -50,6 +50,26 @@ declare module '@tanstack/react-table' {
     // Omit this column from the card layout entirely.
     cardHidden?: boolean
   }
+}
+
+// The chevron expander column for an expandable DataTable — pairs with
+// renderSubComponent. Generic across entities (brews, coffees): the desktop
+// table shows this column; the mobile card renders its own toggle (hence
+// cardHidden).
+export function expanderColumn<T>() {
+  return createColumnHelper<T>().display({
+    id: 'expander',
+    header: '',
+    cell: ({ row }) => (
+      <ChevronDown
+        className={cn(
+          'h-4 w-4 text-muted-foreground transition-transform',
+          row.getIsExpanded() && 'rotate-180',
+        )}
+      />
+    ),
+    meta: { cardHidden: true },
+  })
 }
 
 // The card layout has no header row, so derive a label from the column's

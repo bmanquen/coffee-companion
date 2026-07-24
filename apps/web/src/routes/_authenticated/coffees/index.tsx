@@ -12,9 +12,8 @@ import {
 } from '@tanstack/react-table'
 import { CoffeeIcon, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { CellContext } from '@tanstack/react-table'
-import { brewExpanderColumn } from '@/components/brews/brew-details'
 import { CoffeeDetails } from '@/components/coffees/coffee-details'
-import { DataTable } from '@/components/data-table'
+import { DataTable, expanderColumn } from '@/components/data-table'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -178,9 +177,7 @@ const columns = [
     enableSorting: false,
     meta: { cardHideLabel: true },
   }),
-  // The shared chevron expander column (generic despite the name; see the
-  // planned rename in the brew-detail consolidation follow-up).
-  brewExpanderColumn<CoffeeRow>(),
+  expanderColumn<CoffeeRow>(),
 ]
 
 export function Coffee() {

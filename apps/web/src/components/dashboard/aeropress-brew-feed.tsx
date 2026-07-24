@@ -2,13 +2,12 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
 import type { AeropressBrewWithRelations } from '@/types'
 import {
-  BrewDetails,
-  brewExpanderColumn,
   dialedInCoffeeColumn,
+  renderBrewDetails,
 } from '@/components/brews/brew-details'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
+import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
-import { daysOffRoast } from '@/lib/brew'
 
 const columnHelper = createColumnHelper<AeropressBrewWithRelations>()
 
@@ -43,7 +42,7 @@ const columns = [
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  brewExpanderColumn<AeropressBrewWithRelations>(),
+  expanderColumn<AeropressBrewWithRelations>(),
 ]
 
 // The AeroPress tab of the dashboard: the full aeropress history as a
@@ -59,17 +58,7 @@ export function AeropressBrewFeed() {
       title="AeroPress"
       brews={brews}
       columns={columns}
-      renderDetails={(row) => (
-        <BrewDetails
-          grinder={row.original.grinder}
-          device={row.original.brewingDevice}
-          daysOffRoast={daysOffRoast(
-            row.original.roastDate,
-            row.original.createdAt,
-          )}
-          notes={row.original.notes}
-        />
-      )}
+      renderDetails={(row) => renderBrewDetails(row.original)}
       newTo="/aeropress/new"
       logLabel="Log Brew"
       emptyMessage="No aeropress brews yet."

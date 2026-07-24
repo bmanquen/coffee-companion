@@ -2,13 +2,13 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
 import type { FrenchpressBrewWithRelations } from '@/types'
 import {
-  BrewDetails,
-  brewExpanderColumn,
   dialedInCoffeeColumn,
+  renderBrewDetails,
+  waterTempExtra,
 } from '@/components/brews/brew-details'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
+import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
-import { daysOffRoast } from '@/lib/brew'
 
 const columnHelper = createColumnHelper<FrenchpressBrewWithRelations>()
 
@@ -43,7 +43,7 @@ const columns = [
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  brewExpanderColumn<FrenchpressBrewWithRelations>(),
+  expanderColumn<FrenchpressBrewWithRelations>(),
 ]
 
 // The French Press tab of the dashboard: the full french press history as a
@@ -59,22 +59,9 @@ export function FrenchpressBrewFeed() {
       title="French Press"
       brews={brews}
       columns={columns}
-      renderDetails={(row) => (
-        <BrewDetails
-          grinder={row.original.grinder}
-          device={row.original.brewingDevice}
-          extra={
-            row.original.waterTemp != null
-              ? { label: 'Water temp', value: `${row.original.waterTemp}°C` }
-              : undefined
-          }
-          daysOffRoast={daysOffRoast(
-            row.original.roastDate,
-            row.original.createdAt,
-          )}
-          notes={row.original.notes}
-        />
-      )}
+      renderDetails={(row) =>
+        renderBrewDetails(row.original, waterTempExtra(row.original.waterTemp))
+      }
       newTo="/frenchpress/new"
       logLabel="Log Brew"
       emptyMessage="No french press brews yet."

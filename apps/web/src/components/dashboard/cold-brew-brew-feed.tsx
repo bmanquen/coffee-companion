@@ -2,13 +2,14 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
 import type { ColdBrewBrewWithRelations } from '@/types'
 import {
-  BrewDetails,
-  brewExpanderColumn,
+  brewEnvironmentExtra,
   dialedInCoffeeColumn,
+  renderBrewDetails,
 } from '@/components/brews/brew-details'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
+import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
-import { daysOffRoast, formatSteepMinutes } from '@/lib/brew'
+import { formatSteepMinutes } from '@/lib/brew'
 
 const columnHelper = createColumnHelper<ColdBrewBrewWithRelations>()
 
@@ -40,7 +41,7 @@ const columns = [
     cell: (info) => formatSteepMinutes(info.getValue()),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-  brewExpanderColumn<ColdBrewBrewWithRelations>(),
+  expanderColumn<ColdBrewBrewWithRelations>(),
 ]
 
 // The Cold Brew tab of the dashboard: the full cold brew history as a
@@ -56,25 +57,12 @@ export function ColdBrewBrewFeed() {
       title="Cold Brew"
       brews={brews}
       columns={columns}
-      renderDetails={(row) => (
-        <BrewDetails
-          grinder={row.original.grinder}
-          device={row.original.brewingDevice}
-          extra={
-            row.original.brewEnvironment
-              ? {
-                  label: 'Brew Environment',
-                  value: row.original.brewEnvironment,
-                }
-              : undefined
-          }
-          daysOffRoast={daysOffRoast(
-            row.original.roastDate,
-            row.original.createdAt,
-          )}
-          notes={row.original.notes}
-        />
-      )}
+      renderDetails={(row) =>
+        renderBrewDetails(
+          row.original,
+          brewEnvironmentExtra(row.original.brewEnvironment),
+        )
+      }
       newTo="/cold-brew/new"
       logLabel="Log Brew"
       emptyMessage="No cold brews yet."
