@@ -74,8 +74,10 @@ describe('ColdBrewBrewsSection', () => {
     expect(table.getByText('500g')).toBeTruthy() // water
     // 1080 minutes -> 18 hours, formatted as "18h".
     expect(table.getByText('18h')).toBeTruthy()
-    expect(table.getByText('Fridge')).toBeTruthy() // brew environment
     expect(table.getByText('coarse')).toBeTruthy() // grind setting
+    // Brew Environment is no longer a summary column — it lives in the expander
+    // (BrewDetails `extra`), still present in the always-rendered sub-row.
+    expect(table.getByText('Fridge')).toBeTruthy() // brew environment
   })
 
   it('formats a sub-hour steep with minutes', () => {
@@ -108,9 +110,10 @@ describe('ColdBrewBrewsSection', () => {
     render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Exactly five "-": days-off-roast, dose, water, steep, and grind.
-    // Environment renders blank and notes shows a "No notes..." placeholder —
-    // so a 6th dash means a regression.
+    // Exactly five "-": the grind/dose/water/steep summary columns, plus the
+    // Days off roast row in the expander (BrewDetails). Brew Environment is
+    // omitted when unset (no `extra` row) and empty notes show the "No notes..."
+    // placeholder — so a 6th dash means a regression.
     expect(table.getAllByText('-')).toHaveLength(5)
     expect(table.getByText('No notes...')).toBeTruthy()
   })
@@ -351,6 +354,122 @@ describe('ColdBrewBrewsSection', () => {
       const [url, init] = fetchSpy.mock.calls[0]
       expect(String(url)).toContain('coldBrewBrew.delete')
       expect(String(init?.body ?? '')).toContain('cb1')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  // The detail region for a row: its sibling sub-row's animating grid-rows wrap
+  // (grid-rows-[1fr] open, grid-rows-[0fr] collapsed). Always in the DOM.
+  const detailRegionFor = (name: string): HTMLElement => {
+    const dataRow = within(screen.getByRole('table')).getByText(name).closest('tr')!
+    return dataRow.nextElementSibling!.querySelector(
+      '[class*="grid-rows-"]',
+    ) as HTMLElement
+  }
+
+  it('expands a desktop row on click to reveal the brew detail with environment', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+      makeColdBrewBrew({
+        id: 'cb1',
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        brewEnvironment: 'Fridge',
+        notes: 'tasted smooth',
+      }),
+    ])
+
+    render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+
+    const row = within(screen.getByRole('table'))
+      .getByText('Ethiopia Guji')
+      .closest('tr')!
+    const region = detailRegionFor('Ethiopia Guji')
+    expect(region.className).toContain('grid-rows-[0fr]')
+
+    fireEvent.click(row)
+
+    expect(region.className).toContain('grid-rows-[1fr]')
+    const detail = within(region)
+    expect(detail.getByText('Grinder')).toBeTruthy()
+    expect(detail.getByText('Device')).toBeTruthy()
+    expect(detail.getByText('Days off roast')).toBeTruthy()
+    // Cold Brew's method-specific expander field.
+    expect(detail.getByText('Brew Environment')).toBeTruthy()
+    expect(detail.getByText('Fridge')).toBeTruthy()
+    expect(detail.getByText('tasted smooth')).toBeTruthy()
+
+    fireEvent.click(row)
+    expect(region.className).toContain('grid-rows-[0fr]')
+  })
+
+  it('keeps only one desktop row expanded at a time (accordion)', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+      makeColdBrewBrew({
+        id: 'cb1',
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      }),
+      makeColdBrewBrew({
+        id: 'cb2',
+        coffeeId: 'c2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+      }),
+    ])
+
+    render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    const row1 = table.getByText('Ethiopia Guji').closest('tr')!
+    const row2 = table.getByText('Colombia Huila').closest('tr')!
+    const region1 = detailRegionFor('Ethiopia Guji')
+    const region2 = detailRegionFor('Colombia Huila')
+
+    fireEvent.click(row1)
+    expect(region1.className).toContain('grid-rows-[1fr]')
+
+    fireEvent.click(row2)
+    expect(region2.className).toContain('grid-rows-[1fr]')
+    expect(region1.className).toContain('grid-rows-[0fr]')
+  })
+
+  it('does not expand the row when a control is activated', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+        makeColdBrewBrew({
+          id: 'cb1',
+          isDialedIn: false,
+          coffeeId: 'c1',
+          coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        }),
+      ])
+
+      render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+
+      const table = within(screen.getByRole('table'))
+      const region = detailRegionFor('Ethiopia Guji')
+
+      // Dialed-in toggle, Edit link, and Delete trigger all sit in cardHideLabel
+      // control cells, whose clicks are stopped from bubbling to the row toggle.
+      fireEvent.click(
+        table.getByRole('button', { name: 'Mark Ethiopia Guji as dialed in' }),
+      )
+      expect(region.className).toContain('grid-rows-[0fr]')
+
+      fireEvent.click(table.getByRole('button', { name: 'Edit brew' }))
+      expect(region.className).toContain('grid-rows-[0fr]')
+
+      fireEvent.click(table.getByRole('button', { name: 'Delete brew' }))
+      expect(region.className).toContain('grid-rows-[0fr]')
     } finally {
       fetchSpy.mockRestore()
     }
