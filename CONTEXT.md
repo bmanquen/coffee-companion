@@ -5,6 +5,11 @@ several brewing methods so they can reproduce the results they like.
 
 ## Language
 
+**Coffee**:
+A roaster's product — a named offering, not a single bag. Buying the same offering
+twice is the same Coffee, so a Coffee is unique per user by roaster and name.
+_Avoid_: Bean, bag, lot
+
 **Brewing Method**:
 A distinct way of brewing coffee (Espresso, Pour Over, French Press, AeroPress, Cold
 Brew). Each method captures its own typed brew settings.
@@ -25,6 +30,27 @@ _Avoid_: Style, mode
 The flag marking a brew as the reference settings to reproduce for a coffee. At most
 one dialed-in brew per coffee per method variant; Cold Brew allows at most one per
 coffee (it has no variants).
+
+## Plans
+
+**Plan**:
+The tier of access a user has — Free, Pro, or Pro+. It governs how much of the user's
+own past stays readable, and how many Grinders, Brewing Devices, and AI calls they may
+use. It never limits how much they may log.
+_Avoid_: Tier, subscription level, membership
+
+**Shelf**:
+The Coffees whose Brews a user can read. Free holds five, ordered by most recently
+brewed; paid Plans hold the whole library. A Coffee off the Shelf is still fully
+usable — only its past is out of reach.
+_Avoid_: Active coffees, viewable coffees, library
+
+**Sealed Brew**:
+A Brew made unreadable because its Coffee fell off the Shelf. Sealing stamps the Brews
+a Coffee holds at that moment, and on Free it is permanent: brewing that Coffee again
+records new, readable Brews but never reopens the old ones — only upgrading does.
+Nothing is ever deleted (see ADR-0004).
+_Avoid_: Archived, hidden, locked, expired
 
 ## Cold Brew
 
