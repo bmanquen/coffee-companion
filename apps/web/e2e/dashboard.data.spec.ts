@@ -33,13 +33,13 @@ test('the public root redirects an authenticated visitor to the dashboard', asyn
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
 })
 
-test('the signed-in app keeps its navigation chrome after the move', async ({
+test('signed-in pages carry the navigation chrome, with Home on the dashboard', async ({
   page,
 }) => {
   await page.goto('/dashboard')
 
-  // The chrome moved from the root shell into the authenticated layout; it must
-  // still render on every signed-in page, with Home now pointing at /dashboard.
+  // The chrome hangs off the authenticated layout, so it renders on every
+  // signed-in page.
   await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible()
   await page.getByRole('button', { name: 'Open menu' }).click()
   await expect(

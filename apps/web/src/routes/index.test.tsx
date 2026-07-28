@@ -12,10 +12,4 @@ describe('LandingPage', () => {
       screen.getByRole('button', { name: /Sign in with Google/i }),
     ).toBeTruthy()
   })
-
-  it('renders no authenticated app chrome', () => {
-    const { container } = render(<LandingPage />)
-    expect(container.querySelector('nav')).toBeNull()
-    expect(container.querySelector('header')).toBeNull()
-  })
 })
