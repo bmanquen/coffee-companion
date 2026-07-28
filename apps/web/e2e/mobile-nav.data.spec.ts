@@ -14,7 +14,7 @@ test('small screens show the bottom tab bar and header, not the drawer trigger',
   page,
 }) => {
   await page.setViewportSize(MOBILE)
-  await page.goto('/')
+  await page.goto('/dashboard')
 
   const bottomNav = page.getByRole('navigation', { name: 'Primary' })
   await expect(bottomNav).toBeVisible()
@@ -28,7 +28,7 @@ test('tablet-width screens still use the mobile bottom tab bar (< lg)', async ({
   page,
 }) => {
   await page.setViewportSize(TABLET)
-  await page.goto('/')
+  await page.goto('/dashboard')
 
   const bottomNav = page.getByRole('navigation', { name: 'Primary' })
   await expect(bottomNav).toBeVisible()
@@ -40,7 +40,7 @@ test('large screens show the drawer trigger, not the mobile chrome', async ({
   page,
 }) => {
   await page.setViewportSize(DESKTOP)
-  await page.goto('/')
+  await page.goto('/dashboard')
 
   await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeHidden()

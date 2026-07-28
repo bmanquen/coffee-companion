@@ -31,7 +31,7 @@ describe('BottomNav', () => {
     render(<BottomNav />)
 
     const tabs: Array<[string, string]> = [
-      ['Home', '/'],
+      ['Home', '/dashboard'],
       ['Coffee', '/coffees'],
       ['Brews', '/brews'],
       ['Equipment', '/equipment'],

@@ -3,7 +3,7 @@ import { Bean, Coffee, Home, Wrench } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 
 const tabs = [
-  { to: '/', label: 'Home', icon: Home, exact: true },
+  { to: '/dashboard', label: 'Home', icon: Home, exact: true },
   { to: '/coffees', label: 'Coffee', icon: Bean, exact: false },
   { to: '/brews', label: 'Brews', icon: Coffee, exact: false },
   { to: '/equipment', label: 'Equipment', icon: Wrench, exact: false },

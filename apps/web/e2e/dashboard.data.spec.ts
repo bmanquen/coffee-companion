@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 // Runs in the `authed-data` project, which carries the e2e_auth bypass cookie
-// (see playwright.config.ts). When authenticated, the home route renders the
-// dashboard instead of the landing page.
+// (see playwright.config.ts). The dashboard has its own URL; the public root
+// redirects an authenticated visitor here rather than showing them the pitch.
 
 // The method switcher is a picker: a trigger button whose label is the current
 // method, opening a listbox of every method. Open it, then click a row.
@@ -15,8 +15,8 @@ async function pickMethod(page: Page, current: string, next: RegExp) {
   await page.getByRole('option', { name: next }).click()
 }
 
-test('authenticated home renders the dashboard', async ({ page }) => {
-  await page.goto('/')
+test('the dashboard renders at its own URL', async ({ page }) => {
+  await page.goto('/dashboard')
 
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
   await expect(
@@ -24,10 +24,33 @@ test('authenticated home renders the dashboard', async ({ page }) => {
   ).toHaveCount(0)
 })
 
+test('the public root redirects an authenticated visitor to the dashboard', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+})
+
+test('the signed-in app keeps its navigation chrome after the move', async ({
+  page,
+}) => {
+  await page.goto('/dashboard')
+
+  // The chrome moved from the root shell into the authenticated layout; it must
+  // still render on every signed-in page, with Home now pointing at /dashboard.
+  await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible()
+  await page.getByRole('button', { name: 'Open menu' }).click()
+  await expect(
+    page.getByRole('link', { name: 'Home', exact: true }),
+  ).toHaveAttribute('href', '/dashboard')
+})
+
 test('the picker lists every method alphabetically and switches feeds', async ({
   page,
 }) => {
-  await page.goto('/?method=espresso')
+  await page.goto('/dashboard?method=espresso')
 
   // Opening the picker lists all five methods alphabetically.
   await methodTrigger(page, 'Espresso').click()
@@ -57,7 +80,7 @@ test('the picker lists every method alphabetically and switches feeds', async ({
 })
 
 test('the picker is keyboard-navigable', async ({ page }) => {
-  await page.goto('/?method=espresso')
+  await page.goto('/dashboard?method=espresso')
 
   // Open the picker and drive it entirely from the keyboard: focus lands in the
   // Command, arrow to the next row, Enter to choose it.
@@ -74,7 +97,7 @@ test('the picker is keyboard-navigable', async ({ page }) => {
 test('deep-linking a method via the URL opens that method', async ({ page }) => {
   // Cold Brew has no seeded data, so the URL param — not recency — is what
   // selects it. The picker trigger reflects the selected method.
-  await page.goto('/?method=coldbrew')
+  await page.goto('/dashboard?method=coldbrew')
 
   await expect(methodTrigger(page, 'Cold Brew')).toBeVisible()
   await expect(page.getByRole('link', { name: /Log Brew/i })).toHaveAttribute(
@@ -84,14 +107,14 @@ test('deep-linking a method via the URL opens that method', async ({ page }) => 
 })
 
 test('choosing a method writes it to the URL', async ({ page }) => {
-  await page.goto('/?method=espresso')
+  await page.goto('/dashboard?method=espresso')
 
   await pickMethod(page, 'Espresso', /Cold Brew/)
   await expect(page).toHaveURL(/[?&]method=coldbrew\b/)
 })
 
 test('a reload preserves the selected method', async ({ page }) => {
-  await page.goto('/?method=pourover')
+  await page.goto('/dashboard?method=pourover')
   await expect(methodTrigger(page, 'Pour Over')).toBeVisible()
 
   await page.reload()
@@ -99,7 +122,7 @@ test('a reload preserves the selected method', async ({ page }) => {
 })
 
 test('the back button returns to the previous method', async ({ page }) => {
-  await page.goto('/?method=espresso')
+  await page.goto('/dashboard?method=espresso')
   await expect(methodTrigger(page, 'Espresso')).toBeVisible()
 
   await pickMethod(page, 'Espresso', /Cold Brew/)
