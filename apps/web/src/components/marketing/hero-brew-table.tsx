@@ -17,6 +17,7 @@ export function HeroBrewTable() {
     data: sampleShots,
     columns: espressoSummaryColumns,
     getCoreRowModel: getCoreRowModel(),
+    enableSorting: false,
   })
 
   return (
