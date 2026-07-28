@@ -25,7 +25,7 @@ test.describe('dashboard brew cards', () => {
     page,
   }) => {
     await page.setViewportSize(mobile)
-    await page.goto('/')
+    await page.goto('/dashboard')
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
 
     const cards = page.locator(mobileCards)
@@ -44,7 +44,7 @@ test.describe('dashboard brew cards', () => {
     page,
   }) => {
     await page.setViewportSize(mobile)
-    await page.goto('/')
+    await page.goto('/dashboard')
     const cards = page.locator(mobileCards)
     await expect(cards.first()).toBeVisible()
     test.skip((await cards.count()) < 2, 'needs at least two brews')
@@ -59,7 +59,7 @@ test.describe('dashboard brew cards', () => {
 
   test('desktop: a table row expands into a detail sub-row', async ({ page }) => {
     await page.setViewportSize(desktop)
-    await page.goto('/')
+    await page.goto('/dashboard')
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
 
     const table = page.locator('div.lg\\:block table')

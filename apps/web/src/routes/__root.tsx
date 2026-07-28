@@ -5,11 +5,6 @@ import {
   createRootRouteWithContext,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { useState } from 'react'
-
-import BottomNav from '../components/BottomNav'
-import MobileHeader from '../components/MobileHeader'
-import Navigation from '../components/Navigation'
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
@@ -51,23 +46,17 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   shellComponent: RootDocument,
 })
 
+// The bare document. Navigation chrome deliberately lives in the authenticated
+// layout, not here, so public routes render without furniture meant for users
+// who are already signed in. Each layout supplies its own <main>.
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const [navOpen, setNavOpen] = useState(false)
-
   return (
     <html lang="en">
       <head>
         <HeadContent />
       </head>
       <body>
-        <Navigation open={navOpen} setOpen={setNavOpen} />
-        <MobileHeader />
-        <main
-          className={`transition-all duration-300 ${navOpen ? 'lg:ml-64' : ''} px-3 pb-20 lg:pb-0`}
-        >
-          {children}
-        </main>
-        <BottomNav />
+        {children}
         <TanStackDevtools
           config={{
             position: 'bottom-right',

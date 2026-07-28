@@ -43,7 +43,7 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
         <nav className="flex flex-col gap-2 mt-10 h-full">
           <Link
             className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
-            to="/"
+            to="/dashboard"
             activeOptions={{ exact: true }}
             onClick={() => setOpen(false)}
           >
