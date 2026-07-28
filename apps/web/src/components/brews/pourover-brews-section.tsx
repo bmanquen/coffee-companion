@@ -198,6 +198,7 @@ export function PouroverBrewsSection() {
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     onExpandedChange: expansion.onExpandedChange,
+    enableSorting: false,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
