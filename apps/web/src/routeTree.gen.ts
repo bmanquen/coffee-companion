@@ -9,8 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as MarketingRouteImport } from './routes/_marketing'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as MarketingIndexRouteImport } from './routes/_marketing/index'
+import { Route as MarketingPricingRouteImport } from './routes/_marketing/pricing'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedEquipmentIndexRouteImport } from './routes/_authenticated/equipment/index'
 import { Route as AuthenticatedCoffeesIndexRouteImport } from './routes/_authenticated/coffees/index'
@@ -34,14 +36,23 @@ import { Route as AuthenticatedAeropressBrewIdEditRouteImport } from './routes/_
 import { Route as AuthenticatedEquipmentGrindersGrinderIdEditRouteImport } from './routes/_authenticated/equipment/grinders/$grinderId.edit'
 import { Route as AuthenticatedEquipmentBrewingDevicesDeviceIdEditRouteImport } from './routes/_authenticated/equipment/brewing-devices/$deviceId.edit'
 
+const MarketingRoute = MarketingRouteImport.update({
+  id: '/_marketing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
+const MarketingIndexRoute = MarketingIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => MarketingRoute,
+} as any)
+const MarketingPricingRoute = MarketingPricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => MarketingRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
@@ -172,8 +183,9 @@ const AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof MarketingIndexRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/pricing': typeof MarketingPricingRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/cold-brew/new': typeof AuthenticatedColdBrewNewRoute
@@ -197,8 +209,9 @@ export interface FileRoutesByFullPath {
   '/equipment/grinders/$grinderId/edit': typeof AuthenticatedEquipmentGrindersGrinderIdEditRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/': typeof MarketingIndexRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/pricing': typeof MarketingPricingRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/cold-brew/new': typeof AuthenticatedColdBrewNewRoute
@@ -223,9 +236,11 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/_marketing': typeof MarketingRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_marketing/pricing': typeof MarketingPricingRoute
+  '/_marketing/': typeof MarketingIndexRoute
   '/_authenticated/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/_authenticated/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/_authenticated/cold-brew/new': typeof AuthenticatedColdBrewNewRoute
@@ -253,6 +268,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
+    | '/pricing'
     | '/aeropress/new'
     | '/coffees/new'
     | '/cold-brew/new'
@@ -278,6 +294,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/dashboard'
+    | '/pricing'
     | '/aeropress/new'
     | '/coffees/new'
     | '/cold-brew/new'
@@ -301,9 +318,11 @@ export interface FileRouteTypes {
     | '/equipment/grinders/$grinderId/edit'
   id:
     | '__root__'
-    | '/'
     | '/_authenticated'
+    | '/_marketing'
     | '/_authenticated/dashboard'
+    | '/_marketing/pricing'
+    | '/_marketing/'
     | '/_authenticated/aeropress/new'
     | '/_authenticated/coffees/new'
     | '/_authenticated/cold-brew/new'
@@ -328,14 +347,21 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  MarketingRoute: typeof MarketingRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_marketing': {
+      id: '/_marketing'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof MarketingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -343,12 +369,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
+    '/_marketing/': {
+      id: '/_marketing/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof MarketingIndexRouteImport
+      parentRoute: typeof MarketingRoute
+    }
+    '/_marketing/pricing': {
+      id: '/_marketing/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof MarketingPricingRouteImport
+      parentRoute: typeof MarketingRoute
     }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
@@ -562,9 +595,23 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface MarketingRouteChildren {
+  MarketingPricingRoute: typeof MarketingPricingRoute
+  MarketingIndexRoute: typeof MarketingIndexRoute
+}
+
+const MarketingRouteChildren: MarketingRouteChildren = {
+  MarketingPricingRoute: MarketingPricingRoute,
+  MarketingIndexRoute: MarketingIndexRoute,
+}
+
+const MarketingRouteWithChildren = MarketingRoute._addFileChildren(
+  MarketingRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  MarketingRoute: MarketingRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
 }

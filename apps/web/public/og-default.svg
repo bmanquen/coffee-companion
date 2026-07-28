@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Coffee Companion — remember how you dialed it in">
+  <rect width="1200" height="630" fill="#f7f0e8"/>
+  <rect x="0" y="0" width="1200" height="10" fill="#c2703f"/>
+  <g fill="none" stroke="#c2703f" stroke-width="10" opacity="0.28">
+    <circle cx="1010" cy="315" r="180"/>
+    <circle cx="1010" cy="315" r="120"/>
+    <circle cx="1010" cy="315" r="60"/>
+  </g>
+  <g stroke="#c2703f" stroke-width="10" opacity="0.28" stroke-linecap="round">
+    <line x1="1010" y1="95" x2="1010" y2="155"/>
+    <line x1="1010" y1="475" x2="1010" y2="535"/>
+    <line x1="790" y1="315" x2="850" y2="315"/>
+    <line x1="1170" y1="315" x2="1230" y2="315"/>
+  </g>
+  <text x="90" y="250" font-family="Georgia, 'Times New Roman', serif" font-size="76" font-weight="bold" fill="#3b2a20">Coffee Companion</text>
+  <text x="90" y="340" font-family="Georgia, 'Times New Roman', serif" font-size="42" fill="#6b5546">Remember how you dialed it in.</text>
+  <text x="90" y="540" font-family="Georgia, 'Times New Roman', serif" font-size="30" fill="#8a7263">Espresso · Pour Over · French Press · AeroPress · Cold Brew</text>
+</svg>
