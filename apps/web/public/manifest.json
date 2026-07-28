@@ -1,6 +1,7 @@
 {
-  "short_name": "TanStack App",
-  "name": "Create TanStack App Sample",
+  "short_name": "Coffee Companion",
+  "name": "Coffee Companion — brewing logbook",
+  "description": "Log every brew across five brewing methods and keep the settings that worked.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -18,8 +19,8 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#c2703f",
+  "background_color": "#f7f0e8"
 }

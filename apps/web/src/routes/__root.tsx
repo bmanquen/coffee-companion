@@ -40,6 +40,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         rel: 'stylesheet',
         href: appCss,
       },
+      // The manifest shipped unreferenced until now, so its scaffold defaults
+      // were never anyone's app identity. Linked here so the corrected name and
+      // icons actually apply.
+      {
+        rel: 'manifest',
+        href: '/manifest.json',
+      },
     ],
   }),
 
