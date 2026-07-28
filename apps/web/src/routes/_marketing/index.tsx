@@ -2,6 +2,7 @@ import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { Crosshair, Scale, Timer } from 'lucide-react'
 import { HeroBrewTable } from '@/components/marketing/hero-brew-table'
 import { dashboardMethods } from '@/components/dashboard/methods'
+import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { authClient } from '@/lib/auth-client'
@@ -15,7 +16,9 @@ const DESCRIPTION =
 export const Route = createFileRoute('/_marketing/')({
   head: () => {
     const url = absoluteUrl('/')
-    const image = absoluteUrl('/og-default.svg')
+    // PNG, not the SVG it was rendered from: every major unfurler (X, Facebook,
+    // LinkedIn, Slack) drops an SVG og:image and shows a blank card.
+    const image = absoluteUrl('/og-default.png')
     return {
       meta: [
         { title: TITLE },
@@ -25,6 +28,8 @@ export const Route = createFileRoute('/_marketing/')({
         { property: 'og:description', content: DESCRIPTION },
         { property: 'og:url', content: url },
         { property: 'og:image', content: image },
+        { property: 'og:image:width', content: '1200' },
+        { property: 'og:image:height', content: '630' },
         { name: 'twitter:card', content: 'summary_large_image' },
         { name: 'twitter:title', content: TITLE },
         { name: 'twitter:description', content: DESCRIPTION },
@@ -61,7 +66,7 @@ const brewCaptures = [
   {
     icon: Scale,
     title: 'The weights',
-    body: 'Dose in, yield out — the ratio that decides whether a cup is thin or syrupy.',
+    body: 'Dose in, yield out — the real numbers, as you weighed them, not a figure derived from them.',
   },
   {
     icon: Timer,
@@ -82,9 +87,7 @@ export function MarketingHome({ onSignIn }: { onSignIn: () => void }) {
     <div className="flex flex-col gap-24 py-12">
       <section className="flex flex-col gap-8">
         <div className="flex max-w-2xl flex-col gap-5">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            Remember how you dialed it in
-          </h1>
+          <H1 className="text-4xl sm:text-5xl">Remember how you dialed it in</H1>
           <p className="text-lg text-muted-foreground">
             You pulled a great shot on Tuesday. By Friday the grind has moved,
             the bag is older, and you are guessing again. Coffee Companion keeps

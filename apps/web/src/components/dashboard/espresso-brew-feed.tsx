@@ -16,7 +16,7 @@ const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 // device, days off roast and notes live in the expander
 // (BrewDetails). On desktop these are scannable columns; on mobile they collapse
 // into the card's summary line, everything else revealed on expand.
-const columns = [
+export const espressoSummaryColumns = [
   dialedInCoffeeColumn<EspressoShotWithRelations>(),
   columnHelper.accessor('grindSetting', {
     header: 'Grind',
@@ -38,6 +38,12 @@ const columns = [
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
+]
+
+// The feed's own columns: the shared summary plus the expander that reveals
+// grinder, device, days off roast and notes.
+const columns = [
+  ...espressoSummaryColumns,
   expanderColumn<EspressoShotWithRelations>(),
 ]
 

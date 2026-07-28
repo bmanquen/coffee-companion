@@ -6,8 +6,11 @@ import type { EspressoShotWithRelations } from '@/types'
 //
 // Deliberately separate from src/test/factories.ts: these exist to be read by
 // strangers, so the numbers have to tell a believable dial-in story rather than
-// just satisfy an assertion — three Shots walking a grind finer until the ratio
-// lands, the last one marked Dialed-in.
+// just satisfy an assertion — three Shots walking the grind finer as the yield
+// tightens and the time stretches, the last one marked Dialed-in.
+//
+// Notes are left null: the hero renders no expander, so there is nowhere for
+// them to show, and unreachable copy only rots.
 const createdAt = new Date('2026-03-14T07:30:00.000Z')
 const updatedAt = createdAt
 
@@ -85,7 +88,6 @@ export const sampleShots: Array<EspressoShotWithRelations> = [
     yield: '37',
     time: 29,
     isDialedIn: true,
-    notes: 'Syrupy, ripe peach. This is the one — keep it here.',
   }),
   sampleShot({
     id: 'sample-shot-2',
@@ -93,7 +95,6 @@ export const sampleShots: Array<EspressoShotWithRelations> = [
     dose: '18',
     yield: '41',
     time: 24,
-    notes: 'Ran fast and thin. Going finer.',
   }),
   sampleShot({
     id: 'sample-shot-1',
@@ -101,6 +102,5 @@ export const sampleShots: Array<EspressoShotWithRelations> = [
     dose: '18',
     yield: '44',
     time: 21,
-    notes: 'Sour, gushed. Way too coarse.',
   }),
 ]

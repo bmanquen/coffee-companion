@@ -1,0 +1,14 @@
+<!-- Design source for logo192.png / logo512.png. Regenerate the PNGs from this
+     with a headless browser render at the target size. The crosshair is the
+     same mark the app uses for a Dialed-in Brew. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Coffee Companion">
+  <rect width="512" height="512" rx="96" fill="#f7f0e8"/>
+  <g fill="none" stroke="#c2703f" stroke-width="26" stroke-linecap="round">
+    <circle cx="256" cy="256" r="110"/>
+    <line x1="256" y1="92" x2="256" y2="150"/>
+    <line x1="256" y1="362" x2="256" y2="420"/>
+    <line x1="92" y1="256" x2="150" y2="256"/>
+    <line x1="362" y1="256" x2="420" y2="256"/>
+  </g>
+  <circle cx="256" cy="256" r="34" fill="#c2703f"/>
+</svg>

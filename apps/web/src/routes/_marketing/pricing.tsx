@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { H1 } from '@/components/typography/h1'
 import { absoluteUrl } from '@/lib/site-url'
 
 // Placeholder. The real pricing page — Plan catalogue, tier table, annual
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/_marketing/pricing')({
 function PricingPlaceholder() {
   return (
     <div className="py-12">
-      <h1 className="text-4xl font-bold tracking-tight">Pricing</h1>
+      <H1 className="text-4xl">Pricing</H1>
     </div>
   )
 }

@@ -50,15 +50,14 @@ test('marketing pages render none of the authenticated app chrome', async ({
   for (const path of ['/', '/pricing']) {
     await page.goto(path)
 
-    // The two pieces that would otherwise leak: the mobile header (a banner)
-    // and the desktop drawer trigger. The signed-in bottom tab bar hides itself
-    // without a session anyway, but assert it too so a future change that drops
-    // that guard is caught here.
+    // Exactly one banner — the marketing header. MobileHeader is also a
+    // <header>, so a leak shows up as two rather than as a missing element,
+    // which a toHaveCount(0) would never catch.
+    await expect(page.getByRole('banner')).toHaveCount(1)
     await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(0)
     await expect(
       page.getByRole('navigation', { name: 'Primary' }),
     ).toHaveCount(0)
-    await expect(page.getByText('Sign Out')).toHaveCount(0)
   }
 })
 
@@ -80,9 +79,10 @@ test('the home page carries its canonical URL and social card tags', async ({
     'content',
     /.+/,
   )
+  // Raster, not SVG — every major unfurler drops an SVG og:image.
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
     'content',
-    /^https?:\/\/.+/,
+    /^https?:\/\/.+\.(png|jpg|jpeg)$/,
   )
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
     'content',

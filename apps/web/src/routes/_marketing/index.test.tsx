@@ -98,12 +98,4 @@ describe('MarketingHome', () => {
     expect(table.getByText('Yield')).toBeTruthy()
     expect(table.getByLabelText('Dialed in')).toBeTruthy()
   })
-
-  it('renders none of the authenticated app chrome', () => {
-    const { container } = renderHome()
-    // The signed-in bottom tab bar is labelled "Primary"; the drawer trigger is
-    // "Open menu". Neither belongs on a page for people without accounts.
-    expect(container.querySelector('[aria-label="Primary"]')).toBeNull()
-    expect(screen.queryByRole('button', { name: /open menu/i })).toBeNull()
-  })
 })
