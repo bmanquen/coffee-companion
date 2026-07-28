@@ -41,7 +41,49 @@ test('the marketing header reaches pricing', async ({ page }) => {
     .getByRole('link', { name: 'Pricing' })
     .click()
   await expect(page).toHaveURL(/\/pricing$/)
-  await expect(page.getByRole('heading', { name: 'Pricing' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { level: 1, name: /keep your history/i }),
+  ).toBeVisible()
+})
+
+test('the pricing page renders standalone, with every Plan and a working toggle', async ({
+  page,
+}) => {
+  await page.goto('/pricing')
+
+  for (const plan of ['Free', 'Pro', 'Pro+']) {
+    await expect(
+      page.getByRole('heading', { level: 2, name: plan, exact: true }),
+    ).toBeVisible()
+  }
+
+  await expect(page.getByText('$4.99')).toBeVisible()
+  await page.getByRole('button', { name: 'Annual' }).click()
+  await expect(page.getByText('$44.99')).toBeVisible()
+  await expect(page.getByText('$4.99')).toHaveCount(0)
+})
+
+test('the pricing FAQ opens the sealing answer', async ({ page }) => {
+  await page.goto('/pricing')
+
+  // Radix mounts an answer only once opened — verified in a real browser
+  // because the animation and mount behaviour are what a visitor actually hits.
+  await page
+    .getByRole('button', { name: /what happens to my old Brews/i })
+    .click()
+  await expect(page.getByText(/your Shelf/i)).toBeVisible()
+  await expect(page.getByText(/Nothing is ever deleted/i)).toBeVisible()
+})
+
+test('the sitemap lists both marketing routes', async ({ page }) => {
+  const response = await page.request.get('/sitemap.xml')
+
+  expect(response.ok()).toBe(true)
+  expect(response.headers()['content-type']).toContain('xml')
+
+  const body = await response.text()
+  expect(body).toMatch(/<loc>https?:\/\/[^<]+\/<\/loc>/)
+  expect(body).toMatch(/<loc>https?:\/\/[^<]+\/pricing<\/loc>/)
 })
 
 test('marketing pages render none of the authenticated app chrome', async ({
