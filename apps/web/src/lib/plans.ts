@@ -40,10 +40,10 @@ export const plans: Array<Plan> = [
   {
     id: 'free',
     name: 'Free',
-    tagline: 'Log everything. Keep your five most recent Coffees.',
+    tagline: 'Log everything. Keep your five most recent coffees.',
     price: { monthly: 0, annual: 0 },
     sellable: true,
-    cta: 'Start logging',
+    cta: 'Save your first brew',
   },
   {
     id: 'pro',
@@ -69,7 +69,7 @@ export const planFeatures: Array<PlanFeature> = [
   {
     label: 'Brew history',
     values: {
-      free: 'Your 5 most-recently-brewed Coffees',
+      free: 'Your 5 most-recently-brewed coffees',
       pro: 'Everything',
       proPlus: 'Everything',
     },
@@ -78,8 +78,8 @@ export const planFeatures: Array<PlanFeature> = [
     label: 'Search',
     values: {
       free: 'Coffee names and roasters',
-      pro: 'Notes, origin, Brews, dial-ins',
-      proPlus: 'Notes, origin, Brews, dial-ins',
+      pro: 'Notes, origin, brews, dial-ins',
+      proPlus: 'Notes, origin, brews, dial-ins',
     },
   },
   {
@@ -104,9 +104,9 @@ export const planFeatures: Array<PlanFeature> = [
 // What every Plan gets, stated up front so the comparison table is read as a
 // list of differences rather than a list of what Free lacks.
 export const planIncludes: Array<string> = [
-  'Unlimited Coffees',
-  'Unlimited Brews',
-  'Every Brewing Method',
+  'Unlimited coffees',
+  'Unlimited brews',
+  'Every brewing method',
   'Cross-device sync',
 ]
 

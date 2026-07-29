@@ -5,6 +5,13 @@ several brewing methods so they can reproduce the results they like.
 
 ## Language
 
+Capitals mark defined terms. In the app and in these docs the whole language is
+capitalised; in public marketing prose only the invented terms — Dialed-in, Shelf,
+Sealed — keep their capitals, and the ordinary words (brew, coffee, brewing method,
+grinder, brewing device) are lowercased. A visitor has not read this glossary, so a
+capital there has to mean "this word has a definition" rather than "this word is ours".
+UI labels keep their casing either way. See ADR-0005.
+
 **Coffee**:
 A roaster's product — a named offering, not a single bag. Buying the same offering
 twice is the same Coffee, so a Coffee is unique per user by roaster and name.

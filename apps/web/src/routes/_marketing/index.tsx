@@ -1,7 +1,7 @@
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { Crosshair, Scale, Timer } from 'lucide-react'
-import { HeroBrewTable } from '@/components/marketing/hero-brew-table'
 import { dashboardMethods } from '@/components/dashboard/methods'
+import { HeroBrewTable } from '@/components/marketing/hero-brew-table'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -9,9 +9,9 @@ import { authClient } from '@/lib/auth-client'
 import { marketingHead } from '@/lib/marketing-head'
 import { getForwardedHeaders } from '@/lib/request-headers'
 
-const TITLE = 'Coffee Companion — remember how you dialed it in'
+const TITLE = 'Coffee Companion — coffee brew log and dial-in tracker'
 const DESCRIPTION =
-  'Log every Brew across five Brewing Methods, mark the one that worked, and come back to it. A brewing logbook for people who want the same cup twice.'
+  'Log every brew across espresso, pour over, French press, AeroPress and cold brew. Save the grind, dose and time that worked, so the next bag starts where the last one ended.'
 
 export const Route = createFileRoute('/_marketing/')({
   head: () =>
@@ -49,7 +49,7 @@ const brewCaptures = [
   {
     icon: Timer,
     title: 'Grind and time',
-    body: 'Your Grinder setting and how long it ran, on the Brewing Device you used.',
+    body: 'Your grinder setting and how long it ran, on the brewing device you used.',
   },
   {
     icon: Crosshair,
@@ -65,15 +65,18 @@ export function MarketingHome({ onSignIn }: { onSignIn: () => void }) {
     <div className="flex flex-col gap-24 py-12">
       <section className="flex flex-col gap-8">
         <div className="flex max-w-2xl flex-col gap-5">
-          <H1 className="text-4xl sm:text-5xl">Remember how you dialed it in</H1>
+          <H1 className="text-4xl sm:text-5xl">
+            Dial it in once. Never guess again.
+          </H1>
           <p className="text-lg text-muted-foreground">
-            You pulled a great shot on Tuesday. By Friday the grind has moved,
-            the bag is older, and you are guessing again. Coffee Companion keeps
-            the Brew that worked so you can pull it back.
+            Working out a new bag costs you a week of mornings and the beans
+            that went down the sink — then you buy it again and start over.
+            Coffee Companion holds the grind, dose, time and yield of the brew
+            that worked, so the second bag starts where the first one ended.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Button size="lg" onClick={onSignIn}>
-              Start logging — free
+              Save your first brew — free
             </Button>
             <Link
               to="/pricing"
@@ -89,11 +92,11 @@ export function MarketingHome({ onSignIn }: { onSignIn: () => void }) {
       <section className="flex flex-col gap-6">
         <div className="flex max-w-2xl flex-col gap-3">
           <h2 className="text-3xl font-bold tracking-tight">
-            One logbook, every Brewing Method
+            One place for every brewing method
           </h2>
           <p className="text-muted-foreground">
-            Each Brewing Method records the settings that actually matter to it
-            — a Cold Brew steeps for hours and has no shot time, an Espresso
+            Each brewing method records the settings that actually matter to it
+            — a cold brew steeps for hours and has no shot time, an espresso
             lives and dies by a two-second window. No lowest common denominator.
           </p>
         </div>
@@ -111,7 +114,7 @@ export function MarketingHome({ onSignIn }: { onSignIn: () => void }) {
 
       <section className="flex flex-col gap-6">
         <h2 className="max-w-2xl text-3xl font-bold tracking-tight">
-          What a Brew captures
+          The variables you would otherwise be trying to remember
         </h2>
         <div className="grid gap-4 sm:grid-cols-3">
           {brewCaptures.map(({ icon: Icon, title, body }) => (
@@ -127,13 +130,16 @@ export function MarketingHome({ onSignIn }: { onSignIn: () => void }) {
       <section className="flex flex-col gap-4">
         <div className="flex max-w-2xl flex-col gap-3">
           <h2 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
-            <Crosshair className="h-7 w-7 shrink-0 text-primary" aria-hidden="true" />
+            <Crosshair
+              className="h-7 w-7 shrink-0 text-primary"
+              aria-hidden="true"
+            />
             Mark the one that worked
           </h2>
           <p className="text-muted-foreground">
-            When a Brew finally tastes right, mark it{' '}
+            When a brew finally tastes right, mark it{' '}
             <strong className="font-semibold text-foreground">Dialed-in</strong>
-            . It becomes the reference for that Coffee — the settings you
+            . It becomes the reference for that coffee — the settings you
             reproduce next time, kept apart from the dozen attempts that got you
             there.
           </p>
@@ -142,10 +148,15 @@ export function MarketingHome({ onSignIn }: { onSignIn: () => void }) {
 
       <section className="flex flex-col items-start gap-5 border-t border-border pt-12">
         <h2 className="max-w-2xl text-3xl font-bold tracking-tight">
-          Stop re-learning the same coffee
+          Stop learning the same coffee twice
         </h2>
+        <p className="max-w-2xl text-muted-foreground">
+          Every bag you work out from scratch costs you the same week of
+          mornings and the same handful of throwaway cups. You only have to pay
+          that once.
+        </p>
         <Button size="lg" onClick={onSignIn}>
-          Start logging — free
+          Save your first brew — free
         </Button>
       </section>
     </div>

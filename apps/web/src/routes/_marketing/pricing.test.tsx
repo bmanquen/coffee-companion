@@ -23,7 +23,7 @@ const expected = {
   Free: {
     monthly: '$0',
     annual: '$0',
-    'Brew history': 'Your 5 most-recently-brewed Coffees',
+    'Brew history': 'Your 5 most-recently-brewed coffees',
     Search: 'Coffee names and roasters',
     Grinders: '1',
     'Brewing Devices': '3',
@@ -33,7 +33,7 @@ const expected = {
     monthly: '$4.99',
     annual: '$44.99',
     'Brew history': 'Everything',
-    Search: 'Notes, origin, Brews, dial-ins',
+    Search: 'Notes, origin, brews, dial-ins',
     Grinders: 'Unlimited',
     'Brewing Devices': 'Unlimited',
     'AI calls': '30 / month',
@@ -42,7 +42,7 @@ const expected = {
     monthly: '$7.99',
     annual: '$74.99',
     'Brew history': 'Everything',
-    Search: 'Notes, origin, Brews, dial-ins',
+    Search: 'Notes, origin, brews, dial-ins',
     Grinders: 'Unlimited',
     'Brewing Devices': 'Unlimited',
     'AI calls': 'Unlimited',
@@ -101,7 +101,7 @@ describe('PricingPage', () => {
     const { onCheckout, onNotify } = renderPricing()
 
     fireEvent.click(
-      planCard('Free').getByRole('button', { name: 'Start logging' }),
+      planCard('Free').getByRole('button', { name: 'Save your first brew' }),
     )
     expect(onCheckout).toHaveBeenCalledWith('free')
 
@@ -126,9 +126,7 @@ describe('PricingPage', () => {
 
     const aiLabel = planCard('Pro').getByText('AI calls')
     expect(within(aiLabel.closest('dt')!).getByText('Coming soon')).toBeTruthy()
-    expect(
-      within(aiLabel.closest('div')!).getByText('30 / month'),
-    ).toBeTruthy()
+    expect(within(aiLabel.closest('div')!).getByText('30 / month')).toBeTruthy()
   })
 
   it('marks Pro+ itself as not yet buyable', () => {
@@ -202,7 +200,7 @@ describe('PricingPage', () => {
 
   it('states that logging is never limited', () => {
     renderPricing()
-    expect(screen.getByText(/Unlimited Coffees/)).toBeTruthy()
-    expect(screen.getByText(/Unlimited Brews/)).toBeTruthy()
+    expect(screen.getByText(/Unlimited coffees/)).toBeTruthy()
+    expect(screen.getByText(/Unlimited brews/)).toBeTruthy()
   })
 })
