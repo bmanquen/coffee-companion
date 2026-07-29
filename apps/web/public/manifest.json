@@ -1,7 +1,7 @@
 {
   "short_name": "Coffee Companion",
-  "name": "Coffee Companion — brewing logbook",
-  "description": "Log every brew across five brewing methods and keep the settings that worked.",
+  "name": "Coffee Companion — coffee brew log and dial-in tracker",
+  "description": "Log every brew across five brewing methods. Save the grind, dose and time that worked, so the next bag starts where the last one ended.",
   "icons": [
     {
       "src": "favicon.ico",
