@@ -9,7 +9,7 @@
 // open, and the app's own Plan identifiers are what the rest of the codebase
 // should ever see.
 
-export type PlanId = 'free' | 'pro' | 'pro_plus'
+export type PlanId = 'free' | 'pro' | 'proPlus'
 
 export type BillingPeriod = 'monthly' | 'annual'
 
@@ -54,7 +54,7 @@ export const plans: Array<Plan> = [
     cta: 'Subscribe',
   },
   {
-    id: 'pro_plus',
+    id: 'proPlus',
     name: 'Pro+',
     tagline: 'Everything in Pro, plus unlimited AI when it lands.',
     price: { monthly: 7.99, annual: 74.99 },
@@ -71,7 +71,7 @@ export const planFeatures: Array<PlanFeature> = [
     values: {
       free: 'Your 5 most-recently-brewed Coffees',
       pro: 'Everything',
-      pro_plus: 'Everything',
+      proPlus: 'Everything',
     },
   },
   {
@@ -79,16 +79,16 @@ export const planFeatures: Array<PlanFeature> = [
     values: {
       free: 'Coffee names and roasters',
       pro: 'Notes, origin, Brews, dial-ins',
-      pro_plus: 'Notes, origin, Brews, dial-ins',
+      proPlus: 'Notes, origin, Brews, dial-ins',
     },
   },
   {
     label: 'Grinders',
-    values: { free: '1', pro: 'Unlimited', pro_plus: 'Unlimited' },
+    values: { free: '1', pro: 'Unlimited', proPlus: 'Unlimited' },
   },
   {
     label: 'Brewing Devices',
-    values: { free: '3', pro: 'Unlimited', pro_plus: 'Unlimited' },
+    values: { free: '3', pro: 'Unlimited', proPlus: 'Unlimited' },
   },
   {
     label: 'AI calls',
@@ -96,7 +96,7 @@ export const planFeatures: Array<PlanFeature> = [
     values: {
       free: '5 lifetime',
       pro: '30 / month',
-      pro_plus: 'Unlimited',
+      proPlus: 'Unlimited',
     },
   },
 ]
@@ -110,13 +110,13 @@ export const planIncludes: Array<string> = [
   'Cross-device sync',
 ]
 
+// Renders $0 rather than "Free" so a price never collides with a Plan name —
+// otherwise the Free card reads "Free / Free" and no test can tell the heading
+// from the amount.
 export function formatPrice(amount: number): string {
-  return amount === 0
-    ? 'Free'
-    : `$${amount.toFixed(2).replace(/\.00$/, '')}`
+  return `$${amount.toFixed(2).replace(/\.00$/, '')}`
 }
 
-// What a Plan costs per period, and the label that period is billed under.
 export function priceSuffix(period: BillingPeriod): string {
   return period === 'monthly' ? '/month' : '/year'
 }

@@ -6,7 +6,7 @@ import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { authClient } from '@/lib/auth-client'
-import { absoluteUrl } from '@/lib/site-url'
+import { marketingHead } from '@/lib/marketing-head'
 import { getForwardedHeaders } from '@/lib/request-headers'
 
 const TITLE = 'Coffee Companion — remember how you dialed it in'
@@ -14,30 +14,8 @@ const DESCRIPTION =
   'Log every Brew across five Brewing Methods, mark the one that worked, and come back to it. A brewing logbook for people who want the same cup twice.'
 
 export const Route = createFileRoute('/_marketing/')({
-  head: () => {
-    const url = absoluteUrl('/')
-    // PNG, not the SVG it was rendered from: every major unfurler (X, Facebook,
-    // LinkedIn, Slack) drops an SVG og:image and shows a blank card.
-    const image = absoluteUrl('/og-default.png')
-    return {
-      meta: [
-        { title: TITLE },
-        { name: 'description', content: DESCRIPTION },
-        { property: 'og:type', content: 'website' },
-        { property: 'og:title', content: TITLE },
-        { property: 'og:description', content: DESCRIPTION },
-        { property: 'og:url', content: url },
-        { property: 'og:image', content: image },
-        { property: 'og:image:width', content: '1200' },
-        { property: 'og:image:height', content: '630' },
-        { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:title', content: TITLE },
-        { name: 'twitter:description', content: DESCRIPTION },
-        { name: 'twitter:image', content: image },
-      ],
-      links: [{ rel: 'canonical', href: url }],
-    }
-  },
+  head: () =>
+    marketingHead({ title: TITLE, description: DESCRIPTION, path: '/' }),
   beforeLoad: async () => {
     const headers = await getForwardedHeaders()
     const { data: session } = await authClient.getSession({
