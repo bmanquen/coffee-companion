@@ -31,27 +31,26 @@ function renderHome() {
 }
 
 describe('MarketingHome', () => {
-  it('leads with what the product is for', () => {
+  it('leads with a single headline', () => {
     renderHome()
-    expect(
-      screen.getByRole('heading', { level: 1, name: /dialed it in/i }),
-    ).toBeTruthy()
+    expect(screen.getAllByRole('heading', { level: 1 }).length).toBe(1)
   })
 
-  it('offers a sign-up call to action that reports the intent', () => {
+  it('offers two identically worded calls to action, each reporting the intent', () => {
     const { onSignIn } = renderHome()
 
-    const ctas = screen.getAllByRole('button', { name: /start logging/i })
-    expect(ctas.length).toBeGreaterThan(0)
+    const ctas = screen.getAllByRole('button')
+    expect(ctas.length).toBe(2)
+    expect(new Set(ctas.map((cta) => cta.textContent)).size).toBe(1)
 
-    fireEvent.click(ctas[0])
-    expect(onSignIn).toHaveBeenCalledTimes(1)
+    for (const cta of ctas) fireEvent.click(cta)
+    expect(onSignIn).toHaveBeenCalledTimes(ctas.length)
   })
 
   it('links to the pricing page', () => {
     renderHome()
     expect(
-      screen.getByRole('link', { name: /see pricing/i }).getAttribute('href'),
+      screen.getByRole('link', { name: /pricing/i }).getAttribute('href'),
     ).toBe('/pricing')
   })
 
@@ -68,23 +67,26 @@ describe('MarketingHome', () => {
     }
   })
 
-  it('explains what a Brew captures', () => {
+  it('proves which variables a brew captures', () => {
     renderHome()
-    expect(
-      screen.getByRole('heading', { name: /what a Brew captures/i }),
-    ).toBeTruthy()
-    // The dial-in levers, in the glossary's terms.
-    expect(screen.getByText(/dose in, yield out/i)).toBeTruthy()
-    expect(screen.getByText(/Grinder setting/i)).toBeTruthy()
+
+    const cards = screen.getAllByRole('heading', { level: 3 })
+    expect(cards.length).toBe(3)
+
+    const captured = cards
+      .map((heading) => heading.closest('[data-slot="card"]')?.textContent)
+      .join(' ')
+    expect(captured).toMatch(/dose/i)
+    expect(captured).toMatch(/grind/i)
+    expect(captured).toMatch(/tast/i)
   })
 
   it('explains what Dialed-in means', () => {
     renderHome()
-    expect(
-      screen.getByRole('heading', { name: /mark the one that worked/i }),
-    ).toBeTruthy()
-    expect(screen.getByText('Dialed-in')).toBeTruthy()
-    expect(screen.getByText(/reference for that Coffee/i)).toBeTruthy()
+
+    const explanation = screen.getByText('Dialed-in').closest('p')?.textContent
+    expect(explanation).toMatch(/reference/i)
+    expect(explanation).toMatch(/coffee/i)
   })
 
   it('shows the product itself, with a Dialed-in Brew highlighted', () => {

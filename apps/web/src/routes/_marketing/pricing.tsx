@@ -23,7 +23,7 @@ import { marketingHead } from '@/lib/marketing-head'
 
 const TITLE = 'Pricing — Coffee Companion'
 const DESCRIPTION =
-  'Free keeps your five most-recently-brewed Coffees. Pro keeps everything, searchable, on as much gear as you own. Logging is never limited on any plan.'
+  'Free keeps your five most-recently-brewed coffees. Pro keeps everything, searchable, on as much gear as you own. Logging is never limited on any plan.'
 
 export const Route = createFileRoute('/_marketing/pricing')({
   head: () =>
@@ -51,29 +51,29 @@ function PricingRoute() {
 
 const faq: Array<{ question: string; answer: string }> = [
   {
-    question: 'What happens to my old Brews on the Free plan?',
+    question: 'What happens to my old brews on the Free plan?',
     answer:
-      'Free reads the Brews of your five most-recently-brewed Coffees — your Shelf. When a Coffee drops off the Shelf, the Brews it holds at that moment are Sealed: still yours, still stored, but not readable until you upgrade. Nothing is ever deleted, and upgrading reopens all of it.',
+      'Free reads the brews of your five most-recently-brewed coffees — your Shelf. When a coffee drops off the Shelf, the brews it holds at that moment are Sealed: still yours, still stored, but not readable until you upgrade. Nothing is ever deleted, and upgrading reopens all of it.',
   },
   {
-    question: 'Can I still brew a Coffee that has fallen off the Shelf?',
+    question: 'Can I still brew a coffee that has fallen off the Shelf?',
     answer:
-      'Yes. A Coffee off the Shelf stays fully usable — you can log new Brews against it whenever you like, and those Brews are readable straight away. What Free withholds is the past, not the Coffee.',
+      'Yes. A coffee off the Shelf stays fully usable — you can log new brews against it whenever you like, and those brews are readable straight away. What Free withholds is the past, not the coffee.',
   },
   {
     question: 'Does sealing ever undo itself?',
     answer:
-      'Not on Free. Brewing a Coffee again records new, readable Brews, but the ones sealed earlier stay sealed until you subscribe. Reading your own history back is the main thing a subscription buys.',
+      'Not on Free. Brewing a coffee again records new, readable brews, but the ones Sealed earlier stay Sealed until you subscribe. Reading your own history back is the main thing a subscription buys.',
   },
   {
     question: 'Is there a limit on how much I can log?',
     answer:
-      'No. Every plan logs unlimited Coffees and unlimited Brews across every Brewing Method. Free limits what you can read back, never what you can record.',
+      'No. Every plan logs unlimited coffees and unlimited brews across every brewing method. Free limits what you can read back, never what you can record.',
   },
   {
-    question: 'What happens to my extra Grinders if I downgrade?',
+    question: 'What happens to my extra grinders if I downgrade?',
     answer:
-      'You keep them. Equipment limits only stop you adding more while you are over them — nothing you already own is removed or hidden, because your existing Brews reference it.',
+      'You keep them. Equipment limits only stop you adding more while you are over them — nothing you already own is removed or hidden, because your existing brews reference it.',
   },
 ]
 
@@ -108,7 +108,9 @@ export function PricingPage({
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-semibold">{plan.name}</h2>
-                {!plan.sellable && <Badge variant="secondary">Coming soon</Badge>}
+                {!plan.sellable && (
+                  <Badge variant="secondary">Coming soon</Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground">{plan.tagline}</p>
             </div>
@@ -138,7 +140,10 @@ export function PricingPage({
                   <dt className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {feature.label}
                     {feature.comingSoon && (
-                      <Badge variant="outline" className="font-normal normal-case">
+                      <Badge
+                        variant="outline"
+                        className="font-normal normal-case"
+                      >
                         Coming soon
                       </Badge>
                     )}
@@ -158,7 +163,10 @@ export function PricingPage({
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {planIncludes.map((item) => (
             <li key={item} className="flex items-center gap-2 text-sm">
-              <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <Check
+                className="h-4 w-4 shrink-0 text-primary"
+                aria-hidden="true"
+              />
               {item}
             </li>
           ))}

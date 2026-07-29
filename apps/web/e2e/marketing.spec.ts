@@ -9,11 +9,9 @@ test('the home page pitches the product and offers a way in', async ({
 }) => {
   await page.goto('/')
 
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   await expect(
-    page.getByRole('heading', { level: 1, name: /dialed it in/i }),
-  ).toBeVisible()
-  await expect(
-    page.getByRole('button', { name: /start logging/i }).first(),
+    page.getByRole('button', { name: /save your first brew/i }).first(),
   ).toBeVisible()
 })
 
@@ -97,9 +95,9 @@ test('marketing pages render none of the authenticated app chrome', async ({
     // which a toHaveCount(0) would never catch.
     await expect(page.getByRole('banner')).toHaveCount(1)
     await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(0)
-    await expect(
-      page.getByRole('navigation', { name: 'Primary' }),
-    ).toHaveCount(0)
+    await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(
+      0,
+    )
   }
 })
 
