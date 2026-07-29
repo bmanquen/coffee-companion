@@ -19,35 +19,15 @@ import {
   plans,
   priceSuffix,
 } from '@/lib/plans'
-import { absoluteUrl } from '@/lib/site-url'
+import { marketingHead } from '@/lib/marketing-head'
 
 const TITLE = 'Pricing — Coffee Companion'
 const DESCRIPTION =
   'Free keeps your five most-recently-brewed Coffees. Pro keeps everything, searchable, on as much gear as you own. Logging is never limited on any plan.'
 
 export const Route = createFileRoute('/_marketing/pricing')({
-  head: () => {
-    const url = absoluteUrl('/pricing')
-    const image = absoluteUrl('/og-default.png')
-    return {
-      meta: [
-        { title: TITLE },
-        { name: 'description', content: DESCRIPTION },
-        { property: 'og:type', content: 'website' },
-        { property: 'og:title', content: TITLE },
-        { property: 'og:description', content: DESCRIPTION },
-        { property: 'og:url', content: url },
-        { property: 'og:image', content: image },
-        { property: 'og:image:width', content: '1200' },
-        { property: 'og:image:height', content: '630' },
-        { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:title', content: TITLE },
-        { name: 'twitter:description', content: DESCRIPTION },
-        { name: 'twitter:image', content: image },
-      ],
-      links: [{ rel: 'canonical', href: url }],
-    }
-  },
+  head: () =>
+    marketingHead({ title: TITLE, description: DESCRIPTION, path: '/pricing' }),
   component: PricingRoute,
 })
 
@@ -78,12 +58,12 @@ const faq: Array<{ question: string; answer: string }> = [
   {
     question: 'Can I still brew a Coffee that has fallen off the Shelf?',
     answer:
-      'Yes. A Sealed Coffee stays fully usable — you can log new Brews against it whenever you like, and those Brews are readable straight away. What Free withholds is the past, not the Coffee.',
+      'Yes. A Coffee off the Shelf stays fully usable — you can log new Brews against it whenever you like, and those Brews are readable straight away. What Free withholds is the past, not the Coffee.',
   },
   {
     question: 'Does sealing ever undo itself?',
     answer:
-      'Not on Free. Brewing a Coffee again records new, readable Brews, but the ones sealed earlier stay sealed until you subscribe. That is the whole of what a subscription buys: your own history back.',
+      'Not on Free. Brewing a Coffee again records new, readable Brews, but the ones sealed earlier stay sealed until you subscribe. Reading your own history back is the main thing a subscription buys.',
   },
   {
     question: 'Is there a limit on how much I can log?',
@@ -94,11 +74,6 @@ const faq: Array<{ question: string; answer: string }> = [
     question: 'What happens to my extra Grinders if I downgrade?',
     answer:
       'You keep them. Equipment limits only stop you adding more while you are over them — nothing you already own is removed or hidden, because your existing Brews reference it.',
-  },
-  {
-    question: 'Can I get my data out?',
-    answer:
-      'Yes, on any plan, including Free, and including Sealed Brews. Your records are yours whether or not you are paying.',
   },
 ]
 
@@ -142,11 +117,9 @@ export function PricingPage({
               <span className="text-3xl font-bold tracking-tight">
                 {formatPrice(plan.price[period])}
               </span>
-              {plan.price[period] > 0 && (
-                <span className="text-sm text-muted-foreground">
-                  {priceSuffix(period)}
-                </span>
-              )}
+              <span className="text-sm text-muted-foreground">
+                {priceSuffix(period)}
+              </span>
             </div>
 
             <Button
