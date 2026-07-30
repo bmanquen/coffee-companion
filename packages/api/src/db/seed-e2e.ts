@@ -9,6 +9,7 @@ import {
   coffees,
   espressoShots,
   grinders,
+  planGrants,
   roasters,
   user,
 } from './schema'
@@ -23,6 +24,13 @@ export async function seedE2eUser() {
     id: E2E_USER_WITH_DATA,
     name: 'E2E Tester',
     email: 'e2e@example.com',
+  })
+
+  // This user exercises equipment CRUD past what Free allows.
+  await db.insert(planGrants).values({
+    userId: E2E_USER_WITH_DATA,
+    planId: 'pro',
+    reason: 'e2e fixture',
   })
 
   const existing = await db

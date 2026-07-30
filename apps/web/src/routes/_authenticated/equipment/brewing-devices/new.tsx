@@ -7,12 +7,14 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertBrewingDevice } from '@coffee-companion/api/db/zod'
+import { PlanLimitNotice } from '@/components/plan-limit-notice'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
+import { planLimitMessage } from '@/lib/plan-limit'
 
 export const Route = createFileRoute(
   '/_authenticated/equipment/brewing-devices/new',
@@ -55,6 +57,8 @@ function NewBrewingDevice() {
     }),
   )
 
+  const limitMessage = planLimitMessage(createDevice.error)
+
   const defaultDevice: InsertBrewingDevice = {
     name: '',
     brand: '',
@@ -94,6 +98,7 @@ function NewBrewingDevice() {
         <form.AppField name="typeId">
           {(field) => <field.SearchSelect label="Type" {...type} />}
         </form.AppField>
+        {limitMessage && <PlanLimitNotice message={limitMessage} />}
         <Button type="submit">
           Add
           <Plus />

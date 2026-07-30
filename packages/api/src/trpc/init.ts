@@ -2,6 +2,7 @@ import { TRPCError, initTRPC } from '@trpc/server'
 import superjson from 'superjson'
 import { auth } from '../lib/auth'
 import { e2eBypassSession } from '../lib/e2e-auth'
+import { resolvePlan } from '../lib/plan'
 
 export interface TRPCContext {
   headers: Headers
@@ -30,6 +31,7 @@ export const authedProcedure = t.procedure.use(async ({ ctx, next }) => {
     ctx: {
       ...ctx,
       session,
+      plan: await resolvePlan(session.user.id),
     },
   })
 })
