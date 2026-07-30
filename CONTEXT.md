@@ -46,10 +46,25 @@ own past stays readable, and how many Grinders, Brewing Devices, and AI calls th
 use. It never limits how much they may log.
 _Avoid_: Tier, subscription level, membership
 
+**Subscription**:
+The recurring paid arrangement that grants a paid Plan for as long as it is paid. Not a
+synonym for Plan: the Plan is the tier of access, the Subscription is what pays for one,
+and a user can hold a paid Plan without a Subscription (see Grant).
+_Avoid_: Membership, billing, plan
+
+**Grant**:
+A paid Plan given without payment — a comp, a beta tester, a goodwill gesture after a
+support failure, a developer's own account. It carries the reason it was given and,
+optionally, when it ends. A Grant and a Subscription may both apply to one user, and the
+more generous of the two is that user's Plan.
+_Avoid_: Override, freebie, coupon, discount
+
 **Shelf**:
 The Coffees whose Brews a user can read. Free holds five, ordered by most recently
-brewed; paid Plans hold the whole library. A Coffee off the Shelf is still fully
-usable — only its past is out of reach.
+brewed; paid Plans hold the whole library. Its size is therefore a function of the Plan,
+so gaining or losing a paid Plan resizes it — and the Coffees that fall off a shrinking
+Shelf Seal (see ADR-0007). A Coffee off the Shelf is still fully usable — only its past
+is out of reach.
 _Avoid_: Active coffees, viewable coffees, library
 
 **Sealed Brew**:
