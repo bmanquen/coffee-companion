@@ -442,10 +442,30 @@ export const coldBrewBrews = pgTable(
   ],
 )
 
+export const planIdEnum = pgEnum('plan_id', ['free', 'pro', 'proPlus'])
+
+export const planGrants = pgTable(
+  'plan_grants',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .references(() => user.id, { onDelete: 'cascade' })
+      .notNull(),
+    planId: planIdEnum('plan_id').notNull(),
+    reason: text().notNull(),
+    // Timezone-aware, unlike the DB-written timestamps above: this one is
+    // written by the app and compared against now(), so a naive column would
+    // read a UTC value back as local wall time and expire on the wrong day.
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [index('plan_grants_user_idx').on(table.userId)],
+)
+
 // Relations
 
 export const relations = defineRelations(
-  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews },
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, planGrants },
   (r) => ({
     user: {
       sessions: r.many.session(),
@@ -470,6 +490,14 @@ export const relations = defineRelations(
       frenchpressMethods: r.many.frenchpressMethods(),
       frenchpressBrews: r.many.frenchpressBrews(),
       coldBrewBrews: r.many.coldBrewBrews(),
+      planGrants: r.many.planGrants(),
+    },
+    planGrants: {
+      user: r.one.user({
+        from: r.planGrants.userId,
+        to: r.user.id,
+        optional: false,
+      }),
     },
     countries: {
       user: r.one.user({ from: r.countries.userId, to: r.user.id }),

@@ -1,9 +1,10 @@
 import { afterAll, beforeAll } from 'vitest'
-import { inArray } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { db } from '../src/db'
-import { user } from '../src/db/schema'
+import { planGrants, user } from '../src/db/schema'
 import { createCallerFactory } from '../src/trpc/init'
 import { trpcRouter } from '../src/trpc/router'
+import type { PlanId } from '../src/lib/plan'
 
 // Shared setup for the per-router integration tests. Each router has its own
 // `<router>.integration.test.ts` file; they all authenticate through the e2e
@@ -26,6 +27,28 @@ export const callerFor = (userId: string) =>
 export const anonCaller = createCallerFactory(trpcRouter)({
   headers: new Headers(),
 })
+
+// Puts a user on a paid Plan without any payment, the way a comp or a
+// developer's own account does. Call it before any fixture that exercises a
+// paid Plan's allowances.
+export const grantPlan = async (
+  userId: string,
+  planId: PlanId,
+  { reason = 'integration test', expiresAt = null }: GrantOptions = {},
+) => {
+  await db.insert(planGrants).values({ userId, planId, reason, expiresAt })
+}
+
+type GrantOptions = { reason?: string; expiresAt?: Date | null }
+
+// Backdates every Grant a user holds, which is how a Plan lapses: no event
+// arrives, the Grant simply stops applying on the next request.
+export const expireGrants = async (userId: string) => {
+  await db
+    .update(planGrants)
+    .set({ expiresAt: new Date(Date.now() - 60_000) })
+    .where(eq(planGrants.userId, userId))
+}
 
 // Unique names sidestep cross-run collisions on globally-unique lookup columns;
 // scope rows to a per-file test user so they cascade-delete with that user.

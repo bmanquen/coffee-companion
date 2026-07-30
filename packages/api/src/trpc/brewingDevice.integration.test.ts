@@ -1,18 +1,32 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { UNKNOWN_UUID, callerFor, seedUsers, uniqFor } from '../../test/trpc'
+import {
+  UNKNOWN_UUID,
+  callerFor,
+  grantPlan,
+  seedUsers,
+  uniqFor,
+} from '../../test/trpc'
 
 const USER_A = 'device-user-a'
 const USER_B = 'device-user-b'
+// A user with no Grant, so on Free — the equipment limits apply to them alone.
+const USER_FREE = 'device-user-free'
 const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
+const asFree = callerFor(USER_FREE)
 const uniq = uniqFor(USER_A)
+const uniqFree = uniqFor(USER_FREE)
 
-seedUsers([USER_A, USER_B])
+seedUsers([USER_A, USER_B, USER_FREE])
 
 let typeId: string
 let deviceAId: string
 
 beforeAll(async () => {
+  // The CRUD cases below own more devices than Free allows.
+  await grantPlan(USER_A, 'pro')
+  await grantPlan(USER_B, 'pro')
+
   const type = await asA.brewingDeviceType.create({ name: uniq('Type') })
   typeId = type.id
 
@@ -133,5 +147,39 @@ describe('brewingDevice.delete', () => {
     )
     // The owner can still retrieve it afterward.
     expect((await asA.brewingDevice.getById(deviceAId)).id).toBe(deviceAId)
+  })
+})
+
+describe('brewingDevice plan limits', () => {
+  it('allows three brewing devices on Free and refuses the fourth', async () => {
+    for (const label of ['One', 'Two', 'Three']) {
+      await asFree.brewingDevice.create({
+        name: uniqFree(label),
+        brand: 'Brand',
+        typeId,
+      })
+    }
+
+    await expect(
+      asFree.brewingDevice.create({
+        name: uniqFree('Fourth'),
+        brand: 'Brand',
+        typeId,
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+
+    // The three they own are untouched.
+    expect((await asFree.brewingDevice.list()).length).toBe(3)
+  })
+
+  it('lets a granted paid Plan add devices past the Free limit', async () => {
+    await grantPlan(USER_FREE, 'pro')
+
+    const fourth = await asFree.brewingDevice.create({
+      name: uniqFree('Now allowed'),
+      brand: 'Brand',
+      typeId,
+    })
+    expect(fourth.userId).toBe(USER_FREE)
   })
 })

@@ -4,6 +4,7 @@ import z from 'zod'
 import { db } from '../db'
 import { brewingDevices } from '../db/schema'
 import { insertBrewingDeviceSchema } from '../db/zod'
+import { assertRoomForAnother } from '../lib/plan'
 import { authedProcedure, createTRPCRouter } from './init'
 
 export const brewingDeviceRouter = createTRPCRouter({
@@ -31,6 +32,12 @@ export const brewingDeviceRouter = createTRPCRouter({
   create: authedProcedure
     .input(insertBrewingDeviceSchema)
     .mutation(async ({ ctx, input }) => {
+      await assertRoomForAnother(
+        ctx.plan,
+        'brewingDevices',
+        ctx.session.user.id,
+      )
+
       const [device] = await db
         .insert(brewingDevices)
         .values({ ...input, userId: ctx.session.user.id })
