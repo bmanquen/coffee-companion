@@ -1,7 +1,6 @@
-import { and, count, eq, gt, isNull, or, sql } from 'drizzle-orm'
-import { TRPCError } from '@trpc/server'
-import { db } from '../db'
-import { brewingDevices, grinders, planGrants } from '../db/schema'
+// The Plan catalogue: the identifiers, what each Plan allows, and how a limit
+// is worded. Deliberately free of database access so the web app can import it
+// and reason about limits before asking the server to refuse.
 
 export type PlanId = 'free' | 'pro' | 'proPlus'
 
@@ -16,65 +15,37 @@ const planName: Record<PlanId, string> = {
 export type GearResource = 'grinders' | 'brewingDevices'
 
 // null is unlimited.
-export const planLimits: Record<PlanId, Record<GearResource, number | null>> = {
+export type GearLimits = Record<GearResource, number | null>
+
+export const planLimits: Record<PlanId, GearLimits> = {
   free: { grinders: 1, brewingDevices: 3 },
   pro: { grinders: null, brewingDevices: null },
   proPlus: { grinders: null, brewingDevices: null },
 }
 
-const gear = {
-  grinders: { table: grinders, one: 'Grinder', many: 'Grinders' },
-  brewingDevices: {
-    table: brewingDevices,
-    one: 'Brewing Device',
-    many: 'Brewing Devices',
-  },
-} as const
+const gearLabel: Record<GearResource, { one: string; many: string }> = {
+  grinders: { one: 'Grinder', many: 'Grinders' },
+  brewingDevices: { one: 'Brewing Device', many: 'Brewing Devices' },
+}
 
-function mostGenerous(plans: Array<PlanId>): PlanId {
+export function mostGenerous(plans: Array<PlanId>): PlanId {
   return plans.reduce<PlanId>(
     (best, plan) => (rank.indexOf(plan) > rank.indexOf(best) ? plan : best),
     'free',
   )
 }
 
-// No role ever confers a Plan: a maintainer account has to be able to see
-// exactly what a Free user sees.
-export async function resolvePlan(userId: string): Promise<PlanId> {
-  const grants = await db
-    .select({ planId: planGrants.planId })
-    .from(planGrants)
-    .where(
-      and(
-        eq(planGrants.userId, userId),
-        or(isNull(planGrants.expiresAt), gt(planGrants.expiresAt, sql`now()`)),
-      ),
-    )
-
-  return mostGenerous(grants.map((grant) => grant.planId))
-}
-
-// Refuses the next addition once the Plan's limit is met. Never applied to what
-// a user already owns: their existing Brews reference that equipment.
-export async function assertRoomForAnother(
+// How a Plan's equipment limit is worded, wherever it is said — the server's
+// refusal and the app's warning before the user reaches it. Null when the Plan
+// holds as much as the user likes.
+export function gearLimitSentence(
   plan: PlanId,
   resource: GearResource,
-  userId: string,
-): Promise<void> {
+): string | null {
   const limit = planLimits[plan][resource]
-  if (limit === null) return
+  if (limit === null) return null
 
-  const { table, one, many } = gear[resource]
-  const [{ owned }] = await db
-    .select({ owned: count() })
-    .from(table)
-    .where(eq(table.userId, userId))
-  if (owned < limit) return
-
-  throw new TRPCError({
-    code: 'FORBIDDEN',
-    message: `${planName[plan]} holds ${limit} ${limit === 1 ? one : many}.${
-      plan === 'free' ? ' Subscribe to add more.' : ''
-    }`,
-  })
+  const label = limit === 1 ? gearLabel[resource].one : gearLabel[resource].many
+  const upgrade = plan === 'free' ? ' Subscribe to add more.' : ''
+  return `${planName[plan]} holds ${limit} ${label}.${upgrade}`
 }

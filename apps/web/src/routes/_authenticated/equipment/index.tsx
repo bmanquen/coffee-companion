@@ -12,10 +12,12 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
+import { gearLimitSentence } from '@coffee-companion/api/lib/plan'
 import { useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
+import { EquipmentAddAction } from '@/components/equipment-add-action'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -41,9 +43,13 @@ export const Route = createFileRoute('/_authenticated/equipment/')({
     context.queryClient.ensureQueryData(
       context.trpc.brewingDevice.list.queryOptions(),
     )
+    context.queryClient.ensureQueryData(context.trpc.plan.current.queryOptions())
   },
   component: EquipmentIndex,
 })
+
+const atGearLimit = (limit: number | null, owned: number) =>
+  limit !== null && owned >= limit
 
 type Grinder = {
   id: string
@@ -237,6 +243,9 @@ function GrindersSection() {
   'use no memo'
   const trpc = useTRPC()
   const { data: grinders } = useSuspenseQuery(trpc.grinder.list.queryOptions())
+  const { data: entitlement } = useSuspenseQuery(
+    trpc.plan.current.queryOptions(),
+  )
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -258,12 +267,15 @@ function GrindersSection() {
     <Card className="flex flex-col gap-4 w-full bg-white p-6">
       <div className="flex justify-between items-center w-full">
         <h2 className="text-lg font-semibold">Grinders</h2>
-        <Link to="/equipment/grinders/new">
-          <Button>
-            <Plus />
-            Add Grinder
-          </Button>
-        </Link>
+        <EquipmentAddAction
+          to="/equipment/grinders/new"
+          label="Add Grinder"
+          limitNote={
+            atGearLimit(entitlement.limits.grinders, grinders.length)
+              ? gearLimitSentence(entitlement.plan, 'grinders')
+              : null
+          }
+        />
       </div>
       {grinders.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -294,6 +306,9 @@ function BrewingDevicesSection() {
   const { data: devices } = useSuspenseQuery(
     trpc.brewingDevice.list.queryOptions(),
   )
+  const { data: entitlement } = useSuspenseQuery(
+    trpc.plan.current.queryOptions(),
+  )
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -315,12 +330,15 @@ function BrewingDevicesSection() {
     <Card className="flex flex-col gap-4 w-full bg-white p-6">
       <div className="flex justify-between items-center w-full">
         <h2 className="text-lg font-semibold">Brewing Devices</h2>
-        <Link to="/equipment/brewing-devices/new">
-          <Button>
-            <Plus />
-            Add Brewing Device
-          </Button>
-        </Link>
+        <EquipmentAddAction
+          to="/equipment/brewing-devices/new"
+          label="Add Brewing Device"
+          limitNote={
+            atGearLimit(entitlement.limits.brewingDevices, devices.length)
+              ? gearLimitSentence(entitlement.plan, 'brewingDevices')
+              : null
+          }
+        />
       </div>
       {devices.length === 0 ? (
         <p className="text-sm text-muted-foreground">
