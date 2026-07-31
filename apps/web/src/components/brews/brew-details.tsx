@@ -1,5 +1,6 @@
 import { createColumnHelper } from '@tanstack/react-table'
 import { Crosshair } from 'lucide-react'
+import { SealedBrewNotice } from '@/components/brews/sealed-brew-notice'
 import { DetailList } from '@/components/detail-list'
 import { daysOffRoast as computeDaysOffRoast } from '@/lib/brew'
 
@@ -46,11 +47,12 @@ export function BrewDetails({
 // (the Brews-page sections' narrow types and the dashboard feeds' *WithRelations)
 // satisfies it without adaptation.
 type BrewDetailData = {
-  grinder: { name: string; brand: string }
-  brewingDevice: { name: string; brand: string }
+  grinder: { name: string; brand: string } | null
+  brewingDevice: { name: string; brand: string } | null
   roastDate: string | null
   createdAt: Date
   notes: string | null
+  sealed?: boolean
 }
 
 // Renders a brew's shared detail sub-row from any surface — a Brews-page section
@@ -61,6 +63,12 @@ export function renderBrewDetails(
   brew: BrewDetailData,
   extra?: { label: string; value: string },
 ) {
+  // A Sealed Brew has no settings to reveal, so the detail region carries the
+  // way to reopen it instead.
+  if (brew.sealed || !brew.grinder || !brew.brewingDevice) {
+    return <SealedBrewNotice />
+  }
+
   return (
     <BrewDetails
       grinder={brew.grinder}

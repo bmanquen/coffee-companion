@@ -25,6 +25,8 @@ export function makeRecentShot(
 ): RecentShot {
   return {
     id: 's1',
+    sealed: false,
+    sealedAt: null,
     userId: 'u1',
     coffeeId: 'c1',
     grinderId: 'g1',
@@ -92,6 +94,7 @@ export function makeAeropressBrew(
 ): AeropressBrew {
   return {
     id: 'a1',
+    sealedAt: null,
     userId: 'u1',
     coffeeId: 'c1',
     grinderId: 'g1',
@@ -147,6 +150,7 @@ export function makePouroverBrew(
 ): PouroverBrew {
   return {
     id: 'p1',
+    sealedAt: null,
     userId: 'u1',
     coffeeId: 'c1',
     grinderId: 'g1',
@@ -203,6 +207,7 @@ export function makeFrenchpressBrew(
 ): FrenchpressBrew {
   return {
     id: 'f1',
+    sealedAt: null,
     userId: 'u1',
     coffeeId: 'c1',
     grinderId: 'g1',
@@ -261,6 +266,7 @@ export function makeColdBrewBrew(
 ): ColdBrewBrew {
   return {
     id: 'cb1',
+    sealedAt: null,
     userId: 'u1',
     coffeeId: 'c1',
     grinderId: 'g1',
