@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { planLimits } from '@coffee-companion/api/lib/plan'
-import type { GearResource, PlanId } from '@coffee-companion/api/lib/plan'
 import { planFeatures, plans } from './plans'
+import type { GearResource, PlanId } from '@coffee-companion/api/lib/plan'
 
 // The catalogue is what a visitor is sold; planLimits is what the server
 // enforces. These are separate sources on purpose — one is prose, the other is

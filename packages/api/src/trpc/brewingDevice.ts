@@ -4,7 +4,7 @@ import z from 'zod'
 import { db } from '../db'
 import { brewingDevices } from '../db/schema'
 import { insertBrewingDeviceSchema } from '../db/zod'
-import { assertRoomForAnother } from '../lib/plan'
+import { assertRoomForAnother } from '../lib/entitlement'
 import { authedProcedure, createTRPCRouter } from './init'
 
 export const brewingDeviceRouter = createTRPCRouter({

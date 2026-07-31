@@ -2,7 +2,7 @@ import { TRPCError, initTRPC } from '@trpc/server'
 import superjson from 'superjson'
 import { auth } from '../lib/auth'
 import { e2eBypassSession } from '../lib/e2e-auth'
-import { resolvePlan } from '../lib/plan'
+import { resolvePlan } from '../lib/entitlement'
 
 export interface TRPCContext {
   headers: Headers

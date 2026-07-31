@@ -4,7 +4,7 @@ import z from 'zod'
 import { db } from '../db'
 import { grinders } from '../db/schema'
 import { insertGrinderSchema } from '../db/zod'
-import { assertRoomForAnother } from '../lib/plan'
+import { assertRoomForAnother } from '../lib/entitlement'
 import { authedProcedure, createTRPCRouter } from './init'
 
 export const grinderRouter = createTRPCRouter({
