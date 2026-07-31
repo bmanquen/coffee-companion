@@ -273,7 +273,7 @@ describe('espressoShot.getAll / getRecent', () => {
     expect(shots.length).toBeGreaterThanOrEqual(1)
     expect(shots.every((s) => s.userId === USER_A)).toBe(true)
     expect(shots[0].coffee).toBeTruthy()
-    expect(shots[0].brewingDevice.type).toBeTruthy()
+    expect(shots[0].brewingDevice?.type).toBeTruthy()
   })
 
   it('paginates with getRecent', async () => {

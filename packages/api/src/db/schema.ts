@@ -268,6 +268,9 @@ const brewBase = {
   grindSetting: text('grind_setting'),
   notes: text(),
   isDialedIn: boolean('is_dialed_in').notNull().default(false),
+  // Timezone-aware for the same reason plan_grants.expires_at is: the app
+  // writes it and compares it against now().
+  sealedAt: timestamp('sealed_at', { withTimezone: true }),
   ...timestamps,
 }
 

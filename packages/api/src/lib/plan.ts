@@ -23,6 +23,14 @@ export const planLimits: Record<PlanId, GearLimits> = {
   proPlus: { grinders: null, brewingDevices: null },
 }
 
+// How many Coffees a Plan keeps readable, most recently brewed first. null is
+// the whole library.
+export const shelfSizes: Record<PlanId, number | null> = {
+  free: 5,
+  pro: null,
+  proPlus: null,
+}
+
 const gearLabel: Record<GearResource, { one: string; many: string }> = {
   grinders: { one: 'Grinder', many: 'Grinders' },
   brewingDevices: { one: 'Brewing Device', many: 'Brewing Devices' },

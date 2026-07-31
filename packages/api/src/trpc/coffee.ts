@@ -4,10 +4,13 @@ import z from 'zod'
 import { db } from '../db'
 import { coffees, espressoShots } from '../db/schema'
 import { insertCoffeeSchema } from '../db/zod'
+import { isSealed, reconcileSeals } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 export const coffeeRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
+    await reconcileSeals(ctx.session.user.id, ctx.plan)
+
     const rows = await db.query.coffees.findMany({
       where: { userId: ctx.session.user.id },
       orderBy: { updatedAt: 'desc' },
@@ -24,11 +27,14 @@ export const coffeeRouter = createTRPCRouter({
       },
     })
     return rows.map(
-      ({ espressoShots: dialedIn, coffeesVarieties, ...coffee }) => ({
-        ...coffee,
-        varieties: coffeesVarieties.map((cv) => cv.variety),
-        dialedInShot: dialedIn.at(0) ?? null,
-      }),
+      ({ espressoShots: dialedIn, coffeesVarieties, ...coffee }) => {
+        const shot = dialedIn.at(0) ?? null
+        return {
+          ...coffee,
+          varieties: coffeesVarieties.map((cv) => cv.variety),
+          dialedInShot: shot && !isSealed(shot, ctx.plan) ? shot : null,
+        }
+      },
     )
   }),
 

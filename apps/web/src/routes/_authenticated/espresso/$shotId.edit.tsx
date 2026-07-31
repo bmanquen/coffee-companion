@@ -68,8 +68,9 @@ function EditEspressoShot() {
 
   const defaultShot: InsertEspressoShot = {
     coffeeId: shot.coffeeId,
-    grinderId: shot.grinderId,
-    brewingDeviceId: shot.brewingDeviceId,
+    // Blank on a Sealed shot: its equipment is withheld along with the rest.
+    grinderId: shot.grinderId ?? '',
+    brewingDeviceId: shot.brewingDeviceId ?? '',
     roastDate: shot.roastDate,
     dose: shot.dose,
     yield: shot.yield,

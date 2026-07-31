@@ -16,10 +16,17 @@ import type {
 // An espresso shot with its coffee, grinder, and brewing device relations joined
 // in — the shape returned by the espresso shot list queries (getRecent /
 // getDialedIn) and rendered by the dashboard widgets.
-export interface EspressoShotWithRelations extends EspressoShot {
+//
+// A Sealed shot arrives with its settings blanked, so everything the paywall
+// withholds is nullable here. `sealed` says which it is.
+export interface EspressoShotWithRelations
+  extends Omit<EspressoShot, 'grinderId' | 'brewingDeviceId'> {
   coffee: Coffee
-  grinder: Grinder
-  brewingDevice: BrewingDevice & { type: BrewingDeviceType }
+  grinder: Grinder | null
+  brewingDevice: (BrewingDevice & { type: BrewingDeviceType }) | null
+  grinderId: string | null
+  brewingDeviceId: string | null
+  sealed: boolean
 }
 
 // An aeropress brew with its coffee, grinder, brewing device, and method

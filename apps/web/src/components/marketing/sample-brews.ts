@@ -60,6 +60,8 @@ function sampleShot(
 ): EspressoShotWithRelations {
   return {
     id: 'sample-shot',
+    sealed: false,
+    sealedAt: null,
     userId: 'sample',
     coffeeId: coffee.id,
     grinderId: grinder.id,

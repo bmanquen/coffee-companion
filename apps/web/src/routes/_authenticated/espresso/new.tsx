@@ -102,8 +102,11 @@ function NewEspressoShot() {
             // recent shot. The recipe (dose/yield/time/grind) is left blank so
             // it's entered fresh each shot.
             onChange: ({ value }) => {
-              const latest = shots.find((s) => s.coffeeId === value)
-              if (!latest) return
+              // A Sealed shot carries no settings to carry forward.
+              const latest = shots.find(
+                (s) => s.coffeeId === value && !s.sealed,
+              )
+              if (!latest?.grinderId || !latest.brewingDeviceId) return
               form.setFieldValue('grinderId', latest.grinderId)
               form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
               form.setFieldValue('roastDate', latest.roastDate)

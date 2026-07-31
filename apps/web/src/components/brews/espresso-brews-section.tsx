@@ -39,8 +39,9 @@ type Shot = {
   grindSetting: string | null
   notes: string | null
   coffee: { name: string }
-  grinder: { name: string; brand: string }
-  brewingDevice: { name: string; brand: string; type: { name: string } }
+  grinder: { name: string; brand: string } | null
+  brewingDevice: { name: string; brand: string; type: { name: string } } | null
+  sealed: boolean
 }
 
 const columnHelper = createColumnHelper<Shot>()
