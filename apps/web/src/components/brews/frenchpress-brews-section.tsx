@@ -24,6 +24,10 @@ import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
+import {
+  SealedRowNotice,
+  sealedRowClass,
+} from '@/components/brews/sealed-row'
 import { DataTable, expanderColumn } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -213,7 +217,8 @@ export function FrenchpressBrewsSection() {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
-    getRowCanExpand: () => true,
+    // A Sealed Brew has no settings to reveal.
+    getRowCanExpand: (row) => !row.original.sealed,
   })
 
   return (
@@ -256,8 +261,13 @@ export function FrenchpressBrewsSection() {
                 waterTempExtra(row.original.waterTemp),
               )
             }
+            replaceRow={(row) =>
+              row.original.sealed ? <SealedRowNotice /> : null
+            }
             rowClassName={(row) =>
-              row.original.isDialedIn
+              row.original.sealed
+                ? sealedRowClass
+                : row.original.isDialedIn
                 ? 'bg-primary/10 hover:bg-primary/15'
                 : undefined
             }

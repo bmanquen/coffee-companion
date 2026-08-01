@@ -21,7 +21,9 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
   return (
     <thead
       data-slot="table-header"
-      className={cn('[&_tr]:border-b', className)}
+      // TableRow is shared with the body, which highlights on hover. A header
+      // row is not a target, so it opts out for every table.
+      className={cn('[&_tr]:border-b [&_tr:hover]:bg-transparent', className)}
       {...props}
     />
   )

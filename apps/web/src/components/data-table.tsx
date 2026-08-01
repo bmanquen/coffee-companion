@@ -60,14 +60,15 @@ export function expanderColumn<T>() {
   return createColumnHelper<T>().display({
     id: 'expander',
     header: '',
-    cell: ({ row }) => (
-      <ChevronDown
-        className={cn(
-          'h-4 w-4 text-muted-foreground transition-transform',
-          row.getIsExpanded() && 'rotate-180',
-        )}
-      />
-    ),
+    cell: ({ row }) =>
+      row.getCanExpand() ? (
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 text-muted-foreground transition-transform',
+            row.getIsExpanded() && 'rotate-180',
+          )}
+        />
+      ) : null,
     meta: { cardHidden: true },
   })
 }
@@ -115,10 +116,12 @@ function CardRows<T>({
 function DataCard<T>({
   row,
   renderSubComponent,
+  replaceRow,
   className,
 }: {
   row: Row<T>
   renderSubComponent?: (row: Row<T>) => ReactNode
+  replaceRow?: (row: Row<T>) => ReactNode | null
   className?: string
 }) {
   'use no memo'
@@ -146,20 +149,28 @@ function DataCard<T>({
     )
   })
 
+  const replacement = replaceRow?.(row) ?? null
+
   const hasDetail =
     detailCells.length > 0 ||
     fullWidthCells.length > 0 ||
     renderSubComponent != null
-  const isExpanded = hasDetail && row.getIsExpanded()
+  // A row the table refuses to expand (a Sealed Brew has nothing to reveal) is
+  // not clickable and carries no affordance saying otherwise.
+  const expandable =
+    replacement == null &&
+    hasDetail &&
+    (renderSubComponent == null || row.getCanExpand())
+  const isExpanded = expandable && row.getIsExpanded()
 
   return (
     <div
       className={cn(
         'rounded-lg border bg-card p-4',
-        hasDetail && 'cursor-pointer',
+        expandable && 'cursor-pointer',
         className,
       )}
-      onClick={hasDetail ? row.getToggleExpandedHandler() : undefined}
+      onClick={expandable ? row.getToggleExpandedHandler() : undefined}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -173,7 +184,8 @@ function DataCard<T>({
               ))}
             </div>
           )}
-          {summaryCells.length > 0 && (
+          {replacement}
+          {replacement == null && summaryCells.length > 0 && (
             // Each stat is a small centred block — label above its value —
             // spread evenly across the row (no separators between them).
             <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1 text-sm">
@@ -196,7 +208,7 @@ function DataCard<T>({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {actionCells.length > 0 && (
+          {replacement == null && actionCells.length > 0 && (
             <div
               className="flex items-center gap-1"
               onClick={(e) => e.stopPropagation()}
@@ -208,7 +220,7 @@ function DataCard<T>({
               ))}
             </div>
           )}
-          {hasDetail && (
+          {expandable && (
             <ChevronDown
               aria-hidden
               className={cn(
@@ -219,7 +231,7 @@ function DataCard<T>({
           )}
         </div>
       </div>
-      {hasDetail && (
+      {expandable && (
         // Grid-rows 1fr↔0fr animates the detail's height without measuring it.
         <div
           className={cn(
@@ -271,6 +283,10 @@ interface DataTableProps<T> {
   // rendered by this function. Requires the table to enable row expansion
   // (getExpandedRowModel + getRowCanExpand).
   renderSubComponent?: (row: Row<T>) => ReactNode
+  // When it returns a node, the row's cells are replaced by that node spanning
+  // every column but the row's title — for a row whose data is unavailable
+  // rather than absent. Such a row is not clickable and cannot expand.
+  replaceRow?: (row: Row<T>) => ReactNode | null
   // When true, renders pagination controls and pads the current page with
   // blank rows so the table keeps a constant height that fits a full page.
   // Requires the table to enable pagination (getPaginationRowModel).
@@ -283,6 +299,7 @@ interface DataTableProps<T> {
 export function DataTable<T>({
   table,
   renderSubComponent,
+  replaceRow,
   paginated,
   rowClassName,
 }: DataTableProps<T>) {
@@ -345,20 +362,30 @@ export function DataTable<T>({
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row) => (
+              rows.map((row) => {
+                const replacement = replaceRow?.(row) ?? null
+                const clickable =
+                  replacement == null &&
+                  renderSubComponent != null &&
+                  row.getCanExpand()
+                // A replaced row keeps whatever names it — its title cells —
+                // and gives the rest of its width to the replacement.
+                const keptCells = row
+                  .getVisibleCells()
+                  .filter((cell) => cell.column.columnDef.meta?.cardTitle)
+                const cells =
+                  replacement == null ? row.getVisibleCells() : keptCells
+
+                return (
                 <Fragment key={row.id}>
                   <TableRow
                     className={cn(
-                      renderSubComponent && 'cursor-pointer',
+                      clickable && 'cursor-pointer',
                       rowClassName?.(row),
                     )}
-                    onClick={
-                      renderSubComponent
-                        ? row.getToggleExpandedHandler()
-                        : undefined
-                    }
+                    onClick={clickable ? row.getToggleExpandedHandler() : undefined}
                   >
-                    {row.getVisibleCells().map((cell) => (
+                    {cells.map((cell) => (
                       <TableCell
                         key={cell.id}
                         // Control cells (actions, dialed-in toggle) stop the
@@ -376,11 +403,20 @@ export function DataTable<T>({
                         )}
                       </TableCell>
                     ))}
+                    {replacement != null && (
+                      <TableCell
+                        colSpan={
+                          row.getVisibleCells().length - keptCells.length
+                        }
+                      >
+                        {replacement}
+                      </TableCell>
+                    )}
                   </TableRow>
                   {/* Always rendered so the detail can animate its height open
                       and closed (grid-rows 1fr↔0fr); collapsed it is 0-height
                       and borderless, so it reads as absent. */}
-                  {renderSubComponent && (
+                  {renderSubComponent && replacement == null && (
                     <TableRow className="border-0 hover:bg-transparent">
                       <TableCell
                         colSpan={row.getVisibleCells().length}
@@ -404,7 +440,8 @@ export function DataTable<T>({
                     </TableRow>
                   )}
                 </Fragment>
-              ))
+                )
+              })
             )}
           </TableBody>
         </Table>
@@ -421,6 +458,7 @@ export function DataTable<T>({
               key={row.id}
               row={row}
               renderSubComponent={renderSubComponent}
+              replaceRow={replaceRow}
               className={rowClassName?.(row)}
             />
           ))

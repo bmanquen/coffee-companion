@@ -11,6 +11,7 @@ import type { LinkProps } from '@tanstack/react-router'
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
+import { SealedRowNotice, sealedRowClass } from '@/components/brews/sealed-row'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
@@ -24,6 +25,7 @@ type BrewRow = {
   isDialedIn: boolean
   coffeeId: string
   coffee: { name: string }
+  sealed: boolean
 }
 
 // The dashboard's reference-only per-method Brew feed. Given a method's full
@@ -94,7 +96,8 @@ export function BrewFeed<T extends BrewRow>({
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getRowCanExpand: () => true,
+    // A Sealed Brew has no settings to reveal.
+    getRowCanExpand: (row) => !row.original.sealed,
     enableSorting: false,
     initialState: { pagination: { pageSize } },
   })
@@ -136,11 +139,16 @@ export function BrewFeed<T extends BrewRow>({
           <DataTable
             table={table}
             renderSubComponent={renderDetails}
+            replaceRow={(row) =>
+              row.original.sealed ? <SealedRowNotice /> : null
+            }
             paginated
             rowClassName={(row) =>
-              row.original.isDialedIn
-                ? 'bg-primary/10 hover:bg-primary/15'
-                : undefined
+              row.original.sealed
+                ? sealedRowClass
+                : row.original.isDialedIn
+                  ? 'bg-primary/10 hover:bg-primary/15'
+                  : undefined
             }
           />
         </>

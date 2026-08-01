@@ -20,6 +20,10 @@ import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
+import {
+  SealedRowNotice,
+  sealedRowClass,
+} from '@/components/brews/sealed-row'
 import { DataTable, expanderColumn } from '@/components/data-table'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { Button } from '@/components/ui/button'
@@ -60,10 +64,6 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
 
   const shot = row.original
   const dialedIn = shot.isDialedIn
-
-  // A Sealed Brew cannot be the reference to reproduce: its settings are not
-  // readable.
-  if (shot.sealed) return null
 
   return (
     <DialedInToggleCell
@@ -215,7 +215,8 @@ export function EspressoBrewsSection() {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
-    getRowCanExpand: () => true,
+    // A Sealed Brew has no settings to reveal.
+    getRowCanExpand: (row) => !row.original.sealed,
   })
 
   return (
@@ -253,8 +254,13 @@ export function EspressoBrewsSection() {
           <DataTable
             table={table}
             renderSubComponent={(row) => renderBrewDetails(row.original)}
+            replaceRow={(row) =>
+              row.original.sealed ? <SealedRowNotice /> : null
+            }
             rowClassName={(row) =>
-              row.original.isDialedIn
+              row.original.sealed
+                ? sealedRowClass
+                : row.original.isDialedIn
                 ? 'bg-primary/10 hover:bg-primary/15'
                 : undefined
             }
