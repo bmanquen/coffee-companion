@@ -1,6 +1,6 @@
-import { Button } from '@/components/ui/button'
 import { Link } from '@tanstack/react-router'
 import { Lock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 // Stands where the edit and delete controls would be on a Sealed row: a Brew
 // nobody can read is not one they can meaningfully change. The row itself is
