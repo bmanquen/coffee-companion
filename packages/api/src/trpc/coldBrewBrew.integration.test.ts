@@ -256,7 +256,7 @@ describe('coldBrewBrew.getAll', () => {
     expect(brews.every((b) => b.userId === USER_A)).toBe(true)
     expect(brews[0].coffee).toBeTruthy()
     expect(brews[0].grinder).toBeTruthy()
-    expect(brews[0].brewingDevice.type).toBeTruthy()
+    expect(brews[0].brewingDevice?.type).toBeTruthy()
   })
 
   it('returns brews most recent first', async () => {

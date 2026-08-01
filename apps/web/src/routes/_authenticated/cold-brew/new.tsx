@@ -101,8 +101,11 @@ function NewColdBrewBrew() {
             // is left blank so it's entered fresh each brew. Cold brew is
             // methodless, so there is no method to carry forward.
             onChange: ({ value }) => {
-              const latest = brews.find((b) => b.coffeeId === value)
-              if (!latest) return
+              // A Sealed Brew carries no settings to carry forward.
+              const latest = brews.find(
+                (b) => b.coffeeId === value && !b.sealed,
+              )
+              if (!latest?.grinderId || !latest.brewingDeviceId) return
               form.setFieldValue('grinderId', latest.grinderId)
               form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
               form.setFieldValue('roastDate', latest.roastDate)

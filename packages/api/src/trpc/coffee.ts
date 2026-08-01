@@ -112,6 +112,20 @@ export const coffeeRouter = createTRPCRouter({
     .input(z.object({ coffeeId: z.string(), shotId: z.string().nullable() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id
+
+      // A Sealed Brew cannot become the reference to reproduce: its settings
+      // are not readable, and it would drop straight back out of the dial-ins.
+      if (input.shotId) {
+        const target = await db.query.espressoShots.findFirst({
+          where: { id: input.shotId, userId },
+        })
+        if (target && isSealed(target, ctx.plan)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'This Brew is Sealed. Subscribe to dial it in again.',
+          })
+        }
+      }
       await db.transaction(async (tx) => {
         // Clear the coffee's current dialed-in espresso shot, if any. The
         // partial unique index allows only one dialed-in shot per coffee, so

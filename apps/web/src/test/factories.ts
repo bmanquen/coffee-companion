@@ -94,6 +94,7 @@ export function makeAeropressBrew(
 ): AeropressBrew {
   return {
     id: 'a1',
+    sealed: false,
     sealedAt: null,
     userId: 'u1',
     coffeeId: 'c1',
@@ -150,6 +151,7 @@ export function makePouroverBrew(
 ): PouroverBrew {
   return {
     id: 'p1',
+    sealed: false,
     sealedAt: null,
     userId: 'u1',
     coffeeId: 'c1',
@@ -207,6 +209,7 @@ export function makeFrenchpressBrew(
 ): FrenchpressBrew {
   return {
     id: 'f1',
+    sealed: false,
     sealedAt: null,
     userId: 'u1',
     coffeeId: 'c1',
@@ -266,6 +269,7 @@ export function makeColdBrewBrew(
 ): ColdBrewBrew {
   return {
     id: 'cb1',
+    sealed: false,
     sealedAt: null,
     userId: 'u1',
     coffeeId: 'c1',

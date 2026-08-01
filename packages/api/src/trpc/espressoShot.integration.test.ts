@@ -320,8 +320,8 @@ describe('espressoShot.getDialedIn', () => {
     const entry = dialedIn.find((s) => s.id === dialedShot.id)
     expect(entry).toBeTruthy()
     expect(entry!.coffee.name).toBe(coffee.name)
-    expect(entry!.grinder.name).toBeTruthy()
-    expect(entry!.brewingDevice.type).toBeTruthy()
+    expect(entry!.grinder?.name).toBeTruthy()
+    expect(entry!.brewingDevice?.type).toBeTruthy()
 
     expect(dialedIn.some((s) => s.id === otherShot.id)).toBe(false)
     // Every returned shot is flagged as a dialed-in reference.

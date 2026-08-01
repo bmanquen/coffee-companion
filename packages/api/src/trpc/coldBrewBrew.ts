@@ -5,6 +5,7 @@ import { db } from '../db'
 import { coldBrewBrews } from '../db/schema'
 import { insertColdBrewBrewSchema } from '../db/zod'
 import { COLD_BREW_DEVICE_TYPE, isColdBrewDevice } from '../lib/cold-brew'
+import { isSealed, reconcileSeals, withSealing } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 // Cold brew is methodless (ADR-0001), so there is no method relation here.
@@ -37,11 +38,14 @@ async function assertColdBrewDevice(brewingDeviceId: string, userId: string) {
 
 export const coldBrewBrewRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
-    return db.query.coldBrewBrews.findMany({
+    await reconcileSeals(ctx.session.user.id, ctx.plan)
+
+    const brews = await db.query.coldBrewBrews.findMany({
       where: { userId: ctx.session.user.id },
       orderBy: { createdAt: 'desc' },
       with: withRelations,
     })
+    return brews.map((brew) => withSealing(brew, ctx.plan))
   }),
 
   getRecent: authedProcedure
@@ -49,6 +53,8 @@ export const coldBrewBrewRouter = createTRPCRouter({
       z.object({ limit: z.number().min(1).max(50), offset: z.number().min(0) }),
     )
     .query(async ({ ctx, input }) => {
+      await reconcileSeals(ctx.session.user.id, ctx.plan)
+
       const [items, [{ total }]] = await Promise.all([
         db.query.coldBrewBrews.findMany({
           where: { userId: ctx.session.user.id },
@@ -62,17 +68,19 @@ export const coldBrewBrewRouter = createTRPCRouter({
           .from(coldBrewBrews)
           .where(eq(coldBrewBrews.userId, ctx.session.user.id)),
       ])
-      return { items, total }
+      return { items: items.map((b) => withSealing(b, ctx.plan)), total }
     }),
 
   getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {
+    await reconcileSeals(ctx.session.user.id, ctx.plan)
+
     const brew = await db.query.coldBrewBrews.findFirst({
       where: { id: input, userId: ctx.session.user.id },
     })
     if (!brew) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
     }
-    return brew
+    return withSealing(brew, ctx.plan)
   }),
 
   create: authedProcedure
@@ -91,6 +99,18 @@ export const coldBrewBrewRouter = createTRPCRouter({
     .input(insertColdBrewBrewSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
+
+      // A Sealed Brew reaches the form with its settings withheld, so saving it
+      // would write those blanks over what is stored.
+      const existing = await db.query.coldBrewBrews.findFirst({
+        where: { id, userId: ctx.session.user.id },
+      })
+      if (existing && isSealed(existing, ctx.plan)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'This Brew is Sealed. Subscribe to read and edit it again.',
+        })
+      }
       await assertColdBrewDevice(data.brewingDeviceId, ctx.session.user.id)
 
       const updated = await db
@@ -130,12 +150,17 @@ export const coldBrewBrewRouter = createTRPCRouter({
   getDialedIn: authedProcedure
     .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
     .query(async ({ ctx, input }) => {
-      return db.query.coldBrewBrews.findMany({
+      await reconcileSeals(ctx.session.user.id, ctx.plan)
+
+      const dialedIn = await db.query.coldBrewBrews.findMany({
         where: { userId: ctx.session.user.id, isDialedIn: true },
         orderBy: { createdAt: 'desc' },
         with: withRelations,
         limit: input?.limit,
       })
+      return dialedIn
+        .filter((brew) => !isSealed(brew, ctx.plan))
+        .map((brew) => withSealing(brew, ctx.plan))
     }),
 
   // Set (or clear, with brewId null) the dialed-in cold brew for a coffee.
@@ -151,6 +176,20 @@ export const coldBrewBrewRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id
+
+      // A Sealed Brew cannot become the reference to reproduce: its settings
+      // are not readable, and it would drop straight back out of the dial-ins.
+      if (input.brewId) {
+        const target = await db.query.coldBrewBrews.findFirst({
+          where: { id: input.brewId, userId },
+        })
+        if (target && isSealed(target, ctx.plan)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'This Brew is Sealed. Subscribe to dial it in again.',
+          })
+        }
+      }
       await db.transaction(async (tx) => {
         await tx
           .update(coldBrewBrews)

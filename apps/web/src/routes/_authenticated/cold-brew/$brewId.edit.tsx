@@ -69,8 +69,9 @@ function EditColdBrewBrew() {
 
   const defaultBrew: InsertColdBrewBrew = {
     coffeeId: brew.coffeeId,
-    grinderId: brew.grinderId,
-    brewingDeviceId: brew.brewingDeviceId,
+    // Blank on a Sealed Brew: its equipment is withheld along with the rest.
+    grinderId: brew.grinderId ?? '',
+    brewingDeviceId: brew.brewingDeviceId ?? '',
     roastDate: brew.roastDate,
     dose: brew.dose,
     water: brew.water,

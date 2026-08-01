@@ -32,38 +32,57 @@ export interface EspressoShotWithRelations
 // An aeropress brew with its coffee, grinder, brewing device, and method
 // relations joined in — the shape returned by the aeropress brew list queries
 // (getAll / getRecent / getDialedIn) and rendered by the tables and dashboard.
-export interface AeropressBrewWithRelations extends AeropressBrew {
+export interface AeropressBrewWithRelations
+  extends Omit<AeropressBrew, 'grinderId' | 'brewingDeviceId' | 'methodId'> {
   coffee: Coffee
-  grinder: Grinder
-  brewingDevice: BrewingDevice & { type: BrewingDeviceType }
-  method: AeropressMethod
+  grinder: Grinder | null
+  brewingDevice: (BrewingDevice & { type: BrewingDeviceType }) | null
+  grinderId: string | null
+  brewingDeviceId: string | null
+  methodId: string | null
+  method: AeropressMethod | null
+  sealed: boolean
 }
 
 // A pour over brew with its coffee, grinder, brewing device, and method
 // relations joined in — the shape returned by the pour over brew list queries
 // (getAll / getRecent / getDialedIn) and rendered by the tables and dashboard.
-export interface PouroverBrewWithRelations extends PouroverBrew {
+export interface PouroverBrewWithRelations
+  extends Omit<PouroverBrew, 'grinderId' | 'brewingDeviceId' | 'methodId'> {
   coffee: Coffee
-  grinder: Grinder
-  brewingDevice: BrewingDevice & { type: BrewingDeviceType }
-  method: PouroverMethod
+  grinder: Grinder | null
+  brewingDevice: (BrewingDevice & { type: BrewingDeviceType }) | null
+  grinderId: string | null
+  brewingDeviceId: string | null
+  methodId: string | null
+  method: PouroverMethod | null
+  sealed: boolean
 }
 
 // A french press brew with its coffee, grinder, brewing device, and method
 // relations joined in — the shape returned by the french press brew list queries
 // (getAll / getRecent / getDialedIn) and rendered by the tables and dashboard.
-export interface FrenchpressBrewWithRelations extends FrenchpressBrew {
+export interface FrenchpressBrewWithRelations
+  extends Omit<FrenchpressBrew, 'grinderId' | 'brewingDeviceId' | 'methodId'> {
   coffee: Coffee
-  grinder: Grinder
-  brewingDevice: BrewingDevice & { type: BrewingDeviceType }
-  method: FrenchpressMethod
+  grinder: Grinder | null
+  brewingDevice: (BrewingDevice & { type: BrewingDeviceType }) | null
+  grinderId: string | null
+  brewingDeviceId: string | null
+  methodId: string | null
+  method: FrenchpressMethod | null
+  sealed: boolean
 }
 
 // A cold brew with its coffee, grinder, and brewing device relations joined in —
 // the shape returned by the cold brew list queries and rendered by the table.
 // Methodless (ADR-0001), so there is no method relation.
-export interface ColdBrewBrewWithRelations extends ColdBrewBrew {
+export interface ColdBrewBrewWithRelations
+  extends Omit<ColdBrewBrew, 'grinderId' | 'brewingDeviceId'> {
   coffee: Coffee
-  grinder: Grinder
-  brewingDevice: BrewingDevice & { type: BrewingDeviceType }
+  grinder: Grinder | null
+  brewingDevice: (BrewingDevice & { type: BrewingDeviceType }) | null
+  grinderId: string | null
+  brewingDeviceId: string | null
+  sealed: boolean
 }
