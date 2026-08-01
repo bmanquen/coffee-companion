@@ -80,6 +80,13 @@ beforeAll(async () => {
     const shotId = await logShot(coffee.id)
     coffees.push({ id: coffee.id, name, shotId })
   }
+
+  // Dial in the shot that will later Seal. It has to happen now: once Sealed, a
+  // Brew can no longer be made the reference to reproduce.
+  await asUser.coffee.setDialedIn({
+    coffeeId: coffees[1].id,
+    shotId: coffees[1].shotId,
+  })
 })
 
 const shotById = async (id: string) => {
@@ -138,12 +145,6 @@ describe('a Coffee off the Shelf', () => {
 
 describe('Sealing and the Plan', () => {
   it('withholds a Sealed shot from the dial-ins', async () => {
-    // coffees[1] has fallen off by now; make its shot the coffee's dial-in.
-    await asUser.coffee.setDialedIn({
-      coffeeId: coffees[1].id,
-      shotId: coffees[1].shotId,
-    })
-
     const sealedShot = await shotById(coffees[1].shotId)
     expect(sealedShot.sealed).toBe(true)
 

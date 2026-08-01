@@ -46,17 +46,23 @@ function DialedInCell({ row }: CellContext<Brew, unknown>) {
   const brew = row.original
   const dialedIn = brew.isDialedIn
 
+  // A Sealed Brew has no Brewing Method to dial in against, and its settings
+  // are not readable.
+  // Destructured so the narrowing survives into the onToggle closure below.
+  const { method, methodId } = brew
+  if (brew.sealed || !method || !methodId) return null
+
   return (
     <DialedInToggleCell
       dialedIn={dialedIn}
-      onLabel={`Dialed in ${brew.coffee.name} for ${brew.method.name} — clear`}
-      offLabel={`Mark ${brew.coffee.name} as dialed in for ${brew.method.name}`}
+      onLabel={`Dialed in ${brew.coffee.name} for ${method.name} — clear`}
+      offLabel={`Mark ${brew.coffee.name} as dialed in for ${method.name}`}
       // Dialing in is scoped per method: this only replaces the coffee's
       // dialed-in brew for *this* brew's method.
       onToggle={() =>
         setDialedIn.mutate({
           coffeeId: brew.coffeeId,
-          methodId: brew.methodId,
+          methodId,
           brewId: dialedIn ? null : brew.id,
         })
       }

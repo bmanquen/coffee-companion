@@ -1,8 +1,24 @@
 import { and, eq, isNull, notInArray, sql } from 'drizzle-orm'
 import { db } from '../db'
-import { espressoShots } from '../db/schema'
+import {
+  aeropressBrews,
+  coldBrewBrews,
+  espressoShots,
+  frenchpressBrews,
+  pouroverBrews,
+} from '../db/schema'
 import { shelfSizes } from './plan'
 import type { PlanId } from './plan'
+
+// Every table a Brew can live in. The Shelf query below lists them again in
+// SQL, so a new Brewing Method touches both.
+const brewTables = [
+  espressoShots,
+  aeropressBrews,
+  pouroverBrews,
+  frenchpressBrews,
+  coldBrewBrews,
+]
 
 // Ordered by each Coffee's last Brew across every method, since a Coffee's
 // latest Brew may belong to any of them.
@@ -43,18 +59,23 @@ export async function reconcileSeals(
   if (size === null) return
 
   const shelf = await shelfCoffeeIds(userId, size)
+  const stamp = new Date()
 
-  await db
-    .update(espressoShots)
-    .set({ sealedAt: new Date() })
-    .where(
-      and(
-        eq(espressoShots.userId, userId),
-        isNull(espressoShots.sealedAt),
-        // An empty Shelf means every Coffee has fallen off it.
-        shelf.length ? notInArray(espressoShots.coffeeId, shelf) : undefined,
-      ),
-    )
+  await Promise.all(
+    brewTables.map((table) =>
+      db
+        .update(table)
+        .set({ sealedAt: stamp })
+        .where(
+          and(
+            eq(table.userId, userId),
+            isNull(table.sealedAt),
+            // An empty Shelf means every Coffee has fallen off it.
+            shelf.length ? notInArray(table.coffeeId, shelf) : undefined,
+          ),
+        ),
+    ),
+  )
 }
 
 // Readability is the stamp plus the Plan, never the stamp alone.

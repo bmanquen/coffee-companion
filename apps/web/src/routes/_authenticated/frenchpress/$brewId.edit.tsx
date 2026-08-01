@@ -91,9 +91,10 @@ function EditFrenchpressBrew() {
 
   const defaultBrew: InsertFrenchpressBrew = {
     coffeeId: brew.coffeeId,
-    methodId: brew.methodId,
-    grinderId: brew.grinderId,
-    brewingDeviceId: brew.brewingDeviceId,
+    methodId: brew.methodId ?? '',
+    // Blank on a Sealed Brew: its equipment is withheld along with the rest.
+    grinderId: brew.grinderId ?? '',
+    brewingDeviceId: brew.brewingDeviceId ?? '',
     roastDate: brew.roastDate,
     dose: brew.dose,
     water: brew.water,

@@ -61,6 +61,10 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
   const shot = row.original
   const dialedIn = shot.isDialedIn
 
+  // A Sealed Brew cannot be the reference to reproduce: its settings are not
+  // readable.
+  if (shot.sealed) return null
+
   return (
     <DialedInToggleCell
       dialedIn={dialedIn}

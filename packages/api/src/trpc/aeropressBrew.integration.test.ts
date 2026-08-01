@@ -220,7 +220,7 @@ describe('aeropressBrew.getAll / getRecent', () => {
     expect(brews.every((b) => b.userId === USER_A)).toBe(true)
     expect(brews[0].coffee).toBeTruthy()
     expect(brews[0].method).toBeTruthy()
-    expect(brews[0].brewingDevice.type).toBeTruthy()
+    expect(brews[0].brewingDevice?.type).toBeTruthy()
   })
 
   it('paginates with getRecent', async () => {

@@ -5,6 +5,7 @@ import { db } from '../db'
 import { pouroverBrews } from '../db/schema'
 import { insertPouroverBrewSchema } from '../db/zod'
 import { POUR_OVER_DEVICE_TYPE, isPourOverDevice } from '../lib/pourover'
+import { isSealed, reconcileSeals, withSealing } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 const withRelations = {
@@ -50,11 +51,14 @@ async function assertPourOverMethod(methodId: string, userId: string) {
 
 export const pouroverBrewRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
-    return db.query.pouroverBrews.findMany({
+    await reconcileSeals(ctx.session.user.id, ctx.plan)
+
+    const brews = await db.query.pouroverBrews.findMany({
       where: { userId: ctx.session.user.id },
       orderBy: { createdAt: 'desc' },
       with: withRelations,
     })
+    return brews.map((brew) => withSealing(brew, ctx.plan))
   }),
 
   getRecent: authedProcedure
@@ -62,6 +66,8 @@ export const pouroverBrewRouter = createTRPCRouter({
       z.object({ limit: z.number().min(1).max(50), offset: z.number().min(0) }),
     )
     .query(async ({ ctx, input }) => {
+      await reconcileSeals(ctx.session.user.id, ctx.plan)
+
       const [items, [{ total }]] = await Promise.all([
         db.query.pouroverBrews.findMany({
           where: { userId: ctx.session.user.id },
@@ -75,7 +81,7 @@ export const pouroverBrewRouter = createTRPCRouter({
           .from(pouroverBrews)
           .where(eq(pouroverBrews.userId, ctx.session.user.id)),
       ])
-      return { items, total }
+      return { items: items.map((b) => withSealing(b, ctx.plan)), total }
     }),
 
   // Brews that are the dialed-in reference for their coffee+method, most recent
@@ -83,22 +89,29 @@ export const pouroverBrewRouter = createTRPCRouter({
   getDialedIn: authedProcedure
     .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
     .query(async ({ ctx, input }) => {
-      return db.query.pouroverBrews.findMany({
+      await reconcileSeals(ctx.session.user.id, ctx.plan)
+
+      const dialedIn = await db.query.pouroverBrews.findMany({
         where: { userId: ctx.session.user.id, isDialedIn: true },
         orderBy: { createdAt: 'desc' },
         with: withRelations,
         limit: input?.limit,
       })
+      return dialedIn
+        .filter((brew) => !isSealed(brew, ctx.plan))
+        .map((brew) => withSealing(brew, ctx.plan))
     }),
 
   getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {
+    await reconcileSeals(ctx.session.user.id, ctx.plan)
+
     const brew = await db.query.pouroverBrews.findFirst({
       where: { id: input, userId: ctx.session.user.id },
     })
     if (!brew) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
     }
-    return brew
+    return withSealing(brew, ctx.plan)
   }),
 
   create: authedProcedure
@@ -118,6 +131,18 @@ export const pouroverBrewRouter = createTRPCRouter({
     .input(insertPouroverBrewSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
+
+      // A Sealed Brew reaches the form with its settings withheld, so saving it
+      // would write those blanks over what is stored.
+      const existing = await db.query.pouroverBrews.findFirst({
+        where: { id, userId: ctx.session.user.id },
+      })
+      if (existing && isSealed(existing, ctx.plan)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'This Brew is Sealed. Subscribe to read and edit it again.',
+        })
+      }
       await assertPourOverDevice(data.brewingDeviceId, ctx.session.user.id)
       await assertPourOverMethod(data.methodId, ctx.session.user.id)
 
@@ -167,6 +192,20 @@ export const pouroverBrewRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id
+
+      // A Sealed Brew cannot become the reference to reproduce: its settings
+      // are not readable, and it would drop straight back out of the dial-ins.
+      if (input.brewId) {
+        const target = await db.query.pouroverBrews.findFirst({
+          where: { id: input.brewId, userId },
+        })
+        if (target && isSealed(target, ctx.plan)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'This Brew is Sealed. Subscribe to dial it in again.',
+          })
+        }
+      }
       await db.transaction(async (tx) => {
         // Clear the coffee's current dialed-in brew for this method, if any. The
         // partial unique index allows only one per (coffee, method), so this

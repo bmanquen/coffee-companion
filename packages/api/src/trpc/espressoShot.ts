@@ -80,7 +80,9 @@ export const espressoShotRouter = createTRPCRouter({
       // A Sealed dial-in is not a dial-in: the reference settings are the most
       // valuable thing on the Coffee and would otherwise be a hole straight
       // through the paywall.
-      return dialedIn.filter((shot) => !isSealed(shot, ctx.plan))
+      return dialedIn
+        .filter((shot) => !isSealed(shot, ctx.plan))
+        .map((shot) => withSealing(shot, ctx.plan))
     }),
 
   getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {

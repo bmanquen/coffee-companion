@@ -122,9 +122,14 @@ function NewPouroverBrew() {
             // recent brew. The recipe (dose/water/brew time/temp/grind) is left
             // blank so it's entered fresh each brew.
             onChange: ({ value }) => {
-              const latest = brews.find((b) => b.coffeeId === value)
-              if (!latest) return
-              form.setFieldValue('methodId', latest.methodId)
+              // A Sealed Brew carries no settings to carry forward.
+              const latest = brews.find(
+                (b) => b.coffeeId === value && !b.sealed,
+              )
+              if (!latest?.grinderId || !latest.brewingDeviceId) return
+              if (latest.methodId) {
+                form.setFieldValue('methodId', latest.methodId)
+              }
               form.setFieldValue('grinderId', latest.grinderId)
               form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
               form.setFieldValue('roastDate', latest.roastDate)
