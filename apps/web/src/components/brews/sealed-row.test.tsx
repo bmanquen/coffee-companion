@@ -97,3 +97,39 @@ describe('the table header', () => {
     expect(headerRow?.className).not.toContain('opacity-70')
   })
 })
+
+describe('column alignment', () => {
+  it('leaves a Sealed row’s coffee in the same column as a readable one', async () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+      makeRecentShot({ id: 'readable', coffee, coffeeId: 'c1' }),
+      makeRecentShot({
+        id: 'sealed',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Kenya Nyeri' }),
+        coffeeId: 'c2',
+        sealed: true,
+        sealedAt: new Date('2026-07-01T00:00:00.000Z'),
+        dose: null,
+        yield: null,
+        time: null,
+        grinder: null,
+        brewingDevice: null,
+      }),
+    ])
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+    await screen.findAllByText(/^Sealed —/)
+
+    const columnOf = (name: string) => {
+      const rows = [...document.querySelectorAll('tbody tr')]
+      for (const row of rows) {
+        const cells = [...row.querySelectorAll('td')]
+        const index = cells.findIndex((cell) => cell.textContent === name)
+        if (index >= 0) return index
+      }
+      throw new Error(`No cell holding "${name}"`)
+    }
+
+    expect(columnOf('Kenya Nyeri')).toBe(columnOf('Ethiopia Guji'))
+  })
+})

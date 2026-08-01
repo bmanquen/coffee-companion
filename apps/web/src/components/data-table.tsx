@@ -73,6 +73,17 @@ export function expanderColumn<T>() {
   })
 }
 
+// Control columns — the dialed-in toggle, row actions, the expander — hold one
+// small fixed thing. Left alone the table's auto layout gives them an equal
+// share of the width; w-px plus nowrap shrinks them to their content and hands
+// the rest back to the data.
+function isControlColumn<T>(column: Column<T, unknown>): boolean {
+  const meta = column.columnDef.meta
+  return Boolean(meta?.cardHideLabel || meta?.cardHidden)
+}
+
+const controlColumnClass = 'w-px whitespace-nowrap'
+
 // The card layout has no header row, so derive a label from the column's
 // header when it's a plain string, falling back to the column id.
 function cardLabel<T>(column: Column<T, unknown>): string {
@@ -323,7 +334,10 @@ export function DataTable<T>({
                   return (
                     <TableHead
                       key={header.id}
-                      className={cn(canSort && 'cursor-pointer select-none')}
+                      className={cn(
+                        canSort && 'cursor-pointer select-none',
+                        isControlColumn(header.column) && controlColumnClass,
+                      )}
                       onClick={header.column.getToggleSortingHandler()}
                     >
                       {header.isPlaceholder ? null : (
@@ -369,12 +383,17 @@ export function DataTable<T>({
                   renderSubComponent != null &&
                   row.getCanExpand()
                 // A replaced row keeps whatever names it — its title cells —
-                // and gives the rest of its width to the replacement.
-                const keptCells = row
-                  .getVisibleCells()
-                  .filter((cell) => cell.column.columnDef.meta?.cardTitle)
-                const cells =
-                  replacement == null ? row.getVisibleCells() : keptCells
+                // and gives the rest of its width to the replacement. The
+                // columns before the title still render, empty, so the title
+                // stays under its own header instead of sliding left.
+                const allCells = row.getVisibleCells()
+                const lastTitle = allCells.reduce(
+                  (last, cell, index) =>
+                    cell.column.columnDef.meta?.cardTitle ? index : last,
+                  -1,
+                )
+                const leadingCells =
+                  replacement == null ? allCells : allCells.slice(0, lastTitle + 1)
 
                 return (
                 <Fragment key={row.id}>
@@ -385,9 +404,12 @@ export function DataTable<T>({
                     )}
                     onClick={clickable ? row.getToggleExpandedHandler() : undefined}
                   >
-                    {cells.map((cell) => (
+                    {leadingCells.map((cell) => (
                       <TableCell
                         key={cell.id}
+                        className={cn(
+                          isControlColumn(cell.column) && controlColumnClass,
+                        )}
                         // Control cells (actions, dialed-in toggle) stop the
                         // click so activating them doesn't also toggle the
                         // row's expansion — mirrors the mobile card (above).
@@ -397,18 +419,17 @@ export function DataTable<T>({
                             : undefined
                         }
                       >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
+                        {replacement != null &&
+                        !cell.column.columnDef.meta?.cardTitle
+                          ? null
+                          : flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
                       </TableCell>
                     ))}
                     {replacement != null && (
-                      <TableCell
-                        colSpan={
-                          row.getVisibleCells().length - keptCells.length
-                        }
-                      >
+                      <TableCell colSpan={allCells.length - leadingCells.length}>
                         {replacement}
                       </TableCell>
                     )}
