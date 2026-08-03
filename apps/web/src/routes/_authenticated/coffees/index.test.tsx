@@ -52,6 +52,13 @@ function makeCoffeeRow(over: {
   process?: string | null
   roastLevel?: string | null
   varieties?: Array<string>
+  dialedInShot?: {
+    sealed: boolean
+    dose: string | null
+    yield: string | null
+    time: number | null
+    grindSetting: string | null
+  } | null
 }): CoffeeGetAllRow {
   return {
     ...makeCoffee({ id: over.id, name: over.name, notes: over.notes ?? null }),
@@ -61,7 +68,7 @@ function makeCoffeeRow(over: {
     process: over.process ? { name: over.process } : null,
     roastLevel: over.roastLevel ? { name: over.roastLevel } : null,
     varieties: (over.varieties ?? []).map((name) => ({ name })),
-    dialedInShot: null,
+    dialedInShot: over.dialedInShot ?? null,
   } as CoffeeGetAllRow
 }
 
@@ -141,6 +148,63 @@ describe('Coffees page', () => {
 
     fireEvent.click(row)
     expect(region.className).toContain('grid-rows-[0fr]')
+  })
+
+  // A coffee whose dial-in is Sealed must not read as one that was never
+  // dialed in — a dash would say the settings do not exist rather than that
+  // they are not readable.
+  describe('a dialed-in shot that is Sealed', () => {
+    const expandDetail = (name: string) => {
+      fireEvent.click(
+        within(screen.getByRole('table')).getByText(name).closest('tr')!,
+      )
+      return within(detailRegionFor(name))
+    }
+
+    it('stands the Sealed notice in place of the recipe', () => {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [
+        makeCoffeeRow({
+          id: 'cf1',
+          name: 'Colombia Huila',
+          // What the server sends for a Sealed Brew: identifiable, blank.
+          dialedInShot: {
+            sealed: true,
+            dose: null,
+            yield: null,
+            time: null,
+            grindSetting: null,
+          },
+        }),
+      ])
+      render(<Coffee />, { wrapper: Wrapper })
+
+      const detail = expandDetail('Colombia Huila')
+      expect(detail.getByRole('note').textContent).toContain('Sealed')
+      expect(detail.getByText('See plans')).toBeTruthy()
+    })
+
+    it('still shows the recipe when the shot is readable', () => {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [
+        makeCoffeeRow({
+          id: 'cf1',
+          name: 'Ethiopia Guji',
+          dialedInShot: {
+            sealed: false,
+            dose: '18',
+            yield: '38',
+            time: 27,
+            grindSetting: '5',
+          },
+        }),
+      ])
+      render(<Coffee />, { wrapper: Wrapper })
+
+      const detail = expandDetail('Ethiopia Guji')
+      expect(detail.getByText('18g → 38g · 27s · Grind 5')).toBeTruthy()
+      expect(detail.queryByRole('note')).toBeNull()
+    })
   })
 
   it('keeps only one desktop row expanded at a time (accordion)', () => {

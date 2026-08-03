@@ -68,10 +68,11 @@ is out of reach.
 _Avoid_: Active coffees, viewable coffees, library
 
 **Sealed Brew**:
-A Brew made unreadable because its Coffee fell off the Shelf. Sealing stamps the Brews
-a Coffee holds at that moment, and on Free it is permanent: brewing that Coffee again
-records new, readable Brews but never reopens the old ones — only upgrading does.
-Nothing is ever deleted (see ADR-0004).
+A Brew made unreadable because its Coffee fell off the Shelf. Falling off is what Seals
+it — nothing has to be written first. A stamp is recorded separately, before anything
+that could give a Coffee its slot back, and its only job is making Sealing permanent on
+Free: a Coffee can return to the Shelf and record new, readable Brews, but the old ones
+never reopen — only upgrading does. Nothing is ever deleted (see ADR-0004).
 _Avoid_: Archived, hidden, locked, expired
 
 ## Cold Brew

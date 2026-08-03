@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 // The label/value detail grid shared by the entity detail components
 // (BrewDetails, CoffeeDetails), rendered inside a card's expander or a desktop
 // table sub-row (see ADR-0003). Labels align in a fixed-width column so values
@@ -9,7 +11,9 @@ export function DetailList({
   rows,
   notes,
 }: {
-  rows: Array<{ label: string; value: string }>
+  // A value is usually text, but may be a node — a Sealed field stands in for
+  // its value with the notice that explains why it is missing.
+  rows: Array<{ label: string; value: ReactNode }>
   notes: string | null
 }) {
   return (

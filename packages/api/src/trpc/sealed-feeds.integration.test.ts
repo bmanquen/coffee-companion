@@ -288,12 +288,18 @@ describe.each(methods)('%s feeds', (method) => {
     expect(brew.dose).toBe(null)
   })
 
-  it('drops a Sealed brew from the dial-ins, keeping the readable one', async () => {
+  it('withholds a Sealed brew from the dial-ins without dropping it', async () => {
     const dialedIn = await feedFor().getDialedIn()
+    const sealed = dialedIn.find((row) => row.id === sealedId(method))
 
-    expect(dialedIn.some((row) => row.id === sealedId(method))).toBe(false)
-    // The control: without this, an empty feed would satisfy the line above.
-    expect(dialedIn.some((row) => row.id === readableId(method))).toBe(true)
+    // Still the coffee's reference brew, just not a readable one.
+    expect(sealed?.sealed).toBe(true)
+    expect(sealed?.dose).toBe(null)
+
+    // The control: without this, a blanket-blanking bug would satisfy the above.
+    const readable = dialedIn.find((row) => row.id === readableId(method))
+    expect(readable?.sealed).toBe(false)
+    expect(readable?.dose).toBe('21')
   })
 })
 
