@@ -4,37 +4,38 @@ import z from 'zod'
 import { db } from '../db'
 import { coffees, espressoShots } from '../db/schema'
 import { insertCoffeeSchema } from '../db/zod'
-import { isSealed, reconcileSeals } from '../lib/shelf'
+import { isSealed, sealNestedBrew, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 export const coffeeRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
-    await reconcileSeals(ctx.session.user.id, ctx.plan)
-
-    const rows = await db.query.coffees.findMany({
-      where: { userId: ctx.session.user.id },
-      orderBy: { updatedAt: 'desc' },
-      with: {
-        country: true,
-        region: true,
-        process: true,
-        roaster: true,
-        roastLevel: true,
-        // Varieties are a many-to-many via the join table; flatten below.
-        coffeesVarieties: { with: { variety: true } },
-        // The coffee's dialed-in espresso shot, if one is set.
-        espressoShots: { where: { isDialedIn: true }, limit: 1 },
-      },
-    })
+    const [rows, shelf] = await Promise.all([
+      db.query.coffees.findMany({
+        where: { userId: ctx.session.user.id },
+        orderBy: { updatedAt: 'desc' },
+        with: {
+          country: true,
+          region: true,
+          process: true,
+          roaster: true,
+          roastLevel: true,
+          // Varieties are a many-to-many via the join table; flatten below.
+          coffeesVarieties: { with: { variety: true } },
+          // The coffee's dialed-in espresso shot, if one is set.
+          espressoShots: { where: { isDialedIn: true }, limit: 1 },
+        },
+      }),
+      ctx.shelf(),
+    ])
     return rows.map(
-      ({ espressoShots: dialedIn, coffeesVarieties, ...coffee }) => {
-        const shot = dialedIn.at(0) ?? null
-        return {
-          ...coffee,
-          varieties: coffeesVarieties.map((cv) => cv.variety),
-          dialedInShot: shot && !isSealed(shot, ctx.plan) ? shot : null,
-        }
-      },
+      ({ espressoShots: dialedIn, coffeesVarieties, ...coffee }) => ({
+        ...coffee,
+        varieties: coffeesVarieties.map((cv) => cv.variety),
+        // Blanked rather than dropped, like every Brew feed: a Sealed dial-in
+        // is still the coffee's reference shot, and the list is where a user
+        // notices it has gone.
+        dialedInShot: sealNestedBrew(dialedIn.at(0) ?? null, shelf),
+      }),
     )
   }),
 
@@ -96,6 +97,8 @@ export const coffeeRouter = createTRPCRouter({
   delete: authedProcedure
     .input(z.uuid())
     .mutation(async ({ ctx, input }) => {
+      await stampFallenBrews(ctx.session.user.id, ctx.plan)
+
       const deleted = await db
         .delete(coffees)
         .where(
@@ -114,12 +117,12 @@ export const coffeeRouter = createTRPCRouter({
       const userId = ctx.session.user.id
 
       // A Sealed Brew cannot become the reference to reproduce: its settings
-      // are not readable, and it would drop straight back out of the dial-ins.
+      // are not readable, so it would arrive as a Sealed row nobody can act on.
       if (input.shotId) {
         const target = await db.query.espressoShots.findFirst({
           where: { id: input.shotId, userId },
         })
-        if (target && isSealed(target, ctx.plan)) {
+        if (target && isSealed(target, await ctx.shelf())) {
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'This Brew is Sealed. Subscribe to dial it in again.',

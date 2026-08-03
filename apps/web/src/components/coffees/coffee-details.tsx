@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { DetailList } from '@/components/detail-list'
 
 // The expandable detail region shared by the coffee card and the desktop table
@@ -17,11 +18,12 @@ export function CoffeeDetails({
   process: string | null
   roastLevel: string | null
   varieties: Array<string>
-  // The dialed-in espresso recipe, pre-compacted to a single line ('-' if none).
-  dialedInEspresso: string
+  // The dialed-in espresso recipe, pre-compacted to a single line ('-' if none)
+  // — or the Sealed notice, when the shot it came from is not readable.
+  dialedInEspresso: ReactNode
   notes: string | null
 }) {
-  const rows: Array<{ label: string; value: string }> = [
+  const rows: Array<{ label: string; value: ReactNode }> = [
     { label: 'Process', value: process || '-' },
     { label: 'Roast level', value: roastLevel || '-' },
     {

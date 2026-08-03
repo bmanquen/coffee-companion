@@ -24,10 +24,19 @@ value of this record:
 
 Consequences to understand before changing anything here:
 
-- **Sealing is a one-way stamp on individual Brews, not a filter over Coffees.** A
-  Coffee can sit off the Shelf, be brewed again, and then hold readable and Sealed
-  Brews at the same time. Any query that "simplifies" this into a coffee-level
-  visibility flag will silently reopen paid data.
+- **Sealing is decided per Brew, not per Coffee.** A Coffee can sit off the Shelf, be
+  brewed again, and then hold readable and Sealed Brews at the same time. Any query that
+  "simplifies" this into a coffee-level visibility flag will silently reopen paid data.
+- **Reading never depends on a write having happened.** A Brew is withheld when its
+  Coffee is off the Shelf, whether or not it has been stamped, so a read path cannot leak
+  by forgetting to repair state first. Moving that repair back onto a read path would
+  restore the leak this replaced.
+- **The stamp is written only where a Coffee could regain its slot.** Its one job is
+  keeping a Brew withheld after its Coffee returns to the Shelf, so it is written before
+  logging a Brew (which lifts a Coffee to the top) and before deleting a Coffee or a Brew
+  (which drops whatever was ranked by it and promotes what sat beneath). Adding a Coffee
+  only displaces, so it needs no stamp. Miss one of these and Sealing stops being one-way:
+  a Free user could reopen withheld Brews by deleting whatever displaced them.
 - **Nothing is ever deleted.** Sealed Brews are retained in full and reopen the instant
   a user upgrades. Data export must ignore Plan state entirely — GDPR Art. 15/20 give
   users a right to their own data whether or not they are paying.

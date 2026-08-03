@@ -5,7 +5,13 @@ import { db } from '../db'
 import { espressoShots } from '../db/schema'
 import { insertEspressoShotSchema } from '../db/zod'
 import { ESPRESSO_DEVICE_TYPE, isEspressoDevice } from '../lib/espresso'
-import { isSealed, reconcileSeals, withSealing } from '../lib/shelf'
+import {
+  isSealed,
+  sealBrew,
+  sealBrewPage,
+  sealBrews,
+  stampFallenBrews,
+} from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 // Espresso shots must be brewed on an Espresso-type device. Throws if the
@@ -30,86 +36,94 @@ async function assertEspressoDevice(brewingDeviceId: string, userId: string) {
 }
 
 export const espressoShotRouter = createTRPCRouter({
-  getAll: authedProcedure.query(async ({ ctx }) => {
-    await reconcileSeals(ctx.session.user.id, ctx.plan)
-
-    const shots = await db.query.espressoShots.findMany({
-      where: { userId: ctx.session.user.id },
-      orderBy: { createdAt: 'desc' },
-      with: { coffee: true, grinder: true, brewingDevice: { with: { type: true } } },
-    })
-    return shots.map((shot) => withSealing(shot, ctx.plan))
-  }),
-
-  getRecent: authedProcedure
-    .input(z.object({ limit: z.number().min(1).max(50), offset: z.number().min(0) }))
-    .query(async ({ ctx, input }) => {
-      await reconcileSeals(ctx.session.user.id, ctx.plan)
-
-      const [items, [{ total }]] = await Promise.all([
-        db.query.espressoShots.findMany({
-          where: { userId: ctx.session.user.id },
-          orderBy: { createdAt: 'desc' },
-          with: { coffee: true, grinder: true, brewingDevice: { with: { type: true } } },
-          limit: input.limit,
-          offset: input.offset,
-        }),
-        db.select({ total: count() }).from(espressoShots).where(eq(espressoShots.userId, ctx.session.user.id)),
-      ])
-      return { items: items.map((shot) => withSealing(shot, ctx.plan)), total }
-    }),
-
-  // Shots that are the dialed-in reference for their coffee, most recent first.
-  // An optional limit caps the result (the dashboard asks for a handful);
-  // omitting it returns every dialed-in shot.
-  getDialedIn: authedProcedure
-    .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
-    .query(async ({ ctx, input }) => {
-      await reconcileSeals(ctx.session.user.id, ctx.plan)
-
-      const dialedIn = await db.query.espressoShots.findMany({
-        where: { userId: ctx.session.user.id, isDialedIn: true },
+  getAll: authedProcedure.query(({ ctx }) =>
+    sealBrews(ctx.shelf, () =>
+      db.query.espressoShots.findMany({
+        where: { userId: ctx.session.user.id },
         orderBy: { createdAt: 'desc' },
         with: {
           coffee: true,
           grinder: true,
           brewingDevice: { with: { type: true } },
         },
-        limit: input?.limit,
+      }),
+    ),
+  ),
+
+  getRecent: authedProcedure
+    .input(
+      z.object({ limit: z.number().min(1).max(50), offset: z.number().min(0) }),
+    )
+    .query(({ ctx, input }) =>
+      sealBrewPage(ctx.shelf, async () => {
+        const [items, [{ total }]] = await Promise.all([
+          db.query.espressoShots.findMany({
+            where: { userId: ctx.session.user.id },
+            orderBy: { createdAt: 'desc' },
+            with: {
+              coffee: true,
+              grinder: true,
+              brewingDevice: { with: { type: true } },
+            },
+            limit: input.limit,
+            offset: input.offset,
+          }),
+          db
+            .select({ total: count() })
+            .from(espressoShots)
+            .where(eq(espressoShots.userId, ctx.session.user.id)),
+        ])
+        return { items, total }
+      }),
+    ),
+
+  // Shots that are the dialed-in reference for their coffee, most recent first.
+  // An optional limit caps the result (the dashboard asks for a handful);
+  // omitting it returns every dialed-in shot. A Sealed one is blanked like any
+  // other Brew rather than dropped: it is still the coffee's reference shot,
+  // and the user is owed the sight of what subscribing would reopen.
+  getDialedIn: authedProcedure
+    .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
+    .query(({ ctx, input }) =>
+      sealBrews(ctx.shelf, () =>
+        db.query.espressoShots.findMany({
+          where: { userId: ctx.session.user.id, isDialedIn: true },
+          orderBy: { createdAt: 'desc' },
+          with: {
+            coffee: true,
+            grinder: true,
+            brewingDevice: { with: { type: true } },
+          },
+          limit: input?.limit,
+        }),
+      ),
+    ),
+
+  // Sealed here too: the edit form would otherwise hand back every setting the
+  // feeds withhold.
+  getById: authedProcedure.input(z.uuid()).query(({ ctx, input }) =>
+    sealBrew(ctx.shelf, async () => {
+      const shot = await db.query.espressoShots.findFirst({
+        where: { id: input, userId: ctx.session.user.id },
       })
-      // A Sealed dial-in is not a dial-in: the reference settings are the most
-      // valuable thing on the Coffee and would otherwise be a hole straight
-      // through the paywall.
-      return dialedIn
-        .filter((shot) => !isSealed(shot, ctx.plan))
-        .map((shot) => withSealing(shot, ctx.plan))
+      if (!shot) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Shot not found' })
+      }
+      return shot
     }),
-
-  getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {
-    await reconcileSeals(ctx.session.user.id, ctx.plan)
-
-    const shot = await db.query.espressoShots.findFirst({
-      where: { id: input, userId: ctx.session.user.id },
-    })
-    if (!shot) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Shot not found' })
-    }
-    // Sealed here too: the edit form would otherwise hand back every setting
-    // the feeds withhold.
-    return withSealing(shot, ctx.plan)
-  }),
+  ),
 
   create: authedProcedure
     .input(insertEspressoShotSchema)
     .mutation(async ({ ctx, input }) => {
       await assertEspressoDevice(input.brewingDeviceId, ctx.session.user.id)
 
+      await stampFallenBrews(ctx.session.user.id, ctx.plan)
+
       const [shot] = await db
         .insert(espressoShots)
         .values({ ...input, userId: ctx.session.user.id })
         .returning()
-      // Logging a Brew reorders the Shelf, which may push another Coffee off it.
-      await reconcileSeals(ctx.session.user.id, ctx.plan)
       return shot
     }),
 
@@ -125,7 +139,7 @@ export const espressoShotRouter = createTRPCRouter({
       const existing = await db.query.espressoShots.findFirst({
         where: { id, userId: ctx.session.user.id },
       })
-      if (existing && isSealed(existing, ctx.plan)) {
+      if (existing && isSealed(existing, await ctx.shelf())) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message:
@@ -152,6 +166,8 @@ export const espressoShotRouter = createTRPCRouter({
   delete: authedProcedure
     .input(z.uuid())
     .mutation(async ({ ctx, input }) => {
+      await stampFallenBrews(ctx.session.user.id, ctx.plan)
+
       const deleted = await db
         .delete(espressoShots)
         .where(

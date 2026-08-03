@@ -17,11 +17,23 @@ process.env.E2E_BYPASS_AUTH = 'true'
 
 export const UNKNOWN_UUID = '00000000-0000-4000-8000-000000000000'
 
+const cookieFor = (userId: string) =>
+  new Headers({ cookie: `e2e_auth=${userId}` })
+
 // A caller authenticated as the given user id (must exist in the `user` table).
+// Builds a context per call, so each procedure is its own request — matching an
+// app that fires one query at a time, and keeping per-request state (the Plan
+// and the Shelf) from going stale across a test file.
 export const callerFor = (userId: string) =>
-  createCallerFactory(trpcRouter)({
-    headers: new Headers({ cookie: `e2e_auth=${userId}` }),
-  })
+  createCallerFactory(trpcRouter)(() => ({ headers: cookieFor(userId) }))
+
+// A caller whose procedures all share one context, the way tRPC's HTTP batching
+// puts a dashboard's feeds in a single request. Use it to assert what a request
+// resolves once; prefer callerFor everywhere else.
+export const batchedCallerFor = (userId: string) => {
+  const ctx = { headers: cookieFor(userId) }
+  return createCallerFactory(trpcRouter)(ctx)
+}
 
 // A caller with no bypass cookie → treated as unauthenticated.
 export const anonCaller = createCallerFactory(trpcRouter)({
