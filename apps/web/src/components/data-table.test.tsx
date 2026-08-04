@@ -2,6 +2,7 @@ import {
   createColumnHelper,
   getCoreRowModel,
   getExpandedRowModel,
+  getPaginationRowModel,
   useReactTable,
 } from '@tanstack/react-table'
 import { fireEvent, render, screen, within } from '@testing-library/react'
@@ -43,6 +44,58 @@ function DataTableHarness({
 function cardRegion(container: HTMLElement): HTMLElement {
   return container.querySelector<HTMLElement>('.lg\\:hidden')!
 }
+
+// Pagination is opt-in, and needs the paginated row model plus a page size the
+// data actually exceeds — otherwise both controls sit disabled.
+function PaginatedHarness({ data }: { data: Array<CoffeeRow> }) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageIndex: 0, pageSize: 1 } },
+  })
+  return <DataTable table={table} paginated />
+}
+
+describe('DataTable pagination', () => {
+  const twoPages = [
+    { name: 'Ethiopia Guji', roaster: 'Sey' },
+    { name: 'Colombia El Paraiso', roaster: 'Onyx' },
+  ]
+
+  it('reports the current page and disables Previous on the first one', () => {
+    render(<PaginatedHarness data={twoPages} />)
+
+    expect(screen.getByText(/Page 1 of 2/)).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Previous page' }),
+    ).toHaveProperty('disabled', true)
+  })
+
+  it('walks forward and back through the pages', () => {
+    render(<PaginatedHarness data={twoPages} />)
+    const table = () => within(screen.getByRole('table'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    expect(screen.getByText(/Page 2 of 2/)).toBeTruthy()
+    expect(table().getByText('Colombia El Paraiso')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Next page' })).toHaveProperty(
+      'disabled',
+      true,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Previous page' }))
+    expect(screen.getByText(/Page 1 of 2/)).toBeTruthy()
+    expect(table().getByText('Ethiopia Guji')).toBeTruthy()
+  })
+
+  it('reports one page rather than zero when there are no rows', () => {
+    render(<PaginatedHarness data={[]} />)
+
+    expect(screen.getByText(/Page 1 of 1/)).toBeTruthy()
+  })
+})
 
 describe('DataTable', () => {
   // The component renders two layouts at once — a real table (>= md) and a

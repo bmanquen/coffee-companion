@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 const authState = vi.hoisted(() => ({
   session: null as { user: { name: string; image: string | null } } | null,
 }))
+const interactOutside = vi.hoisted(() => ({ prevented: 0 }))
 const mocks = vi.hoisted(() => ({
   signInSocial: vi.fn(),
   signOut: vi.fn(),
@@ -42,7 +43,29 @@ vi.mock('@/components/ui/sheet', () => ({
   SheetTrigger: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
-  SheetContent: ({ children }: { children: ReactNode }) => (
+  SheetContent: ({
+    children,
+    onInteractOutside,
+  }: {
+    children: ReactNode
+    onInteractOutside?: (e: { preventDefault: () => void }) => void
+  }) => (
+    <div>
+      {/* Radix fires this when the user clicks away; expose it so the
+          component's own handling is observable. */}
+      <button
+        type="button"
+        data-testid="interact-outside"
+        onClick={() =>
+          onInteractOutside?.({
+            preventDefault: () => interactOutside.prevented++,
+          })
+        }
+      />
+      {children}
+    </div>
+  ),
+  _unusedSheetContent: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
 }))
@@ -91,5 +114,17 @@ describe('Navigation', () => {
       )
     })
     expect(mocks.signInSocial).toHaveBeenCalledWith({ provider: 'google' })
+  })
+
+  // The drawer is dismissed by its own close control, not by clicking away —
+  // otherwise a mis-click while reading the nav would collapse it.
+  it('refuses to close on an interaction outside it', () => {
+    authState.session = { user: { name: 'Test User', image: null } }
+    interactOutside.prevented = 0
+    render(<Navigation open setOpen={() => {}} />)
+
+    fireEvent.click(screen.getByTestId('interact-outside'))
+
+    expect(interactOutside.prevented).toBe(1)
   })
 })

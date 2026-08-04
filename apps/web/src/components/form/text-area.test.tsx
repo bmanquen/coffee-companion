@@ -24,6 +24,22 @@ function ValidatedHarness() {
   )
 }
 
+function DescribedHarness({ showLabel }: { showLabel?: boolean }) {
+  const form = useAppForm({ defaultValues: { notes: '' } })
+  return (
+    <form.AppField name="notes">
+      {(field) => (
+        <field.TextArea
+          label="Notes"
+          showLabel={showLabel}
+          description="What you tasted"
+          placeholder="Tasting notes"
+        />
+      )}
+    </form.AppField>
+  )
+}
+
 describe('TextArea', () => {
   it('renders the label and textarea', () => {
     render(<Harness />)
@@ -49,5 +65,20 @@ describe('TextArea', () => {
       fireEvent.blur(textarea)
     })
     expect(screen.getByText('Notes are required')).toBeTruthy()
+  })
+
+  it('renders a description when one is given', () => {
+    render(<DescribedHarness />)
+
+    expect(screen.getByText('What you tasted')).toBeTruthy()
+  })
+
+  // showLabel={false} hides the label visually but must keep it for screen
+  // readers — dropping it would leave the textarea unlabelled.
+  it('keeps the label reachable when it is visually hidden', () => {
+    render(<DescribedHarness showLabel={false} />)
+
+    expect(screen.getByText('Notes').className).toContain('sr-only')
+    expect(screen.getByLabelText('Notes')).toBeTruthy()
   })
 })

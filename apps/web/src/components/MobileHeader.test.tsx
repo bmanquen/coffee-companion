@@ -72,4 +72,20 @@ describe('MobileHeader', () => {
     })
     expect(mocks.signInSocial).toHaveBeenCalledWith({ provider: 'google' })
   })
+
+  it('shows the account picture when the session carries one', () => {
+    authState.session = {
+      user: {
+        name: 'Test User',
+        email: 'test@example.com',
+        image: 'https://example.com/avatar.png',
+      },
+    }
+    const { container } = render(<MobileHeader />)
+
+    // The avatar mock renders a decorative img (empty alt), so it has no
+    // accessible role to query by.
+    const avatar = container.querySelector('img')
+    expect(avatar?.getAttribute('src')).toBe('https://example.com/avatar.png')
+  })
 })
