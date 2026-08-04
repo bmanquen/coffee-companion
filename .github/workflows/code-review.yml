@@ -2,8 +2,17 @@ name: Claude Review
 on:
   pull_request:
     types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
 jobs:
   review:
+    if: >
+      github.event_name == 'pull_request' ||
+      (github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '@claude'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
