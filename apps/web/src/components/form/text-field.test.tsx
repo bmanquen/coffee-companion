@@ -28,6 +28,22 @@ function ValidatedHarness() {
   )
 }
 
+function DescribedHarness({ showLabel }: { showLabel?: boolean }) {
+  const form = useAppForm({ defaultValues: { name: '' } })
+  return (
+    <form.AppField name="name">
+      {(field) => (
+        <field.TextField
+          label="Coffee name"
+          showLabel={showLabel}
+          description="As printed on the bag"
+          placeholder="Enter name"
+        />
+      )}
+    </form.AppField>
+  )
+}
+
 describe('TextField', () => {
   it('renders the label and input', () => {
     render(<Harness />)
@@ -52,5 +68,21 @@ describe('TextField', () => {
       fireEvent.blur(input)
     })
     expect(screen.getByText('Name is required')).toBeTruthy()
+  })
+
+  it('renders a description when one is given', () => {
+    render(<DescribedHarness />)
+
+    expect(screen.getByText('As printed on the bag')).toBeTruthy()
+  })
+
+  // showLabel={false} hides the label visually but must keep it for screen
+  // readers — dropping it would leave the input unlabelled.
+  it('keeps the label reachable when it is visually hidden', () => {
+    render(<DescribedHarness showLabel={false} />)
+
+    const label = screen.getByText('Coffee name')
+    expect(label.className).toContain('sr-only')
+    expect(screen.getByLabelText('Coffee name')).toBeTruthy()
   })
 })
