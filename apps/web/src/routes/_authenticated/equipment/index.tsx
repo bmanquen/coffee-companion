@@ -243,7 +243,7 @@ function GrindersSection() {
   'use no memo'
   const trpc = useTRPC()
   const { data: grinders } = useSuspenseQuery(trpc.grinder.list.queryOptions())
-  const { data: entitlement } = useSuspenseQuery(
+  const { data: allowance } = useSuspenseQuery(
     trpc.plan.current.queryOptions(),
   )
 
@@ -271,8 +271,8 @@ function GrindersSection() {
           to="/equipment/grinders/new"
           label="Add Grinder"
           limitNote={
-            atGearLimit(entitlement.limits.grinders, grinders.length)
-              ? gearLimitSentence(entitlement.plan, 'grinders')
+            atGearLimit(allowance.limits.grinders, grinders.length)
+              ? gearLimitSentence(allowance.plan, 'grinders')
               : null
           }
         />
@@ -306,7 +306,7 @@ function BrewingDevicesSection() {
   const { data: devices } = useSuspenseQuery(
     trpc.brewingDevice.list.queryOptions(),
   )
-  const { data: entitlement } = useSuspenseQuery(
+  const { data: allowance } = useSuspenseQuery(
     trpc.plan.current.queryOptions(),
   )
 
@@ -334,8 +334,8 @@ function BrewingDevicesSection() {
           to="/equipment/brewing-devices/new"
           label="Add Brewing Device"
           limitNote={
-            atGearLimit(entitlement.limits.brewingDevices, devices.length)
-              ? gearLimitSentence(entitlement.plan, 'brewingDevices')
+            atGearLimit(allowance.limits.brewingDevices, devices.length)
+              ? gearLimitSentence(allowance.plan, 'brewingDevices')
               : null
           }
         />
