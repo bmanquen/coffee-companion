@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 import {
   E2E_USER_EMPTY,
+  E2E_USER_FREE,
   E2E_USER_WITH_DATA,
 } from '@coffee-companion/api/lib/e2e-auth'
 
@@ -8,8 +9,11 @@ import {
 //
 // Projects:
 // - `public`       — unauthenticated pages (no cookie).
-// - `authed-data`  — acts as the seeded user (data-state tests).
+// - `authed-data`  — acts as the seeded user, whose Grant puts them on Pro
+//                    (data-state tests, and the granted reading experience).
 // - `authed-empty` — acts as an unseeded user (empty-state tests).
+// - `authed-free`  — acts as a user holding the same library on Free, so the
+//                    Sealed reading experience is driven in a real browser.
 //
 // The `e2e_auth=<userId>` cookie (with E2E_BYPASS_AUTH=true on the server) makes
 // the app treat the request as that user without exercising the real Google
@@ -73,6 +77,14 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         storageState: authAs(E2E_USER_EMPTY),
+      },
+    },
+    {
+      name: 'authed-free',
+      testMatch: /\.free\.spec\.ts$/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: authAs(E2E_USER_FREE),
       },
     },
   ],

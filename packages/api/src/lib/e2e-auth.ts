@@ -14,6 +14,9 @@
 // different users (e.g. one with seeded data, one empty).
 export const E2E_USER_WITH_DATA = 'e2e-user-with-data'
 export const E2E_USER_EMPTY = 'e2e-user-empty'
+// Holds the same library as E2E_USER_WITH_DATA but no Grant, so the two of them
+// read the same rows on different Plans.
+export const E2E_USER_FREE = 'e2e-user-free'
 
 function makeSession(userId: string) {
   return {
