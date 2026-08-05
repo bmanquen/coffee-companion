@@ -59,6 +59,13 @@ optionally, when it ends. A Grant and a Subscription may both apply to one user,
 more generous of the two is that user's Plan.
 _Avoid_: Override, freebie, coupon, discount
 
+**Interest**:
+A signed-in user's record that they want a Plan they cannot buy yet. Held once
+per user per Plan — pressing the call to action again is not a second answer —
+it confers no Plan, charges nothing, and nothing is ever sent from it: it is
+read directly.
+_Avoid_: Waitlist, signup, lead
+
 **Shelf**:
 The Coffees whose Brews a user can read. Free holds five, ordered by most recently
 brewed; paid Plans hold the whole library. Its size is therefore a function of the Plan,

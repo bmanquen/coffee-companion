@@ -1,8 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useMutation } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
 import { useState } from 'react'
 import type { BillingPeriod, PlanId } from '@/lib/plans'
 import { H1 } from '@/components/typography/h1'
+import { authClient } from '@/lib/auth-client'
+import { useTRPC } from '@/integrations/trpc/react'
 import {
   Accordion,
   AccordionContent,
@@ -31,20 +34,32 @@ export const Route = createFileRoute('/_marketing/pricing')({
   component: PricingRoute,
 })
 
-// Both seams throw rather than no-op. No payment provider has been chosen and
-// no waitlist exists yet, so a button that quietly did nothing would look
-// shipped; this makes an unwired call to action impossible to miss.
-function notImplemented(action: string) {
-  return (planId: PlanId): never => {
-    throw new Error(`${action} is not implemented yet (plan: ${planId})`)
-  }
-}
+export function PricingRoute() {
+  const { data: session } = authClient.useSession()
+  const trpc = useTRPC()
+  const interest = useMutation(trpc.planInterest.register.mutationOptions())
 
-function PricingRoute() {
+  const registerInterest = async (planId: PlanId) => {
+    if (!session) {
+      await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: '/pricing',
+      })
+      return 'signing-in' as const
+    }
+
+    await interest.mutateAsync({ planId })
+    return 'recorded' as const
+  }
+
   return (
     <PricingPage
-      onCheckout={notImplemented('Checkout')}
-      onNotify={notImplemented('Interest registration')}
+      // Throws rather than no-ops: no payment provider is wired up yet, so a
+      // button that quietly did nothing would look shipped.
+      onCheckout={(planId) => {
+        throw new Error(`Checkout is not implemented yet (plan: ${planId})`)
+      }}
+      onNotify={registerInterest}
     />
   )
 }
@@ -86,9 +101,24 @@ export function PricingPage({
   onNotify,
 }: {
   onCheckout: (planId: PlanId) => void
-  onNotify: (planId: PlanId) => void
+  onNotify: (planId: PlanId) => Promise<'recorded' | 'signing-in'>
 }) {
   const [period, setPeriod] = useState<BillingPeriod>('monthly')
+  const [notice, setNotice] = useState<{
+    planId: PlanId
+    recorded: boolean
+  } | null>(null)
+
+  const registerInterest = async (planId: PlanId) => {
+    setNotice(null)
+    try {
+      if ((await onNotify(planId)) === 'recorded') {
+        setNotice({ planId, recorded: true })
+      }
+    } catch {
+      setNotice({ planId, recorded: false })
+    }
+  }
 
   return (
     <div className="flex flex-col gap-16 py-12">
@@ -127,12 +157,21 @@ export function PricingPage({
             <Button
               className="w-full"
               variant={plan.sellable ? 'default' : 'outline'}
-              onClick={() =>
-                plan.sellable ? onCheckout(plan.id) : onNotify(plan.id)
-              }
+              onClick={() => {
+                if (plan.sellable) onCheckout(plan.id)
+                else void registerInterest(plan.id)
+              }}
             >
               {plan.cta}
             </Button>
+
+            {notice?.planId === plan.id && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {notice.recorded
+                  ? `Noted. ${plan.name} is not on sale, and you have not been charged.`
+                  : 'That did not save. Nothing has been charged — please try again.'}
+              </p>
+            )}
 
             <dl className="flex flex-col gap-3 border-t border-border pt-4">
               {planFeatures.map((feature) => (
