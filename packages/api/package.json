@@ -22,6 +22,7 @@
     "./db": "./src/db/index.ts",
     "./db/schema": "./src/db/schema.ts",
     "./db/seed-e2e": "./src/db/seed-e2e.ts",
+    "./db/e2e-library": "./src/db/e2e-library.ts",
     "./db/zod": "./src/db/zod.ts",
     "./lib/auth": "./src/lib/auth.ts",
     "./lib/e2e-auth": "./src/lib/e2e-auth.ts",
