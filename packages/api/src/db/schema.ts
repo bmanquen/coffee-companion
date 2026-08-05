@@ -465,10 +465,25 @@ export const planGrants = pgTable(
   (table) => [index('plan_grants_user_idx').on(table.userId)],
 )
 
+export const planInterests = pgTable(
+  'plan_interests',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .references(() => user.id, { onDelete: 'cascade' })
+      .notNull(),
+    planId: planIdEnum('plan_id').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('plan_interests_user_plan_idx').on(table.userId, table.planId),
+  ],
+)
+
 // Relations
 
 export const relations = defineRelations(
-  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, planGrants },
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, planGrants, planInterests },
   (r) => ({
     user: {
       sessions: r.many.session(),
@@ -494,10 +509,18 @@ export const relations = defineRelations(
       frenchpressBrews: r.many.frenchpressBrews(),
       coldBrewBrews: r.many.coldBrewBrews(),
       planGrants: r.many.planGrants(),
+      planInterests: r.many.planInterests(),
     },
     planGrants: {
       user: r.one.user({
         from: r.planGrants.userId,
+        to: r.user.id,
+        optional: false,
+      }),
+    },
+    planInterests: {
+      user: r.one.user({
+        from: r.planInterests.userId,
         to: r.user.id,
         optional: false,
       }),

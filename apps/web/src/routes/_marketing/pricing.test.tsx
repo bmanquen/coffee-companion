@@ -1,10 +1,32 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
-import { PricingPage } from './pricing'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { PricingPage, PricingRoute } from './pricing'
+import type { PlanId } from '@/lib/plans'
+import { createTestProviders } from '@/test/providers'
 
-function renderPricing() {
+const authState = vi.hoisted(() => ({
+  session: null as { user: { id: string } } | null,
+}))
+const mocks = vi.hoisted(() => ({ signInSocial: vi.fn() }))
+
+vi.mock('@/lib/auth-client', () => ({
+  authClient: {
+    useSession: () => ({ data: authState.session }),
+    signIn: { social: mocks.signInSocial },
+  },
+}))
+
+function renderPricing(
+  notify?: (planId: PlanId) => Promise<'recorded' | 'signing-in'>,
+) {
   const onCheckout = vi.fn()
-  const onNotify = vi.fn()
+  const onNotify = vi.fn(notify)
   const utils = render(
     <PricingPage onCheckout={onCheckout} onNotify={onNotify} />,
   )
@@ -121,6 +143,34 @@ describe('PricingPage', () => {
     expect(onCheckout).not.toHaveBeenCalled()
   })
 
+  it('says nothing was charged once interest is recorded', async () => {
+    renderPricing(async () => 'recorded')
+
+    fireEvent.click(planCard('Pro+').getByRole('button', { name: 'Notify me' }))
+
+    const notice = await screen.findByRole('status')
+    expect(notice.textContent).toMatch(/not been charged/i)
+  })
+
+  it('confirms nothing to a visitor sent away to sign in', async () => {
+    const { onNotify } = renderPricing(async () => 'signing-in')
+
+    fireEvent.click(planCard('Pro+').getByRole('button', { name: 'Notify me' }))
+
+    await waitFor(() => expect(onNotify).toHaveBeenCalled())
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('asks the visitor to try again when recording interest fails', async () => {
+    renderPricing(() => Promise.reject(new Error('offline')))
+
+    fireEvent.click(planCard('Pro+').getByRole('button', { name: 'Notify me' }))
+
+    const notice = await screen.findByRole('status')
+    expect(notice.textContent).toMatch(/again/i)
+    expect(notice.textContent).not.toMatch(/recorded/i)
+  })
+
   it('marks the AI row coming soon without hiding its values', () => {
     renderPricing()
 
@@ -202,5 +252,68 @@ describe('PricingPage', () => {
     renderPricing()
     expect(screen.getByText(/Unlimited coffees/)).toBeTruthy()
     expect(screen.getByText(/Unlimited brews/)).toBeTruthy()
+  })
+})
+
+describe('PricingRoute', () => {
+  beforeEach(() => {
+    authState.session = null
+    mocks.signInSocial.mockClear()
+  })
+
+  function renderRoute() {
+    const { Wrapper } = createTestProviders()
+    return render(<PricingRoute />, { wrapper: Wrapper })
+  }
+
+  function stubbedFetch() {
+    return vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+  }
+
+  it('records interest through the API for a signed-in visitor', async () => {
+    authState.session = { user: { id: 'visitor' } }
+    const fetchSpy = stubbedFetch()
+
+    try {
+      renderRoute()
+      fireEvent.click(
+        planCard('Pro+').getByRole('button', { name: 'Notify me' }),
+      )
+
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      const [url, init] = fetchSpy.mock.calls[0]
+      expect(String(url)).toContain('planInterest.register')
+      expect(String(init?.body ?? '')).toContain('proPlus')
+      expect(mocks.signInSocial).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('sends a logged-out visitor to sign in instead of recording anything', async () => {
+    const fetchSpy = stubbedFetch()
+
+    try {
+      renderRoute()
+      fireEvent.click(
+        planCard('Pro+').getByRole('button', { name: 'Notify me' }),
+      )
+
+      await waitFor(() =>
+        expect(mocks.signInSocial).toHaveBeenCalledWith({
+          provider: 'google',
+          callbackURL: '/pricing',
+        }),
+      )
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(screen.queryByRole('status')).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })
