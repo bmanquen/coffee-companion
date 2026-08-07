@@ -2,9 +2,15 @@ import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 
 // The public site's header. Deliberately unrelated to the signed-in app's
-// Navigation/MobileHeader: a visitor here has no account, so there is nothing
-// to navigate and nobody to sign out. Wordmark, one link, one action.
-export function MarketingHeader({ onSignIn }: { onSignIn: () => void }) {
+// Navigation/MobileHeader: even a signed-in visitor is only passing through, so
+// the way back to the app is one link rather than the app's own navigation.
+export function MarketingHeader({
+  signedIn = false,
+  onSignIn,
+}: {
+  signedIn?: boolean
+  onSignIn: () => void
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
@@ -18,9 +24,15 @@ export function MarketingHeader({ onSignIn }: { onSignIn: () => void }) {
           >
             Pricing
           </Link>
-          <Button size="sm" onClick={onSignIn}>
-            Sign in
-          </Button>
+          {signedIn ? (
+            <Button size="sm" asChild>
+              <Link to="/dashboard">Dashboard</Link>
+            </Button>
+          ) : (
+            <Button size="sm" onClick={onSignIn}>
+              Sign in
+            </Button>
+          )}
         </nav>
       </div>
     </header>
