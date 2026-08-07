@@ -6,10 +6,18 @@ export type PlanId = 'free' | 'pro' | 'proPlus'
 
 const rank: Array<PlanId> = ['free', 'pro', 'proPlus']
 
-const planName: Record<PlanId, string> = {
+export const planName: Record<PlanId, string> = {
   free: 'Free',
   pro: 'Pro',
   proPlus: 'Pro+',
+}
+
+// Whether a Plan can be bought. An unsellable Plan is the only kind that can
+// receive Interest — the way to have a sellable one is to subscribe to it.
+export const sellable: Record<PlanId, boolean> = {
+  free: true,
+  pro: true,
+  proPlus: false,
 }
 
 export type GearResource = 'grinders' | 'brewingDevices'

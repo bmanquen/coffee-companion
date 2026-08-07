@@ -6,14 +6,18 @@ import {
   within,
 } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PricingPage, PricingRoute } from './pricing'
+import { PricingPage, PricingScreen } from './pricing'
 import type { PlanId } from '@/lib/plans'
 import { createTestProviders } from '@/test/providers'
 
 const authState = vi.hoisted(() => ({
   session: null as { user: { id: string } } | null,
 }))
-const mocks = vi.hoisted(() => ({ signInSocial: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  signInSocial: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+}))
 
 vi.mock('@/lib/auth-client', () => ({
   authClient: {
@@ -22,13 +26,23 @@ vi.mock('@/lib/auth-client', () => ({
   },
 }))
 
+vi.mock('sonner', () => ({
+  toast: { success: mocks.toastSuccess, error: mocks.toastError },
+}))
+
+beforeEach(() => {
+  mocks.toastSuccess.mockClear()
+  mocks.toastError.mockClear()
+})
+
 function renderPricing(
   notify?: (planId: PlanId) => Promise<'recorded' | 'signing-in'>,
+  props: { pendingInterest?: PlanId; registeredPlans?: Array<PlanId> } = {},
 ) {
   const onCheckout = vi.fn()
   const onNotify = vi.fn(notify)
   const utils = render(
-    <PricingPage onCheckout={onCheckout} onNotify={onNotify} />,
+    <PricingPage onCheckout={onCheckout} onNotify={onNotify} {...props} />,
   )
   return { ...utils, onCheckout, onNotify }
 }
@@ -137,7 +151,9 @@ describe('PricingPage', () => {
   it('registers interest for Pro+ and never sends it to checkout', () => {
     const { onCheckout, onNotify } = renderPricing()
 
-    fireEvent.click(planCard('Pro+').getByRole('button', { name: 'Notify me' }))
+    fireEvent.click(
+      planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
+    )
 
     expect(onNotify).toHaveBeenCalledWith('proPlus')
     expect(onCheckout).not.toHaveBeenCalled()
@@ -146,29 +162,131 @@ describe('PricingPage', () => {
   it('says nothing was charged once interest is recorded', async () => {
     renderPricing(async () => 'recorded')
 
-    fireEvent.click(planCard('Pro+').getByRole('button', { name: 'Notify me' }))
+    fireEvent.click(
+      planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
+    )
 
-    const notice = await screen.findByRole('status')
-    expect(notice.textContent).toMatch(/not been charged/i)
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalled())
+    const [message, options] = mocks.toastSuccess.mock.calls[0]
+    expect(String(message)).toMatch(/Pro\+/)
+    expect(String(options?.description ?? '')).toMatch(/not been charged/i)
+    expect(mocks.toastError).not.toHaveBeenCalled()
+  })
+
+  // The confirmation email is sent by the server on the recording press only,
+  // and not at all when mail is unconfigured or failing. The toast cannot see
+  // any of that, so it must not claim it.
+  it('claims no email it cannot know was sent', async () => {
+    renderPricing(async () => 'recorded')
+
+    fireEvent.click(
+      planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
+    )
+
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalled())
+    const [message, options] = mocks.toastSuccess.mock.calls[0]
+    expect(
+      `${String(message)} ${String(options?.description ?? '')}`,
+    ).not.toMatch(/email|inbox|sent you/i)
   })
 
   it('confirms nothing to a visitor sent away to sign in', async () => {
     const { onNotify } = renderPricing(async () => 'signing-in')
 
-    fireEvent.click(planCard('Pro+').getByRole('button', { name: 'Notify me' }))
+    fireEvent.click(
+      planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
+    )
 
     await waitFor(() => expect(onNotify).toHaveBeenCalled())
-    expect(screen.queryByRole('status')).toBeNull()
+    expect(mocks.toastSuccess).not.toHaveBeenCalled()
   })
 
   it('asks the visitor to try again when recording interest fails', async () => {
     renderPricing(() => Promise.reject(new Error('offline')))
 
-    fireEvent.click(planCard('Pro+').getByRole('button', { name: 'Notify me' }))
+    fireEvent.click(
+      planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
+    )
 
-    const notice = await screen.findByRole('status')
-    expect(notice.textContent).toMatch(/again/i)
-    expect(notice.textContent).not.toMatch(/recorded/i)
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalled())
+    const [message, options] = mocks.toastError.mock.calls[0]
+    expect(`${String(message)} ${String(options?.description ?? '')}`).toMatch(
+      /again/i,
+    )
+    expect(mocks.toastSuccess).not.toHaveBeenCalled()
+  })
+
+  it('registers a Plan carried back from sign-in without a second press', async () => {
+    const { onNotify } = renderPricing(async () => 'recorded', {
+      pendingInterest: 'proPlus',
+    })
+
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalled())
+    expect(onNotify).toHaveBeenCalledWith('proPlus')
+    expect(onNotify).toHaveBeenCalledTimes(1)
+  })
+
+  it('registers nothing on its own when no Plan came back from sign-in', async () => {
+    const { onNotify } = renderPricing(async () => 'recorded')
+
+    await waitFor(() => expect(screen.getByText('Pro+')).toBeTruthy())
+    expect(onNotify).not.toHaveBeenCalled()
+  })
+
+  it('offers no second press once a Plan is registered', () => {
+    const { onNotify } = renderPricing(async () => 'recorded', {
+      registeredPlans: ['proPlus'],
+    })
+
+    const button = planCard('Pro+').getByRole('button', { name: 'Registered' })
+    expect(button.hasAttribute('disabled')).toBe(true)
+    expect(
+      planCard('Pro+').queryByRole('button', { name: 'Join Waitlist' }),
+    ).toBeNull()
+
+    fireEvent.click(button)
+    expect(onNotify).not.toHaveBeenCalled()
+  })
+
+  // Registering interest is only ever the state of a call to action that
+  // registers interest. An interest row against a sellable Plan — which the
+  // server accepts — must never take away its purchase path.
+  it('leaves a sellable Plan buyable however much interest is on record', () => {
+    const { onCheckout } = renderPricing(async () => 'recorded', {
+      registeredPlans: ['pro', 'proPlus'],
+    })
+
+    const subscribe = planCard('Pro').getByRole('button', { name: 'Subscribe' })
+    expect(subscribe.hasAttribute('disabled')).toBe(false)
+
+    fireEvent.click(subscribe)
+    expect(onCheckout).toHaveBeenCalledWith('pro')
+  })
+
+  it('reads as registered straight after the press that recorded it', async () => {
+    renderPricing(async () => 'recorded')
+
+    fireEvent.click(
+      planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
+    )
+
+    expect(
+      await planCard('Pro+').findByRole('button', { name: 'Registered' }),
+    ).toBeTruthy()
+  })
+
+  it('leaves the press available when it did not record', async () => {
+    const { onNotify } = renderPricing(() => Promise.reject(new Error('nope')))
+
+    fireEvent.click(
+      planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
+    )
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalled())
+    expect(
+      planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
+    ).toBeTruthy()
+    expect(onNotify).toHaveBeenCalledTimes(1)
   })
 
   it('marks the AI row coming soon without hiding its values', () => {
@@ -255,15 +373,35 @@ describe('PricingPage', () => {
   })
 })
 
-describe('PricingRoute', () => {
+describe('PricingScreen', () => {
   beforeEach(() => {
     authState.session = null
     mocks.signInSocial.mockClear()
   })
 
-  function renderRoute() {
-    const { Wrapper } = createTestProviders()
-    return render(<PricingRoute />, { wrapper: Wrapper })
+  // Seeds what the visitor has already registered, so the screen never has to
+  // fetch it and the register call is the only request a test can see.
+  function renderScreen({
+    pendingInterest,
+    alreadyRegistered = [],
+  }: {
+    pendingInterest?: PlanId
+    alreadyRegistered?: Array<PlanId>
+  } = {}) {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(
+      trpc.planInterest.list.queryKey(),
+      alreadyRegistered.map((planId) => ({
+        id: `interest-${planId}`,
+        userId: 'visitor',
+        planId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    )
+    return render(<PricingScreen pendingInterest={pendingInterest} />, {
+      wrapper: Wrapper,
+    })
   }
 
   function stubbedFetch() {
@@ -275,43 +413,105 @@ describe('PricingRoute', () => {
     )
   }
 
+  const registerCall = (spy: ReturnType<typeof stubbedFetch>) =>
+    spy.mock.calls.find(([url]) =>
+      String(url).includes('planInterest.register'),
+    )
+
   it('records interest through the API for a signed-in visitor', async () => {
     authState.session = { user: { id: 'visitor' } }
     const fetchSpy = stubbedFetch()
 
     try {
-      renderRoute()
+      renderScreen()
       fireEvent.click(
-        planCard('Pro+').getByRole('button', { name: 'Notify me' }),
+        planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
       )
 
-      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
-      const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('planInterest.register')
-      expect(String(init?.body ?? '')).toContain('proPlus')
+      await waitFor(() => expect(registerCall(fetchSpy)).toBeTruthy())
+      expect(String(registerCall(fetchSpy)?.[1]?.body ?? '')).toContain(
+        'proPlus',
+      )
       expect(mocks.signInSocial).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }
   })
 
-  it('sends a logged-out visitor to sign in instead of recording anything', async () => {
+  it('sends a logged-out visitor to sign in, carrying the Plan they pressed', async () => {
     const fetchSpy = stubbedFetch()
 
     try {
-      renderRoute()
+      renderScreen()
       fireEvent.click(
-        planCard('Pro+').getByRole('button', { name: 'Notify me' }),
+        planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
       )
 
       await waitFor(() =>
         expect(mocks.signInSocial).toHaveBeenCalledWith({
           provider: 'google',
-          callbackURL: '/pricing',
+          callbackURL: '/pricing?interest=proPlus',
         }),
       )
       expect(fetchSpy).not.toHaveBeenCalled()
-      expect(screen.queryByRole('status')).toBeNull()
+      expect(mocks.toastSuccess).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('records the Plan carried back from sign-in without another press', async () => {
+    authState.session = { user: { id: 'visitor' } }
+    const fetchSpy = stubbedFetch()
+
+    try {
+      renderScreen({ pendingInterest: 'proPlus' })
+
+      await waitFor(() => expect(registerCall(fetchSpy)).toBeTruthy())
+      expect(String(registerCall(fetchSpy)?.[1]?.body ?? '')).toContain(
+        'proPlus',
+      )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('records nothing when the link carries a Plan already on record', async () => {
+    authState.session = { user: { id: 'visitor' } }
+    const fetchSpy = stubbedFetch()
+
+    try {
+      renderScreen({
+        pendingInterest: 'proPlus',
+        alreadyRegistered: ['proPlus'],
+      })
+
+      await waitFor(() =>
+        expect(
+          planCard('Pro+').getByRole('button', { name: 'Registered' }),
+        ).toBeTruthy(),
+      )
+      expect(registerCall(fetchSpy)).toBeUndefined()
+      expect(mocks.toastSuccess).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  // Sign-in did not complete, so the visitor is back where they started. Doing
+  // nothing leaves them the button; bouncing them at Google again would be a
+  // loop they could not escape.
+  it('does not act on a Plan carried back by someone still logged out', async () => {
+    const fetchSpy = stubbedFetch()
+
+    try {
+      renderScreen({ pendingInterest: 'proPlus' })
+
+      await waitFor(() =>
+        expect(planCard('Pro+').getByRole('button')).toBeTruthy(),
+      )
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(mocks.signInSocial).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }

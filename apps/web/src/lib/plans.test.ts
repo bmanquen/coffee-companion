@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planLimits } from '@coffee-companion/api/lib/plan'
+import { planLimits, sellable } from '@coffee-companion/api/lib/plan'
 import { planFeatures, plans } from './plans'
 import type { GearResource, PlanId } from '@coffee-companion/api/lib/plan'
 
@@ -35,6 +35,14 @@ describe('the Plan catalogue matches what the server enforces', () => {
   it('covers every Plan in the catalogue', () => {
     for (const plan of plans) {
       expect(planLimits[plan.id]).toBeDefined()
+    }
+  })
+
+  // The card offers a purchase path on exactly the Plans the server will sell,
+  // and registers interest on exactly the ones it refuses to sell.
+  it('offers to sell exactly what the server sells', () => {
+    for (const plan of plans) {
+      expect(plan.sellable).toBe(sellable[plan.id])
     }
   })
 })

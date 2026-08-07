@@ -60,11 +60,19 @@ more generous of the two is that user's Plan.
 _Avoid_: Override, freebie, coupon, discount
 
 **Interest**:
-A signed-in user's record that they want a Plan they cannot buy yet. Held once
-per user per Plan — pressing the call to action again is not a second answer —
-it confers no Plan, charges nothing, and nothing is ever sent from it: it is
-read directly.
-_Avoid_: Waitlist, signup, lead
+A signed-in user's record that they want a Plan they cannot buy yet. Only an
+unsellable Plan can receive one — the way to have a Plan that is on sale is to
+subscribe to it — and it is held once per user per Plan: pressing the call to
+action again is not a second answer, and once it is on record the Plan reads as
+Registered rather than offering the press again. It confers no Plan and charges
+nothing. Recording one sends a confirmation email, and only that first recording
+does; nothing is sent when the Plan later ships. That email's wording lives in a
+published Resend template, not in this repo — the code passes it only who was
+written to — so the template is what has to say that nothing was charged, and
+what must not promise contact the system never makes. The call to action that
+records one is worded "Join Waitlist", but the record itself is an Interest
+everywhere else — in the schema, the API and these docs.
+_Avoid_: Signup, lead
 
 **Shelf**:
 The Coffees whose Brews a user can read. Free holds five, ordered by most recently
