@@ -15,7 +15,10 @@ const config = defineConfig({
       projects: ['./tsconfig.json'],
     }),
     tailwindcss(),
-    tanstackStart(),
+    // Tests sit beside the routes they cover, and a test file is not a route.
+    tanstackStart({
+      router: { routeFileIgnorePattern: '\\.test\\.tsx?$' },
+    }),
     viteReact({
       babel: {
         plugins: ['babel-plugin-react-compiler'],
