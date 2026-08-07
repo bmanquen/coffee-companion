@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import type { BillingPeriod, PlanId } from '@/lib/plans'
 import { H1 } from '@/components/typography/h1'
 import { authClient } from '@/lib/auth-client'
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
   formatPrice,
+  isPlanId,
   planFeatures,
   planIncludes,
   plans,
@@ -31,19 +33,60 @@ const DESCRIPTION =
 export const Route = createFileRoute('/_marketing/pricing')({
   head: () =>
     marketingHead({ title: TITLE, description: DESCRIPTION, path: '/pricing' }),
+  // The Plan a visitor pressed before signing in comes back in the URL, so the
+  // press survives the round trip to Google. Anything else is dropped.
+  validateSearch: (search: Record<string, unknown>): { interest?: PlanId } =>
+    isPlanId(search.interest) ? { interest: search.interest } : {},
   component: PricingRoute,
 })
 
-export function PricingRoute() {
+function PricingRoute() {
+  const { interest } = Route.useSearch()
+  const navigate = Route.useNavigate()
+  // Taken once, then dropped from the URL: it is the tail of one visitor's
+  // press, not a link that registers interest for whoever opens it.
+  const [pressed] = useState(interest)
+
+  useEffect(() => {
+    if (interest) void navigate({ search: {}, replace: true })
+  }, [interest, navigate])
+
+  return <PricingScreen pendingInterest={pressed} />
+}
+
+// Owns the search param's consequences and the network, so PricingPage below
+// stays router-free and rendered bare in tests.
+export function PricingScreen({
+  pendingInterest,
+}: {
+  pendingInterest?: PlanId
+}) {
   const { data: session } = authClient.useSession()
   const trpc = useTRPC()
-  const interest = useMutation(trpc.planInterest.register.mutationOptions())
+  const queryClient = useQueryClient()
+  const interest = useMutation(
+    trpc.planInterest.register.mutationOptions({
+      // So a return visit reads Registered rather than offering the press
+      // again, which would mail nobody and claim otherwise.
+      onSuccess: () =>
+        queryClient.invalidateQueries({
+          queryKey: trpc.planInterest.list.queryKey(),
+        }),
+    }),
+  )
+  const registered = useQuery({
+    ...trpc.planInterest.list.queryOptions(),
+    // Public page: only a signed-in visitor has interests to read.
+    enabled: Boolean(session),
+  })
+
+  const registeredPlans = registered.data?.map(({ planId }) => planId) ?? []
 
   const registerInterest = async (planId: PlanId) => {
     if (!session) {
       await authClient.signIn.social({
         provider: 'google',
-        callbackURL: '/pricing',
+        callbackURL: `/pricing?interest=${planId}`,
       })
       return 'signing-in' as const
     }
@@ -51,6 +94,16 @@ export function PricingRoute() {
     await interest.mutateAsync({ planId })
     return 'recorded' as const
   }
+
+  // Acted on only once what they already registered is known, so an old link
+  // cannot re-register a Plan that is already on record.
+  const carriedBack =
+    pendingInterest &&
+    session &&
+    registered.isSuccess &&
+    !registeredPlans.includes(pendingInterest)
+      ? pendingInterest
+      : undefined
 
   return (
     <PricingPage
@@ -60,6 +113,8 @@ export function PricingRoute() {
         throw new Error(`Checkout is not implemented yet (plan: ${planId})`)
       }}
       onNotify={registerInterest}
+      registeredPlans={registeredPlans}
+      pendingInterest={carriedBack}
     />
   )
 }
@@ -99,26 +154,42 @@ const faq: Array<{ question: string; answer: string }> = [
 export function PricingPage({
   onCheckout,
   onNotify,
+  registeredPlans = [],
+  pendingInterest,
 }: {
   onCheckout: (planId: PlanId) => void
   onNotify: (planId: PlanId) => Promise<'recorded' | 'signing-in'>
+  registeredPlans?: Array<PlanId>
+  // A Plan whose call to action was pressed before signing in, registered on
+  // arrival so the press survives the trip to the identity provider.
+  pendingInterest?: PlanId
 }) {
   const [period, setPeriod] = useState<BillingPeriod>('monthly')
-  const [notice, setNotice] = useState<{
-    planId: PlanId
-    recorded: boolean
-  } | null>(null)
+  const [justRegistered, setJustRegistered] = useState<Array<PlanId>>([])
+  const registered = new Set([...registeredPlans, ...justRegistered])
 
   const registerInterest = async (planId: PlanId) => {
-    setNotice(null)
+    const name = plans.find((plan) => plan.id === planId)?.name ?? planId
     try {
       if ((await onNotify(planId)) === 'recorded') {
-        setNotice({ planId, recorded: true })
+        setJustRegistered((already) => [...already, planId])
+        toast.success(`Noted — you want ${name}`, {
+          description: `${name} is not on sale yet, and you have not been charged.`,
+        })
       }
     } catch {
-      setNotice({ planId, recorded: false })
+      toast.error('That did not save', {
+        description: 'Nothing has been charged. Please try again.',
+      })
     }
   }
+
+  const arrived = useRef(false)
+  useEffect(() => {
+    if (!pendingInterest || arrived.current) return
+    arrived.current = true
+    void registerInterest(pendingInterest)
+  }, [pendingInterest])
 
   return (
     <div className="flex flex-col gap-16 py-12">
@@ -133,66 +204,65 @@ export function PricingPage({
       </section>
 
       <section className="grid gap-6 lg:grid-cols-3">
-        {plans.map((plan) => (
-          <Card key={plan.id} className="flex flex-col gap-5 p-6">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-semibold">{plan.name}</h2>
-                {!plan.sellable && (
-                  <Badge variant="secondary">Coming soon</Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground">{plan.tagline}</p>
-            </div>
+        {plans.map((plan) => {
+          // Only ever the state of a call to action that registers interest.
+          // A sellable Plan keeps its purchase path whatever is on record.
+          const isRegistered = !plan.sellable && registered.has(plan.id)
 
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold tracking-tight">
-                {formatPrice(plan.price[period])}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {priceSuffix(period)}
-              </span>
-            </div>
-
-            <Button
-              className="w-full"
-              variant={plan.sellable ? 'default' : 'outline'}
-              onClick={() => {
-                if (plan.sellable) onCheckout(plan.id)
-                else void registerInterest(plan.id)
-              }}
-            >
-              {plan.cta}
-            </Button>
-
-            {notice?.planId === plan.id && (
-              <p role="status" className="text-sm text-muted-foreground">
-                {notice.recorded
-                  ? `Noted. ${plan.name} is not on sale, and you have not been charged.`
-                  : 'That did not save. Nothing has been charged — please try again.'}
-              </p>
-            )}
-
-            <dl className="flex flex-col gap-3 border-t border-border pt-4">
-              {planFeatures.map((feature) => (
-                <div key={feature.label} className="flex flex-col gap-0.5">
-                  <dt className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {feature.label}
-                    {feature.comingSoon && (
-                      <Badge
-                        variant="outline"
-                        className="font-normal normal-case"
-                      >
-                        Coming soon
-                      </Badge>
-                    )}
-                  </dt>
-                  <dd className="text-sm">{feature.values[plan.id]}</dd>
+          return (
+            <Card key={plan.id} className="flex flex-col gap-5 p-6">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold">{plan.name}</h2>
+                  {!plan.sellable && (
+                    <Badge variant="secondary">Coming soon</Badge>
+                  )}
                 </div>
-              ))}
-            </dl>
-          </Card>
-        ))}
+                <p className="text-sm text-muted-foreground">{plan.tagline}</p>
+              </div>
+
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold tracking-tight">
+                  {formatPrice(plan.price[period])}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {priceSuffix(period)}
+                </span>
+              </div>
+
+              <Button
+                className="w-full"
+                variant={plan.sellable ? 'default' : 'outline'}
+                disabled={isRegistered}
+                onClick={() => {
+                  if (plan.sellable) onCheckout(plan.id)
+                  else void registerInterest(plan.id)
+                }}
+              >
+                {isRegistered ? 'Registered' : plan.cta}
+              </Button>
+
+              <dl className="flex flex-col gap-3 border-t border-border pt-4">
+                {planFeatures.map((feature) => (
+                  <div key={feature.label} className="flex flex-col gap-0.5">
+                    <dt className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {feature.label}
+                      {feature.comingSoon && (
+                        <Badge
+                          variant="outline"
+                          className="font-normal normal-case"
+                        >
+                          Coming soon
+                        </Badge>
+                      )}
+                    </dt>
+                    <dd className="text-sm">{feature.values[plan.id]}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Card>
+          )
+        })}
       </section>
 
       <section className="flex flex-col gap-4">

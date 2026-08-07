@@ -59,7 +59,7 @@ export const plans: Array<Plan> = [
     tagline: 'Everything in Pro, plus unlimited AI when it lands.',
     price: { monthly: 7.99, annual: 74.99 },
     sellable: false,
-    cta: 'Notify me',
+    cta: 'Join Waitlist',
   },
 ]
 
@@ -115,6 +115,10 @@ export const planIncludes: Array<string> = [
 // from the amount.
 export function formatPrice(amount: number): string {
   return `$${amount.toFixed(2).replace(/\.00$/, '')}`
+}
+
+export function isPlanId(value: unknown): value is PlanId {
+  return plans.some((plan) => plan.id === value)
 }
 
 export function priceSuffix(period: BillingPeriod): string {
