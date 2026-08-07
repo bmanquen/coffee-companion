@@ -29,14 +29,16 @@ describe('MarketingHeader', () => {
 
     const nav = within(screen.getByRole('navigation', { name: 'Marketing' }))
     expect(
-      screen.getByRole('link', { name: 'Coffee Companion' }).getAttribute('href'),
+      screen
+        .getByRole('link', { name: 'Coffee Companion' })
+        .getAttribute('href'),
     ).toBe('/')
-    expect(nav.getByRole('link', { name: 'Pricing' }).getAttribute('href')).toBe(
-      '/pricing',
-    )
+    expect(
+      nav.getByRole('link', { name: 'Pricing' }).getAttribute('href'),
+    ).toBe('/pricing')
 
-    // A visitor has no account, so the signed-in app's destinations must not
-    // appear here (see the note on the component).
+    // A signed-out visitor has no account, so the signed-in app's destinations
+    // must not appear here (see the note on the component).
     expect(screen.queryByRole('link', { name: /dashboard/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /sign out/i })).toBeNull()
   })
@@ -48,5 +50,25 @@ describe('MarketingHeader', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
     expect(onSignIn).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers a signed-in visitor the way back to the app, not a sign-in', () => {
+    render(<MarketingHeader signedIn onSignIn={vi.fn()} />)
+
+    expect(
+      screen.getByRole('link', { name: 'Dashboard' }).getAttribute('href'),
+    ).toBe('/dashboard')
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull()
+  })
+
+  // Signing in stays reachable from the pricing page's own calls to action, so
+  // the header must not offer it to someone who is already signed in.
+  it('keeps the pricing link for a signed-in visitor', () => {
+    render(<MarketingHeader signedIn onSignIn={vi.fn()} />)
+
+    const nav = within(screen.getByRole('navigation', { name: 'Marketing' }))
+    expect(
+      nav.getByRole('link', { name: 'Pricing' }).getAttribute('href'),
+    ).toBe('/pricing')
   })
 })

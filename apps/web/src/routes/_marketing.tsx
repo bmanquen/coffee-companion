@@ -11,13 +11,15 @@ export const Route = createFileRoute('/_marketing')({
 // reachable for a signed-in user who wants to upgrade, and the one page that
 // does turn signed-in visitors away (/) does it in its own beforeLoad.
 function MarketingLayout() {
+  const { data: session } = authClient.useSession()
+
   const handleSignIn = () => {
     authClient.signIn.social({ provider: 'google' })
   }
 
   return (
     <>
-      <MarketingHeader onSignIn={handleSignIn} />
+      <MarketingHeader signedIn={Boolean(session)} onSignIn={handleSignIn} />
       <main className="mx-auto w-full max-w-5xl px-4">
         <Outlet />
       </main>
