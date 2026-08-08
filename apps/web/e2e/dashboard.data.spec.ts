@@ -37,6 +37,7 @@ test('signed-in pages carry the navigation chrome, with Home on the dashboard', 
   page,
 }) => {
   await page.goto('/dashboard')
+  await expect(page.locator('button[aria-label="Account menu"]')).toBeAttached()
 
   // The chrome hangs off the authenticated layout, so it renders on every
   // signed-in page.
@@ -51,6 +52,7 @@ test('the picker lists every method alphabetically and switches feeds', async ({
   page,
 }) => {
   await page.goto('/dashboard?method=espresso')
+  await expect(page.locator('button[aria-label="Account menu"]')).toBeAttached()
 
   // Opening the picker lists all five methods alphabetically.
   await methodTrigger(page, 'Espresso').click()
