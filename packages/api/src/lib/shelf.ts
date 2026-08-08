@@ -10,8 +10,8 @@ import {
 import { shelfSizes } from './plan'
 import type { PlanId } from './plan'
 
-// Every table a Brew can live in. The Shelf query below lists them again in
-// SQL, so a new Brewing Method touches both.
+// Every table a Brew can live in. Both the Shelf query and Sealing's write are
+// built from this list, so a new Brewing Method is added here once.
 const brewTables = [
   espressoShots,
   aeropressBrews,
@@ -36,20 +36,21 @@ async function shelfCoffeeIds(
   userId: string,
   size: number,
 ): Promise<Array<string>> {
+  const everyBrew = sql.join(
+    brewTables.map(
+      (table) => sql`
+        select ${table.coffeeId} as coffee_id, ${table.createdAt} as created_at
+        from ${table}
+        where ${eq(table.userId, userId)}
+      `,
+    ),
+    sql` union all `,
+  )
+
   const rows = await db.execute<{ id: string }>(sql`
     select c.id
     from coffees c
-    left join (
-      select coffee_id, created_at from espresso_shots where user_id = ${userId}
-      union all
-      select coffee_id, created_at from aeropress_brews where user_id = ${userId}
-      union all
-      select coffee_id, created_at from pourover_brews where user_id = ${userId}
-      union all
-      select coffee_id, created_at from frenchpress_brews where user_id = ${userId}
-      union all
-      select coffee_id, created_at from cold_brew_brews where user_id = ${userId}
-    ) b on b.coffee_id = c.id
+    left join (${everyBrew}) b on b.coffee_id = c.id
     where c.user_id = ${userId}
     group by c.id, c.created_at
     order by coalesce(max(b.created_at), c.created_at) desc
