@@ -15,6 +15,7 @@ test('brews page shows the espresso log', async ({ page }) => {
 
 test('brews page AeroPress tab shows the aeropress log', async ({ page }) => {
   await page.goto('/brews')
+  await expect(page.locator('button[aria-label="Account menu"]')).toBeAttached()
   await page.getByRole('tab', { name: 'AeroPress' }).click()
   // The seeded dialed-in AeroPress brew for Ethiopia Guji, on the Standard method.
   await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()

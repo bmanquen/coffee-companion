@@ -54,6 +54,7 @@ test('the dashboard Seals the same brew the brews list does', async ({
   // Sealing is enforced on the server, but each feed applies it for itself, so
   // the screens are checked separately.
   await page.goto('/dashboard?method=espresso')
+  await expect(page.locator('button[aria-label="Account menu"]')).toBeAttached()
 
   // The feed pages at five, which is exactly the Shelf — so the Sealed brews
   // are never on the first page. Filter to the coffee instead of paging to it.
