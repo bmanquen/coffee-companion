@@ -56,6 +56,16 @@ Consequences to understand before changing anything here:
 - **The app's own Plan identifiers stay the only vocabulary outside the billing module.**
   Price IDs and the provider live server-side; `apps/web/src/lib/plans.ts` remains free of
   payment-provider concepts, as its header requires.
+- **The advertised price is read from Stripe, not written twice.** A price raised in the
+  Dashboard and not in the catalogue is a page that quotes one figure and charges another,
+  which is the sort of thing that gets read as a bait and switch. `planPrices()` reads the
+  amount and currency off the price objects behind `STRIPE_PRICE_*`, converts them out of
+  minor units and hands the web only `{ planId, period, amount, currency }` — no price ID,
+  no provider name, so the constraint above still holds. The catalogue keeps its own
+  amounts as the fallback when billing is switched off or Stripe cannot be reached: a
+  pricing page with no prices on it is worse than one quoting figures a day out of date.
+  Only Pro has price objects, so Free and Pro+ are always quoted from the catalogue, and
+  the "Prices in USD" line names a currency only while every card is in one.
 - **Some of this can only be done by a human in the Dashboard** — activating Managed
   Payments, tax behaviour, tax codes, the webhook endpoint. The sequence is
   `docs/runbooks/stripe-managed-payments.md`.

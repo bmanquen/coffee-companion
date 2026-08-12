@@ -7,7 +7,7 @@ import {
 } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PricingPage, PricingScreen } from './pricing'
-import type { PlanId } from '@/lib/plans'
+import type { BillingPeriod, PlanId, PlanPrice } from '@/lib/plans'
 import { createTestProviders } from '@/test/providers'
 
 const authState = vi.hoisted(() => ({
@@ -159,6 +159,92 @@ describe('PricingPage', () => {
     fireEvent.click(planCard('Pro').getByRole('button', { name: 'Subscribe' }))
 
     expect(onCheckout).toHaveBeenCalledWith('pro', 'annual')
+  })
+
+  it('opens on the period carried back from sign-in', () => {
+    const onCheckout = vi.fn()
+    render(
+      <PricingPage
+        onCheckout={onCheckout}
+        onNotify={vi.fn()}
+        initialPeriod="annual"
+      />,
+    )
+
+    expect(planCard('Pro').getByText('$44.99')).toBeTruthy()
+    expect(
+      screen
+        .getByRole('button', { name: 'Annual' })
+        .getAttribute('aria-pressed'),
+    ).toBe('true')
+
+    fireEvent.click(planCard('Pro').getByRole('button', { name: 'Subscribe' }))
+    expect(onCheckout).toHaveBeenCalledWith('pro', 'annual')
+  })
+
+  // The catalogue's amounts are an advertisement; the seller's are what the
+  // card is charged. Where they disagree, the page has to show the latter.
+  describe('the price the seller has on record', () => {
+    const sellersPro: Array<PlanPrice> = [
+      { planId: 'pro', period: 'monthly', amount: 5.99, currency: 'USD' },
+      { planId: 'pro', period: 'annual', amount: 53.99, currency: 'USD' },
+    ]
+
+    const renderWith = (prices: Array<PlanPrice>) =>
+      render(
+        <PricingPage onCheckout={vi.fn()} onNotify={vi.fn()} prices={prices} />,
+      )
+
+    it('is shown in place of the catalogue’s', () => {
+      renderWith(sellersPro)
+
+      expect(planCard('Pro').getByText('$5.99')).toBeTruthy()
+      expect(planCard('Pro').queryByText('$4.99')).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
+      expect(planCard('Pro').getByText('$53.99')).toBeTruthy()
+    })
+
+    it('leaves a Plan it says nothing about on the catalogue’s', () => {
+      renderWith(sellersPro)
+
+      expect(planCard('Free').getByText('$0')).toBeTruthy()
+      expect(planCard('Pro+').getByText('$7.99')).toBeTruthy()
+    })
+
+    // The seller's own amount for that currency, not the catalogue's converted:
+    // 3.99 is what a GBP price says, and 4.99 never appears.
+    it('is shown in the currency the seller charges in', () => {
+      renderWith([
+        { planId: 'pro', period: 'monthly', amount: 3.99, currency: 'GBP' },
+      ])
+
+      expect(planCard('Pro').getByText('£3.99')).toBeTruthy()
+      expect(screen.queryByText('$4.99')).toBeNull()
+    })
+
+    // Free and Pro+ have no seller price to follow into GBP, so the page is no
+    // longer in one currency and must not claim to be.
+    it('names no single currency when the page is in more than one', () => {
+      renderWith([
+        { planId: 'pro', period: 'monthly', amount: 3.99, currency: 'GBP' },
+      ])
+
+      expect(screen.getByText('Prices exclude any tax.')).toBeTruthy()
+    })
+
+    it('is the catalogue’s when the seller has none', () => {
+      render(<PricingPage onCheckout={vi.fn()} onNotify={vi.fn()} />)
+
+      expect(planCard('Pro').getByText('$4.99')).toBeTruthy()
+      expect(screen.getByText('Prices in USD, excluding any tax.')).toBeTruthy()
+    })
+
+    it('names the seller’s currency when every price is in it', () => {
+      renderWith(sellersPro)
+
+      expect(screen.getByText('Prices in USD, excluding any tax.')).toBeTruthy()
+    })
   })
 
   it('registers interest for Pro+ and never sends it to checkout', () => {
@@ -398,12 +484,17 @@ describe('PricingScreen', () => {
   // fetch it and the register call is the only request a test can see.
   function renderScreen({
     pendingInterest,
+    pendingCheckout,
     alreadyRegistered = [],
+    prices = null,
   }: {
     pendingInterest?: PlanId
+    pendingCheckout?: { planId: PlanId; period: BillingPeriod }
     alreadyRegistered?: Array<PlanId>
+    prices?: Array<PlanPrice> | null
   } = {}) {
     const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.plan.prices.queryKey(), prices)
     queryClient.setQueryData(
       trpc.planInterest.list.queryKey(),
       alreadyRegistered.map((planId) => ({
@@ -414,9 +505,13 @@ describe('PricingScreen', () => {
         updatedAt: new Date(),
       })),
     )
-    return render(<PricingScreen pendingInterest={pendingInterest} />, {
-      wrapper: Wrapper,
-    })
+    return render(
+      <PricingScreen
+        pendingInterest={pendingInterest}
+        pendingCheckout={pendingCheckout}
+      />,
+      { wrapper: Wrapper },
+    )
   }
 
   function stubbedFetch() {
@@ -513,6 +608,23 @@ describe('PricingScreen', () => {
     }
   })
 
+  it('advertises the price the seller has on record, not the catalogue’s', () => {
+    renderScreen({
+      prices: [
+        { planId: 'pro', period: 'monthly', amount: 5.99, currency: 'USD' },
+      ],
+    })
+
+    expect(planCard('Pro').getByText('$5.99')).toBeTruthy()
+    expect(planCard('Pro').queryByText('$4.99')).toBeNull()
+  })
+
+  it('falls back to the catalogue when the seller has no prices', () => {
+    renderScreen()
+
+    expect(planCard('Pro').getByText('$4.99')).toBeTruthy()
+  })
+
   const subscribeToPro = () =>
     fireEvent.click(planCard('Pro').getByRole('button', { name: 'Subscribe' }))
 
@@ -551,6 +663,67 @@ describe('PricingScreen', () => {
     subscribeToPro()
 
     await waitFor(() => expect(mocks.signInSocial).toHaveBeenCalled())
+    expect(mocks.upgrade).not.toHaveBeenCalled()
+  })
+
+  // The period decides the price, so a sign-in that carried only the Plan back
+  // would quietly reopen an annual purchase at the monthly price.
+  it('carries the Plan and the period through sign-in', async () => {
+    renderScreen()
+    fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
+    subscribeToPro()
+
+    await waitFor(() =>
+      expect(mocks.signInSocial).toHaveBeenCalledWith({
+        provider: 'google',
+        callbackURL: '/pricing?checkout=pro&period=annual',
+      }),
+    )
+  })
+
+  it('opens checkout for a purchase carried back from sign-in', async () => {
+    authState.session = { user: { id: 'visitor' } }
+
+    renderScreen({ pendingCheckout: { planId: 'pro', period: 'annual' } })
+
+    await waitFor(() =>
+      expect(mocks.upgrade).toHaveBeenCalledWith(
+        expect.objectContaining({ plan: 'pro', annual: true }),
+      ),
+    )
+    expect(mocks.upgrade).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the carried-back period whether or not checkout reopens', () => {
+    renderScreen({ pendingCheckout: { planId: 'pro', period: 'annual' } })
+
+    expect(planCard('Pro').getByText('$44.99')).toBeTruthy()
+  })
+
+  it('opens no checkout for someone still logged out', async () => {
+    renderScreen({ pendingCheckout: { planId: 'pro', period: 'annual' } })
+
+    await waitFor(() =>
+      expect(
+        planCard('Pro').getByRole('button', { name: 'Subscribe' }),
+      ).toBeTruthy(),
+    )
+    expect(mocks.upgrade).not.toHaveBeenCalled()
+    expect(mocks.signInSocial).not.toHaveBeenCalled()
+  })
+
+  // A Plan that is not on sale has no price to charge. Only the press of a
+  // sellable Plan writes this link, so anything else is hand-made.
+  it('opens no checkout for a Plan that is not sellable', async () => {
+    authState.session = { user: { id: 'visitor' } }
+
+    renderScreen({ pendingCheckout: { planId: 'proPlus', period: 'annual' } })
+
+    await waitFor(() =>
+      expect(
+        planCard('Pro+').getByRole('button', { name: 'Join Waitlist' }),
+      ).toBeTruthy(),
+    )
     expect(mocks.upgrade).not.toHaveBeenCalled()
   })
 

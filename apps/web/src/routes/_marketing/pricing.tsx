@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import type { BillingPeriod, PlanId } from '@/lib/plans'
+import type { BillingPeriod, PlanId, PlanPrice } from '@/lib/plans'
 import { H1 } from '@/components/typography/h1'
 import { authClient } from '@/lib/auth-client'
 import { useTRPC } from '@/integrations/trpc/react'
@@ -18,10 +18,13 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
   formatPrice,
+  isBillingPeriod,
   isPlanId,
+  isSellable,
   planFeatures,
   planIncludes,
   plans,
+  priceFor,
   priceSuffix,
 } from '@/lib/plans'
 import { marketingHead } from '@/lib/marketing-head'
@@ -30,36 +33,66 @@ const TITLE = 'Pricing — Coffee Companion'
 const DESCRIPTION =
   'Free keeps your five most-recently-brewed coffees. Pro keeps everything, searchable, on as much gear as you own. Logging is never limited on any plan.'
 
+type PricingSearch = {
+  interest?: PlanId
+  checkout?: PlanId
+  period?: BillingPeriod
+}
+
 export const Route = createFileRoute('/_marketing/pricing')({
   head: () =>
     marketingHead({ title: TITLE, description: DESCRIPTION, path: '/pricing' }),
-  // The Plan a visitor pressed before signing in comes back in the URL, so the
-  // press survives the round trip to Google. Anything else is dropped.
-  validateSearch: (search: Record<string, unknown>): { interest?: PlanId } =>
-    isPlanId(search.interest) ? { interest: search.interest } : {},
+  // Carries a press made before signing in back across the trip to Google.
+  // Anything else is dropped.
+  validateSearch: (search: Record<string, unknown>): PricingSearch => ({
+    ...(isPlanId(search.interest) ? { interest: search.interest } : {}),
+    ...(isPlanId(search.checkout) ? { checkout: search.checkout } : {}),
+    ...(isBillingPeriod(search.period) ? { period: search.period } : {}),
+  }),
+  // Awaited so the price is in the server-rendered HTML rather than appearing
+  // after hydration.
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(
+      context.trpc.plan.prices.queryOptions(),
+    ),
   component: PricingRoute,
 })
 
 function PricingRoute() {
-  const { interest } = Route.useSearch()
+  const { interest, checkout, period } = Route.useSearch()
   const navigate = Route.useNavigate()
   // Taken once, then dropped from the URL: it is the tail of one visitor's
-  // press, not a link that registers interest for whoever opens it.
-  const [pressed] = useState(interest)
+  // press, not a link that buys or registers interest for whoever opens it.
+  const [pressed] = useState({ interest, checkout, period })
 
   useEffect(() => {
-    if (interest) void navigate({ search: {}, replace: true })
-  }, [interest, navigate])
+    if (interest || checkout || period)
+      void navigate({ search: {}, replace: true })
+  }, [interest, checkout, period, navigate])
 
-  return <PricingScreen pendingInterest={pressed} />
+  return (
+    <PricingScreen
+      pendingInterest={pressed.interest}
+      pendingCheckout={
+        pressed.checkout && {
+          planId: pressed.checkout,
+          period: pressed.period ?? 'monthly',
+        }
+      }
+    />
+  )
 }
 
 // Owns the search param's consequences and the network, so PricingPage below
 // stays router-free and rendered bare in tests.
 export function PricingScreen({
   pendingInterest,
+  pendingCheckout,
 }: {
   pendingInterest?: PlanId
+  // A purchase pressed before signing in, reopened on arrival at the same Plan
+  // and period, so the press survives the trip to the identity provider.
+  pendingCheckout?: { planId: PlanId; period: BillingPeriod }
 }) {
   const { data: session } = authClient.useSession()
   const trpc = useTRPC()
@@ -78,6 +111,12 @@ export function PricingScreen({
     ...trpc.planInterest.list.queryOptions(),
     // Public page: only a signed-in visitor has interests to read.
     enabled: Boolean(session),
+  })
+  const prices = useQuery({
+    ...trpc.plan.prices.queryOptions(),
+    // What the loader fetched is what renders: prices change on the order of
+    // months, and the server holds its own answer for fifteen minutes anyway.
+    staleTime: 15 * 60 * 1000,
   })
 
   const registeredPlans = registered.data?.map(({ planId }) => planId) ?? []
@@ -112,7 +151,10 @@ export function PricingScreen({
     if (!session) {
       await authClient.signIn.social({
         provider: 'google',
-        ...(planId === 'free' ? {} : { callbackURL: '/pricing' }),
+        // Free has nowhere to come back to — signing in is the whole of it.
+        ...(planId === 'free'
+          ? {}
+          : { callbackURL: `/pricing?checkout=${planId}&period=${period}` }),
       })
       return
     }
@@ -136,12 +178,26 @@ export function PricingScreen({
     }
   }
 
+  // Only for a sellable Plan and a visitor who came back signed in: a hand-made
+  // link cannot open checkout, and an abandoned sign-in is not retried.
+  const reopened = useRef(false)
+  useEffect(() => {
+    if (!pendingCheckout || !session || reopened.current) return
+    if (!isSellable(pendingCheckout.planId)) return
+    reopened.current = true
+    void startCheckout(pendingCheckout.planId, pendingCheckout.period)
+  }, [pendingCheckout, session])
+
   return (
     <PricingPage
       onCheckout={(planId, period) => void startCheckout(planId, period)}
       onNotify={registerInterest}
       registeredPlans={registeredPlans}
       pendingInterest={carriedBack}
+      // Shown whether or not checkout reopens, so a visitor who came back
+      // logged out still sees the period they chose.
+      initialPeriod={pendingCheckout?.period}
+      prices={prices.data ?? undefined}
     />
   )
 }
@@ -183,6 +239,8 @@ export function PricingPage({
   onNotify,
   registeredPlans = [],
   pendingInterest,
+  initialPeriod = 'monthly',
+  prices,
 }: {
   onCheckout: (planId: PlanId, period: BillingPeriod) => void
   onNotify: (planId: PlanId) => Promise<'recorded' | 'signing-in'>
@@ -190,9 +248,20 @@ export function PricingPage({
   // A Plan whose call to action was pressed before signing in, registered on
   // arrival so the press survives the trip to the identity provider.
   pendingInterest?: PlanId
+  // The period to open on, so a selection made before signing in is still the
+  // one on screen — and the one a second press would buy — on the way back.
+  initialPeriod?: BillingPeriod
+  // What the seller will charge. Absent for a Plan nobody can buy, and for all
+  // of them when the seller cannot be reached; the catalogue covers those.
+  prices?: Array<PlanPrice>
 }) {
-  const [period, setPeriod] = useState<BillingPeriod>('monthly')
+  const [period, setPeriod] = useState<BillingPeriod>(initialPeriod)
   const [justRegistered, setJustRegistered] = useState<Array<PlanId>>([])
+  // More than one only if the seller charges in a currency the catalogue's
+  // fallback amounts are not in, in which case no single one can be named.
+  const currencies = [
+    ...new Set(plans.map((plan) => priceFor(plan, period, prices).currency)),
+  ]
   const registered = new Set([...registeredPlans, ...justRegistered])
 
   const registerInterest = async (planId: PlanId) => {
@@ -235,6 +304,7 @@ export function PricingPage({
           // Only ever the state of a call to action that registers interest.
           // A sellable Plan keeps its purchase path whatever is on record.
           const isRegistered = !plan.sellable && registered.has(plan.id)
+          const { amount, currency } = priceFor(plan, period, prices)
 
           return (
             <Card key={plan.id} className="flex flex-col gap-5 p-6">
@@ -250,7 +320,7 @@ export function PricingPage({
 
               <div className="flex items-baseline gap-1">
                 <span className="text-3xl font-bold tracking-tight">
-                  {formatPrice(plan.price[period])}
+                  {formatPrice(amount, currency)}
                 </span>
                 <span className="text-sm text-muted-foreground">
                   {priceSuffix(period)}
@@ -308,7 +378,9 @@ export function PricingPage({
           ))}
         </ul>
         <p className="text-sm text-muted-foreground">
-          Prices in USD, excluding any tax.
+          {currencies.length === 1
+            ? `Prices in ${currencies[0]}, excluding any tax.`
+            : 'Prices exclude any tax.'}
         </p>
       </section>
 

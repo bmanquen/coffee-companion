@@ -1,5 +1,6 @@
 import { planLimits } from '../lib/plan'
-import { authedProcedure, createTRPCRouter } from './init'
+import { planPrices } from '../lib/billing'
+import { authedProcedure, createTRPCRouter, publicProcedure } from './init'
 
 export const planRouter = createTRPCRouter({
   // Lets the app warn about a limit before the user reaches it. The server
@@ -8,4 +9,7 @@ export const planRouter = createTRPCRouter({
     plan: ctx.plan,
     limits: planLimits[ctx.plan],
   })),
+
+  // Public: the pricing page advertises these before anyone signs in.
+  prices: publicProcedure.query(() => planPrices()),
 })

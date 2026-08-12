@@ -1,5 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { billingConfig } from './billing'
+
+const retrieve = vi.fn()
+
+vi.mock('stripe', () => ({
+  default: class {
+    prices = { retrieve }
+  },
+}))
 
 // Every variable these tests touch, so one is never left set for the next.
 const vars = [
@@ -81,5 +89,80 @@ describe('billingConfig', () => {
     configure({ STRIPE_WEBHOOK_SECRET: undefined })
 
     expect(() => billingConfig()).toThrow(/STRIPE_SECRET_KEY/)
+  })
+})
+
+describe('planPrices', () => {
+  // Re-imported per test, so the module's cache does not carry between them.
+  const load = () => import('./billing').then((module) => module.planPrices)
+
+  const price = (unitAmount: number | null, currency = 'usd') => ({
+    unit_amount: unitAmount,
+    currency,
+  })
+
+  beforeEach(() => {
+    retrieve.mockReset()
+    vi.resetModules()
+  })
+
+  it('has no prices to advertise when billing is switched off', async () => {
+    const planPrices = await load()
+
+    expect(await planPrices()).toBe(null)
+  })
+
+  it('reads each sellable Plan’s price in whole currency units', async () => {
+    configure()
+    retrieve.mockImplementation((id: string) =>
+      Promise.resolve(id === 'price_monthly123' ? price(499) : price(4499)),
+    )
+    const planPrices = await load()
+
+    expect(await planPrices()).toEqual([
+      { planId: 'pro', period: 'monthly', amount: 4.99, currency: 'USD' },
+      { planId: 'pro', period: 'annual', amount: 44.99, currency: 'USD' },
+    ])
+  })
+
+  it('leaves a currency with no minor unit whole', async () => {
+    configure()
+    retrieve.mockResolvedValue(price(500, 'jpy'))
+    const planPrices = await load()
+
+    expect((await planPrices())?.[0]).toEqual({
+      planId: 'pro',
+      period: 'monthly',
+      amount: 500,
+      currency: 'JPY',
+    })
+  })
+
+  it('drops a price that has no single amount to advertise', async () => {
+    configure()
+    retrieve.mockResolvedValue(price(null))
+    const planPrices = await load()
+
+    expect(await planPrices()).toEqual([])
+  })
+
+  it('asks the provider once, then answers from memory', async () => {
+    configure()
+    retrieve.mockResolvedValue(price(499))
+    const planPrices = await load()
+
+    await planPrices()
+    await planPrices()
+
+    // Monthly and annual, from the first call alone.
+    expect(retrieve).toHaveBeenCalledTimes(2)
+  })
+
+  it('has no prices to advertise when the provider cannot be reached', async () => {
+    configure()
+    retrieve.mockRejectedValue(new Error('unreachable'))
+    const planPrices = await load()
+
+    expect(await planPrices()).toBe(null)
   })
 })
