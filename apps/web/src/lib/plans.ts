@@ -4,22 +4,23 @@
 // is a change here alone.
 //
 // Deliberately free of payment-provider concepts. There are no price IDs,
-// product IDs or provider names anywhere in this module, and there must not be:
-// which provider we settle on (Stripe versus a merchant of record) is still
-// open, and the app's own Plan identifiers are what the rest of the codebase
+// product IDs or provider names anywhere in this module, and there must not be
+// (ADR-0006) — the app's own Plan identifiers are what the rest of the codebase
 // should ever see.
+
+import type { BillingPeriod } from '@coffee-companion/api/lib/plan'
 
 export type PlanId = 'free' | 'pro' | 'proPlus'
 
-export type BillingPeriod = 'monthly' | 'annual'
+export type { BillingPeriod }
 
 export type Plan = {
   id: PlanId
   name: string
   tagline: string
-  // US dollars per period, as advertised. Tax is not included; whether it is
-  // added at checkout or absorbed depends on the provider decision still to be
-  // made, so the page says so rather than implying a final figure.
+  // US dollars per period, as advertised. Tax is added at checkout on top
+  // (ADR-0006), so the page says "excluding any tax" rather than implying this
+  // is what the buyer pays.
   price: Record<BillingPeriod, number>
   // Whether this Plan can be bought today. Pro+ is shown in full but not
   // sellable: everything separating it from Pro is still unbuilt, so its call

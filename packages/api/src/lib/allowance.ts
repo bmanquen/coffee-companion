@@ -1,8 +1,13 @@
-import { and, count, eq, gt, isNull, or, sql } from 'drizzle-orm'
+import { and, count, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import { db } from '../db'
-import { brewingDevices, grinders, planGrants } from '../db/schema'
-import { gearLimitSentence, mostGenerous, planLimits } from './plan'
+import { brewingDevices, grinders, planGrants, subscription } from '../db/schema'
+import {
+  gearLimitSentence,
+  mostGenerous,
+  planIdFrom,
+  planLimits,
+} from './plan'
 import type { GearResource, PlanId } from './plan'
 
 const gearTable = {
@@ -10,20 +15,48 @@ const gearTable = {
   brewingDevices,
 } as const
 
+// The statuses in which a Subscription is being paid for. What happens to a
+// Subscription that stops being paid for is #68's, not the resolver's:
+// anything not listed here simply stops conferring a Plan.
+const paidStatuses = ['active', 'trialing']
+
+// A Grant and a Subscription are the two sources of a Plan, and the most
+// generous of them wins — so a comp is never downgraded by billing state, and
+// a paid Subscription is never downgraded by a lesser Grant.
+//
 // No role ever confers a Plan: a maintainer account has to be able to see
 // exactly what a Free user sees.
 export async function resolvePlan(userId: string): Promise<PlanId> {
-  const grants = await db
-    .select({ planId: planGrants.planId })
-    .from(planGrants)
-    .where(
-      and(
-        eq(planGrants.userId, userId),
-        or(isNull(planGrants.expiresAt), gt(planGrants.expiresAt, sql`now()`)),
+  const [grants, subscriptions] = await Promise.all([
+    db
+      .select({ planId: planGrants.planId })
+      .from(planGrants)
+      .where(
+        and(
+          eq(planGrants.userId, userId),
+          or(
+            isNull(planGrants.expiresAt),
+            gt(planGrants.expiresAt, sql`now()`),
+          ),
+        ),
       ),
-    )
+    db
+      .select({ plan: subscription.plan })
+      .from(subscription)
+      .where(
+        and(
+          eq(subscription.referenceId, userId),
+          inArray(subscription.status, paidStatuses),
+        ),
+      ),
+  ])
 
-  return mostGenerous(grants.map((grant) => grant.planId))
+  return mostGenerous([
+    ...grants.map((grant) => grant.planId),
+    // A Plan we no longer recognise confers nothing rather than Free, which
+    // would be the same thing said less honestly.
+    ...subscriptions.flatMap((row) => planIdFrom(row.plan) ?? []),
+  ])
 }
 
 // Refuses the next addition once the Plan's limit is met. Never applied to what

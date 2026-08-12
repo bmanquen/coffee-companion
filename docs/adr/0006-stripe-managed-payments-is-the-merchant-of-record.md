@@ -56,3 +56,6 @@ Consequences to understand before changing anything here:
 - **The app's own Plan identifiers stay the only vocabulary outside the billing module.**
   Price IDs and the provider live server-side; `apps/web/src/lib/plans.ts` remains free of
   payment-provider concepts, as its header requires.
+- **Some of this can only be done by a human in the Dashboard** — activating Managed
+  Payments, tax behaviour, tax codes, the webhook endpoint. The sequence is
+  `docs/runbooks/stripe-managed-payments.md`.

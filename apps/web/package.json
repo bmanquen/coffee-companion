@@ -15,6 +15,7 @@
     "check": "prettier --write . && eslint --fix"
   },
   "dependencies": {
+    "@better-auth/stripe": "1.6.26",
     "@coffee-companion/api": "workspace:*",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -35,7 +36,7 @@
     "@trpc/client": "^11.8.1",
     "@trpc/server": "^11.8.1",
     "@trpc/tanstack-react-query": "^11.8.1",
-    "better-auth": "^1.4.10",
+    "better-auth": "^1.6.26",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

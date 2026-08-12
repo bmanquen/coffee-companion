@@ -29,6 +29,16 @@ export default async function setup() {
   process.env.PGPASSWORD = decodeURIComponent(url.password)
   process.env.PGDATABASE = url.pathname.slice(1)
 
+  // Fixtures, not credentials. Nothing here reaches Stripe: the webhook tests
+  // sign their own payloads with this same secret and verify them offline, and
+  // the price identifiers only have to match what the server was configured
+  // with. Set unconditionally so a developer whose .env.local holds real keys
+  // never has a test use them.
+  process.env.STRIPE_SECRET_KEY = 'sk_test_notARealKey'
+  process.env.STRIPE_WEBHOOK_SECRET = 'whsec_notARealSecret'
+  process.env.STRIPE_PRICE_PRO_MONTHLY = 'price_fixtureMonthly'
+  process.env.STRIPE_PRICE_PRO_ANNUAL = 'price_fixtureAnnual'
+
   const pool = new Pool()
   await migrate(drizzle({ client: pool }), { migrationsFolder: './drizzle' })
   await pool.end()
