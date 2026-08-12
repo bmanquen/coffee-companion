@@ -5,7 +5,7 @@
 
 import Stripe from 'stripe'
 import { sellable } from './plan'
-import type { BillingPeriod, PlanId } from './plan'
+import type { BillingPeriod, PlanId, PlanPrice } from './plan'
 
 // The Plans a customer can hand over money for. Free is sellable in the
 // catalogue's sense — it has a call to action — but nothing is charged for it,
@@ -81,6 +81,71 @@ export function billingConfig(): BillingConfig | null {
     webhookSecret: webhookSecret as string,
     plans,
   }
+}
+
+const PRICE_TTL_MS = 15 * 60 * 1000
+// Shorter, so an outage costs one call a minute rather than one per visitor.
+const PRICE_RETRY_MS = 60 * 1000
+
+let cached: { prices: Array<PlanPrice> | null; until: number } | null = null
+
+// The amounts the buyer will actually be charged. Null when billing is off or
+// the provider cannot be reached, which is the caller's cue to advertise its
+// own figures rather than show a pricing page with no price on it.
+export async function planPrices(): Promise<Array<PlanPrice> | null> {
+  const config = billingConfig()
+  if (!config) return null
+
+  if (cached && Date.now() < cached.until) return cached.prices
+
+  try {
+    const read = await Promise.all(
+      config.plans.flatMap((plan) => [
+        planPrice(config.client, plan.name, 'monthly', plan.priceId),
+        planPrice(
+          config.client,
+          plan.name,
+          'annual',
+          plan.annualDiscountPriceId,
+        ),
+      ]),
+    )
+    const prices = read.filter((price): price is PlanPrice => price !== null)
+    cached = { prices, until: Date.now() + PRICE_TTL_MS }
+    return prices
+  } catch {
+    cached = { prices: null, until: Date.now() + PRICE_RETRY_MS }
+    return null
+  }
+}
+
+async function planPrice(
+  client: Stripe,
+  planId: PlanId,
+  period: BillingPeriod,
+  priceId: string,
+): Promise<PlanPrice | null> {
+  const price = await client.prices.retrieve(priceId)
+  // A tiered or metered price has no single amount to advertise.
+  if (price.unit_amount === null) return null
+
+  return {
+    planId,
+    period,
+    amount: wholeUnits(price.unit_amount, price.currency),
+    currency: price.currency.toUpperCase(),
+  }
+}
+
+// Stripe stores money in the currency's smallest unit: 499 is $4.99, but 499
+// yen. The exponent comes off the currency rather than a list of exceptions.
+function wholeUnits(amount: number, currency: string): number {
+  const { maximumFractionDigits = 2 } = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+  }).resolvedOptions()
+
+  return amount / 10 ** maximumFractionDigits
 }
 
 // Makes Stripe the merchant of record for this purchase, so it calculates,

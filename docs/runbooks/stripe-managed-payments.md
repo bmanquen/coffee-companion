@@ -59,6 +59,11 @@ prices on it:
 | `STRIPE_PRICE_PRO_MONTHLY` | $4.99 | monthly |
 | `STRIPE_PRICE_PRO_ANNUAL` | $44.99 | yearly |
 
+These amounts are what the pricing page advertises: it reads them back from Stripe, so
+changing one here changes the page within fifteen minutes and no code change is needed.
+The figures in `apps/web/src/lib/plans.ts` are only the fallback for a deployment with no
+Stripe key, so keep them in step when you change a price for real.
+
 Both must have **tax behaviour: exclusive**. Tax is added at checkout on top of the
 advertised price (ADR-0006) — inclusive pricing would make margin a function of where the
 subscriber lives, and the pricing page says "excluding any tax" in as many words.

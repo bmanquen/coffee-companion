@@ -6,6 +6,16 @@ export type PlanId = 'free' | 'pro' | 'proPlus'
 
 export type BillingPeriod = 'monthly' | 'annual'
 
+// What a Plan costs, as the seller has it on record. The amount is in whole
+// currency units — 4.99, not 499 — so nothing outside the billing module has to
+// know how a payment provider stores money.
+export type PlanPrice = {
+  planId: PlanId
+  period: BillingPeriod
+  amount: number
+  currency: string
+}
+
 const rank: Array<PlanId> = ['free', 'pro', 'proPlus']
 
 export const planName: Record<PlanId, string> = {

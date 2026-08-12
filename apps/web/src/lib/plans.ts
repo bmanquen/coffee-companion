@@ -8,19 +8,19 @@
 // (ADR-0006) — the app's own Plan identifiers are what the rest of the codebase
 // should ever see.
 
-import type { BillingPeriod } from '@coffee-companion/api/lib/plan'
+import type { BillingPeriod, PlanPrice } from '@coffee-companion/api/lib/plan'
 
 export type PlanId = 'free' | 'pro' | 'proPlus'
 
-export type { BillingPeriod }
+export type { BillingPeriod, PlanPrice }
 
 export type Plan = {
   id: PlanId
   name: string
   tagline: string
-  // US dollars per period, as advertised. Tax is added at checkout on top
-  // (ADR-0006), so the page says "excluding any tax" rather than implying this
-  // is what the buyer pays.
+  // US dollars per period. Shown only where the seller has no price on record
+  // — always for Free and Pro+, which are not purchasable. Tax is added at
+  // checkout on top (ADR-0006), so the page says "excluding any tax".
   price: Record<BillingPeriod, number>
   // Whether this Plan can be bought today. Pro+ is shown in full but not
   // sellable: everything separating it from Pro is still unbuilt, so its call
@@ -111,15 +111,46 @@ export const planIncludes: Array<string> = [
   'Cross-device sync',
 ]
 
+export const FALLBACK_CURRENCY = 'USD'
+
+// What a Plan costs: the seller's own price where there is one, the
+// catalogue's otherwise.
+export function priceFor(
+  plan: Plan,
+  period: BillingPeriod,
+  prices: Array<PlanPrice> = [],
+): { amount: number; currency: string } {
+  const onRecord = prices.find(
+    (price) => price.planId === plan.id && price.period === period,
+  )
+
+  if (onRecord) return { amount: onRecord.amount, currency: onRecord.currency }
+
+  return { amount: plan.price[period], currency: FALLBACK_CURRENCY }
+}
+
 // Renders $0 rather than "Free" so a price never collides with a Plan name —
 // otherwise the Free card reads "Free / Free" and no test can tell the heading
 // from the amount.
-export function formatPrice(amount: number): string {
-  return `$${amount.toFixed(2).replace(/\.00$/, '')}`
+export function formatPrice(
+  amount: number,
+  currency: string = FALLBACK_CURRENCY,
+): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency })
+    .format(amount)
+    .replace(/\.00$/, '')
 }
 
 export function isPlanId(value: unknown): value is PlanId {
   return plans.some((plan) => plan.id === value)
+}
+
+export function isBillingPeriod(value: unknown): value is BillingPeriod {
+  return value === 'monthly' || value === 'annual'
+}
+
+export function isSellable(planId: PlanId): boolean {
+  return plans.find((plan) => plan.id === planId)?.sellable ?? false
 }
 
 export function priceSuffix(period: BillingPeriod): string {
