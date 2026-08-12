@@ -4,6 +4,8 @@
 
 export type PlanId = 'free' | 'pro' | 'proPlus'
 
+export type BillingPeriod = 'monthly' | 'annual'
+
 const rank: Array<PlanId> = ['free', 'pro', 'proPlus']
 
 export const planName: Record<PlanId, string> = {
@@ -42,6 +44,13 @@ export const shelfSizes: Record<PlanId, number | null> = {
 const gearLabel: Record<GearResource, { one: string; many: string }> = {
   grinders: { one: 'Grinder', many: 'Grinders' },
   brewingDevices: { one: 'Brewing Device', many: 'Brewing Devices' },
+}
+
+// Reads a Plan identifier back out of a store that lowercases what it is
+// given, so proPlus comes back as proplus. Anything unrecognised is undefined
+// rather than Free, so a caller has to decide what an unknown Plan means.
+export function planIdFrom(value: string): PlanId | undefined {
+  return rank.find((planId) => planId.toLowerCase() === value.toLowerCase())
 }
 
 export function mostGenerous(plans: Array<PlanId>): PlanId {

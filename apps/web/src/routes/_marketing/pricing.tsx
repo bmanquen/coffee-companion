@@ -105,13 +105,40 @@ export function PricingScreen({
       ? pendingInterest
       : undefined
 
+  // Free is a call to action, not a purchase — it opens the app. Everything
+  // else leaves for Checkout, where the price is chosen from the Plan and the
+  // period and the tax is added on top.
+  const startCheckout = async (planId: PlanId, period: BillingPeriod) => {
+    if (!session) {
+      await authClient.signIn.social({
+        provider: 'google',
+        ...(planId === 'free' ? {} : { callbackURL: '/pricing' }),
+      })
+      return
+    }
+
+    if (planId === 'free') {
+      window.location.href = '/dashboard'
+      return
+    }
+
+    const { error } = await authClient.subscription.upgrade({
+      plan: planId,
+      annual: period === 'annual',
+      successUrl: '/dashboard',
+      cancelUrl: '/pricing',
+    })
+
+    if (error) {
+      toast.error('We could not open checkout', {
+        description: 'You have not been charged. Please try again.',
+      })
+    }
+  }
+
   return (
     <PricingPage
-      // Throws rather than no-ops: no payment provider is wired up yet, so a
-      // button that quietly did nothing would look shipped.
-      onCheckout={(planId) => {
-        throw new Error(`Checkout is not implemented yet (plan: ${planId})`)
-      }}
+      onCheckout={(planId, period) => void startCheckout(planId, period)}
       onNotify={registerInterest}
       registeredPlans={registeredPlans}
       pendingInterest={carriedBack}
@@ -157,7 +184,7 @@ export function PricingPage({
   registeredPlans = [],
   pendingInterest,
 }: {
-  onCheckout: (planId: PlanId) => void
+  onCheckout: (planId: PlanId, period: BillingPeriod) => void
   onNotify: (planId: PlanId) => Promise<'recorded' | 'signing-in'>
   registeredPlans?: Array<PlanId>
   // A Plan whose call to action was pressed before signing in, registered on
@@ -235,7 +262,7 @@ export function PricingPage({
                 variant={plan.sellable ? 'default' : 'outline'}
                 disabled={isRegistered}
                 onClick={() => {
-                  if (plan.sellable) onCheckout(plan.id)
+                  if (plan.sellable) onCheckout(plan.id, period)
                   else void registerInterest(plan.id)
                 }}
               >

@@ -15,6 +15,7 @@ const authState = vi.hoisted(() => ({
 }))
 const mocks = vi.hoisted(() => ({
   signInSocial: vi.fn(),
+  upgrade: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }))
@@ -23,6 +24,7 @@ vi.mock('@/lib/auth-client', () => ({
   authClient: {
     useSession: () => ({ data: authState.session }),
     signIn: { social: mocks.signInSocial },
+    subscription: { upgrade: mocks.upgrade },
   },
 }))
 
@@ -139,13 +141,24 @@ describe('PricingPage', () => {
     fireEvent.click(
       planCard('Free').getByRole('button', { name: 'Save your first brew' }),
     )
-    expect(onCheckout).toHaveBeenCalledWith('free')
+    expect(onCheckout).toHaveBeenCalledWith('free', 'monthly')
 
     fireEvent.click(planCard('Pro').getByRole('button', { name: 'Subscribe' }))
-    expect(onCheckout).toHaveBeenCalledWith('pro')
+    expect(onCheckout).toHaveBeenCalledWith('pro', 'monthly')
 
     expect(onCheckout).toHaveBeenCalledTimes(2)
     expect(onNotify).not.toHaveBeenCalled()
+  })
+
+  // The toggle is not decoration: it decides which price is charged, so the
+  // period on screen has to be the period that reaches checkout.
+  it('checks out the period the visitor is looking at, not the default', () => {
+    const { onCheckout } = renderPricing()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
+    fireEvent.click(planCard('Pro').getByRole('button', { name: 'Subscribe' }))
+
+    expect(onCheckout).toHaveBeenCalledWith('pro', 'annual')
   })
 
   it('registers interest for Pro+ and never sends it to checkout', () => {
@@ -260,7 +273,7 @@ describe('PricingPage', () => {
     expect(subscribe.hasAttribute('disabled')).toBe(false)
 
     fireEvent.click(subscribe)
-    expect(onCheckout).toHaveBeenCalledWith('pro')
+    expect(onCheckout).toHaveBeenCalledWith('pro', 'monthly')
   })
 
   it('reads as registered straight after the press that recorded it', async () => {
@@ -377,6 +390,8 @@ describe('PricingScreen', () => {
   beforeEach(() => {
     authState.session = null
     mocks.signInSocial.mockClear()
+    mocks.upgrade.mockReset()
+    mocks.upgrade.mockResolvedValue({ data: {}, error: null })
   })
 
   // Seeds what the visitor has already registered, so the screen never has to
@@ -496,6 +511,76 @@ describe('PricingScreen', () => {
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+
+  const subscribeToPro = () =>
+    fireEvent.click(planCard('Pro').getByRole('button', { name: 'Subscribe' }))
+
+  it('starts checkout for a signed-in visitor at the monthly price', async () => {
+    authState.session = { user: { id: 'visitor' } }
+
+    renderScreen()
+    subscribeToPro()
+
+    await waitFor(() =>
+      expect(mocks.upgrade).toHaveBeenCalledWith(
+        expect.objectContaining({ plan: 'pro', annual: false }),
+      ),
+    )
+    expect(mocks.signInSocial).not.toHaveBeenCalled()
+  })
+
+  // The price the visitor is charged is chosen server-side from this flag, so
+  // it is the whole of what the toggle buys.
+  it('starts checkout at the annual price once the visitor toggles', async () => {
+    authState.session = { user: { id: 'visitor' } }
+
+    renderScreen()
+    fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
+    subscribeToPro()
+
+    await waitFor(() =>
+      expect(mocks.upgrade).toHaveBeenCalledWith(
+        expect.objectContaining({ plan: 'pro', annual: true }),
+      ),
+    )
+  })
+
+  it('sends a logged-out presser to sign in rather than to checkout', async () => {
+    renderScreen()
+    subscribeToPro()
+
+    await waitFor(() => expect(mocks.signInSocial).toHaveBeenCalled())
+    expect(mocks.upgrade).not.toHaveBeenCalled()
+  })
+
+  it('says nothing was charged when checkout cannot be reached', async () => {
+    authState.session = { user: { id: 'visitor' } }
+    mocks.upgrade.mockResolvedValue({
+      data: null,
+      error: { message: 'no such price' },
+    })
+
+    renderScreen()
+    subscribeToPro()
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalled())
+    const [message, options] = mocks.toastError.mock.calls[0]
+    expect(`${String(message)} ${String(options?.description ?? '')}`).toMatch(
+      /not been charged/i,
+    )
+  })
+
+  // Free is a call to action, not a purchase. Nothing about it may reach the
+  // payment provider.
+  it('never sends the Free plan to checkout', async () => {
+    renderScreen()
+    fireEvent.click(
+      planCard('Free').getByRole('button', { name: 'Save your first brew' }),
+    )
+
+    await waitFor(() => expect(mocks.signInSocial).toHaveBeenCalled())
+    expect(mocks.upgrade).not.toHaveBeenCalled()
   })
 
   // Sign-in did not complete, so the visitor is back where they started. Doing

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../src/db'
-import { planGrants, user } from '../src/db/schema'
+import { planGrants, subscription, user } from '../src/db/schema'
 import { createCallerFactory } from '../src/trpc/init'
 import { trpcRouter } from '../src/trpc/router'
 import type { PlanId } from '../src/lib/plan'
@@ -52,6 +52,22 @@ export const grantPlan = async (
 }
 
 type GrantOptions = { reason?: string; expiresAt?: Date | null }
+
+// The row the Stripe plugin writes when a purchase completes, without going
+// near Stripe. The plan name is stored lowercased because that is what the
+// plugin persists; status defaults to a Subscription that is being paid for.
+export const subscribePlan = async (
+  userId: string,
+  planId: PlanId,
+  { status = 'active' }: { status?: string } = {},
+) => {
+  await db.insert(subscription).values({
+    id: crypto.randomUUID(),
+    plan: planId.toLowerCase(),
+    referenceId: userId,
+    status,
+  })
+}
 
 // Backdates every Grant a user holds, which is how a Plan lapses: no event
 // arrives, the Grant simply stops applying on the next request.

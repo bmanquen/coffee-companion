@@ -14,7 +14,7 @@ import {
   uuid
 } from 'drizzle-orm/pg-core'
 import { defineRelations, sql } from 'drizzle-orm'
-import { account, session, user } from './auth-schema'
+import { account, session, subscription, user } from './auth-schema'
 
 export * from './auth-schema'
 
@@ -483,7 +483,7 @@ export const planInterests = pgTable(
 // Relations
 
 export const relations = defineRelations(
-  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, planGrants, planInterests },
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, planGrants, planInterests, subscription },
   (r) => ({
     user: {
       sessions: r.many.session(),
@@ -510,6 +510,14 @@ export const relations = defineRelations(
       coldBrewBrews: r.many.coldBrewBrews(),
       planGrants: r.many.planGrants(),
       planInterests: r.many.planInterests(),
+      subscriptions: r.many.subscription(),
+    },
+    subscription: {
+      user: r.one.user({
+        from: r.subscription.referenceId,
+        to: r.user.id,
+        optional: false,
+      }),
     },
     planGrants: {
       user: r.one.user({
