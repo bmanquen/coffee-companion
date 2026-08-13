@@ -18,8 +18,6 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
   formatPrice,
-  isBillingPeriod,
-  isPlanId,
   isSellable,
   planFeatures,
   planIncludes,
@@ -27,28 +25,17 @@ import {
   priceFor,
   priceSuffix,
 } from '@/lib/plans'
+import { pressFromSearch, returnLink } from '@/lib/pricing-press'
 import { marketingHead } from '@/lib/marketing-head'
 
 const TITLE = 'Pricing — Coffee Companion'
 const DESCRIPTION =
   'Free keeps your five most-recently-brewed coffees. Pro keeps everything, searchable, on as much gear as you own. Logging is never limited on any plan.'
 
-type PricingSearch = {
-  interest?: PlanId
-  checkout?: PlanId
-  period?: BillingPeriod
-}
-
 export const Route = createFileRoute('/_marketing/pricing')({
   head: () =>
     marketingHead({ title: TITLE, description: DESCRIPTION, path: '/pricing' }),
-  // Carries a press made before signing in back across the trip to Google.
-  // Anything else is dropped.
-  validateSearch: (search: Record<string, unknown>): PricingSearch => ({
-    ...(isPlanId(search.interest) ? { interest: search.interest } : {}),
-    ...(isPlanId(search.checkout) ? { checkout: search.checkout } : {}),
-    ...(isBillingPeriod(search.period) ? { period: search.period } : {}),
-  }),
+  validateSearch: pressFromSearch,
   // Awaited so the price is in the server-rendered HTML rather than appearing
   // after hydration.
   loader: ({ context }) =>
@@ -125,7 +112,8 @@ export function PricingScreen({
     if (!session) {
       await authClient.signIn.social({
         provider: 'google',
-        callbackURL: `/pricing?interest=${planId}`,
+        callbackURL: returnLink({ interest: planId }),
+        errorCallbackURL: '/pricing',
       })
       return 'signing-in' as const
     }
@@ -154,7 +142,10 @@ export function PricingScreen({
         // Free has nowhere to come back to — signing in is the whole of it.
         ...(planId === 'free'
           ? {}
-          : { callbackURL: `/pricing?checkout=${planId}&period=${period}` }),
+          : { callbackURL: returnLink({ checkout: planId, period }) }),
+        // Abandoned or refused at Google, the visitor lands back on the page
+        // they pressed from rather than on the auth library's error page.
+        errorCallbackURL: '/pricing',
       })
       return
     }

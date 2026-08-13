@@ -561,6 +561,7 @@ describe('PricingScreen', () => {
         expect(mocks.signInSocial).toHaveBeenCalledWith({
           provider: 'google',
           callbackURL: '/pricing?interest=proPlus',
+          errorCallbackURL: '/pricing',
         }),
       )
       expect(fetchSpy).not.toHaveBeenCalled()
@@ -667,8 +668,10 @@ describe('PricingScreen', () => {
   })
 
   // The period decides the price, so a sign-in that carried only the Plan back
-  // would quietly reopen an annual purchase at the monthly price.
-  it('carries the Plan and the period through sign-in', async () => {
+  // would quietly reopen an annual purchase at the monthly price. Sign-in that
+  // fails or is abandoned comes back here too, rather than to the auth
+  // library's own error page.
+  it('carries the Plan and the period through sign-in, either way it ends', async () => {
     renderScreen()
     fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
     subscribeToPro()
@@ -677,6 +680,7 @@ describe('PricingScreen', () => {
       expect(mocks.signInSocial).toHaveBeenCalledWith({
         provider: 'google',
         callbackURL: '/pricing?checkout=pro&period=annual',
+        errorCallbackURL: '/pricing',
       }),
     )
   })
@@ -752,7 +756,14 @@ describe('PricingScreen', () => {
       planCard('Free').getByRole('button', { name: 'Save your first brew' }),
     )
 
-    await waitFor(() => expect(mocks.signInSocial).toHaveBeenCalled())
+    // Signing in is the whole of Free, so there is nothing to come back for —
+    // but an abandoned sign-in still lands here rather than on an error page.
+    await waitFor(() =>
+      expect(mocks.signInSocial).toHaveBeenCalledWith({
+        provider: 'google',
+        errorCallbackURL: '/pricing',
+      }),
+    )
     expect(mocks.upgrade).not.toHaveBeenCalled()
   })
 
