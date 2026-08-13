@@ -61,6 +61,26 @@ test('the pricing page renders standalone, with every Plan and a working toggle'
   await expect(page.getByText('$4.99')).toHaveCount(0)
 })
 
+// The far side of a sign-in that started with Subscribe: the press comes back
+// on the URL, is read once, and is dropped. Driven here rather than in jsdom
+// because the route's own parsing and the navigation that strips the URL only
+// exist in a real router.
+test('a purchase pressed before signing in comes back on the period it was pressed on', async ({
+  page,
+}) => {
+  await page.goto('/pricing?checkout=pro&period=annual')
+
+  await expect(page.getByText('$44.99')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Annual' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  // Nothing is bought: this visitor is still logged out, and the press is no
+  // longer in the URL for a reload or a shared link to act on.
+  await expect(page).toHaveURL(/\/pricing$/)
+  await expect(page.getByRole('button', { name: 'Subscribe' })).toBeVisible()
+})
+
 test('the pricing FAQ opens the sealing answer', async ({ page }) => {
   await page.goto('/pricing')
 
