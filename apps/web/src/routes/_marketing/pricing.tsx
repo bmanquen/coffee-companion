@@ -45,6 +45,9 @@ export const Route = createFileRoute('/_marketing/pricing')({
   component: PricingRoute,
 })
 
+const planName = (planId: PlanId) =>
+  plans.find((plan) => plan.id === planId)?.name ?? planId
+
 function PricingRoute() {
   const { interest, checkout, period } = Route.useSearch()
   const navigate = Route.useNavigate()
@@ -97,6 +100,11 @@ export function PricingScreen({
   const registered = useQuery({
     ...trpc.planInterest.list.queryOptions(),
     // Public page: only a signed-in visitor has interests to read.
+    enabled: Boolean(session),
+  })
+  // What they are already on, so the page never tries to sell it to them.
+  const held = useQuery({
+    ...trpc.plan.current.queryOptions(),
     enabled: Boolean(session),
   })
   const prices = useQuery({
@@ -155,6 +163,15 @@ export function PricingScreen({
       return
     }
 
+    // Already theirs: the seller refuses to sell it a second time, and asking
+    // them to try again would be asking for the same refusal.
+    if (planId === held.data?.plan) {
+      toast.success(`You are already on ${planName(planId)}`, {
+        description: 'Nothing has been charged.',
+      })
+      return
+    }
+
     const { error } = await authClient.subscription.upgrade({
       plan: planId,
       annual: period === 'annual',
@@ -170,14 +187,15 @@ export function PricingScreen({
   }
 
   // Only for a sellable Plan and a visitor who came back signed in: a hand-made
-  // link cannot open checkout, and an abandoned sign-in is not retried.
+  // link cannot open checkout, and an abandoned sign-in is not retried. Held
+  // last, so a Plan still unknown reopens nothing rather than sells twice.
   const reopened = useRef(false)
   useEffect(() => {
     if (!pendingCheckout || !session || reopened.current) return
-    if (!isSellable(pendingCheckout.planId)) return
+    if (!isSellable(pendingCheckout.planId) || !held.isSuccess) return
     reopened.current = true
     void startCheckout(pendingCheckout.planId, pendingCheckout.period)
-  }, [pendingCheckout, session])
+  }, [pendingCheckout, session, held.isSuccess])
 
   return (
     <PricingPage
@@ -256,7 +274,7 @@ export function PricingPage({
   const registered = new Set([...registeredPlans, ...justRegistered])
 
   const registerInterest = async (planId: PlanId) => {
-    const name = plans.find((plan) => plan.id === planId)?.name ?? planId
+    const name = planName(planId)
     try {
       if ((await onNotify(planId)) === 'recorded') {
         setJustRegistered((already) => [...already, planId])
