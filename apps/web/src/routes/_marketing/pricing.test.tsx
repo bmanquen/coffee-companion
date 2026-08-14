@@ -6,6 +6,7 @@ import {
   within,
 } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { planLimits } from '@coffee-companion/api/lib/plan'
 import { PricingPage, PricingScreen } from './pricing'
 import type { BillingPeriod, PlanId, PlanPrice } from '@/lib/plans'
 import { createTestProviders } from '@/test/providers'
@@ -480,21 +481,29 @@ describe('PricingScreen', () => {
     mocks.upgrade.mockResolvedValue({ data: {}, error: null })
   })
 
-  // Seeds what the visitor has already registered, so the screen never has to
-  // fetch it and the register call is the only request a test can see.
+  // Seeds what the visitor has already registered and the Plan they hold, so
+  // the screen never has to fetch either and the register call is the only
+  // request a test can see. `currentPlan: null` leaves the Plan unknown.
   function renderScreen({
     pendingInterest,
     pendingCheckout,
     alreadyRegistered = [],
+    currentPlan = 'free',
     prices = null,
   }: {
     pendingInterest?: PlanId
     pendingCheckout?: { planId: PlanId; period: BillingPeriod }
     alreadyRegistered?: Array<PlanId>
+    currentPlan?: PlanId | null
     prices?: Array<PlanPrice> | null
   } = {}) {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.plan.prices.queryKey(), prices)
+    if (currentPlan)
+      queryClient.setQueryData(trpc.plan.current.queryKey(), {
+        plan: currentPlan,
+        limits: planLimits[currentPlan],
+      })
     queryClient.setQueryData(
       trpc.planInterest.list.queryKey(),
       alreadyRegistered.map((planId) => ({
@@ -729,6 +738,59 @@ describe('PricingScreen', () => {
       ).toBeTruthy(),
     )
     expect(mocks.upgrade).not.toHaveBeenCalled()
+  })
+
+  // The seller refuses to sell a Plan the visitor is already on, so reopening
+  // the press would greet them with a failure they can do nothing about.
+  it('reopens no checkout for a Plan the visitor already holds', async () => {
+    authState.session = { user: { id: 'visitor' } }
+
+    renderScreen({
+      pendingCheckout: { planId: 'pro', period: 'annual' },
+      currentPlan: 'pro',
+    })
+
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalled())
+    expect(String(mocks.toastSuccess.mock.calls[0][0])).toMatch(/already/i)
+    expect(mocks.upgrade).not.toHaveBeenCalled()
+    expect(mocks.toastError).not.toHaveBeenCalled()
+  })
+
+  it('tells a visitor who presses Subscribe on the Plan they are on', async () => {
+    authState.session = { user: { id: 'visitor' } }
+
+    renderScreen({ currentPlan: 'pro' })
+    subscribeToPro()
+
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalled())
+    expect(String(mocks.toastSuccess.mock.calls[0][0])).toMatch(/already/i)
+    expect(mocks.upgrade).not.toHaveBeenCalled()
+    expect(mocks.toastError).not.toHaveBeenCalled()
+  })
+
+  // Reopening before the answer arrives is how the visitor gets charged for
+  // what they already have, so an unknown Plan buys nothing.
+  it('reopens no checkout until the Plan the visitor holds is known', async () => {
+    authState.session = { user: { id: 'visitor' } }
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockReturnValue(new Promise(() => {}))
+
+    try {
+      renderScreen({
+        pendingCheckout: { planId: 'pro', period: 'annual' },
+        currentPlan: null,
+      })
+
+      await waitFor(() =>
+        expect(
+          planCard('Pro').getByRole('button', { name: 'Subscribe' }),
+        ).toBeTruthy(),
+      )
+      expect(mocks.upgrade).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 
   it('says nothing was charged when checkout cannot be reached', async () => {
