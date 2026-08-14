@@ -153,6 +153,12 @@ export function isSellable(planId: PlanId): boolean {
   return plans.find((plan) => plan.id === planId)?.sellable ?? false
 }
 
+// Whether holding this Plan means paying for it. Free comes with signing up,
+// so holding it is never being subscribed.
+export function isPaid(planId: PlanId): boolean {
+  return planId !== 'free'
+}
+
 export function priceSuffix(period: BillingPeriod): string {
   return period === 'monthly' ? '/month' : '/year'
 }

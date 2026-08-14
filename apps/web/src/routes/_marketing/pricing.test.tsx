@@ -40,7 +40,11 @@ beforeEach(() => {
 
 function renderPricing(
   notify?: (planId: PlanId) => Promise<'recorded' | 'signing-in'>,
-  props: { pendingInterest?: PlanId; registeredPlans?: Array<PlanId> } = {},
+  props: {
+    pendingInterest?: PlanId
+    registeredPlans?: Array<PlanId>
+    heldPlan?: PlanId
+  } = {},
 ) {
   const onCheckout = vi.fn()
   const onNotify = vi.fn(notify)
@@ -361,6 +365,45 @@ describe('PricingPage', () => {
 
     fireEvent.click(subscribe)
     expect(onCheckout).toHaveBeenCalledWith('pro', 'monthly')
+  })
+
+  // The seller refuses to sell a Plan the visitor is already on, so the card
+  // says what they have rather than offering a press that can only fail.
+  it('offers no purchase of the Plan the visitor is subscribed to', () => {
+    const { onCheckout } = renderPricing(undefined, { heldPlan: 'pro' })
+
+    const button = planCard('Pro').getByRole('button', { name: 'Subscribed' })
+    expect(button.hasAttribute('disabled')).toBe(true)
+    expect(
+      planCard('Pro').queryByRole('button', { name: 'Subscribe' }),
+    ).toBeNull()
+
+    fireEvent.click(button)
+    expect(onCheckout).not.toHaveBeenCalled()
+  })
+
+  it('leaves every other Plan buyable for a subscriber', () => {
+    const { onCheckout } = renderPricing(undefined, { heldPlan: 'pro' })
+
+    fireEvent.click(
+      planCard('Free').getByRole('button', { name: 'Save your first brew' }),
+    )
+    expect(onCheckout).toHaveBeenCalledWith('free', 'monthly')
+  })
+
+  // Free comes with signing up. Calling it a subscription would take away the
+  // one call to action that opens the app.
+  it('never reads as subscribed on Free', () => {
+    const { onCheckout } = renderPricing(undefined, { heldPlan: 'free' })
+
+    const button = planCard('Free').getByRole('button', {
+      name: 'Save your first brew',
+    })
+    expect(button.hasAttribute('disabled')).toBe(false)
+    expect(screen.queryByRole('button', { name: 'Subscribed' })).toBeNull()
+
+    fireEvent.click(button)
+    expect(onCheckout).toHaveBeenCalledWith('free', 'monthly')
   })
 
   it('reads as registered straight after the press that recorded it', async () => {
@@ -756,16 +799,42 @@ describe('PricingScreen', () => {
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
-  it('tells a visitor who presses Subscribe on the Plan they are on', async () => {
+  it('marks the Plan the visitor is on as Subscribed', async () => {
     authState.session = { user: { id: 'visitor' } }
 
     renderScreen({ currentPlan: 'pro' })
-    subscribeToPro()
 
-    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalled())
-    expect(String(mocks.toastSuccess.mock.calls[0][0])).toMatch(/already/i)
-    expect(mocks.upgrade).not.toHaveBeenCalled()
-    expect(mocks.toastError).not.toHaveBeenCalled()
+    await waitFor(() =>
+      expect(
+        planCard('Pro').getByRole('button', { name: 'Subscribed' }),
+      ).toBeTruthy(),
+    )
+    expect(
+      planCard('Pro')
+        .getByRole('button', { name: 'Subscribed' })
+        .hasAttribute('disabled'),
+    ).toBe(true)
+  })
+
+  // The Plan is only known once the server answers, and a logged-out visitor
+  // never asks, so the press has to stay available until it is.
+  it('offers the press while the Plan the visitor holds is unknown', async () => {
+    authState.session = { user: { id: 'visitor' } }
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockReturnValue(new Promise(() => {}))
+
+    try {
+      renderScreen({ currentPlan: null })
+
+      await waitFor(() =>
+        expect(
+          planCard('Pro').getByRole('button', { name: 'Subscribe' }),
+        ).toBeTruthy(),
+      )
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 
   // Reopening before the answer arrives is how the visitor gets charged for

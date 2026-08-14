@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
   formatPrice,
+  isPaid,
   isSellable,
   planFeatures,
   planIncludes,
@@ -202,6 +203,7 @@ export function PricingScreen({
       onCheckout={(planId, period) => void startCheckout(planId, period)}
       onNotify={registerInterest}
       registeredPlans={registeredPlans}
+      heldPlan={held.data?.plan}
       pendingInterest={carriedBack}
       // Shown whether or not checkout reopens, so a visitor who came back
       // logged out still sees the period they chose.
@@ -247,6 +249,7 @@ export function PricingPage({
   onCheckout,
   onNotify,
   registeredPlans = [],
+  heldPlan,
   pendingInterest,
   initialPeriod = 'monthly',
   prices,
@@ -254,6 +257,8 @@ export function PricingPage({
   onCheckout: (planId: PlanId, period: BillingPeriod) => void
   onNotify: (planId: PlanId) => Promise<'recorded' | 'signing-in'>
   registeredPlans?: Array<PlanId>
+  // What the visitor is already on, so the page stops offering to sell it.
+  heldPlan?: PlanId
   // A Plan whose call to action was pressed before signing in, registered on
   // arrival so the press survives the trip to the identity provider.
   pendingInterest?: PlanId
@@ -313,6 +318,12 @@ export function PricingPage({
           // Only ever the state of a call to action that registers interest.
           // A sellable Plan keeps its purchase path whatever is on record.
           const isRegistered = !plan.sellable && registered.has(plan.id)
+          const isSubscribed = plan.id === heldPlan && isPaid(plan.id)
+          const cta = isSubscribed
+            ? 'Subscribed'
+            : isRegistered
+              ? 'Registered'
+              : plan.cta
           const { amount, currency } = priceFor(plan, period, prices)
 
           return (
@@ -339,13 +350,13 @@ export function PricingPage({
               <Button
                 className="w-full"
                 variant={plan.sellable ? 'default' : 'outline'}
-                disabled={isRegistered}
+                disabled={isSubscribed || isRegistered}
                 onClick={() => {
                   if (plan.sellable) onCheckout(plan.id, period)
                   else void registerInterest(plan.id)
                 }}
               >
-                {isRegistered ? 'Registered' : plan.cta}
+                {cta}
               </Button>
 
               <dl className="flex flex-col gap-3 border-t border-border pt-4">
