@@ -15,10 +15,12 @@ const gearTable = {
   brewingDevices,
 } as const
 
-// The statuses in which a Subscription is being paid for. What happens to a
-// Subscription that stops being paid for is #68's, not the resolver's:
-// anything not listed here simply stops conferring a Plan.
-const paidStatuses = ['active', 'trialing']
+// A declined renewal is Stripe retrying a card, not an ending, and nothing may
+// Seal while it can still be fixed (ADR-0007) — so this is a status in which a
+// Subscription still confers its Plan.
+const RETRYING = 'past_due'
+
+const paidStatuses = ['active', 'trialing', RETRYING]
 
 // A Grant and a Subscription are the two sources of a Plan, and the most
 // generous of them wins — so a comp is never downgraded by billing state, and
@@ -57,6 +59,24 @@ export async function resolvePlan(userId: string): Promise<PlanId> {
     // would be the same thing said less honestly.
     ...subscriptions.flatMap((row) => planIdFrom(row.plan) ?? []),
   ])
+}
+
+// Whether Stripe is still retrying a declined renewal. Reported alongside the
+// Plan rather than derived from it: a Grant can be carrying the Plan while the
+// card is the one thing the user can still put right.
+export async function isRenewalFailing(userId: string): Promise<boolean> {
+  const retrying = await db
+    .select({ plan: subscription.plan })
+    .from(subscription)
+    .where(
+      and(
+        eq(subscription.referenceId, userId),
+        eq(subscription.status, RETRYING),
+      ),
+    )
+  // A Subscription to a Plan we no longer recognise confers nothing, so its card
+  // is not something the user needs to put right.
+  return retrying.some((row) => planIdFrom(row.plan) !== undefined)
 }
 
 // Refuses the next addition once the Plan's limit is met. Never applied to what

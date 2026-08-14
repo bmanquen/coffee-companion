@@ -1,7 +1,12 @@
 import { afterAll, beforeAll } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../src/db'
-import { planGrants, subscription, user } from '../src/db/schema'
+import {
+  brewingDeviceTypes,
+  planGrants,
+  subscription,
+  user,
+} from '../src/db/schema'
 import { createCallerFactory } from '../src/trpc/init'
 import { trpcRouter } from '../src/trpc/router'
 import type { PlanId } from '../src/lib/plan'
@@ -69,6 +74,37 @@ export const subscribePlan = async (
   })
 }
 
+// A Subscription to a Plan the app no longer recognises — a price retired while
+// someone was still on it. It confers nothing, so nothing about it is the user's
+// to put right.
+export const subscribeRetiredPlan = async (userId: string, status: string) => {
+  await db.insert(subscription).values({
+    id: crypto.randomUUID(),
+    plan: 'legacy-gold',
+    referenceId: userId,
+    status,
+  })
+}
+
+// Moves a Subscription to the status Stripe would next put it in. Every way a
+// paid Plan ends reaches the app as this column changing, so driving it is
+// driving the event that wrote it.
+export const setSubscriptionStatus = async (userId: string, status: string) => {
+  await db
+    .update(subscription)
+    .set({ status })
+    .where(eq(subscription.referenceId, userId))
+}
+
+// A cancellation Stripe has accepted but not yet acted on: the Subscription is
+// still paid up, and stays that way until the period runs out.
+export const scheduleCancellation = async (userId: string) => {
+  await db
+    .update(subscription)
+    .set({ cancelAtPeriodEnd: true })
+    .where(eq(subscription.referenceId, userId))
+}
+
 // Backdates every Grant a user holds, which is how a Plan lapses: no event
 // arrives, the Grant simply stops applying on the next request.
 export const expireGrants = async (userId: string) => {
@@ -76,6 +112,35 @@ export const expireGrants = async (userId: string) => {
     .update(planGrants)
     .set({ expiresAt: new Date(Date.now() - 60_000) })
     .where(eq(planGrants.userId, userId))
+}
+
+// Brewing device types are global rather than per-user, so they neither cascade
+// with a test user nor belong to one file. Take whatever is already there, and
+// hand back a `cleanup` that removes only the rows this file had to create.
+export const deviceTypes = () => {
+  const created: Array<string> = []
+  return {
+    findOrCreate: async (name: string) => {
+      const [existing] = await db
+        .select()
+        .from(brewingDeviceTypes)
+        .where(eq(brewingDeviceTypes.name, name))
+      if (existing) return existing.id
+      const [row] = await db
+        .insert(brewingDeviceTypes)
+        .values({ name })
+        .returning()
+      created.push(row.id)
+      return row.id
+    },
+    cleanup: async () => {
+      if (created.length) {
+        await db
+          .delete(brewingDeviceTypes)
+          .where(inArray(brewingDeviceTypes.id, created))
+      }
+    },
+  }
 }
 
 // Unique names sidestep cross-run collisions on globally-unique lookup columns;

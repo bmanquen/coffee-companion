@@ -493,6 +493,18 @@ describe('PricingPage', () => {
     expect(screen.getByText(/stay sealed until you subscribe/i)).toBeTruthy()
   })
 
+  // ADR-0007 requires the cancellation rule be readable before anyone buys.
+  it('states the cancellation rule, and that a failed payment Seals nothing', () => {
+    renderPricing()
+    fireEvent.click(
+      screen.getByRole('button', { name: /what happens if I cancel/i }),
+    )
+
+    const answer = screen.getByText(/until the period you have paid for/i)
+    expect(answer.textContent).toMatch(/end, not the moment you press it/i)
+    expect(answer.textContent).toMatch(/nothing is Sealed while your card/i)
+  })
+
   it('never says Brewers, including in the FAQ answers', () => {
     const { container } = renderPricing()
     const text = textWithEveryAnswerRead(container)
@@ -546,6 +558,7 @@ describe('PricingScreen', () => {
       queryClient.setQueryData(trpc.plan.current.queryKey(), {
         plan: currentPlan,
         limits: planLimits[currentPlan],
+        renewalFailing: false,
       })
     queryClient.setQueryData(
       trpc.planInterest.list.queryKey(),

@@ -1,10 +1,13 @@
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import MobileHeader from '@/components/MobileHeader'
 import Navigation from '@/components/Navigation'
+import { RenewalFailedNotice } from '@/components/renewal-failed-notice'
 import { authClient } from '@/lib/auth-client'
 import { getForwardedHeaders } from '@/lib/request-headers'
+import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async () => {
@@ -28,6 +31,10 @@ export const Route = createFileRoute('/_authenticated')({
 // because it shifts the main column on desktop.
 function AuthenticatedLayout() {
   const [navOpen, setNavOpen] = useState(false)
+  const trpc = useTRPC()
+  // Not suspended on: a failing renewal is worth saying wherever the user is,
+  // but never worth holding the whole app up for.
+  const { data: plan } = useQuery(trpc.plan.current.queryOptions())
 
   return (
     <>
@@ -36,6 +43,11 @@ function AuthenticatedLayout() {
       <main
         className={`transition-all duration-300 ${navOpen ? 'lg:ml-64' : ''} px-3 pb-20 lg:pb-0`}
       >
+        {plan?.renewalFailing && (
+          <div className="pt-3">
+            <RenewalFailedNotice />
+          </div>
+        )}
         <Outlet />
       </main>
       <BottomNav />

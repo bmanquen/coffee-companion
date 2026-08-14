@@ -1,11 +1,12 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { count, eq, inArray } from 'drizzle-orm'
+import { count, eq } from 'drizzle-orm'
 import { db } from '../db'
-import { brewingDeviceTypes, espressoShots } from '../db/schema'
+import { espressoShots } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import {
   batchedCallerFor,
   callerFor,
+  deviceTypes,
   expireGrants,
   grantPlan,
   seedUsers,
@@ -25,25 +26,9 @@ const PROMOTED = 'shelf-promoted-user'
 const asPromoted = callerFor(PROMOTED)
 const uniqPromoted = uniqFor(PROMOTED)
 
-const createdTypeIds: Array<string> = []
-async function findOrCreateDeviceType(name: string): Promise<string> {
-  const existing = await db
-    .select()
-    .from(brewingDeviceTypes)
-    .where(eq(brewingDeviceTypes.name, name))
-  if (existing[0]) return existing[0].id
-  const [row] = await db.insert(brewingDeviceTypes).values({ name }).returning()
-  createdTypeIds.push(row.id)
-  return row.id
-}
+const types = deviceTypes()
 
-seedUsers([USER, PROMOTED], async () => {
-  if (createdTypeIds.length) {
-    await db
-      .delete(brewingDeviceTypes)
-      .where(inArray(brewingDeviceTypes.id, createdTypeIds))
-  }
-})
+seedUsers([USER, PROMOTED], types.cleanup)
 
 let grinderId: string
 let deviceId: string
@@ -64,7 +49,7 @@ async function logShot(coffeeId: string) {
 }
 
 beforeAll(async () => {
-  const typeId = await findOrCreateDeviceType(ESPRESSO_DEVICE_TYPE)
+  const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
   const device = await asUser.brewingDevice.create({
     name: uniq('Linea Mini'),
     brand: 'La Marzocco',
@@ -362,7 +347,7 @@ describe('a Coffee promoted back onto the Shelf', () => {
   }
 
   beforeAll(async () => {
-    const typeId = await findOrCreateDeviceType(ESPRESSO_DEVICE_TYPE)
+    const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
     promotedDevice = (
       await asPromoted.brewingDevice.create({
         name: uniqPromoted('Linea Mini'),
