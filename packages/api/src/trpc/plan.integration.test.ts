@@ -4,7 +4,9 @@ import {
   callerFor,
   grantPlan,
   seedUsers,
+  setSubscriptionStatus,
   subscribePlan,
+  subscribeRetiredPlan,
 } from '../../test/trpc'
 
 const USER_FREE = 'plan-user-free'
@@ -18,6 +20,9 @@ const USER_LAPSED = 'plan-user-lapsed'
 const USER_BOTH = 'plan-user-both'
 const USER_RICHER_GRANT = 'plan-user-richer-grant'
 const USER_LESSER_GRANT = 'plan-user-lesser-grant'
+const USER_RETRYING = 'plan-user-retrying'
+const USER_RETRYING_GRANT = 'plan-user-retrying-grant'
+const USER_RETRYING_RETIRED = 'plan-user-retrying-retired'
 
 seedUsers([
   USER_FREE,
@@ -27,6 +32,9 @@ seedUsers([
   USER_BOTH,
   USER_RICHER_GRANT,
   USER_LESSER_GRANT,
+  USER_RETRYING,
+  USER_RETRYING_GRANT,
+  USER_RETRYING_RETIRED,
 ])
 
 describe('plan.current', () => {
@@ -34,6 +42,7 @@ describe('plan.current', () => {
     expect(await asFree.plan.current()).toEqual({
       plan: 'free',
       limits: { grinders: 1, brewingDevices: 3 },
+      renewalFailing: false,
     })
   })
 
@@ -43,6 +52,7 @@ describe('plan.current', () => {
     expect(await asPaid.plan.current()).toEqual({
       plan: 'pro',
       limits: { grinders: null, brewingDevices: null },
+      renewalFailing: false,
     })
   })
 
@@ -89,5 +99,54 @@ describe('plan.current with a Subscription', () => {
     await subscribePlan(USER_LESSER_GRANT, 'pro')
 
     expect(await planOf(USER_LESSER_GRANT)).toBe('pro')
+  })
+})
+
+// A declined renewal is Stripe retrying a card, not an ending. The Plan is
+// untouched for as long as that lasts, and the app says so while the card can
+// still be fixed (ADR-0007).
+describe('plan.current while a renewal is failing', () => {
+  it('keeps the subscribed Plan for as long as Stripe retries', async () => {
+    await subscribePlan(USER_RETRYING, 'pro', { status: 'past_due' })
+
+    expect((await callerFor(USER_RETRYING).plan.current()).plan).toBe('pro')
+  })
+
+  it('reports the failure, so the app can offer to fix the card', async () => {
+    expect(
+      (await callerFor(USER_RETRYING).plan.current()).renewalFailing,
+    ).toBe(true)
+  })
+
+  it('reports it even when a Grant is carrying the Plan anyway', async () => {
+    // The Grant is why they still read their history; it is not why their card
+    // was declined, and staying quiet would leave the card unfixed.
+    await grantPlan(USER_RETRYING_GRANT, 'proPlus')
+    await subscribePlan(USER_RETRYING_GRANT, 'pro', { status: 'past_due' })
+
+    expect(await callerFor(USER_RETRYING_GRANT).plan.current()).toMatchObject({
+      plan: 'proPlus',
+      renewalFailing: true,
+    })
+  })
+
+  it('says nothing once the payment is recovered', async () => {
+    await setSubscriptionStatus(USER_RETRYING, 'active')
+
+    expect(await callerFor(USER_RETRYING).plan.current()).toMatchObject({
+      plan: 'pro',
+      renewalFailing: false,
+    })
+  })
+
+  it('stays quiet about a Plan the app no longer recognises', async () => {
+    // That Subscription confers nothing, so there is no access to lose and
+    // nothing the user could usefully be asked to fix.
+    await subscribeRetiredPlan(USER_RETRYING_RETIRED, 'past_due')
+
+    expect(await callerFor(USER_RETRYING_RETIRED).plan.current()).toMatchObject({
+      plan: 'free',
+      renewalFailing: false,
+    })
   })
 })

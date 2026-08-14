@@ -235,6 +235,11 @@ const faq: Array<{ question: string; answer: string }> = [
       'No. Every plan logs unlimited coffees and unlimited brews across every brewing method. Free limits what you can read back, never what you can record.',
   },
   {
+    question: 'What happens if I cancel?',
+    answer:
+      'You keep reading everything until the period you have paid for runs out — cancelling takes effect at the end, not the moment you press it. After that your Shelf goes back to five coffees and what falls off is Sealed, still stored and readable again whenever you resubscribe. If a renewal payment fails, nothing is Sealed while your card is being retried; we tell you in the app so you can fix it first.',
+  },
+  {
     question: 'What happens to my extra grinders if I downgrade?',
     answer:
       'You keep them. Equipment limits only stop you adding more while you are over them — nothing you already own is removed or hidden, because your existing brews reference it.',
