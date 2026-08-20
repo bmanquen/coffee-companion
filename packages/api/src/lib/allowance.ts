@@ -16,7 +16,7 @@ const gearTable = {
 } as const
 
 // A declined renewal is Stripe retrying a card, not an ending, and nothing may
-// Seal while it can still be fixed (ADR-0007) — so this is a status in which a
+// Seal while it can still be fixed (ADR-0008) — so this is a status in which a
 // Subscription still confers its Plan.
 const RETRYING = 'past_due'
 

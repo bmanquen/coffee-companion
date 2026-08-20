@@ -48,7 +48,7 @@ Consequences to understand before changing anything here:
   unrecognised descriptor is a leading cause of disputes.
 - **We control the entitlement, not the money.** Stripe owns disputes end to end and may
   refund without our approval if a support escalation goes unanswered for 48 hours, so
-  revoking access is our side of a decision someone else made (see ADR-0007).
+  revoking access is our side of a decision someone else made (see ADR-0008).
 - **Constraints we have inherited.** Digital goods only, each carrying an eligible tax
   code. No Connect, no Elements or embedded components, and Subscriptions must be created
   through Checkout or Payment Links — which is why checkout is a redirect and not an

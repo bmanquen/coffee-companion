@@ -1,5 +1,9 @@
 # Three events Seal a lapsed subscriber, and they are not one event
 
+Superseded by ADR-0008. Its rules mostly survive there; its mechanism — one webhook per
+rule — does not, and its full-refund rule is reversed. Kept for the reasoning below,
+which ADR-0008 relies on rather than repeats.
+
 Losing a paid Plan is a Shelf shrinking from the whole library to five, so ADR-0004
 already says what happens to the Brews that fall off it: they Seal. What ADR-0004 never
 considered is a former subscriber, and billing supplies three different ways to become

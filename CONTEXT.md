@@ -78,7 +78,7 @@ _Avoid_: Signup, lead
 The Coffees whose Brews a user can read. Free holds five, ordered by most recently
 brewed; paid Plans hold the whole library. Its size is therefore a function of the Plan,
 so gaining or losing a paid Plan resizes it — and the Coffees that fall off a shrinking
-Shelf Seal (see ADR-0007). A Coffee off the Shelf is still fully usable — only its past
+Shelf Seal (see ADR-0008). A Coffee off the Shelf is still fully usable — only its past
 is out of reach.
 _Avoid_: Active coffees, viewable coffees, library
 
