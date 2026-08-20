@@ -170,7 +170,36 @@ triggered `customer.subscription.created` carries none of the metadata the plugi
 onto a real Checkout Session, so it takes the branch meant for Subscriptions created by
 hand in the Dashboard, and proves nothing about the path a customer walks.
 
-## 6. Check the result
+## 6. Decide what a dispute does to a Subscription
+
+Dashboard → **Settings → Billing → Automatic collection** → **Manage disputed payments**.
+Left alone, a disputed Subscription keeps cycling and keeps generating charges for the
+same customer to dispute again. Set it to **cancel the subscription immediately without
+prorating**.
+
+That setting is the whole of the dispute rule in ADR-0007. Stripe moves `status` to
+`canceled`, the plugin mirrors the column, and the Plan ends by the same path a
+cancellation takes — so there is nothing to write here and no `charge.dispute.*` event to
+subscribe to.
+
+Two things to know before choosing it:
+
+- It fires when the dispute is **opened**, not when it is lost, and a canceled
+  Subscription cannot be restarted. A dispute that is withdrawn or won leaves a customer
+  who has to buy again — give them a Plan Grant rather than asking them to.
+- It only covers card disputes opened for the full amount. A partial dispute, or one on a
+  local payment method, leaves the Subscription cycling.
+
+The other option — **cancel the subscription at the end of the period** — keeps them on
+Pro for a period they have charged back, which is the thing the setting exists to stop.
+
+A refund is not this. Refunding a charge never touches `subscription.status`, so a
+Subscription refunded on its own keeps its Plan and keeps billing. The Dashboard's own
+cancel flow offers a full refund as part of cancelling, and that is the way to end
+someone's Plan and give their money back in one action. A goodwill refund on its own is
+meant to leave the Plan alone.
+
+## 7. Check the result
 
 Buy Pro in test mode and confirm three things, in this order of importance:
 
