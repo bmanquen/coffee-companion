@@ -104,7 +104,7 @@ describe('plan.current with a Subscription', () => {
 
 // A declined renewal is Stripe retrying a card, not an ending. The Plan is
 // untouched for as long as that lasts, and the app says so while the card can
-// still be fixed (ADR-0007).
+// still be fixed (ADR-0008).
 describe('plan.current while a renewal is failing', () => {
   it('keeps the subscribed Plan for as long as Stripe retries', async () => {
     await subscribePlan(USER_RETRYING, 'pro', { status: 'past_due' })

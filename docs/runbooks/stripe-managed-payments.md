@@ -177,7 +177,7 @@ Left alone, a disputed Subscription keeps cycling and keeps generating charges f
 same customer to dispute again. Set it to **cancel the subscription immediately without
 prorating**.
 
-That setting is the whole of the dispute rule in ADR-0007. Stripe moves `status` to
+That setting is the whole of the dispute rule in ADR-0008. Stripe moves `status` to
 `canceled`, the plugin mirrors the column, and the Plan ends by the same path a
 cancellation takes — so there is nothing to write here and no `charge.dispute.*` event to
 subscribe to.

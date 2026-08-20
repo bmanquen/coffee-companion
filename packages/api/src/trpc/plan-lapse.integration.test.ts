@@ -14,7 +14,7 @@ import {
   uniqFor,
 } from '../../test/trpc'
 
-// How a paid Plan ends (ADR-0007), observed where it is felt: the Shelf, and
+// How a paid Plan ends (ADR-0008), observed where it is felt: the Shelf, and
 // what falls off it. Every ending reaches the app as one Subscription status
 // changing, with Stripe deciding when — so these tests drive that column, and
 // fail if the binding between an ending and a status moves.

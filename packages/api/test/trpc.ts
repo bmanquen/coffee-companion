@@ -121,11 +121,11 @@ export const deviceTypes = () => {
   const created: Array<string> = []
   return {
     findOrCreate: async (name: string) => {
-      const [existing] = await db
+      const existing = await db
         .select()
         .from(brewingDeviceTypes)
         .where(eq(brewingDeviceTypes.name, name))
-      if (existing) return existing.id
+      if (existing.length) return existing[0].id
       const [row] = await db
         .insert(brewingDeviceTypes)
         .values({ name })

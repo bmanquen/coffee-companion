@@ -493,7 +493,7 @@ describe('PricingPage', () => {
     expect(screen.getByText(/stay sealed until you subscribe/i)).toBeTruthy()
   })
 
-  // ADR-0007 requires the cancellation rule be readable before anyone buys.
+  // ADR-0008 requires the cancellation rule be readable before anyone buys.
   it('states the cancellation rule, and that a failed payment Seals nothing', () => {
     renderPricing()
     fireEvent.click(
