@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
+import { db } from '../db'
 import { auth } from './auth'
 
 // The other side of the purchase: opening Checkout at all. Under Managed
@@ -21,6 +22,11 @@ const upgrade = () =>
       }),
     }),
   )
+
+// No seedUsers here, so no teardown to close the pool the session lookup opens.
+afterAll(async () => {
+  await db.$client.end()
+})
 
 describe('opening Checkout', () => {
   // Unauthorized rather than a failure out of Stripe: the fixture key would not
