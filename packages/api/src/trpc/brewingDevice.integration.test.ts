@@ -72,7 +72,7 @@ describe('brewingDevice.getById', () => {
 })
 
 describe('brewingDevice.update', () => {
-  it('updates fields and bumps updatedAt past createdAt', async () => {
+  it('updates fields and never moves updatedAt before createdAt', async () => {
     const created = await asA.brewingDevice.create({
       name: uniq('Before'),
       brand: 'Brand',
@@ -92,8 +92,8 @@ describe('brewingDevice.update', () => {
     })
     expect(updated.name).toBe(newName)
     expect(updated.brand).toBe('New Brand')
-    // $onUpdate moves updatedAt forward on every update.
-    expect(new Date(updated.updatedAt).getTime()).toBeGreaterThan(
+    // A JS Date truncates to milliseconds, which a fast update shares with createdAt.
+    expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(
       new Date(updated.createdAt).getTime(),
     )
   })

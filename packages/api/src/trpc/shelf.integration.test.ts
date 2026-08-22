@@ -36,6 +36,9 @@ let roasterId: string
 // The six Coffees, oldest-brewed first. coffees[0] is the one that falls off.
 const coffees: Array<{ id: string; name: string; shotId: string }> = []
 
+// Counted rather than hard-coded, so an earlier failure doesn't fail this too.
+let shotsLogged = 0
+
 async function logShot(coffeeId: string) {
   const shot = await asUser.espressoShot.create({
     coffeeId,
@@ -45,6 +48,7 @@ async function logShot(coffeeId: string) {
     yield: '36',
     time: 28,
   })
+  shotsLogged++
   return shot.id
 }
 
@@ -193,8 +197,7 @@ describe('Sealing and the Plan', () => {
       .select({ total: count() })
       .from(espressoShots)
       .where(eq(espressoShots.userId, USER))
-    // Six coffees seeded with one shot each, plus the two logged above.
-    expect(Number(total)).toBe(8)
+    expect(Number(total)).toBe(shotsLogged)
   })
 
   it('still lets a Free user log and edit whatever they like', async () => {
