@@ -25,6 +25,26 @@ This project uses [Vitest](https://vitest.dev/) for testing. You can run the tes
 pnpm test
 ```
 
+### Integration tests
+
+The API's integration tests run tRPC procedures against a real database, so they
+need one to point at:
+
+```bash
+cp packages/api/.env.test.example packages/api/.env.test
+# edit .env.test with the test-environment database URL
+pnpm test:integration
+```
+
+Use the test-environment database. The suite deletes and re-inserts its test
+users on every run, so a development or production URL loses data. The setup
+reads only `.env.test` — never `.env.local` — so the development database can't
+be reached by forgetting to set this.
+
+The database is reached over the network, so expect the suite to take several
+minutes. CI is unaffected: it sets `DATABASE_URL` to its own Postgres service
+container, which takes precedence over the file.
+
 ## Styling
 
 This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.

@@ -98,7 +98,9 @@ jobs:
     # hosted dependency, no shared state, no secret.
     services:
       postgres:
-        image: postgres:16
+        # Matches the version Railway runs, so CI never passes on a major that
+        # production doesn't use.
+        image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
