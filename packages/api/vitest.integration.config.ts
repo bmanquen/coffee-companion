@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitest/config'
 
-// DB-backed integration tests. Require a DATABASE_URL pointing at a disposable
-// Postgres; migrations are applied once in globalSetup. Run serially so tests
-// sharing the database don't race.
+// DB-backed integration tests. Require a DATABASE_URL pointing at the test
+// environment; migrations are applied once in globalSetup. Run serially so
+// tests sharing the database don't race.
 export default defineConfig({
   test: {
     environment: 'node',
@@ -12,8 +12,10 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'src/**/*.integration.test.ts'],
     globalSetup: ['./test/integration.setup.ts'],
     fileParallelism: false,
-    hookTimeout: 60_000,
-    testTimeout: 30_000,
+    // Generous because the database is reached over the network: a fixture-heavy
+    // beforeAll issues hundreds of statements, and each pays a round trip.
+    hookTimeout: 300_000,
+    testTimeout: 120_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
