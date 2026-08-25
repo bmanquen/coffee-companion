@@ -52,7 +52,14 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? 'github' : 'list',
+  // In CI, `github` annotates the failing line in the diff, and `html` writes a
+  // report to playwright-report/ for the workflow to upload. The html reporter
+  // copies attachments in with it, so the trace from a retried test is the
+  // point of this — a failure that only reproduces on a loaded runner is
+  // otherwise diagnosable from its error text alone.
+  reporter: process.env.CI
+    ? [['github'], ['html', { open: 'never' }]]
+    : 'list',
   use: {
     baseURL,
     trace: 'on-first-retry',

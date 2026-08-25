@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { clickUntil } from './helpers'
 
 // Covers espresso/new end-to-end: the coffee SearchSelect (seeded), the
 // prefill that fills grinder + device from the coffee's most recent shot, the
@@ -6,8 +7,9 @@ import { expect, test } from '@playwright/test'
 test('log an espresso shot via the new-shot form', async ({ page }) => {
   await page.goto('/espresso/new')
 
-  await page.getByText('Select Coffee').click()
-  await page.getByText('Ethiopia Guji', { exact: true }).click()
+  const coffee = page.getByText('Ethiopia Guji', { exact: true })
+  await clickUntil(page.getByText('Select Coffee'), coffee)
+  await coffee.click()
 
   // Selecting the coffee prefills grinder + device from its most recent shot,
   // so the "Select Grinder"/"Select Brewing Device" placeholders are replaced.
@@ -29,10 +31,11 @@ test('log an espresso shot via the new-shot form', async ({ page }) => {
 test('roast-date picker selects a date', async ({ page }) => {
   await page.goto('/espresso/new')
 
-  await page.getByText('Pick a date').click()
   // Day buttons are labelled by full date (e.g. "Monday, June 15th, 2026");
   // match the 15th of whatever month is shown.
-  await page.getByRole('button', { name: /15th/ }).click()
+  const fifteenth = page.getByRole('button', { name: /15th/ })
+  await clickUntil(page.getByText('Pick a date'), fifteenth)
+  await fifteenth.click()
 
   await expect(page.getByText('Pick a date')).toHaveCount(0)
 })

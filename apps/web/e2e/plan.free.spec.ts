@@ -5,7 +5,7 @@ import {
   ON_SHELF_COFFEE,
 } from '@coffee-companion/api/db/e2e-library'
 import { expect, test } from '@playwright/test'
-import { expandRow, rowFor } from './table'
+import { expandRow, rowFor } from './helpers'
 import type { Page } from '@playwright/test'
 
 // The Free reading experience, driven in a real browser. Runs in the

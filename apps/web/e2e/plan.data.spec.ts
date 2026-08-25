@@ -3,7 +3,7 @@ import {
   OFF_SHELF_DIALED_IN_COFFEE,
 } from '@coffee-companion/api/db/e2e-library'
 import { expect, test } from '@playwright/test'
-import { expandRow, rowFor } from './table'
+import { expandRow, rowFor } from './helpers'
 
 // The granted reading experience, driven in a real browser. Runs in the
 // `authed-data` project, whose identity holds a Pro Grant and the same library
