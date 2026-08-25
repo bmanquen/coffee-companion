@@ -177,6 +177,8 @@ jobs:
       - name: End-to-end tests (Playwright)
         run: pnpm test:e2e
 
+      # Not `if-no-files-found: ignore`: the report is written on every run, so
+      # its absence is a broken reporter config rather than a quiet non-event.
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
@@ -184,4 +186,4 @@ jobs:
           name: playwright-report
           path: apps/web/playwright-report
           retention-days: 7
-          if-no-files-found: ignore
+          if-no-files-found: warn

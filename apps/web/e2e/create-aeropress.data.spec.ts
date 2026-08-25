@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { clickUntil } from './helpers'
 
 // Covers aeropress/new end-to-end: the coffee SearchSelect (seeded), the
 // prefill that fills method + grinder + device from the coffee's most recent
@@ -6,8 +7,9 @@ import { expect, test } from '@playwright/test'
 test('log an aeropress brew via the new-brew form', async ({ page }) => {
   await page.goto('/aeropress/new')
 
-  await page.getByText('Select Coffee').click()
-  await page.getByText('Ethiopia Guji', { exact: true }).click()
+  const coffee = page.getByText('Ethiopia Guji', { exact: true })
+  await clickUntil(page.getByText('Select Coffee'), coffee)
+  await coffee.click()
 
   // Selecting the coffee prefills method + grinder + device from its most recent
   // brew, replacing the "Select ..." placeholders with the seeded values.

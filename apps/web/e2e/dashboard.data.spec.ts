@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { clickUntil } from './helpers'
 import type { Page } from '@playwright/test'
 
 // Runs in the `authed-data` project, which carries the e2e_auth bypass cookie
@@ -11,8 +12,9 @@ function methodTrigger(page: Page, method: string) {
   return page.getByRole('button', { name: method, exact: true })
 }
 async function pickMethod(page: Page, current: string, next: RegExp) {
-  await methodTrigger(page, current).click()
-  await page.getByRole('option', { name: next }).click()
+  const option = page.getByRole('option', { name: next })
+  await clickUntil(methodTrigger(page, current), option)
+  await option.click()
 }
 
 test('the dashboard renders at its own URL', async ({ page }) => {

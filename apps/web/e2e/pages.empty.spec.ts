@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { clickUntil } from './helpers'
 
 // Empty-state page tests. Run in the `authed-empty` project (bypass cookie for
 // an unseeded user), so every authenticated page renders its empty state.
@@ -11,8 +12,9 @@ test('brews page shows the espresso empty state', async ({ page }) => {
 
 test('brews page shows the aeropress empty state', async ({ page }) => {
   await page.goto('/brews')
-  await page.getByRole('tab', { name: 'AeroPress' }).click()
-  await expect(page.getByText(/No aeropress brews yet/i)).toBeVisible()
+  const emptyState = page.getByText(/No aeropress brews yet/i)
+  await clickUntil(page.getByRole('tab', { name: 'AeroPress' }), emptyState)
+  await expect(emptyState).toBeVisible()
 })
 
 test('coffees page shows the empty state', async ({ page }) => {
@@ -28,6 +30,10 @@ test('equipment page shows empty grinder and device sections', async ({
   // Grinders tab (default) empty state.
   await expect(page.getByText(/No grinders yet/i)).toBeVisible()
   // Brewing Devices empty state lives behind its own tab.
-  await page.getByRole('tab', { name: 'Brewing Devices' }).click()
-  await expect(page.getByText(/No brewing devices yet/i)).toBeVisible()
+  const deviceEmptyState = page.getByText(/No brewing devices yet/i)
+  await clickUntil(
+    page.getByRole('tab', { name: 'Brewing Devices' }),
+    deviceEmptyState,
+  )
+  await expect(deviceEmptyState).toBeVisible()
 })
