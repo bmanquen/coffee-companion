@@ -5,74 +5,45 @@ on:
     branches: [main]
   pull_request:
 
+# Nothing here writes to the repository or publishes anything; artifact uploads
+# carry their own grant.
+permissions:
+  contents: read
+
 # Each run gets its own ephemeral Postgres, so runs no longer share state and
-# need not be serialized. Cancel superseded in-progress runs for the same ref.
+# need not be serialized. Superseded pull-request runs are cancelled; pushes to
+# main are not, so the default branch keeps a complete record of what passed.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  lint:
-    name: Lint
+  static:
+    name: Lint & typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
 
       - name: Lint
         run: pnpm lint
 
-  typecheck:
-    name: Typecheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+      # Runs even when lint fails, so a single push reports both rather than
+      # sending you back for a second round.
       - name: Typecheck
+        if: ${{ !cancelled() }}
         run: pnpm typecheck
 
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # No database: web tests seed the React Query cache (tRPC is never called)
     # and the api unit config excludes the DB-backed *.integration.test.ts.
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
 
       - name: Web unit tests with coverage (fails below thresholds)
         run: pnpm --filter coffee-companion test:coverage
@@ -82,24 +53,74 @@ jobs:
 
       - name: Upload web coverage report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-coverage
           path: apps/web/coverage
           retention-days: 7
           if-no-files-found: ignore
 
-  integration-e2e:
-    name: Integration & E2E tests
+  # The two database-backed jobs below run independently rather than in
+  # sequence. Each stands up its own Postgres, so neither can see the other's
+  # rows and the slower one sets the wall clock on its own. GitHub Actions has
+  # no YAML anchors, so the service and env blocks are duplicated by necessity —
+  # they must stay in step.
+
+  integration:
+    name: Integration tests
     runs-on: ubuntu-latest
-    # The only job that needs a database. Integration tests exercise real
-    # Drizzle/SQL and the e2e app server connects to the same DB. A throwaway
-    # Postgres service container gives each run its own clean database — no
-    # hosted dependency, no shared state, no secret.
+    # Well above the ~1 minute this takes, but far below the 6-hour default:
+    # the integration config allows a 300s hook, so a wedged run is otherwise
+    # expensive to notice.
+    timeout-minutes: 20
     services:
       postgres:
         # Matches the version Railway runs, so CI never passes on a major that
-        # production doesn't use.
+        # production doesn't use. Deliberately not -alpine: musl collates text
+        # differently from glibc, which would quietly change how ORDER BY sorts
+        # here relative to production.
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: coffee_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/coffee_test
+      # The routers pull in lib/auth via trpc/init, so these have to be present
+      # for the module to load. Placeholders — nothing here authenticates.
+      BETTER_AUTH_SECRET: ci-secret-not-for-production
+      GOOGLE_CLIENT_ID: test-client-id
+      GOOGLE_CLIENT_SECRET: test-client-secret
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - name: API integration tests with coverage (fails below thresholds)
+        run: pnpm --filter @coffee-companion/api test:coverage
+
+      - name: Upload api coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: api-coverage
+          path: packages/api/coverage
+          retention-days: 7
+          if-no-files-found: ignore
+
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        # Kept identical to the integration job above, and to Railway's major.
         image: postgres:17
         env:
           POSTGRES_USER: postgres
@@ -120,44 +141,45 @@ jobs:
       GOOGLE_CLIENT_ID: test-client-id
       GOOGLE_CLIENT_SECRET: test-client-secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+      # Required, not redundant: this job has no integration suite whose
+      # globalSetup would migrate first, and Playwright's own globalSetup seeds
+      # users into these tables before the app server starts.
       - name: Apply database migrations
         run: pnpm db:migrate
 
-      - name: API integration tests with coverage (fails below thresholds)
-        run: pnpm --filter @coffee-companion/api test:coverage
+      - name: Resolve Playwright version
+        id: playwright
+        run: |
+          version=$(pnpm --filter coffee-companion exec playwright --version | awk '{print $2}')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # Browser binaries are the bulk of the download and the only part that
+      # lands in this path — the apt packages `--with-deps` installs go to the
+      # system, so a cache hit still has to put those back.
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm --filter coffee-companion exec playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter coffee-companion exec playwright install-deps chromium
 
       - name: End-to-end tests (Playwright)
         run: pnpm test:e2e
 
-      - name: Upload api coverage report
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-coverage
-          path: packages/api/coverage
-          retention-days: 7
-          if-no-files-found: ignore
-
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: apps/web/playwright-report
