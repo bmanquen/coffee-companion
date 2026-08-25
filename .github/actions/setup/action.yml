@@ -1,0 +1,19 @@
+name: Setup
+description: pnpm, Node, and the installed workspace. Assumes the repo is already checked out.
+
+runs:
+  using: composite
+  steps:
+    # No `version`: the action reads it from the root package.json's
+    # `packageManager` field, so the pin lives in one place. Given a version
+    # here as well, the two can drift and the action fails the run.
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 22
+        cache: pnpm
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+      shell: bash
