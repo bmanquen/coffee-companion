@@ -41,9 +41,14 @@ users on every run, so a development or production URL loses data. The setup
 reads only `.env.test` — never `.env.local` — so the development database can't
 be reached by forgetting to set this.
 
+`.env.test` also overrides a `DATABASE_URL` already exported in your shell, and
+without the file the suite refuses to run rather than trust an inherited one.
+Both are the same rule: the database this suite may touch is named by that file
+and nowhere else.
+
 The database is reached over the network, so expect the suite to take several
-minutes. CI is unaffected: it sets `DATABASE_URL` to its own Postgres service
-container, which takes precedence over the file.
+minutes. CI is the one exception — it has no `.env.test`, and supplies
+`DATABASE_URL` for its own Postgres service container instead.
 
 ## Styling
 
