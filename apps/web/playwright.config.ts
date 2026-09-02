@@ -4,6 +4,7 @@ import {
   E2E_USER_FREE,
   E2E_USER_WITH_DATA,
 } from '@coffee-companion/api/lib/e2e-auth'
+import { loadTestDatabaseUrl } from '@coffee-companion/api/test/database'
 
 // End-to-end tests. Boots the app and drives it in a real browser.
 //
@@ -26,6 +27,11 @@ import {
 const PORT = 3000
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`
 const cookieDomain = new URL(baseURL).hostname
+
+// A local run seeds and boots against the test database named by
+// packages/api/.env.test, never the development one in .env.local. An external
+// server brings its own database, and the seed is skipped.
+if (!process.env.E2E_BASE_URL) loadTestDatabaseUrl()
 
 // storageState carrying the bypass cookie for a given user, scoped to this
 // project's browser only.
@@ -57,9 +63,7 @@ export default defineConfig({
   // copies attachments in with it, so the trace from a retried test is the
   // point of this — a failure that only reproduces on a loaded runner is
   // otherwise diagnosable from its error text alone.
-  reporter: process.env.CI
-    ? [['github'], ['html', { open: 'never' }]]
-    : 'list',
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL,
     trace: 'on-first-retry',
@@ -106,11 +110,14 @@ export default defineConfig({
     : {
         command: 'node .output/server/index.mjs',
         url: `http://localhost:${PORT}`,
-        reuseExistingServer: !process.env.CI,
+        // Never reuse: a server already on the port is a dev server on the
+        // development database, without the auth bypass.
+        reuseExistingServer: false,
         timeout: 120_000,
-        // The server inherits the environment (DATABASE_URL etc. from CI, or
-        // from .env.local locally); we only add the test-auth bypass + port.
+        // The server inherits the environment; we pin the test database
+        // resolved above and add the test-auth bypass + port.
         env: {
+          DATABASE_URL: process.env.DATABASE_URL!,
           PORT: String(PORT),
           E2E_BYPASS_AUTH: 'true',
         },
