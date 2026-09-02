@@ -32,7 +32,8 @@
     "./lib/aeropress": "./src/lib/aeropress.ts",
     "./lib/pourover": "./src/lib/pourover.ts",
     "./lib/frenchpress": "./src/lib/frenchpress.ts",
-    "./lib/cold-brew": "./src/lib/cold-brew.ts"
+    "./lib/cold-brew": "./src/lib/cold-brew.ts",
+    "./test/database": "./test/database.ts"
   },
   "dependencies": {
     "@better-auth/stripe": "1.6.26",

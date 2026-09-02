@@ -50,6 +50,17 @@ The database is reached over the network, so expect the suite to take several
 minutes. CI is the one exception — it has no `.env.test`, and supplies
 `DATABASE_URL` for its own Postgres service container instead.
 
+### End-to-end tests
+
+The e2e suite follows the same rule. A local `pnpm test:e2e` seeds its users
+and boots the app against the database named by `packages/api/.env.test`, so
+it needs that file too. It also refuses to reuse a server already on port 3000,
+which would be a dev server on the development database.
+
+```bash
+pnpm test:e2e
+```
+
 ## Styling
 
 This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
