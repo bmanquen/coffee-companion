@@ -23,6 +23,18 @@ vi.mock('@/lib/auth-client', () => ({
 }))
 
 vi.mock('@tanstack/react-router', () => ({
+  Link: ({
+    to,
+    children,
+    ...props
+  }: {
+    to: string
+    children: ReactNode
+  }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
   useNavigate: () => mocks.navigate,
 }))
 
@@ -53,6 +65,9 @@ describe('MobileHeader', () => {
     expect(screen.getByText('test@example.com')).toBeTruthy()
     // Avatar fallback initial when there is no image.
     expect(screen.getByText('T')).toBeTruthy()
+    expect(
+      screen.getByRole('link', { name: 'Account' }).getAttribute('href'),
+    ).toBe('/account')
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }))

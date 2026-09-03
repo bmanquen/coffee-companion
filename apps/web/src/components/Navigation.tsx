@@ -1,5 +1,5 @@
 import { Link, useNavigate } from '@tanstack/react-router'
-import { Bean, Coffee, Home, Menu, Wrench } from 'lucide-react'
+import { Bean, Coffee, Home, Menu, UserRound, Wrench } from 'lucide-react'
 import { Avatar, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet'
@@ -75,6 +75,14 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
               >
                 <Wrench className="h-5 w-5" />
                 Equipment
+              </Link>
+              <Link
+                className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-primary/40 data-[status=active]:bg-primary data-[status=active]:text-white data-[status=active]:font-medium"
+                to="/account"
+                onClick={() => setOpen(false)}
+              >
+                <UserRound className="h-5 w-5" />
+                Account
               </Link>
             </>
           )}

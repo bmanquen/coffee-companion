@@ -1,4 +1,4 @@
-import { useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import {
@@ -52,6 +52,9 @@ export default function MobileHeader() {
                   {session.user.email}
                 </span>
               </div>
+              <Button variant="outline" asChild>
+                <Link to="/account">Account</Link>
+              </Button>
               <Button variant="outline" onClick={handleSignOut}>
                 Sign Out
               </Button>

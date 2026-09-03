@@ -1,6 +1,22 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { RenewalFailedNotice } from './renewal-failed-notice'
+import type { ReactNode } from 'react'
+
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({
+    to,
+    children,
+    ...props
+  }: {
+    to: string
+    children: ReactNode
+  }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
+}))
 
 describe('RenewalFailedNotice', () => {
   it('says the payment failed while the card can still be fixed', () => {
@@ -13,13 +29,10 @@ describe('RenewalFailedNotice', () => {
     expect(alert).toMatch(/still/i)
   })
 
-  it('sends the user to Link, which is where the card lives', () => {
+  it('sends the user to their account, where the card can be managed', () => {
     render(<RenewalFailedNotice />)
 
     const link = screen.getByRole('link', { name: /card/i })
-    expect(link.getAttribute('href')).toBe('https://link.com')
-    // Leaves the app rather than replacing it.
-    expect(link.getAttribute('target')).toBe('_blank')
-    expect(link.getAttribute('rel')).toContain('noreferrer')
+    expect(link.getAttribute('href')).toBe('/account')
   })
 })

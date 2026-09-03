@@ -1,5 +1,4 @@
-// Under ADR-0006 there is no billing portal of ours to send them to.
-const MANAGE_URL = 'https://link.com'
+import { Link } from '@tanstack/react-router'
 
 export function RenewalFailedNotice() {
   return (
@@ -11,14 +10,9 @@ export function RenewalFailedNotice() {
         Your Subscription payment did not go through. Nothing has changed yet —
         your history is still open while the card is retried.
       </p>
-      <a
-        href={MANAGE_URL}
-        target="_blank"
-        rel="noreferrer"
-        className="font-medium underline underline-offset-4"
-      >
-        Update your card at Link
-      </a>
+      <Link to="/account" className="font-medium underline underline-offset-4">
+        Update your card
+      </Link>
     </div>
   )
 }

@@ -79,6 +79,33 @@ export async function isRenewalFailing(userId: string): Promise<boolean> {
   return retrying.some((row) => planIdFrom(row.plan) !== undefined)
 }
 
+// What the app needs to know about a paid Subscription: that there is one to
+// manage, which Plan it buys, and when access ends if a cancellation is
+// pending. Everything else about billing is Stripe's to show.
+export async function currentSubscription(
+  userId: string,
+): Promise<{ plan: PlanId; endsAt: Date | null } | null> {
+  const rows = await db
+    .select({
+      plan: subscription.plan,
+      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+      periodEnd: subscription.periodEnd,
+    })
+    .from(subscription)
+    .where(
+      and(
+        eq(subscription.referenceId, userId),
+        inArray(subscription.status, paidStatuses),
+      ),
+    )
+  for (const row of rows) {
+    const plan = planIdFrom(row.plan)
+    if (plan === undefined) continue
+    return { plan, endsAt: row.cancelAtPeriodEnd ? (row.periodEnd ?? null) : null }
+  }
+  return null
+}
+
 // Refuses the next addition once the Plan's limit is met. Never applied to what
 // a user already owns: their existing Brews reference that equipment.
 export async function assertRoomForAnother(

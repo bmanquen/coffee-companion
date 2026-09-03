@@ -83,6 +83,9 @@ describe('Navigation', () => {
     expect(screen.getByRole('link', { name: 'Coffee' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Brews' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Equipment' })).toBeTruthy()
+    expect(
+      screen.getByRole('link', { name: 'Account' }).getAttribute('href'),
+    ).toBe('/account')
     expect(screen.getByText('Test User')).toBeTruthy()
 
     await act(async () => {
@@ -96,10 +99,10 @@ describe('Navigation', () => {
     const setOpen = vi.fn()
     render(<Navigation open setOpen={setOpen} />)
 
-    for (const name of ['Home', 'Coffee', 'Brews', 'Equipment']) {
+    for (const name of ['Home', 'Coffee', 'Brews', 'Equipment', 'Account']) {
       fireEvent.click(screen.getByRole('link', { name }))
     }
-    expect(setOpen).toHaveBeenCalledTimes(4)
+    expect(setOpen).toHaveBeenCalledTimes(5)
     expect(setOpen).toHaveBeenCalledWith(false)
   })
 
