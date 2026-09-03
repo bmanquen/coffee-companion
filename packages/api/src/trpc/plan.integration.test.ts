@@ -3,6 +3,7 @@ import {
   anonCaller,
   callerFor,
   grantPlan,
+  scheduleCancellation,
   seedUsers,
   setSubscriptionStatus,
   subscribePlan,
@@ -23,6 +24,8 @@ const USER_LESSER_GRANT = 'plan-user-lesser-grant'
 const USER_RETRYING = 'plan-user-retrying'
 const USER_RETRYING_GRANT = 'plan-user-retrying-grant'
 const USER_RETRYING_RETIRED = 'plan-user-retrying-retired'
+const USER_MANAGING = 'plan-user-managing'
+const USER_MANAGING_CANCELED = 'plan-user-managing-canceled'
 
 seedUsers([
   USER_FREE,
@@ -35,6 +38,8 @@ seedUsers([
   USER_RETRYING,
   USER_RETRYING_GRANT,
   USER_RETRYING_RETIRED,
+  USER_MANAGING,
+  USER_MANAGING_CANCELED,
 ])
 
 describe('plan.current', () => {
@@ -43,6 +48,7 @@ describe('plan.current', () => {
       plan: 'free',
       limits: { grinders: 1, brewingDevices: 3 },
       renewalFailing: false,
+      subscription: null,
     })
   })
 
@@ -53,6 +59,7 @@ describe('plan.current', () => {
       plan: 'pro',
       limits: { grinders: null, brewingDevices: null },
       renewalFailing: false,
+      subscription: null,
     })
   })
 
@@ -148,5 +155,35 @@ describe('plan.current while a renewal is failing', () => {
       plan: 'free',
       renewalFailing: false,
     })
+  })
+})
+
+// Billing is managed in Stripe's portal, so the app only needs to know whether
+// there is a Subscription to manage and, once a cancellation is pending, when
+// access ends.
+describe('plan.current for a subscriber', () => {
+  it('reports a Subscription with no end in sight', async () => {
+    await subscribePlan(USER_MANAGING, 'pro')
+
+    expect((await callerFor(USER_MANAGING).plan.current()).subscription).toEqual(
+      { plan: 'pro', endsAt: null },
+    )
+  })
+
+  it('says when access ends once a cancellation is pending', async () => {
+    const endsAt = new Date('2026-10-14T09:30:00.000Z')
+    await scheduleCancellation(USER_MANAGING, { endsAt })
+
+    expect((await callerFor(USER_MANAGING).plan.current()).subscription).toEqual(
+      { plan: 'pro', endsAt },
+    )
+  })
+
+  it('offers nothing to manage once the Subscription has ended', async () => {
+    await subscribePlan(USER_MANAGING_CANCELED, 'pro', { status: 'canceled' })
+
+    expect(
+      (await callerFor(USER_MANAGING_CANCELED).plan.current()).subscription,
+    ).toBeNull()
   })
 })

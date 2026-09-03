@@ -12,7 +12,7 @@ malformed, and runs with billing switched off entirely if `STRIPE_SECRET_KEY` is
 
 Going live is this whole sequence a second time, not a key swap. Test and live are
 separate worlds: a test-mode `price_…` does not exist in live mode, so all four values
-change together, and steps 1, 3 and 4 have to be redone before there is anything to point
+change together, and steps 1, 3, 4 and 7 have to be redone before there is anything to point
 at.
 
 ## 1. Activate Managed Payments
@@ -199,7 +199,31 @@ cancel flow offers a full refund as part of cancelling, and that is the way to e
 someone's Plan and give their money back in one action. A goodwill refund on its own is
 meant to leave the Plan alone.
 
-## 7. Check the result
+## 7. Configure the customer portal
+
+Dashboard → **Settings → Billing → Customer portal**. The app's **Manage subscription**
+action (account settings) opens a portal session for the signed-in customer, and Stripe
+refuses to create one until a portal configuration has been saved — in test mode and in
+live mode separately.
+
+Turn on:
+
+- **Payment methods** → customers can update their payment method.
+- **Cancellations** → customers can cancel subscriptions, **at the end of the billing
+  period**. That is the cancellation rule in ADR-0008 and the pricing FAQ: the period
+  already paid for stays open, and Stripe moves `status` to `canceled` when it runs out.
+  Leave immediate cancellation off — it would end a Plan the customer has paid for, and
+  the app builds no refund flow to make that right.
+
+Leave off switching plans and updating quantities: the app sells one Plan through
+Checkout, and the portal is not a second place to buy from.
+
+The app shows nothing of its own for cancelling, proration or dunning. Once a
+cancellation is pending, account settings reads **Pro until <date>** from the
+Subscription's `cancel_at_period_end` and `current_period_end`, both of which the plugin
+mirrors from the portal's own webhooks.
+
+## 8. Check the result
 
 Buy Pro in test mode and confirm three things, in this order of importance:
 

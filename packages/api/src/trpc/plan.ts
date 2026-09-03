@@ -1,6 +1,6 @@
 import { planLimits } from '../lib/plan'
 import { planPrices } from '../lib/billing'
-import { isRenewalFailing } from '../lib/allowance'
+import { currentSubscription, isRenewalFailing } from '../lib/allowance'
 import { authedProcedure, createTRPCRouter, publicProcedure } from './init'
 
 export const planRouter = createTRPCRouter({
@@ -10,6 +10,7 @@ export const planRouter = createTRPCRouter({
     plan: ctx.plan,
     limits: planLimits[ctx.plan],
     renewalFailing: await isRenewalFailing(ctx.session.user.id),
+    subscription: await currentSubscription(ctx.session.user.id),
   })),
 
   // Public: the pricing page advertises these before anyone signs in.

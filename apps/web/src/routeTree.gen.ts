@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as MarketingIndexRouteImport } from './routes/_marketing/index'
 import { Route as MarketingPricingRouteImport } from './routes/_marketing/pricing'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
 import { Route as AuthenticatedEquipmentIndexRouteImport } from './routes/_authenticated/equipment/index'
 import { Route as AuthenticatedCoffeesIndexRouteImport } from './routes/_authenticated/coffees/index'
 import { Route as AuthenticatedBrewsIndexRouteImport } from './routes/_authenticated/brews/index'
@@ -63,6 +64,11 @@ const MarketingPricingRoute = MarketingPricingRouteImport.update({
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedEquipmentIndexRoute =
@@ -191,6 +197,7 @@ const AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute =
 export interface FileRoutesByFullPath {
   '/': typeof MarketingIndexRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/account': typeof AuthenticatedAccountRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/pricing': typeof MarketingPricingRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
@@ -218,6 +225,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof MarketingIndexRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/account': typeof AuthenticatedAccountRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/pricing': typeof MarketingPricingRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
@@ -247,6 +255,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_marketing': typeof MarketingRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/_authenticated/account': typeof AuthenticatedAccountRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_marketing/pricing': typeof MarketingPricingRoute
   '/_marketing/': typeof MarketingIndexRoute
@@ -277,6 +286,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/sitemap.xml'
+    | '/account'
     | '/dashboard'
     | '/pricing'
     | '/aeropress/new'
@@ -304,6 +314,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/sitemap.xml'
+    | '/account'
     | '/dashboard'
     | '/pricing'
     | '/aeropress/new'
@@ -332,6 +343,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/_marketing'
     | '/sitemap.xml'
+    | '/_authenticated/account'
     | '/_authenticated/dashboard'
     | '/_marketing/pricing'
     | '/_marketing/'
@@ -408,6 +420,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/account': {
+      id: '/_authenticated/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AuthenticatedAccountRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/equipment/': {
@@ -561,6 +580,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAccountRoute: typeof AuthenticatedAccountRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedAeropressNewRoute: typeof AuthenticatedAeropressNewRoute
   AuthenticatedCoffeesNewRoute: typeof AuthenticatedCoffeesNewRoute
@@ -584,6 +604,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAccountRoute: AuthenticatedAccountRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedAeropressNewRoute: AuthenticatedAeropressNewRoute,
   AuthenticatedCoffeesNewRoute: AuthenticatedCoffeesNewRoute,

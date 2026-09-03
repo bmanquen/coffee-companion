@@ -51,8 +51,9 @@ Consequences to understand before changing anything here:
   cancelling, and that sets `status` by the cancellation path already.
 - **A failing renewal is reported, not inferred.** `plan.current` returns
   `renewalFailing` alongside the Plan rather than folded into it, because a Grant can be
-  carrying the Plan while the card is the one thing the user can still put right. ADR-0006
-  leaves us no billing portal, so the notice points at link.com.
+  carrying the Plan while the card is the one thing the user can still put right. The
+  notice points at account settings, whose **Manage subscription** action opens Stripe's
+  billing portal for that customer; link.com stays available beside it (ADR-0006).
 - **Sealing writes; unsealing does not.** While a Plan is paid, seal stamps are ignored
   entirely, so recovering from a declined card or resubscribing costs no writes at all.
   Only the shrinking of a Shelf writes.
