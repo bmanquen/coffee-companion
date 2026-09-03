@@ -53,7 +53,8 @@ Consequences to understand before changing anything here:
   `renewalFailing` alongside the Plan rather than folded into it, because a Grant can be
   carrying the Plan while the card is the one thing the user can still put right. The
   notice points at account settings, whose **Manage subscription** action opens Stripe's
-  billing portal for that customer; link.com stays available beside it (ADR-0006).
+  billing portal for that customer. The app no longer links to link.com, though a customer
+  who finds it there can still manage the Subscription that way (ADR-0006).
 - **Sealing writes; unsealing does not.** While a Plan is paid, seal stamps are ignored
   entirely, so recovering from a declined card or resubscribing costs no writes at all.
   Only the shrinking of a Shelf writes.

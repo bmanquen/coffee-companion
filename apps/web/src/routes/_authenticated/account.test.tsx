@@ -64,8 +64,6 @@ describe('AccountScreen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Manage subscription' }))
 
-    // The portal is where the card and the cancellation live; the app only
-    // sends them there and asks to have them back.
     await waitFor(() =>
       expect(mocks.billingPortal).toHaveBeenCalledWith(
         expect.objectContaining({ returnUrl: '/account' }),
@@ -92,8 +90,6 @@ describe('AccountScreen', () => {
   })
 
   it('points someone with no Subscription at the plans instead', () => {
-    // A Grant can put them on Pro with no Subscription behind it, so the portal
-    // would have no customer to open for — a link there could only break.
     render(<AccountScreen user={user} plan="pro" subscription={null} />)
 
     expect(

@@ -98,13 +98,19 @@ export const setSubscriptionStatus = async (userId: string, status: string) => {
 
 // A cancellation Stripe has accepted but not yet acted on: the Subscription is
 // still paid up, and stays that way until the period runs out.
-export const scheduleCancellation = async (
-  userId: string,
-  { endsAt }: { endsAt?: Date } = {},
-) => {
+export const scheduleCancellation = async (userId: string, endsAt?: Date) => {
   await db
     .update(subscription)
     .set({ cancelAtPeriodEnd: true, periodEnd: endsAt })
+    .where(eq(subscription.referenceId, userId))
+}
+
+// The same cancellation expressed as Stripe's `cancel_at`: a date rather than
+// a flag, which is how newer API versions record cancelling at period end.
+export const scheduleCancellationOn = async (userId: string, endsAt: Date) => {
+  await db
+    .update(subscription)
+    .set({ cancelAt: endsAt })
     .where(eq(subscription.referenceId, userId))
 }
 

@@ -1,12 +1,8 @@
 import { expect, test } from '@playwright/test'
 
-// Account settings for the granted user. Runs in the `authed-data` project,
-// whose identity holds a Pro Grant and no Subscription — so the Plan is Pro,
-// but there is no Stripe customer for a billing portal to open for. The page
-// must say so rather than offer a link that can only break.
-//
-// A subscriber's Manage subscription action is exercised in unit tests up to
-// the portal call; the redirect itself is Stripe's, as with Checkout.
+// Runs in the `authed-data` project, whose identity holds a Pro Grant and no
+// Subscription. A subscriber's Manage subscription action stops at the portal
+// call in unit tests; the redirect itself is Stripe's, as with Checkout.
 
 test('shows the Plan a Grant confers, with nothing to manage', async ({
   page,

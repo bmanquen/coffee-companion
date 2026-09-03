@@ -4,6 +4,10 @@
 
 export type PlanId = 'free' | 'pro' | 'proPlus'
 
+// A paid Subscription as the app shows it: which Plan it buys, and when access
+// ends if a cancellation is pending.
+export type CurrentSubscription = { plan: PlanId; endsAt: Date | null }
+
 export type BillingPeriod = 'monthly' | 'annual'
 
 // What a Plan costs, as the seller has it on record. The amount is in whole

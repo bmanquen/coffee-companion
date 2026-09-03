@@ -3,7 +3,10 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { planName } from '@coffee-companion/api/lib/plan'
-import type { PlanId } from '@coffee-companion/api/lib/plan'
+import type {
+  CurrentSubscription,
+  PlanId,
+} from '@coffee-companion/api/lib/plan'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,13 +28,13 @@ export const Route = createFileRoute('/_authenticated/account')({
 function AccountContainer() {
   const { session } = Route.useRouteContext()
   const trpc = useTRPC()
-  const { data: held } = useSuspenseQuery(trpc.plan.current.queryOptions())
+  const { data: current } = useSuspenseQuery(trpc.plan.current.queryOptions())
 
   return (
     <AccountScreen
       user={session.user}
-      plan={held.plan}
-      subscription={held.subscription}
+      plan={current.plan}
+      subscription={current.subscription}
     />
   )
 }
@@ -43,7 +46,7 @@ export function AccountScreen({
 }: {
   user: { name: string; email: string }
   plan: PlanId
-  subscription: { plan: PlanId; endsAt: Date | null } | null
+  subscription: CurrentSubscription | null
 }) {
   const manage = async () => {
     const { error } = await authClient.subscription.billingPortal({
