@@ -8,7 +8,7 @@ import {
   planIdFrom,
   planLimits,
 } from './plan'
-import type { GearResource, PlanId } from './plan'
+import type { CurrentSubscription, GearResource, PlanId } from './plan'
 
 const gearTable = {
   grinders,
@@ -21,6 +21,22 @@ const gearTable = {
 const RETRYING = 'past_due'
 
 const paidStatuses = ['active', 'trialing', RETRYING]
+
+const paidSubscriptionsOf = (userId: string) =>
+  db
+    .select({
+      plan: subscription.plan,
+      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+      periodEnd: subscription.periodEnd,
+      cancelAt: subscription.cancelAt,
+    })
+    .from(subscription)
+    .where(
+      and(
+        eq(subscription.referenceId, userId),
+        inArray(subscription.status, paidStatuses),
+      ),
+    )
 
 // A Grant and a Subscription are the two sources of a Plan, and the most
 // generous of them wins — so a comp is never downgraded by billing state, and
@@ -42,15 +58,7 @@ export async function resolvePlan(userId: string): Promise<PlanId> {
           ),
         ),
       ),
-    db
-      .select({ plan: subscription.plan })
-      .from(subscription)
-      .where(
-        and(
-          eq(subscription.referenceId, userId),
-          inArray(subscription.status, paidStatuses),
-        ),
-      ),
+    paidSubscriptionsOf(userId),
   ])
 
   return mostGenerous([
@@ -79,29 +87,16 @@ export async function isRenewalFailing(userId: string): Promise<boolean> {
   return retrying.some((row) => planIdFrom(row.plan) !== undefined)
 }
 
-// What the app needs to know about a paid Subscription: that there is one to
-// manage, which Plan it buys, and when access ends if a cancellation is
-// pending. Everything else about billing is Stripe's to show.
+// Stripe records a pending cancellation either as a flag against the period end
+// or, on newer API versions, as a date of its own.
 export async function currentSubscription(
   userId: string,
-): Promise<{ plan: PlanId; endsAt: Date | null } | null> {
-  const rows = await db
-    .select({
-      plan: subscription.plan,
-      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-      periodEnd: subscription.periodEnd,
-    })
-    .from(subscription)
-    .where(
-      and(
-        eq(subscription.referenceId, userId),
-        inArray(subscription.status, paidStatuses),
-      ),
-    )
-  for (const row of rows) {
+): Promise<CurrentSubscription | null> {
+  for (const row of await paidSubscriptionsOf(userId)) {
     const plan = planIdFrom(row.plan)
     if (plan === undefined) continue
-    return { plan, endsAt: row.cancelAtPeriodEnd ? (row.periodEnd ?? null) : null }
+    const endsAt = row.cancelAt ?? (row.cancelAtPeriodEnd ? row.periodEnd : null)
+    return { plan, endsAt: endsAt ?? null }
   }
   return null
 }

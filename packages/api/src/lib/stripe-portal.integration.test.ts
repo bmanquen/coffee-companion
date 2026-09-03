@@ -2,11 +2,9 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { db } from '../db'
 import { auth } from './auth'
 
-// Managing a Subscription happens in Stripe's billing portal, and the portal
-// session is created for whoever the app session says is asking. Without one
-// there is nobody to open it for, so the request is turned away before Stripe
-// hears of it — a portal opened for the wrong customer would hand them someone
-// else's card and cancellation.
+// The portal session is created for whoever the app session says is asking.
+// Without one there is nobody to open it for, so the request is turned away
+// before Stripe hears of it.
 const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'
 
 const openPortal = () =>

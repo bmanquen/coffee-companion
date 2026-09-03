@@ -225,13 +225,15 @@ mirrors from the portal's own webhooks.
 
 ## 8. Check the result
 
-Buy Pro in test mode and confirm three things, in this order of importance:
+Buy Pro in test mode and confirm four things, in this order of importance:
 
 1. The Checkout page says **Sold through Link** and shows tax as a separate line on top
    of the price.
 2. The buyer is on Pro **without returning to the app** — close the tab at the Stripe
    page and read their Plan back.
 3. Everything Sealed while they were on Free is readable again.
+4. **Manage subscription** on `/account` opens the customer portal (step 7), and
+   cancelling there brings the buyer back to a page reading **Pro until <date>**.
 
 The statement descriptor reads `LINK.COM*`, and receipts come from Link rather than from
 us. That is expected (ADR-0006), and disclosing it to buyers is what keeps the dispute

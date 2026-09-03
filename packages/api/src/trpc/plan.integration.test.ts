@@ -4,6 +4,7 @@ import {
   callerFor,
   grantPlan,
   scheduleCancellation,
+  scheduleCancellationOn,
   seedUsers,
   setSubscriptionStatus,
   subscribePlan,
@@ -26,6 +27,7 @@ const USER_RETRYING_GRANT = 'plan-user-retrying-grant'
 const USER_RETRYING_RETIRED = 'plan-user-retrying-retired'
 const USER_MANAGING = 'plan-user-managing'
 const USER_MANAGING_CANCELED = 'plan-user-managing-canceled'
+const USER_MANAGING_DATED = 'plan-user-managing-dated'
 
 seedUsers([
   USER_FREE,
@@ -40,6 +42,7 @@ seedUsers([
   USER_RETRYING_RETIRED,
   USER_MANAGING,
   USER_MANAGING_CANCELED,
+  USER_MANAGING_DATED,
 ])
 
 describe('plan.current', () => {
@@ -158,9 +161,6 @@ describe('plan.current while a renewal is failing', () => {
   })
 })
 
-// Billing is managed in Stripe's portal, so the app only needs to know whether
-// there is a Subscription to manage and, once a cancellation is pending, when
-// access ends.
 describe('plan.current for a subscriber', () => {
   it('reports a Subscription with no end in sight', async () => {
     await subscribePlan(USER_MANAGING, 'pro')
@@ -172,11 +172,21 @@ describe('plan.current for a subscriber', () => {
 
   it('says when access ends once a cancellation is pending', async () => {
     const endsAt = new Date('2026-10-14T09:30:00.000Z')
-    await scheduleCancellation(USER_MANAGING, { endsAt })
+    await scheduleCancellation(USER_MANAGING, endsAt)
 
     expect((await callerFor(USER_MANAGING).plan.current()).subscription).toEqual(
       { plan: 'pro', endsAt },
     )
+  })
+
+  it('reads the end date when Stripe recorded it as a date', async () => {
+    const endsAt = new Date('2026-11-01T00:00:00.000Z')
+    await subscribePlan(USER_MANAGING_DATED, 'pro')
+    await scheduleCancellationOn(USER_MANAGING_DATED, endsAt)
+
+    expect(
+      (await callerFor(USER_MANAGING_DATED).plan.current()).subscription,
+    ).toEqual({ plan: 'pro', endsAt })
   })
 
   it('offers nothing to manage once the Subscription has ended', async () => {
