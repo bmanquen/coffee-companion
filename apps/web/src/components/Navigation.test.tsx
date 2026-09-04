@@ -22,14 +22,7 @@ vi.mock('@/lib/auth-client', () => ({
 }))
 
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({
-    to,
-    children,
-    ...props
-  }: {
-    to: string
-    children: ReactNode
-  }) => (
+  Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => (
     <a href={to} {...props}>
       {children}
     </a>
@@ -73,6 +66,9 @@ vi.mock('@/components/ui/sheet', () => ({
 vi.mock('@/components/ui/avatar', () => ({
   Avatar: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   AvatarImage: ({ src }: { src?: string }) => <img alt="" src={src} />,
+  AvatarFallback: ({ children }: { children?: ReactNode }) => (
+    <span>{children}</span>
+  ),
 }))
 
 describe('Navigation', () => {
@@ -92,6 +88,19 @@ describe('Navigation', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }))
     })
     expect(mocks.signOut).toHaveBeenCalled()
+  })
+
+  it('takes the user to their account from their avatar and name', () => {
+    authState.session = { user: { name: 'Test User', image: null } }
+    const setOpen = vi.fn()
+    render(<Navigation open setOpen={setOpen} />)
+
+    const link = screen.getByRole('link', { name: /Test User/ })
+    expect(link.getAttribute('href')).toBe('/account')
+    expect(link.textContent).toContain('T')
+
+    fireEvent.click(link)
+    expect(setOpen).toHaveBeenCalledWith(false)
   })
 
   it('closes the drawer when any nav link is selected', () => {
