@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
+  annualSaving,
   formatPrice,
   isPaid,
   isSellable,
@@ -67,7 +68,7 @@ function PricingRoute() {
       pendingCheckout={
         pressed.checkout && {
           planId: pressed.checkout,
-          period: pressed.period ?? 'monthly',
+          period: pressed.period ?? 'annual',
         }
       }
     />
@@ -247,12 +248,27 @@ const faq: Array<{ question: string; answer: string }> = [
   {
     question: 'What happens if I cancel?',
     answer:
-      'You keep reading everything until the period you have paid for runs out — cancelling takes effect at the end, not the moment you press it. After that your Shelf goes back to five coffees and what falls off is Sealed, still stored and readable again whenever you resubscribe. If a renewal payment fails, nothing is Sealed while your card is being retried; we tell you in the app so you can fix it first.',
+      'You keep reading everything until the period you have paid for runs out — cancelling takes effect at the end, not the moment you press it. After that your Shelf goes back to five coffees and what falls off is Sealed. Nothing is deleted: it all stays stored, and resubscribing reopens all of it. If a renewal payment fails, nothing is Sealed while your card is being retried; we tell you in the app so you can fix it first.',
   },
   {
     question: 'What happens to my extra grinders if I downgrade?',
     answer:
       'You keep them. Equipment limits only stop you adding more while you are over them — nothing you already own is removed or hidden, because your existing brews reference it.',
+  },
+  {
+    question: 'Why will my card statement say Link?',
+    answer:
+      'Because Link is the merchant of record: you buy through Link, and Link handles the payment, the tax and any refund or dispute. Your card statement will read LINK.COM, receipts and subscription emails come from Link, and checkout says “Sold through Link”. If you see that name against this price, it is your subscription here.',
+  },
+  {
+    question: 'Will I be charged in my own currency?',
+    answer:
+      'Yes. The prices on this page are in US dollars, but at checkout the price is converted into your own currency and that is what your card is charged, so the figure on your statement is the one you agreed to.',
+  },
+  {
+    question: 'Is tax included in the price?',
+    answer:
+      'No. The prices shown exclude tax. Tax is added at checkout, calculated for your country, so the total you see there before you confirm is the total you pay.',
   },
 ]
 
@@ -266,7 +282,7 @@ export function PricingPage({
   registeredPlans = [],
   heldPlan,
   pendingInterest,
-  initialPeriod = 'monthly',
+  initialPeriod = 'annual',
   prices,
 }: {
   onCheckout: (planId: PlanId, period: BillingPeriod) => void
@@ -279,6 +295,8 @@ export function PricingPage({
   pendingInterest?: PlanId
   // The period to open on, so a selection made before signing in is still the
   // one on screen — and the one a second press would buy — on the way back.
+  // Annual otherwise: it is the cheaper period (ADR-0006), so it is the one a
+  // visitor sees first rather than one they have to hunt for.
   initialPeriod?: BillingPeriod
   // What the seller will charge. Absent for a Plan nobody can buy, and for all
   // of them when the seller cannot be reached; the catalogue covers those.
@@ -340,6 +358,7 @@ export function PricingPage({
               ? 'Registered'
               : plan.cta
           const { amount, currency } = priceFor(plan, period, prices)
+          const saving = period === 'annual' ? annualSaving(plan, prices) : null
 
           return (
             <Card key={plan.id} className="flex flex-col gap-5 p-6">
@@ -353,13 +372,20 @@ export function PricingPage({
                 <p className="text-sm text-muted-foreground">{plan.tagline}</p>
               </div>
 
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-bold tracking-tight">
-                  {formatPrice(amount, currency)}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {priceSuffix(period)}
-                </span>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold tracking-tight">
+                    {formatPrice(amount, currency)}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {priceSuffix(period)}
+                  </span>
+                </div>
+                {saving !== null && (
+                  <p className="text-sm text-muted-foreground">
+                    {saving}% less than paying monthly
+                  </p>
+                )}
               </div>
 
               <Button

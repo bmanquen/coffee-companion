@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { planLimits, sellable } from '@coffee-companion/api/lib/plan'
-import { formatPrice, planFeatures, plans, priceFor } from './plans'
+import {
+  annualSaving,
+  formatPrice,
+  planFeatures,
+  plans,
+  priceFor,
+} from './plans'
 import type { GearResource, PlanId } from '@coffee-companion/api/lib/plan'
 import type { Plan } from './plans'
 
@@ -86,5 +92,49 @@ describe('formatPrice', () => {
 
   it('shows the amount in the currency it is charged in', () => {
     expect(formatPrice(39.99, 'GBP')).toBe('£39.99')
+  })
+})
+
+// The toggle defaults to annual because it is cheaper (ADR-0006), and the page
+// has to show by how much rather than leave the visitor to do the arithmetic.
+describe('annualSaving', () => {
+  const pro = plans.find((plan) => plan.id === 'pro') as Plan
+  const free = plans.find((plan) => plan.id === 'free') as Plan
+
+  it('is the share of a year of monthly payments that annual does not charge', () => {
+    // 12 × $4.99 is $59.88; $44.99 is 24.9% less, read as 25%.
+    expect(annualSaving(pro)).toBe(25)
+  })
+
+  it('is worked out from the seller’s prices where there are any', () => {
+    expect(
+      annualSaving(pro, [
+        { planId: 'pro', period: 'monthly', amount: 10, currency: 'USD' },
+        { planId: 'pro', period: 'annual', amount: 100, currency: 'USD' },
+      ]),
+    ).toBe(17)
+  })
+
+  it('is nothing on a Plan that costs nothing', () => {
+    expect(annualSaving(free)).toBeNull()
+  })
+
+  it('is nothing when annual is not the cheaper period', () => {
+    expect(
+      annualSaving(pro, [
+        { planId: 'pro', period: 'monthly', amount: 4, currency: 'USD' },
+        { planId: 'pro', period: 'annual', amount: 48, currency: 'USD' },
+      ]),
+    ).toBeNull()
+  })
+
+  // A monthly price in one currency and an annual in another is not a
+  // comparison, and a percentage of it would be a claim about exchange rates.
+  it('is nothing when the two periods are not priced in one currency', () => {
+    expect(
+      annualSaving(pro, [
+        { planId: 'pro', period: 'monthly', amount: 3.99, currency: 'GBP' },
+      ]),
+    ).toBeNull()
   })
 })

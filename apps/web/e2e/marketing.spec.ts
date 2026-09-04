@@ -55,10 +55,10 @@ test('the pricing page renders standalone, with every Plan and a working toggle'
     ).toBeVisible()
   }
 
-  await expect(page.getByText('$4.99')).toBeVisible()
-  await page.getByRole('button', { name: 'Annual' }).click()
   await expect(page.getByText('$44.99')).toBeVisible()
-  await expect(page.getByText('$4.99')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Monthly' }).click()
+  await expect(page.getByText('$4.99')).toBeVisible()
+  await expect(page.getByText('$44.99')).toHaveCount(0)
 })
 
 // The far side of a sign-in that started with Subscribe: the press comes back
@@ -68,10 +68,10 @@ test('the pricing page renders standalone, with every Plan and a working toggle'
 test('a purchase pressed before signing in comes back on the period it was pressed on', async ({
   page,
 }) => {
-  await page.goto('/pricing?checkout=pro&period=annual')
+  await page.goto('/pricing?checkout=pro&period=monthly')
 
-  await expect(page.getByText('$44.99')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Annual' })).toHaveAttribute(
+  await expect(page.getByText('$4.99')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Monthly' })).toHaveAttribute(
     'aria-pressed',
     'true',
   )

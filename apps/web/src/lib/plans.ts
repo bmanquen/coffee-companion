@@ -129,6 +129,24 @@ export function priceFor(
   return { amount: plan.price[period], currency: FALLBACK_CURRENCY }
 }
 
+// How much less, as a whole percentage, a year costs paid annually than paid
+// monthly. Nothing when there is no saving to state: a Plan that costs nothing,
+// an annual price that is not the cheaper one, or two periods not priced in one
+// currency, which no percentage can honestly compare.
+export function annualSaving(
+  plan: Plan,
+  prices: Array<PlanPrice> = [],
+): number | null {
+  const monthly = priceFor(plan, 'monthly', prices)
+  const annual = priceFor(plan, 'annual', prices)
+  if (monthly.currency !== annual.currency) return null
+
+  const yearOfMonthly = monthly.amount * 12
+  if (yearOfMonthly <= 0 || annual.amount >= yearOfMonthly) return null
+
+  return Math.round((1 - annual.amount / yearOfMonthly) * 100)
+}
+
 // Renders $0 rather than "Free" so a price never collides with a Plan name —
 // otherwise the Free card reads "Free / Free" and no test can tell the heading
 // from the amount.
