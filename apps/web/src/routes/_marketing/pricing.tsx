@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
-  annualSaving,
+  annualSavingPercent,
   formatPrice,
   isPaid,
   isSellable,
@@ -263,7 +263,7 @@ const faq: Array<{ question: string; answer: string }> = [
   {
     question: 'Will I be charged in my own currency?',
     answer:
-      'Yes. The prices on this page are in US dollars, but at checkout the price is converted into your own currency and that is what your card is charged, so the figure on your statement is the one you agreed to.',
+      'Yes. At checkout the price is converted into your own currency and that is what your card is charged, so the figure on your statement is the one you agreed to.',
   },
   {
     question: 'Is tax included in the price?',
@@ -295,8 +295,6 @@ export function PricingPage({
   pendingInterest?: PlanId
   // The period to open on, so a selection made before signing in is still the
   // one on screen — and the one a second press would buy — on the way back.
-  // Annual otherwise: it is the cheaper period (ADR-0006), so it is the one a
-  // visitor sees first rather than one they have to hunt for.
   initialPeriod?: BillingPeriod
   // What the seller will charge. Absent for a Plan nobody can buy, and for all
   // of them when the seller cannot be reached; the catalogue covers those.
@@ -358,7 +356,8 @@ export function PricingPage({
               ? 'Registered'
               : plan.cta
           const { amount, currency } = priceFor(plan, period, prices)
-          const saving = period === 'annual' ? annualSaving(plan, prices) : null
+          const saving =
+            period === 'annual' ? annualSavingPercent(plan, prices) : null
 
           return (
             <Card key={plan.id} className="flex flex-col gap-5 p-6">
