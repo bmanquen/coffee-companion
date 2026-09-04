@@ -38,8 +38,15 @@ What we rejected:
 Consequences to understand before changing anything here:
 
 - **`paidStatuses` is the rule, and `past_due` being in it is the declined-renewal rule.**
-  `active`, `trialing`, `past_due` — one list, in `packages/api/src/lib/allowance.ts`.
+  `active`, `trialing`, `past_due` — one list, in `packages/api/src/lib/plan.ts`.
   Removing `past_due` from it reinstates the flicker ADR-0007 exists to prevent.
+- **Stripe is asked, not our table, before a second Subscription is sold.** The plugin's
+  own guard against buying the same Plan twice reads our `subscription` row, and a row
+  that is missing, `past_due`, or left `incomplete` by an abandoned Checkout lets the same
+  customer through to a second live Subscription. So a hook on `/subscription/upgrade`
+  lists the customer's Subscriptions at Stripe and refuses Checkout when any is in a paid
+  status — the app writes no billing state, so it cannot trust its copy of it either. A
+  customer with a Subscription changes it through the billing portal instead.
 - **The dispute rule is configuration, not code.** Step 6 of
   `docs/runbooks/stripe-managed-payments.md`. It fires when the dispute is opened rather
   than lost, cannot be undone, and covers only full-amount card disputes — a withdrawn

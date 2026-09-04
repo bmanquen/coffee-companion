@@ -4,7 +4,7 @@
 // identifiers (ADR-0006).
 
 import Stripe from 'stripe'
-import { sellable } from './plan'
+import { paidStatuses, sellable } from './plan'
 import type { BillingPeriod, PlanId, PlanPrice } from './plan'
 
 // The Plans a customer can hand over money for. Free is sellable in the
@@ -146,6 +146,24 @@ function wholeUnits(amount: number, currency: string): number {
   }).resolvedOptions()
 
   return amount / 10 ** maximumFractionDigits
+}
+
+// Whether the customer is already paying for a Subscription, on any Plan.
+// Asked of the provider rather than our table: the seller's own guard reads our
+// row, and a row that is missing, past due or left incomplete by an abandoned
+// Checkout would let the same customer buy a second Subscription. Throws when
+// the provider cannot be reached, which refuses the sale rather than risk it.
+export async function hasLiveSubscription(
+  customerId: string,
+): Promise<boolean> {
+  const config = billingConfig()
+  if (!config) return false
+
+  const { data } = await config.client.subscriptions.list({
+    customer: customerId,
+    limit: 100,
+  })
+  return data.some((current) => paidStatuses.includes(current.status))
 }
 
 // Makes Stripe the merchant of record for this purchase, so it calculates,
