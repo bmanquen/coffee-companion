@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { planLimits, sellable } from '@coffee-companion/api/lib/plan'
 import {
-  annualSaving,
+  annualSavingPercent,
   formatPrice,
   planFeatures,
   plans,
@@ -95,20 +95,18 @@ describe('formatPrice', () => {
   })
 })
 
-// The toggle defaults to annual because it is cheaper (ADR-0006), and the page
-// has to show by how much rather than leave the visitor to do the arithmetic.
-describe('annualSaving', () => {
+describe('annualSavingPercent', () => {
   const pro = plans.find((plan) => plan.id === 'pro') as Plan
   const free = plans.find((plan) => plan.id === 'free') as Plan
 
   it('is the share of a year of monthly payments that annual does not charge', () => {
     // 12 × $4.99 is $59.88; $44.99 is 24.9% less, read as 25%.
-    expect(annualSaving(pro)).toBe(25)
+    expect(annualSavingPercent(pro)).toBe(25)
   })
 
   it('is worked out from the seller’s prices where there are any', () => {
     expect(
-      annualSaving(pro, [
+      annualSavingPercent(pro, [
         { planId: 'pro', period: 'monthly', amount: 10, currency: 'USD' },
         { planId: 'pro', period: 'annual', amount: 100, currency: 'USD' },
       ]),
@@ -116,12 +114,12 @@ describe('annualSaving', () => {
   })
 
   it('is nothing on a Plan that costs nothing', () => {
-    expect(annualSaving(free)).toBeNull()
+    expect(annualSavingPercent(free)).toBeNull()
   })
 
   it('is nothing when annual is not the cheaper period', () => {
     expect(
-      annualSaving(pro, [
+      annualSavingPercent(pro, [
         { planId: 'pro', period: 'monthly', amount: 4, currency: 'USD' },
         { planId: 'pro', period: 'annual', amount: 48, currency: 'USD' },
       ]),
@@ -132,7 +130,7 @@ describe('annualSaving', () => {
   // comparison, and a percentage of it would be a claim about exchange rates.
   it('is nothing when the two periods are not priced in one currency', () => {
     expect(
-      annualSaving(pro, [
+      annualSavingPercent(pro, [
         { planId: 'pro', period: 'monthly', amount: 3.99, currency: 'GBP' },
       ]),
     ).toBeNull()

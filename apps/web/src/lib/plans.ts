@@ -129,11 +129,9 @@ export function priceFor(
   return { amount: plan.price[period], currency: FALLBACK_CURRENCY }
 }
 
-// How much less, as a whole percentage, a year costs paid annually than paid
-// monthly. Nothing when there is no saving to state: a Plan that costs nothing,
-// an annual price that is not the cheaper one, or two periods not priced in one
-// currency, which no percentage can honestly compare.
-export function annualSaving(
+// Null when there is no saving to state, including two periods priced in
+// different currencies, which no percentage can honestly compare.
+export function annualSavingPercent(
   plan: Plan,
   prices: Array<PlanPrice> = [],
 ): number | null {

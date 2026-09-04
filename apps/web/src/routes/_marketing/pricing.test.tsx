@@ -140,9 +140,6 @@ describe('PricingPage', () => {
     expect(screen.queryByText('/year')).toBeNull()
   })
 
-  // Annual is the cheaper period (ADR-0006), so it is the one a visitor sees
-  // first — and the page says by how much, rather than leaving them to work
-  // it out from two figures.
   it('opens on annual, with the saving against monthly shown', () => {
     renderPricing()
 
@@ -561,9 +558,6 @@ describe('PricingPage', () => {
     expect(answer.textContent).toMatch(/resubscrib/i)
   })
 
-  // ADR-0006: an unrecognised name on a card statement is a leading cause of
-  // disputes, and eligibility depends on a low dispute rate. Saying who the
-  // charge comes from is the cheapest dispute prevention there is.
   it('names Link as the merchant of record and what the statement will read', () => {
     renderPricing()
     fireEvent.click(screen.getByRole('button', { name: /Link/ }))
