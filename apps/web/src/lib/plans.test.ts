@@ -132,6 +132,17 @@ describe('annualSavingPercent', () => {
     expect(
       annualSavingPercent(pro, [
         { planId: 'pro', period: 'monthly', amount: 3.99, currency: 'GBP' },
+        { planId: 'pro', period: 'annual', amount: 44.99, currency: 'USD' },
+      ]),
+    ).toBeNull()
+  })
+
+  // A seller price for one period against the catalogue's for the other is not
+  // what checkout will charge, so it is not a saving the page can claim.
+  it('is nothing when the seller prices only one of the periods', () => {
+    expect(
+      annualSavingPercent(pro, [
+        { planId: 'pro', period: 'monthly', amount: 10, currency: 'USD' },
       ]),
     ).toBeNull()
   })

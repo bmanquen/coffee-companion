@@ -129,12 +129,17 @@ export function priceFor(
   return { amount: plan.price[period], currency: FALLBACK_CURRENCY }
 }
 
-// Null when there is no saving to state, including two periods priced in
-// different currencies, which no percentage can honestly compare.
+// Null when there is no saving to state: two periods priced in different
+// currencies, or one priced by the seller and the other by the catalogue,
+// neither of which a percentage can honestly compare.
 export function annualSavingPercent(
   plan: Plan,
   prices: Array<PlanPrice> = [],
 ): number | null {
+  const sellerPrices = (period: BillingPeriod) =>
+    prices.some((price) => price.planId === plan.id && price.period === period)
+  if (sellerPrices('monthly') !== sellerPrices('annual')) return null
+
   const monthly = priceFor(plan, 'monthly', prices)
   const annual = priceFor(plan, 'annual', prices)
   if (monthly.currency !== annual.currency) return null
