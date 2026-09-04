@@ -370,11 +370,10 @@ export function PricingPage({
                     {priceSuffix(period)}
                   </span>
                 </div>
-                {saving !== null && (
-                  <p className="text-sm text-muted-foreground">
-                    {saving}% less than paying monthly
-                  </p>
-                )}
+                {/* Always laid out, so the toggle moves nothing below it. */}
+                <p className="min-h-5 text-sm text-muted-foreground">
+                  {saving !== null && `${saving}% less than paying monthly`}
+                </p>
               </div>
 
               <Button
