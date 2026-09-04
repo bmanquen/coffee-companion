@@ -111,7 +111,7 @@ describe('PricingPage', () => {
     const card = planCard(name)
     const rows = expected[name]
 
-    expect(card.getByText(rows.monthly)).toBeTruthy()
+    expect(card.getByText(rows.annual)).toBeTruthy()
     for (const label of [
       'Brew history',
       'Search',
@@ -124,20 +124,49 @@ describe('PricingPage', () => {
     }
   })
 
-  it.each(planNames)('shows the annual price for %s when toggled', (name) => {
+  it.each(planNames)('shows the monthly price for %s when toggled', (name) => {
     renderPricing()
-    fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Monthly' }))
 
-    expect(planCard(name).getByText(expected[name].annual)).toBeTruthy()
+    expect(planCard(name).getByText(expected[name].monthly)).toBeTruthy()
   })
 
   it('labels the billing period on the price', () => {
     renderPricing()
-    expect(screen.getAllByText('/month').length).toBe(planNames.length)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
     expect(screen.getAllByText('/year').length).toBe(planNames.length)
-    expect(screen.queryByText('/month')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Monthly' }))
+    expect(screen.getAllByText('/month').length).toBe(planNames.length)
+    expect(screen.queryByText('/year')).toBeNull()
+  })
+
+  // Annual is the cheaper period (ADR-0006), so it is the one a visitor sees
+  // first — and the page says by how much, rather than leaving them to work
+  // it out from two figures.
+  it('opens on annual, with the saving against monthly shown', () => {
+    renderPricing()
+
+    expect(
+      screen
+        .getByRole('button', { name: 'Annual' })
+        .getAttribute('aria-pressed'),
+    ).toBe('true')
+    // 12 × $4.99 against $44.99: a quarter off.
+    expect(planCard('Pro').getByText(/25%/)).toBeTruthy()
+    expect(planCard('Pro+').getByText(/22%/)).toBeTruthy()
+  })
+
+  it('claims no saving on a Plan that costs nothing', () => {
+    renderPricing()
+
+    expect(planCard('Free').queryByText(/%/)).toBeNull()
+  })
+
+  it('claims no saving while monthly is the period on screen', () => {
+    renderPricing()
+    fireEvent.click(screen.getByRole('button', { name: 'Monthly' }))
+
+    expect(screen.queryByText(/%/)).toBeNull()
   })
 
   it('sends Free and Pro to checkout with their own Plan identifiers', () => {
@@ -146,10 +175,10 @@ describe('PricingPage', () => {
     fireEvent.click(
       planCard('Free').getByRole('button', { name: 'Save your first brew' }),
     )
-    expect(onCheckout).toHaveBeenCalledWith('free', 'monthly')
+    expect(onCheckout).toHaveBeenCalledWith('free', 'annual')
 
     fireEvent.click(planCard('Pro').getByRole('button', { name: 'Subscribe' }))
-    expect(onCheckout).toHaveBeenCalledWith('pro', 'monthly')
+    expect(onCheckout).toHaveBeenCalledWith('pro', 'annual')
 
     expect(onCheckout).toHaveBeenCalledTimes(2)
     expect(onNotify).not.toHaveBeenCalled()
@@ -160,10 +189,10 @@ describe('PricingPage', () => {
   it('checks out the period the visitor is looking at, not the default', () => {
     const { onCheckout } = renderPricing()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Monthly' }))
     fireEvent.click(planCard('Pro').getByRole('button', { name: 'Subscribe' }))
 
-    expect(onCheckout).toHaveBeenCalledWith('pro', 'annual')
+    expect(onCheckout).toHaveBeenCalledWith('pro', 'monthly')
   })
 
   it('opens on the period carried back from sign-in', () => {
@@ -172,19 +201,19 @@ describe('PricingPage', () => {
       <PricingPage
         onCheckout={onCheckout}
         onNotify={vi.fn()}
-        initialPeriod="annual"
+        initialPeriod="monthly"
       />,
     )
 
-    expect(planCard('Pro').getByText('$44.99')).toBeTruthy()
+    expect(planCard('Pro').getByText('$4.99')).toBeTruthy()
     expect(
       screen
-        .getByRole('button', { name: 'Annual' })
+        .getByRole('button', { name: 'Monthly' })
         .getAttribute('aria-pressed'),
     ).toBe('true')
 
     fireEvent.click(planCard('Pro').getByRole('button', { name: 'Subscribe' }))
-    expect(onCheckout).toHaveBeenCalledWith('pro', 'annual')
+    expect(onCheckout).toHaveBeenCalledWith('pro', 'monthly')
   })
 
   // The catalogue's amounts are an advertisement; the seller's are what the
@@ -203,18 +232,31 @@ describe('PricingPage', () => {
     it('is shown in place of the catalogue’s', () => {
       renderWith(sellersPro)
 
-      expect(planCard('Pro').getByText('$5.99')).toBeTruthy()
-      expect(planCard('Pro').queryByText('$4.99')).toBeNull()
-
-      fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
       expect(planCard('Pro').getByText('$53.99')).toBeTruthy()
+      expect(planCard('Pro').queryByText('$44.99')).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Monthly' }))
+      expect(planCard('Pro').getByText('$5.99')).toBeTruthy()
+    })
+
+    // The saving is a claim about what the card is charged, so it follows the
+    // seller's figures too: 12 × $5.99 is $71.88, and $53.99 is 25% less —
+    // but the seller's prices could just as well say 17%.
+    it('is what the saving is worked out from', () => {
+      renderWith([
+        { planId: 'pro', period: 'monthly', amount: 10, currency: 'USD' },
+        { planId: 'pro', period: 'annual', amount: 100, currency: 'USD' },
+      ])
+
+      expect(planCard('Pro').getByText(/17%/)).toBeTruthy()
+      expect(planCard('Pro').queryByText(/25%/)).toBeNull()
     })
 
     it('leaves a Plan it says nothing about on the catalogue’s', () => {
       renderWith(sellersPro)
 
       expect(planCard('Free').getByText('$0')).toBeTruthy()
-      expect(planCard('Pro+').getByText('$7.99')).toBeTruthy()
+      expect(planCard('Pro+').getByText('$74.99')).toBeTruthy()
     })
 
     // The seller's own amount for that currency, not the catalogue's converted:
@@ -223,6 +265,7 @@ describe('PricingPage', () => {
       renderWith([
         { planId: 'pro', period: 'monthly', amount: 3.99, currency: 'GBP' },
       ])
+      fireEvent.click(screen.getByRole('button', { name: 'Monthly' }))
 
       expect(planCard('Pro').getByText('£3.99')).toBeTruthy()
       expect(screen.queryByText('$4.99')).toBeNull()
@@ -234,6 +277,7 @@ describe('PricingPage', () => {
       renderWith([
         { planId: 'pro', period: 'monthly', amount: 3.99, currency: 'GBP' },
       ])
+      fireEvent.click(screen.getByRole('button', { name: 'Monthly' }))
 
       expect(screen.getByText('Prices exclude any tax.')).toBeTruthy()
     })
@@ -241,7 +285,7 @@ describe('PricingPage', () => {
     it('is the catalogue’s when the seller has none', () => {
       render(<PricingPage onCheckout={vi.fn()} onNotify={vi.fn()} />)
 
-      expect(planCard('Pro').getByText('$4.99')).toBeTruthy()
+      expect(planCard('Pro').getByText('$44.99')).toBeTruthy()
       expect(screen.getByText('Prices in USD, excluding any tax.')).toBeTruthy()
     })
 
@@ -364,7 +408,7 @@ describe('PricingPage', () => {
     expect(subscribe.hasAttribute('disabled')).toBe(false)
 
     fireEvent.click(subscribe)
-    expect(onCheckout).toHaveBeenCalledWith('pro', 'monthly')
+    expect(onCheckout).toHaveBeenCalledWith('pro', 'annual')
   })
 
   // The seller refuses to sell a Plan the visitor is already on, so the card
@@ -388,7 +432,7 @@ describe('PricingPage', () => {
     fireEvent.click(
       planCard('Free').getByRole('button', { name: 'Save your first brew' }),
     )
-    expect(onCheckout).toHaveBeenCalledWith('free', 'monthly')
+    expect(onCheckout).toHaveBeenCalledWith('free', 'annual')
   })
 
   // Free comes with signing up. Calling it a subscription would take away the
@@ -403,7 +447,7 @@ describe('PricingPage', () => {
     expect(screen.queryByRole('button', { name: 'Subscribed' })).toBeNull()
 
     fireEvent.click(button)
-    expect(onCheckout).toHaveBeenCalledWith('free', 'monthly')
+    expect(onCheckout).toHaveBeenCalledWith('free', 'annual')
   })
 
   it('reads as registered straight after the press that recorded it', async () => {
@@ -503,6 +547,84 @@ describe('PricingPage', () => {
     const answer = screen.getByText(/until the period you have paid for/i)
     expect(answer.textContent).toMatch(/end, not the moment you press it/i)
     expect(answer.textContent).toMatch(/nothing is Sealed while your card/i)
+  })
+
+  it('says cancelling deletes nothing and resubscribing reopens all of it', () => {
+    renderPricing()
+    fireEvent.click(
+      screen.getByRole('button', { name: /what happens if I cancel/i }),
+    )
+
+    const answer = screen.getByText(/until the period you have paid for/i)
+    expect(answer.textContent).toMatch(/Sealed/)
+    expect(answer.textContent).toMatch(/nothing is (ever )?deleted/i)
+    expect(answer.textContent).toMatch(/resubscrib/i)
+  })
+
+  // ADR-0006: an unrecognised name on a card statement is a leading cause of
+  // disputes, and eligibility depends on a low dispute rate. Saying who the
+  // charge comes from is the cheapest dispute prevention there is.
+  it('names Link as the merchant of record and what the statement will read', () => {
+    renderPricing()
+    fireEvent.click(screen.getByRole('button', { name: /Link/ }))
+
+    const answer = screen.getByText(/LINK\.COM/)
+    expect(answer.textContent).toMatch(/merchant of record/i)
+    expect(answer.textContent).toMatch(/receipts?/i)
+    expect(answer.textContent).toMatch(/sold through Link/i)
+  })
+
+  it('says the charge is converted to the buyer’s own currency', () => {
+    renderPricing()
+    fireEvent.click(screen.getByRole('button', { name: /currency/i }))
+
+    expect(screen.getByText(/converted/i).textContent).toMatch(
+      /your (own |local )?currency/i,
+    )
+  })
+
+  it('says tax is added at checkout for the buyer’s country', () => {
+    renderPricing()
+    fireEvent.click(screen.getByRole('button', { name: /tax/i }))
+
+    const answer = screen.getByText(/added at checkout/i)
+    expect(answer.textContent).toMatch(/your country|where you (live|are)/i)
+  })
+
+  // The five answers written before paying existed are not for this to
+  // reword: they are asserted by their own tests above, and this only pins
+  // that the questions are all still asked.
+  it('keeps every earlier question', () => {
+    renderPricing()
+    for (const question of [
+      /what happens to my old Brews/i,
+      /still brew a Coffee that has fallen off the Shelf/i,
+      /does sealing ever undo itself/i,
+      /limit on how much I can log/i,
+      /extra grinders if I downgrade/i,
+    ]) {
+      expect(screen.getByRole('button', { name: question })).toBeTruthy()
+    }
+  })
+
+  // ADR-0005: in marketing prose only Dialed-in, Shelf and Sealed keep their
+  // capitals, so a visitor can read a capital as "this word has a definition".
+  it('lowercases the ubiquitous language in the FAQ answers', () => {
+    renderPricing()
+    const answers = screen
+      .getAllByRole('button', { name: /\?$/ })
+      .map((trigger) => {
+        fireEvent.click(trigger)
+        return screen.getByRole('region').textContent
+      })
+      // The first word of a sentence is capitalised whatever it is.
+      .map((answer) => answer.replace(/(^|[.!?]\s+)\S+/g, '$1'))
+      .join(' ')
+
+    expect(answers).not.toMatch(
+      /\b(Brews?|Coffees?|Plans?|Subscriptions?|Grinders?|Brewing Methods?)\b/,
+    )
+    expect(answers).toMatch(/\bSealed\b/)
   })
 
   it('never says Brewers, including in the FAQ answers', () => {
@@ -681,6 +803,8 @@ describe('PricingScreen', () => {
       ],
     })
 
+    fireEvent.click(screen.getByRole('button', { name: 'Monthly' }))
+
     expect(planCard('Pro').getByText('$5.99')).toBeTruthy()
     expect(planCard('Pro').queryByText('$4.99')).toBeNull()
   })
@@ -688,13 +812,13 @@ describe('PricingScreen', () => {
   it('falls back to the catalogue when the seller has no prices', () => {
     renderScreen()
 
-    expect(planCard('Pro').getByText('$4.99')).toBeTruthy()
+    expect(planCard('Pro').getByText('$44.99')).toBeTruthy()
   })
 
   const subscribeToPro = () =>
     fireEvent.click(planCard('Pro').getByRole('button', { name: 'Subscribe' }))
 
-  it('starts checkout for a signed-in visitor at the monthly price', async () => {
+  it('starts checkout for a signed-in visitor at the annual price', async () => {
     authState.session = { user: { id: 'visitor' } }
 
     renderScreen()
@@ -702,7 +826,7 @@ describe('PricingScreen', () => {
 
     await waitFor(() =>
       expect(mocks.upgrade).toHaveBeenCalledWith(
-        expect.objectContaining({ plan: 'pro', annual: false }),
+        expect.objectContaining({ plan: 'pro', annual: true }),
       ),
     )
     expect(mocks.signInSocial).not.toHaveBeenCalled()
@@ -710,16 +834,16 @@ describe('PricingScreen', () => {
 
   // The price the visitor is charged is chosen server-side from this flag, so
   // it is the whole of what the toggle buys.
-  it('starts checkout at the annual price once the visitor toggles', async () => {
+  it('starts checkout at the monthly price once the visitor toggles', async () => {
     authState.session = { user: { id: 'visitor' } }
 
     renderScreen()
-    fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Monthly' }))
     subscribeToPro()
 
     await waitFor(() =>
       expect(mocks.upgrade).toHaveBeenCalledWith(
-        expect.objectContaining({ plan: 'pro', annual: true }),
+        expect.objectContaining({ plan: 'pro', annual: false }),
       ),
     )
   })
@@ -733,18 +857,18 @@ describe('PricingScreen', () => {
   })
 
   // The period decides the price, so a sign-in that carried only the Plan back
-  // would quietly reopen an annual purchase at the monthly price. Sign-in that
+  // would quietly reopen a monthly purchase at the annual price. Sign-in that
   // fails or is abandoned comes back here too, rather than to the auth
   // library's own error page.
   it('carries the Plan and the period through sign-in, either way it ends', async () => {
     renderScreen()
-    fireEvent.click(screen.getByRole('button', { name: 'Annual' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Monthly' }))
     subscribeToPro()
 
     await waitFor(() =>
       expect(mocks.signInSocial).toHaveBeenCalledWith({
         provider: 'google',
-        callbackURL: '/pricing?checkout=pro&period=annual',
+        callbackURL: '/pricing?checkout=pro&period=monthly',
         errorCallbackURL: '/pricing',
       }),
     )
@@ -753,20 +877,20 @@ describe('PricingScreen', () => {
   it('opens checkout for a purchase carried back from sign-in', async () => {
     authState.session = { user: { id: 'visitor' } }
 
-    renderScreen({ pendingCheckout: { planId: 'pro', period: 'annual' } })
+    renderScreen({ pendingCheckout: { planId: 'pro', period: 'monthly' } })
 
     await waitFor(() =>
       expect(mocks.upgrade).toHaveBeenCalledWith(
-        expect.objectContaining({ plan: 'pro', annual: true }),
+        expect.objectContaining({ plan: 'pro', annual: false }),
       ),
     )
     expect(mocks.upgrade).toHaveBeenCalledTimes(1)
   })
 
   it('shows the carried-back period whether or not checkout reopens', () => {
-    renderScreen({ pendingCheckout: { planId: 'pro', period: 'annual' } })
+    renderScreen({ pendingCheckout: { planId: 'pro', period: 'monthly' } })
 
-    expect(planCard('Pro').getByText('$44.99')).toBeTruthy()
+    expect(planCard('Pro').getByText('$4.99')).toBeTruthy()
   })
 
   it('opens no checkout for someone still logged out', async () => {
