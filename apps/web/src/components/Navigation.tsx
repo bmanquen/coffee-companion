@@ -1,6 +1,6 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Bean, Coffee, Home, Menu, UserRound, Wrench } from 'lucide-react'
-import { Avatar, AvatarImage } from './ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet'
 import { authClient } from '@/lib/auth-client'
@@ -22,6 +22,8 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
     await authClient.signOut()
     navigate({ to: '/' })
   }
+
+  const initial = session?.user.name.charAt(0).toUpperCase() ?? '?'
 
   return (
     <Sheet open={open} onOpenChange={setOpen} modal={false}>
@@ -88,12 +90,19 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
           )}
           {session ? (
             <div className="flex justify-between items-center gap-2 mt-auto mb-4">
-              <Avatar>
-                {session.user.image ? (
-                  <AvatarImage src={session.user.image} />
-                ) : null}
-              </Avatar>
-              <div className="text-sm">{session.user.name}</div>
+              <Link
+                className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-primary/40"
+                to="/account"
+                onClick={() => setOpen(false)}
+              >
+                <Avatar>
+                  {session.user.image ? (
+                    <AvatarImage src={session.user.image} />
+                  ) : null}
+                  <AvatarFallback>{initial}</AvatarFallback>
+                </Avatar>
+                {session.user.name}
+              </Link>
               <Button variant="outline" onClick={handleSignOut}>
                 Sign Out
               </Button>
