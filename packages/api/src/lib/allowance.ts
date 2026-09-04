@@ -1,10 +1,17 @@
 import { and, count, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import { db } from '../db'
-import { brewingDevices, grinders, planGrants, subscription } from '../db/schema'
 import {
+  brewingDevices,
+  grinders,
+  planGrants,
+  subscription,
+} from '../db/schema'
+import {
+  RETRYING,
   gearLimitSentence,
   mostGenerous,
+  paidStatuses,
   planIdFrom,
   planLimits,
 } from './plan'
@@ -14,13 +21,6 @@ const gearTable = {
   grinders,
   brewingDevices,
 } as const
-
-// A declined renewal is Stripe retrying a card, not an ending, and nothing may
-// Seal while it can still be fixed (ADR-0008) — so this is a status in which a
-// Subscription still confers its Plan.
-const RETRYING = 'past_due'
-
-const paidStatuses = ['active', 'trialing', RETRYING]
 
 const paidSubscriptionsOf = (userId: string) =>
   db
@@ -95,7 +95,8 @@ export async function currentSubscription(
   for (const row of await paidSubscriptionsOf(userId)) {
     const plan = planIdFrom(row.plan)
     if (plan === undefined) continue
-    const endsAt = row.cancelAt ?? (row.cancelAtPeriodEnd ? row.periodEnd : null)
+    const endsAt =
+      row.cancelAt ?? (row.cancelAtPeriodEnd ? row.periodEnd : null)
     return { plan, endsAt: endsAt ?? null }
   }
   return null

@@ -10,6 +10,13 @@ export type CurrentSubscription = { plan: PlanId; endsAt: Date | null }
 
 export type BillingPeriod = 'monthly' | 'annual'
 
+// A declined renewal is Stripe retrying a card, not an ending, and nothing may
+// Seal while it can still be fixed (ADR-0008) — so this is a status in which a
+// Subscription still confers its Plan.
+export const RETRYING = 'past_due'
+
+export const paidStatuses = ['active', 'trialing', RETRYING]
+
 // What a Plan costs, as the seller has it on record. The amount is in whole
 // currency units — 4.99, not 499 — so nothing outside the billing module has to
 // know how a payment provider stores money.

@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { billingConfig } from './billing'
+import { billingConfig, hasLiveSubscription } from './billing'
 
 const retrieve = vi.fn()
+const list = vi.fn()
 
 vi.mock('stripe', () => ({
   default: class {
     prices = { retrieve }
+    subscriptions = { list }
   },
 }))
 
@@ -164,5 +166,60 @@ describe('planPrices', () => {
     const planPrices = await load()
 
     expect(await planPrices()).toBe(null)
+  })
+})
+
+describe('hasLiveSubscription', () => {
+  const listing = (...statuses: Array<string>) =>
+    list.mockResolvedValue({ data: statuses.map((status) => ({ status })) })
+
+  beforeEach(() => {
+    list.mockReset()
+  })
+
+  it('finds nothing when billing is switched off', async () => {
+    expect(await hasLiveSubscription('cus_123')).toBe(false)
+    expect(list).not.toHaveBeenCalled()
+  })
+
+  it('asks the provider about that customer', async () => {
+    configure()
+    listing()
+
+    await hasLiveSubscription('cus_123')
+
+    expect(list).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: 'cus_123' }),
+    )
+  })
+
+  it('finds a Subscription that is being paid for', async () => {
+    configure()
+    listing('active')
+
+    expect(await hasLiveSubscription('cus_123')).toBe(true)
+  })
+
+  // A declined renewal is still a Subscription (ADR-0008); selling another
+  // alongside it would have the customer paying twice once the card clears.
+  it('finds a Subscription whose renewal is being retried', async () => {
+    configure()
+    listing('canceled', 'past_due')
+
+    expect(await hasLiveSubscription('cus_123')).toBe(true)
+  })
+
+  it('looks past Subscriptions that ended or never started', async () => {
+    configure()
+    listing('canceled', 'incomplete', 'incomplete_expired', 'unpaid')
+
+    expect(await hasLiveSubscription('cus_123')).toBe(false)
+  })
+
+  it('refuses to answer when the provider cannot be reached', async () => {
+    configure()
+    list.mockRejectedValue(new Error('unreachable'))
+
+    await expect(hasLiveSubscription('cus_123')).rejects.toThrow('unreachable')
   })
 })

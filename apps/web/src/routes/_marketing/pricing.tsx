@@ -164,8 +164,8 @@ export function PricingScreen({
       return
     }
 
-    // Already theirs: the seller refuses to sell it a second time, and asking
-    // them to try again would be asking for the same refusal.
+    // Already theirs: the server would refuse it, and asking them to try
+    // again would be asking for the same refusal.
     if (planId === held.data?.plan) {
       toast.success(`You are already on ${planName(planId)}`, {
         description: 'Nothing has been charged.',
@@ -179,6 +179,16 @@ export function PricingScreen({
       successUrl: '/dashboard',
       cancelUrl: '/pricing',
     })
+
+    // The server asked the payment provider, which knows of a Subscription the
+    // page did not — so this is news, not a failure to retry.
+    if (error?.code === 'ALREADY_SUBSCRIBED') {
+      toast.success('You already have a subscription', {
+        description:
+          'Nothing has been charged. Change it from your account settings.',
+      })
+      return
+    }
 
     if (error) {
       toast.error('We could not open checkout', {

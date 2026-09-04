@@ -893,6 +893,28 @@ describe('PricingScreen', () => {
     )
   })
 
+  // The page thought the visitor was on Free; the payment provider knew
+  // better. That is the same "already on it" outcome as the page's own guard,
+  // not an error to retry.
+  it('says a Subscription already exists when the server refuses a second', async () => {
+    authState.session = { user: { id: 'visitor' } }
+    mocks.upgrade.mockResolvedValue({
+      data: null,
+      error: { code: 'ALREADY_SUBSCRIBED', message: 'already subscribed' },
+    })
+
+    renderScreen()
+    subscribeToPro()
+
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalled())
+    const [message, options] = mocks.toastSuccess.mock.calls[0]
+    expect(String(message)).toMatch(/already have a subscription/i)
+    expect(String(options?.description ?? '')).toMatch(
+      /nothing has been charged/i,
+    )
+    expect(mocks.toastError).not.toHaveBeenCalled()
+  })
+
   // Free is a call to action, not a purchase. Nothing about it may reach the
   // payment provider.
   it('never sends the Free plan to checkout', async () => {
