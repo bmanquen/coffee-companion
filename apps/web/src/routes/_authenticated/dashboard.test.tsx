@@ -314,7 +314,7 @@ describe('Dashboard', () => {
   })
 
   it('renders the Pour Over feed with its own log button and cards', () => {
-    renderDashboard('pourover', [makeRecentShot()], {
+    const { container } = renderDashboard('pourover', [makeRecentShot()], {
       pourover: [
         makePouroverBrew({
           coffee: makeRecentCoffee({ id: 'c9', name: 'Colombia Huila' }),
@@ -353,7 +353,19 @@ describe('Dashboard', () => {
     expect(table.getByText('2m 45s')).toBeTruthy()
     expect(table.getByText('4m')).toBeTruthy()
     expect(table.getByText('45s')).toBeTruthy()
-    expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(1)
+    expect(
+      within(table.getByText('Brazil Cerrado').closest('tr')!).getByText('-'),
+    ).toBeTruthy()
+
+    const cards = container.querySelector<HTMLElement>('.lg\\:hidden')!
+    expect(within(cards).getByText('2m 45s')).toBeTruthy()
+    expect(within(cards).getByText('4m')).toBeTruthy()
+    expect(within(cards).getByText('45s')).toBeTruthy()
+    const noneCard = within(cards)
+      .getByText('Brazil Cerrado')
+      .closest('.rounded-lg')!
+    const brewStat = within(noneCard).getByText('Brew').closest('div')!
+    expect(within(brewStat).getByText('-')).toBeTruthy()
   })
 
   it('renders the French Press feed', () => {

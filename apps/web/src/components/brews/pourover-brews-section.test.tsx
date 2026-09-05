@@ -118,6 +118,12 @@ describe('PouroverBrewsSection', () => {
         coffeeId: 'c3',
         brewTime: 45,
       }),
+      makePouroverBrew({
+        id: 'p4',
+        coffee: makeRecentCoffee({ id: 'c4', name: 'Brazil Cerrado' }),
+        coffeeId: 'c4',
+        brewTime: null,
+      }),
     ])
 
     const { container } = render(<PouroverBrewsSection />, { wrapper: Wrapper })
@@ -126,6 +132,9 @@ describe('PouroverBrewsSection', () => {
     expect(table.getByText('2m 45s')).toBeTruthy()
     expect(table.getByText('4m')).toBeTruthy()
     expect(table.getByText('45s')).toBeTruthy()
+    expect(
+      within(table.getByText('Brazil Cerrado').closest('tr')!).getByText('-'),
+    ).toBeTruthy()
 
     // The card summary uses the same formatter; scope to the mobile layout
     // so we don't match the desktop table jsdom also renders.
@@ -133,6 +142,11 @@ describe('PouroverBrewsSection', () => {
     expect(within(cards).getByText('2m 45s')).toBeTruthy()
     expect(within(cards).getByText('4m')).toBeTruthy()
     expect(within(cards).getByText('45s')).toBeTruthy()
+    const noneCard = within(cards)
+      .getByText('Brazil Cerrado')
+      .closest('.rounded-lg')!
+    const brewStat = within(noneCard).getByText('Brew').closest('div')!
+    expect(within(brewStat).getByText('-')).toBeTruthy()
   })
 
   it('falls back to a dash for missing recipe values', () => {
