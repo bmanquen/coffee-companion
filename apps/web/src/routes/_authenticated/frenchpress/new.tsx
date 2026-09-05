@@ -160,7 +160,6 @@ function NewFrenchpressBrew() {
           {(field) => (
             <field.TextField
               label="Dose (g)"
-              placeholder="grams"
               type="number"
               step="any"
               inputMode="decimal"
@@ -171,7 +170,6 @@ function NewFrenchpressBrew() {
           {(field) => (
             <field.TextField
               label="Water (g)"
-              placeholder="grams"
               type="number"
               step="any"
               inputMode="decimal"

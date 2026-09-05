@@ -130,7 +130,6 @@ function NewEspressoShot() {
           {(field) => (
             <field.TextField
               label="Dose (g)"
-              placeholder="grams"
               type="number"
               step="any"
               inputMode="decimal"
@@ -141,7 +140,6 @@ function NewEspressoShot() {
           {(field) => (
             <field.TextField
               label="Yield (g)"
-              placeholder="grams"
               type="number"
               step="any"
               inputMode="decimal"
