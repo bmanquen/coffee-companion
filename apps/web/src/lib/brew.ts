@@ -1,4 +1,4 @@
-import { formatDuration } from './duration'
+import { fromSeconds } from './duration'
 
 // General brew helpers, method-agnostic (roast date applies to any brew, not
 // just espresso).
@@ -18,18 +18,24 @@ export function daysOffRoast(
   return days < 0 ? 0 : days
 }
 
-// Cold brew steeps for hours and stores its steep time as whole minutes (unlike
-// the hot methods, which store seconds). Render it the way it's entered — hours
-// and minutes, e.g. 1080 -> "18h", 90 -> "1h 30m", 45 -> "45m" — or "-" when
-// unknown. Pure so it can be unit tested.
-export function formatSteepMinutes(minutes: number | null): string {
-  return formatDuration(minutes, { major: 'h', minor: 'm' })
+function formatFromSeconds(total: number | null): string {
+  if (total == null) return '-'
+  const { hours, minutes, seconds } = fromSeconds(total)
+  const parts = [
+    Number(hours) && `${Number(hours)}h`,
+    Number(minutes) && `${Number(minutes)}m`,
+    Number(seconds) && `${Number(seconds)}s`,
+  ].filter(Boolean)
+  return parts.length === 0 ? '0s' : parts.join(' ')
 }
 
-// Pour Over, French Press, and AeroPress store brew/steep time as whole
-// seconds. Render it the way it's entered — minutes and seconds, e.g. 165 ->
-// "2m 45s", 240 -> "4m", 45 -> "45s" — or "-" when unknown. Pure so it can
-// be unit tested.
+// Cold brew's column is still whole minutes (#85: no migration). Convert to
+// seconds at this edge, then collapse the fromSeconds parts (18h, 1h 30m).
+export function formatSteepMinutes(minutes: number | null): string {
+  return formatFromSeconds(minutes == null ? null : minutes * 60)
+}
+
+// Pour Over (and later French Press / AeroPress) already store seconds.
 export function formatBrewSeconds(seconds: number | null): string {
-  return formatDuration(seconds, { major: 'm', minor: 's' })
+  return formatFromSeconds(seconds)
 }

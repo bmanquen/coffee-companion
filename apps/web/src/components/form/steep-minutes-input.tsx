@@ -1,12 +1,10 @@
 import { Field, FieldContent, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { fromStoredDuration, toStoredDuration } from '@/lib/duration'
+import { fromSeconds, toSeconds } from '@/lib/duration'
 
-// Two inputs (hours + minutes) that together edit a steep time stored as whole
-// minutes — not seconds. Cold brew reuses the same fromStoredDuration /
-// toStoredDuration 60-split with minutes as the base unit so an 18 hour steep
-// stays 1080 minutes. Decoupled from the form field so both cold brew forms
-// reuse it.
+// Hours + minutes boxes for Cold Brew. The column is still whole minutes
+// (no migration); this input converts at the edge: minutes × 60 into
+// fromSeconds / toSeconds, then back to minutes for the form.
 export function SteepMinutesInput({
   value,
   onChange,
@@ -16,9 +14,10 @@ export function SteepMinutesInput({
   onChange: (minutes: number | null) => void
   onBlur: () => void
 }) {
-  const { major: hours, minor: minutes } = fromStoredDuration(value)
+  const { hours, minutes } = fromSeconds(value == null ? null : value * 60)
   const setSteep = (h: string, m: string) => {
-    onChange(toStoredDuration(h, m))
+    const seconds = toSeconds(h, m, '')
+    onChange(seconds == null ? null : seconds / 60)
   }
 
   return (
