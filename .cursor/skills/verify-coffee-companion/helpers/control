@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Control CLI for Coffee Companion verification. Invocation is documented in
+# .cursor/skills/verify-coffee-companion/SKILL.md.
+set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+repo="$(cd "$here/../../../.." && pwd)"
+export VERIFY_REPO_ROOT="$repo"
+exec node "$here/control.mjs" "$@"
