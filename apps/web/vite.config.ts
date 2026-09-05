@@ -17,10 +17,25 @@ function sentrySourceMaps() {
   return [sentryTanstackStart({ org, project, authToken })]
 }
 
+// Sentry's Node SDK (and the OpenTelemetry hooks it pulls in) cannot be
+// bundled by Nitro's Rollup pass — the dual client/server export map
+// crashes getVariableForExportName. Leave them as Node builtins of the
+// output so `node .output/server/index.mjs` loads them from node_modules.
+const sentryServerExternals = [
+  /^@sentry\//,
+  /^@opentelemetry\//,
+  'import-in-the-middle',
+  'require-in-the-middle',
+]
+
 const config = defineConfig({
   plugins: [
     devtools(),
-    nitro(),
+    nitro({
+      rollupConfig: {
+        external: sentryServerExternals,
+      },
+    }),
     // this is the plugin that enables path aliases
     viteTsConfigPaths({
       projects: ['./tsconfig.json'],
