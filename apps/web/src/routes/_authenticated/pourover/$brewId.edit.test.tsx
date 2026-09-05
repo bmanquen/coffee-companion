@@ -145,7 +145,7 @@ describe('EditPouroverBrew form', () => {
       const { Wrapper } = seeded()
       render(<EditPouroverBrew />, { wrapper: Wrapper })
 
-      fireEvent.change(screen.getByPlaceholderText('18.0'), {
+      fireEvent.change(screen.getByLabelText('Dose (g)'), {
         target: { value: '19' },
       })
       fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {

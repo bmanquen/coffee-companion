@@ -94,12 +94,12 @@ function EditBrewingDevice() {
       >
         <form.AppField name="name">
           {(field) => (
-            <field.TextField label="Name" placeholder="e.g. Linea Mini" />
+            <field.TextField label="Name" placeholder="name" />
           )}
         </form.AppField>
         <form.AppField name="brand">
           {(field) => (
-            <field.TextField label="Brand" placeholder="e.g. La Marzocco" />
+            <field.TextField label="Brand" placeholder="brand" />
           )}
         </form.AppField>
         <form.AppField name="typeId">

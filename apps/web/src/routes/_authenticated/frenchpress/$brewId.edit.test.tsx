@@ -141,7 +141,7 @@ describe('EditFrenchpressBrew form', () => {
       const { Wrapper } = seeded()
       render(<EditFrenchpressBrew />, { wrapper: Wrapper })
 
-      fireEvent.change(screen.getByPlaceholderText('30.0'), {
+      fireEvent.change(screen.getByLabelText('Dose (g)'), {
         target: { value: '31' },
       })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))

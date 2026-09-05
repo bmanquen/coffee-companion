@@ -151,10 +151,10 @@ describe('NewColdBrewBrew form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
-      fireEvent.change(screen.getByPlaceholderText('50.0'), {
+      fireEvent.change(screen.getByLabelText('Dose (g)'), {
         target: { value: '55' },
       })
-      fireEvent.change(screen.getByPlaceholderText('500'), {
+      fireEvent.change(screen.getByLabelText('Water (g)'), {
         target: { value: '520' },
       })
       // 18 hours -> 1080 minutes.

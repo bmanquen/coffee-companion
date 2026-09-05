@@ -16,8 +16,8 @@ test('log an espresso shot via the new-shot form', async ({ page }) => {
   await expect(page.getByText('Niche Zero', { exact: true })).toBeVisible()
   await expect(page.getByText('Linea Mini', { exact: true })).toBeVisible()
 
-  await page.getByPlaceholder('18.0').fill('18')
-  await page.getByPlaceholder('36.0').fill('36')
+  await page.getByLabel('Dose (g)').fill('18')
+  await page.getByLabel('Yield (g)').fill('36')
 
   await page.getByRole('button', { name: 'Log', exact: true }).click()
 

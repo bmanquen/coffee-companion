@@ -41,7 +41,7 @@ export function MinutesSecondsInput({
             aria-label={`${label} (minutes)`}
             type="number"
             inputMode="numeric"
-            placeholder="2 min"
+            placeholder="min"
             className={durationInputClassName}
             value={minutes}
             onBlur={onBlur}
@@ -51,7 +51,7 @@ export function MinutesSecondsInput({
             aria-label={`${label} (seconds)`}
             type="number"
             inputMode="numeric"
-            placeholder="45 sec"
+            placeholder="sec"
             className={durationInputClassName}
             value={seconds}
             onBlur={onBlur}

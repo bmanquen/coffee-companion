@@ -132,10 +132,10 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
-      fireEvent.change(screen.getByPlaceholderText('18.0'), {
+      fireEvent.change(screen.getByLabelText('Dose (g)'), {
         target: { value: '18' },
       })
-      fireEvent.change(screen.getByPlaceholderText('36.0'), {
+      fireEvent.change(screen.getByLabelText('Yield (g)'), {
         target: { value: '36' },
       })
 
