@@ -5,6 +5,7 @@
 
 import Stripe from 'stripe'
 import { paidStatuses, sellable } from './plan'
+import { reportError } from './report-error'
 import type { BillingPeriod, PlanId, PlanPrice } from './plan'
 
 // The Plans a customer can hand over money for. Free is sellable in the
@@ -113,7 +114,11 @@ export async function planPrices(): Promise<Array<PlanPrice> | null> {
     const prices = read.filter((price): price is PlanPrice => price !== null)
     cached = { prices, until: Date.now() + PRICE_TTL_MS }
     return prices
-  } catch {
+  } catch (error) {
+    // Still advertise the catalogue rather than a pricing page with no
+    // prices — but a silent Stripe outage is exactly the launch-gate miss
+    // this report is for. No customer, no price id.
+    reportError(error, { area: 'billing', operation: 'planPrices' })
     cached = { prices: null, until: Date.now() + PRICE_RETRY_MS }
     return null
   }

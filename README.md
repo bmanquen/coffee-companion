@@ -61,6 +61,31 @@ which would be a dev server on the development database.
 pnpm test:e2e
 ```
 
+## Error monitoring
+
+Production errors go to [Sentry](https://sentry.io) when a DSN is set. The API
+lives in the same TanStack Start process as the web app, so one server DSN
+covers tRPC, Better Auth / Stripe webhooks, and SSR. A blank DSN sends
+nothing and does not crash the process — local development and CI run that
+way.
+
+Set both of these to the same project DSN (the Vite-prefixed name is what the
+browser bundle may contain):
+
+```
+SENTRY_DSN=
+VITE_SENTRY_DSN=
+```
+
+Optional:
+
+- `SENTRY_ENVIRONMENT` — shown on events; falls back to `NODE_ENV`
+- `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` — together they upload
+  source maps at build time so production stacks are readable
+
+Events carry a Plan / Sealing / billing tag where the path is one of those.
+They do not send emails, cookies, auth headers, or request bodies.
+
 ## Styling
 
 This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
