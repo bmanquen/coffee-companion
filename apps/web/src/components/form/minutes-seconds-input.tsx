@@ -4,8 +4,9 @@ import { fromSeconds, toSeconds } from '@/lib/duration'
 
 // Two inputs (minutes + seconds) that together edit a brew time stored as
 // whole seconds. fromSeconds fills the boxes; toSeconds is what the mutation
-// sends. Hours are carried through so a value past 60 minutes is not dropped
-// just because this input has no hours box. The caller supplies the label.
+// sends. Hours are folded into the minutes box so a value past 60 minutes
+// stays fully editable — this UI has no hours field. The caller supplies
+// the label.
 export function MinutesSecondsInput({
   label,
   value,
@@ -17,9 +18,15 @@ export function MinutesSecondsInput({
   onChange: (seconds: number | null) => void
   onBlur: () => void
 }) {
-  const { hours, minutes, seconds } = fromSeconds(value)
+  const parts = fromSeconds(value)
+  const empty =
+    parts.hours === '' && parts.minutes === '' && parts.seconds === ''
+  const minutes = empty
+    ? ''
+    : String(Number(parts.hours) * 60 + Number(parts.minutes))
+  const seconds = parts.seconds
   const setTime = (m: string, s: string) => {
-    onChange(toSeconds(hours, m, s))
+    onChange(toSeconds('', m, s))
   }
   const minutesId = `${label.replace(/\s+/g, '-').toLowerCase()}-minutes`
 
