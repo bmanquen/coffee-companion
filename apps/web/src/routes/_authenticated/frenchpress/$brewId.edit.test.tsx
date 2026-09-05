@@ -91,7 +91,7 @@ function seeded() {
       brewingDeviceId: FP_DEVICE,
       dose: '30',
       water: '500',
-      steepTime: 240,
+      steepTime: 210,
       waterTemp: 95,
       // Distinct from dose so getByDisplayValue('30') is unambiguous.
       grindSetting: '28',
@@ -120,12 +120,18 @@ describe('EditFrenchpressBrew form', () => {
     const { Wrapper } = seeded()
     render(<EditFrenchpressBrew />, { wrapper: Wrapper })
 
-    // The dose/water/steep/temp inputs and Method select are prefilled from the brew.
+    // The dose/water/temp inputs and Method select are prefilled from the brew.
     expect(screen.getByDisplayValue('30')).toBeTruthy()
     expect(screen.getByDisplayValue('500')).toBeTruthy()
-    expect(screen.getByDisplayValue('240')).toBeTruthy()
     expect(screen.getByDisplayValue('95')).toBeTruthy()
     expect(screen.getByDisplayValue('Standard')).toBeTruthy()
+    // 210 seconds is entered as minutes + seconds, not a raw seconds box.
+    expect(
+      screen.getByLabelText<HTMLInputElement>('Steep Time (minutes)').value,
+    ).toBe('3')
+    expect(
+      screen.getByLabelText<HTMLInputElement>('Steep Time (seconds)').value,
+    ).toBe('30')
   })
 
   it('submits an update carrying the brew id', async () => {
@@ -144,6 +150,9 @@ describe('EditFrenchpressBrew form', () => {
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '31' },
       })
+      fireEvent.change(screen.getByLabelText('Steep Time (minutes)'), {
+        target: { value: '4' },
+      })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
@@ -152,6 +161,8 @@ describe('EditFrenchpressBrew form', () => {
       const body = String(init?.body ?? '')
       expect(body).toContain(BREW)
       expect(body).toContain('31')
+      // 4 minutes + the loaded 30 seconds → 270 whole seconds.
+      expect(body).toMatch(/"steepTime":270/)
     } finally {
       fetchSpy.mockRestore()
     }

@@ -158,14 +158,18 @@ describe('NewFrenchpressBrew form', () => {
       fireEvent.change(screen.getByLabelText(/^Water \(g\)/), {
         target: { value: '520' },
       })
-      fireEvent.change(screen.getByLabelText(/^Steep Time/), {
-        target: { value: '300' },
-      })
       fireEvent.change(screen.getByLabelText(/^Water Temp/), {
         target: { value: '96' },
       })
       fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
         target: { value: '28' },
+      })
+      // 4 minutes + 0 seconds is stored as 240 whole seconds.
+      fireEvent.change(screen.getByLabelText(/^Steep Time \(minutes\)/), {
+        target: { value: '4' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Steep Time \(seconds\)/), {
+        target: { value: '0' },
       })
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
@@ -176,8 +180,8 @@ describe('NewFrenchpressBrew form', () => {
       const body = String(init?.body ?? '')
       expect(body).toContain('32')
       expect(body).toContain('520')
-      expect(body).toContain('300')
       expect(body).toContain('96')
+      expect(body).toMatch(/"steepTime":240/)
       expect(body).toContain(COFFEE)
     } finally {
       fetchSpy.mockRestore()
