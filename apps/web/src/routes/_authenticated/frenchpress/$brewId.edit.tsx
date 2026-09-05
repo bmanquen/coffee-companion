@@ -17,28 +17,28 @@ import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 
-export const Route = createFileRoute('/_authenticated/frenchpress/$brewId/edit')(
-  {
-    loader: async ({ context, params }) => {
-      await context.queryClient.ensureQueryData(
-        context.trpc.frenchpressBrew.getById.queryOptions(params.brewId),
-      )
-      await context.queryClient.ensureQueryData(
-        context.trpc.coffee.getAll.queryOptions(),
-      )
-      await context.queryClient.ensureQueryData(
-        context.trpc.frenchpressMethod.list.queryOptions(),
-      )
-      await context.queryClient.ensureQueryData(
-        context.trpc.grinder.list.queryOptions(),
-      )
-      await context.queryClient.ensureQueryData(
-        context.trpc.brewingDevice.list.queryOptions(),
-      )
-    },
-    component: EditFrenchpressBrew,
+export const Route = createFileRoute(
+  '/_authenticated/frenchpress/$brewId/edit',
+)({
+  loader: async ({ context, params }) => {
+    await context.queryClient.ensureQueryData(
+      context.trpc.frenchpressBrew.getById.queryOptions(params.brewId),
+    )
+    await context.queryClient.ensureQueryData(
+      context.trpc.coffee.getAll.queryOptions(),
+    )
+    await context.queryClient.ensureQueryData(
+      context.trpc.frenchpressMethod.list.queryOptions(),
+    )
+    await context.queryClient.ensureQueryData(
+      context.trpc.grinder.list.queryOptions(),
+    )
+    await context.queryClient.ensureQueryData(
+      context.trpc.brewingDevice.list.queryOptions(),
+    )
   },
-)
+  component: EditFrenchpressBrew,
+})
 
 function EditFrenchpressBrew() {
   const { brewId } = Route.useParams()

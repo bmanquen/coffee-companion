@@ -126,7 +126,9 @@ describe('FrenchpressBrewsSection', () => {
       }),
     ])
 
-    const { container } = render(<FrenchpressBrewsSection />, { wrapper: Wrapper })
+    const { container } = render(<FrenchpressBrewsSection />, {
+      wrapper: Wrapper,
+    })
 
     const table = within(screen.getByRole('table'))
     expect(table.getByText('3m 30s')).toBeTruthy()
@@ -145,7 +147,9 @@ describe('FrenchpressBrewsSection', () => {
     const noneCard = within(cards)
       .getByText('Brazil Cerrado')
       .closest('.rounded-lg') as HTMLElement
-    const steepStat = within(noneCard).getByText('Steep').closest('div') as HTMLElement
+    const steepStat = within(noneCard)
+      .getByText('Steep')
+      .closest('div') as HTMLElement
     expect(within(steepStat).getByText('-')).toBeTruthy()
   })
 
@@ -411,7 +415,9 @@ describe('FrenchpressBrewsSection', () => {
   // The detail region for a row: its sibling sub-row's animating grid-rows wrap
   // (grid-rows-[1fr] open, grid-rows-[0fr] collapsed). Always in the DOM.
   const detailRegionFor = (name: string): HTMLElement => {
-    const dataRow = within(screen.getByRole('table')).getByText(name).closest('tr')!
+    const dataRow = within(screen.getByRole('table'))
+      .getByText(name)
+      .closest('tr')!
     return dataRow.nextElementSibling!.querySelector(
       '[class*="grid-rows-"]',
     ) as HTMLElement
