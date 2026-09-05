@@ -3,7 +3,7 @@ import { billingConfig, hasLiveSubscription } from './billing'
 
 const retrieve = vi.fn()
 const list = vi.fn()
-const reportError = vi.fn()
+const reportError = vi.hoisted(() => vi.fn())
 
 vi.mock('stripe', () => ({
   default: class {
