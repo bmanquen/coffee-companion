@@ -74,4 +74,11 @@ describe('SteepMinutesInput', () => {
 
     expect(onBlur).toHaveBeenCalledTimes(2)
   })
+
+  it('mutes the placeholder so hint copy does not compete with a filled value', () => {
+    const { hours, minutes } = renderInput(null)
+
+    expect(hours.className).toContain('placeholder:text-muted-foreground/60')
+    expect(minutes.className).toContain('placeholder:text-muted-foreground/60')
+  })
 })
