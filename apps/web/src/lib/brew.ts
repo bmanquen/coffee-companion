@@ -1,3 +1,5 @@
+import { formatDuration } from './duration'
+
 // General brew helpers, method-agnostic (roast date applies to any brew, not
 // just espresso).
 
@@ -21,12 +23,7 @@ export function daysOffRoast(
 // and minutes, e.g. 1080 -> "18h", 90 -> "1h 30m", 45 -> "45m" — or "-" when
 // unknown. Pure so it can be unit tested.
 export function formatSteepMinutes(minutes: number | null): string {
-  if (minutes == null) return '-'
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  if (hours === 0) return `${mins}m`
-  if (mins === 0) return `${hours}h`
-  return `${hours}h ${mins}m`
+  return formatDuration(minutes, { major: 'h', minor: 'm' })
 }
 
 // Pour Over, French Press, and AeroPress store brew/steep time as whole
@@ -34,10 +31,5 @@ export function formatSteepMinutes(minutes: number | null): string {
 // "2m 45s", 240 -> "4m", 45 -> "45s" — or "-" when unknown. Pure so it can
 // be unit tested.
 export function formatBrewSeconds(seconds: number | null): string {
-  if (seconds == null) return '-'
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  if (mins === 0) return `${secs}s`
-  if (secs === 0) return `${mins}m`
-  return `${mins}m ${secs}s`
+  return formatDuration(seconds, { major: 'm', minor: 's' })
 }

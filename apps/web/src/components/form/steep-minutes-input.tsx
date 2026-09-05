@@ -1,5 +1,6 @@
 import { Field, FieldContent, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { combineDurationFields, splitDurationFields } from '@/lib/duration'
 
 // Two inputs (hours + minutes) that together edit a steep time stored as whole
 // minutes. Cold brew steeps for hours, so it's entered as h + m rather than raw
@@ -15,14 +16,9 @@ export function SteepMinutesInput({
   onChange: (minutes: number | null) => void
   onBlur: () => void
 }) {
-  const hours = value === null ? '' : Math.floor(value / 60).toString()
-  const minutes = value === null ? '' : (value % 60).toString()
+  const { major: hours, minor: minutes } = splitDurationFields(value)
   const setSteep = (h: string, m: string) => {
-    if (h === '' && m === '') {
-      onChange(null)
-      return
-    }
-    onChange((h === '' ? 0 : Number(h)) * 60 + (m === '' ? 0 : Number(m)))
+    onChange(combineDurationFields(h, m))
   }
 
   return (
