@@ -123,6 +123,13 @@ describe('EditPouroverBrew form', () => {
     expect(screen.getByDisplayValue('300')).toBeTruthy()
     expect(screen.getByDisplayValue('94')).toBeTruthy()
     expect(screen.getByDisplayValue('Standard')).toBeTruthy()
+    // 165 seconds is entered as minutes + seconds, not a raw seconds box.
+    expect(
+      screen.getByLabelText<HTMLInputElement>('Brew Time (minutes)').value,
+    ).toBe('2')
+    expect(
+      screen.getByLabelText<HTMLInputElement>('Brew Time (seconds)').value,
+    ).toBe('45')
   })
 
   it('submits an update carrying the brew id', async () => {
@@ -141,6 +148,9 @@ describe('EditPouroverBrew form', () => {
       fireEvent.change(screen.getByPlaceholderText('18.0'), {
         target: { value: '19' },
       })
+      fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {
+        target: { value: '3' },
+      })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
@@ -149,6 +159,8 @@ describe('EditPouroverBrew form', () => {
       const body = String(init?.body ?? '')
       expect(body).toContain(BREW)
       expect(body).toContain('19')
+      // 3 minutes + the loaded 45 seconds → 225 whole seconds.
+      expect(body).toMatch(/"brewTime":225/)
     } finally {
       fetchSpy.mockRestore()
     }

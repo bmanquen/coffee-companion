@@ -318,6 +318,25 @@ describe('Dashboard', () => {
       pourover: [
         makePouroverBrew({
           coffee: makeRecentCoffee({ id: 'c9', name: 'Colombia Huila' }),
+          brewTime: 165,
+        }),
+        makePouroverBrew({
+          id: 'p2',
+          coffee: makeRecentCoffee({ id: 'c10', name: 'Ethiopia Guji' }),
+          coffeeId: 'c10',
+          brewTime: 240,
+        }),
+        makePouroverBrew({
+          id: 'p3',
+          coffee: makeRecentCoffee({ id: 'c11', name: 'Kenya AA' }),
+          coffeeId: 'c11',
+          brewTime: 45,
+        }),
+        makePouroverBrew({
+          id: 'p4',
+          coffee: makeRecentCoffee({ id: 'c12', name: 'Brazil Cerrado' }),
+          coffeeId: 'c12',
+          brewTime: null,
         }),
       ],
     })
@@ -329,7 +348,12 @@ describe('Dashboard', () => {
     const table = within(screen.getByRole('table'))
     expect(table.getByText('Colombia Huila')).toBeTruthy()
     // The Method Variant shows for methods that have one.
-    expect(table.getByText('Standard')).toBeTruthy()
+    expect(table.getAllByText('Standard').length).toBeGreaterThan(0)
+    // Brew time speaks minutes + seconds, collapsing empty parts, dash if none.
+    expect(table.getByText('2m 45s')).toBeTruthy()
+    expect(table.getByText('4m')).toBeTruthy()
+    expect(table.getByText('45s')).toBeTruthy()
+    expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders the French Press feed', () => {

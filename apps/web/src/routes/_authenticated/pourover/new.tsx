@@ -8,6 +8,7 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertPouroverBrew } from '@coffee-companion/api/db/zod'
+import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -176,10 +177,11 @@ function NewPouroverBrew() {
         </form.AppField>
         <form.AppField name="brewTime">
           {(field) => (
-            <field.TextField
-              label="Brew Time (s)"
-              placeholder="165"
-              type="number"
+            <MinutesSecondsInput
+              label="Brew Time"
+              value={field.state.value ?? null}
+              onChange={(seconds) => field.handleChange(seconds)}
+              onBlur={field.handleBlur}
             />
           )}
         </form.AppField>

@@ -90,11 +90,49 @@ describe('PouroverBrewsSection', () => {
     const table = within(screen.getByRole('table'))
     expect(table.getByText('18g')).toBeTruthy() // dose
     expect(table.getByText('300g')).toBeTruthy() // water
-    expect(table.getByText('165s')).toBeTruthy() // brew time
+    expect(table.getByText('2m 45s')).toBeTruthy() // brew time
     expect(table.getByText('22')).toBeTruthy() // grind setting
     // Water temp is no longer a summary column — it lives in the expander
     // (BrewDetails `extra`), still present in the always-rendered sub-row.
     expect(table.getByText('94°C')).toBeTruthy() // water temp
+  })
+
+  it('formats brew time as minutes and seconds on the table and card', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+      makePouroverBrew({
+        id: 'p1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        coffeeId: 'c1',
+        brewTime: 165,
+      }),
+      makePouroverBrew({
+        id: 'p2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+        coffeeId: 'c2',
+        brewTime: 240,
+      }),
+      makePouroverBrew({
+        id: 'p3',
+        coffee: makeRecentCoffee({ id: 'c3', name: 'Kenya AA' }),
+        coffeeId: 'c3',
+        brewTime: 45,
+      }),
+    ])
+
+    const { container } = render(<PouroverBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('2m 45s')).toBeTruthy()
+    expect(table.getByText('4m')).toBeTruthy()
+    expect(table.getByText('45s')).toBeTruthy()
+
+    // The card summary uses the same formatter; scope to the mobile layout
+    // so we don't match the desktop table jsdom also renders.
+    const cards = container.querySelector<HTMLElement>('.lg\\:hidden')!
+    expect(within(cards).getByText('2m 45s')).toBeTruthy()
+    expect(within(cards).getByText('4m')).toBeTruthy()
+    expect(within(cards).getByText('45s')).toBeTruthy()
   })
 
   it('falls back to a dash for missing recipe values', () => {
