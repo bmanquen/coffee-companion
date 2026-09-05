@@ -82,10 +82,10 @@ describe('SteepMinutesInput', () => {
     expect(minutes.className).toContain('placeholder:text-muted-foreground/40')
   })
 
-  it('omits a placeholder when the accessible label already names the unit', () => {
+  it('names the timeframe in each box so hours and minutes stay distinct', () => {
     const { hours, minutes } = renderInput(null)
 
-    expect(hours.placeholder).toBe('')
-    expect(minutes.placeholder).toBe('')
+    expect(hours.placeholder).toBe('hours')
+    expect(minutes.placeholder).toBe('minutes')
   })
 })

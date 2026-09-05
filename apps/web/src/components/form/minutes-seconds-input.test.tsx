@@ -118,10 +118,10 @@ describe('MinutesSecondsInput', () => {
     expect(seconds.className).toContain('placeholder:text-muted-foreground/40')
   })
 
-  it('omits a placeholder when the accessible label already names the unit', () => {
+  it('names the timeframe in each box so minutes and seconds stay distinct', () => {
     const { minutes, seconds } = renderInput(null)
 
-    expect(minutes.placeholder).toBe('')
-    expect(seconds.placeholder).toBe('')
+    expect(minutes.placeholder).toBe('minutes')
+    expect(seconds.placeholder).toBe('seconds')
   })
 })
