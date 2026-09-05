@@ -198,6 +198,7 @@ async function cmdLaunch() {
   if (!databaseUrl.startsWith('postgres')) {
     die('ensure-postgres.sh wrote an unusable DATABASE_URL file')
   }
+  assertLocalTestDatabase(databaseUrl)
 
   const env = {
     ...placeholderEnv(port),
@@ -216,11 +217,12 @@ async function cmdLaunch() {
     { env, cwd: repoRoot },
   )
 
+  // Always rebuild. An existence-only check would serve a stale .output after
+  // a branch switch or source edit and invalidate the proof. The production
+  // build is ~15s here; correctness beats reuse.
   const serverEntry = join(webDir, '.output/server/index.mjs')
-  if (!existsSync(serverEntry)) {
-    console.error('Building the production web app…')
-    run('pnpm', ['--filter', 'coffee-companion', 'build'], { env })
-  }
+  console.error('Building the production web app…')
+  run('pnpm', ['--filter', 'coffee-companion', 'build'], { env })
   if (!existsSync(serverEntry)) {
     die(`Build did not produce ${serverEntry}`)
   }
@@ -273,6 +275,25 @@ function databaseName(url) {
     return new URL(url).pathname.slice(1)
   } catch {
     return url
+  }
+}
+
+// Same rule as packages/api/test/database.ts isLocalTestDatabase. Node reports
+// IPv6 hostnames without brackets, so ::1 and [::1] both count as loopback.
+function assertLocalTestDatabase(urlString) {
+  let url
+  try {
+    url = new URL(urlString)
+  } catch {
+    die('DATABASE_URL is not a usable URL')
+  }
+  const host = url.hostname
+  const name = decodeURIComponent(url.pathname.replace(/^\//, '').split('/')[0] ?? '')
+  const loopback = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(host)
+  if (!loopback || !name.endsWith('_test')) {
+    die(
+      `Refusing to launch: host must be loopback and the database name must end with _test (got ${host}/${name}).`,
+    )
   }
 }
 
