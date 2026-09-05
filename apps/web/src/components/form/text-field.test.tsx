@@ -49,6 +49,9 @@ describe('TextField', () => {
     render(<Harness />)
     expect(screen.getByLabelText('Coffee name')).toBeTruthy()
     expect(screen.getByPlaceholderText('Enter name')).toBeTruthy()
+    expect(screen.getByPlaceholderText('Enter name').className).toContain(
+      'placeholder:text-muted-foreground/40',
+    )
   })
 
   it('updates the field value on change', async () => {

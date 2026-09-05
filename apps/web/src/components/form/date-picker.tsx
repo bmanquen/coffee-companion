@@ -31,7 +31,7 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className={`flex justify-between ${!field.state.value ? 'text-muted-foreground' : ''}`}
+              className={`flex justify-between ${!field.state.value ? 'text-muted-foreground/40' : ''}`}
             >
               {field.state.value ? (
                 format(field.state.value, 'PPP')
