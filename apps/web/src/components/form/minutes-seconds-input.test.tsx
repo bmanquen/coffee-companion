@@ -114,7 +114,7 @@ describe('MinutesSecondsInput', () => {
   it('mutes the placeholder so hint copy does not compete with a filled value', () => {
     const { minutes, seconds } = renderInput(null)
 
-    expect(minutes.className).toContain('placeholder:text-muted-foreground/60')
-    expect(seconds.className).toContain('placeholder:text-muted-foreground/60')
+    expect(minutes.className).toContain('placeholder:text-muted-foreground/40')
+    expect(seconds.className).toContain('placeholder:text-muted-foreground/40')
   })
 })
