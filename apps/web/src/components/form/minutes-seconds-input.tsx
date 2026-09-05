@@ -19,9 +19,7 @@ export function MinutesSecondsInput({
 }) {
   const { hours, minutes, seconds } = fromSeconds(value)
   const setTime = (m: string, s: string) => {
-    // A sub-hour brew renders hours as '0'; treat that as empty so clearing
-    // both boxes still means no time, not zero seconds.
-    onChange(toSeconds(hours === '0' ? '' : hours, m, s))
+    onChange(toSeconds(hours, m, s))
   }
   const minutesId = `${label.replace(/\s+/g, '-').toLowerCase()}-minutes`
 

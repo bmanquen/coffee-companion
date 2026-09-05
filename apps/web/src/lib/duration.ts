@@ -8,7 +8,9 @@ export function fromSeconds(total: number | null): {
   minutes: string
   seconds: string
 } {
-  if (total === null) return { hours: '', minutes: '', seconds: '' }
+  if (total === null || !Number.isFinite(total)) {
+    return { hours: '', minutes: '', seconds: '' }
+  }
   const hours = Math.floor(total / 3600)
   const minutes = Math.floor((total % 3600) / 60)
   const seconds = total % 60
@@ -24,10 +26,14 @@ export function toSeconds(
   minutes: string,
   seconds: string,
 ): number | null {
-  if (hours === '' && minutes === '' && seconds === '') return null
-  return (
-    (hours === '' ? 0 : Number(hours)) * 3600 +
-    (minutes === '' ? 0 : Number(minutes)) * 60 +
-    (seconds === '' ? 0 : Number(seconds))
-  )
+  const h = hours === '' ? 0 : Number(hours)
+  const m = minutes === '' ? 0 : Number(minutes)
+  const s = seconds === '' ? 0 : Number(seconds)
+  if (!Number.isFinite(h) || !Number.isFinite(m) || !Number.isFinite(s)) {
+    return null
+  }
+  // Empty and leftover zeros (fromSeconds fills unused parts with '0') are
+  // no time — an optional brew time field stores null, not 0.
+  if (h === 0 && m === 0 && s === 0) return null
+  return h * 3600 + m * 60 + s
 }

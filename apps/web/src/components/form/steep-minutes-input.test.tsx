@@ -58,13 +58,12 @@ describe('SteepMinutesInput', () => {
     expect(onChange).toHaveBeenCalledWith(45)
   })
 
-  it('reads a cleared hours field as zero while minutes still holds a value', () => {
+  it('sends no steep time when hours is cleared and minutes is only a leftover zero', () => {
     const { hours, onChange } = renderInput(1080) // minutes renders as '0'
 
     fireEvent.change(hours, { target: { value: '' } })
 
-    // '0' is not empty, so this is zero hours — not "no steep time".
-    expect(onChange).toHaveBeenCalledWith(0)
+    expect(onChange).toHaveBeenCalledWith(null)
   })
 
   it('reports a blur from either field, so the form can validate on leave', () => {
