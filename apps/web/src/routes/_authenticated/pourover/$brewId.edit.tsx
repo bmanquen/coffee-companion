@@ -140,7 +140,7 @@ function EditPouroverBrew() {
           {(field) => (
             <field.TextField
               label="Dose (g)"
-              placeholder="g"
+              placeholder="grams"
               type="number"
               step="any"
               inputMode="decimal"
@@ -151,7 +151,7 @@ function EditPouroverBrew() {
           {(field) => (
             <field.TextField
               label="Water (g)"
-              placeholder="g"
+              placeholder="grams"
               type="number"
               step="any"
               inputMode="decimal"

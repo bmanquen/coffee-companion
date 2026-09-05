@@ -85,7 +85,7 @@ describe('SteepMinutesInput', () => {
   it('hints the unit instead of an example time', () => {
     const { hours, minutes } = renderInput(null)
 
-    expect(hours.placeholder).toBe('hr')
-    expect(minutes.placeholder).toBe('min')
+    expect(hours.placeholder).toBe('hours')
+    expect(minutes.placeholder).toBe('minutes')
   })
 })
