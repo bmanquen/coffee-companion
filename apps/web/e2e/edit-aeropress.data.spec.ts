@@ -14,11 +14,13 @@ test('edit an aeropress brew updates it in the log', async ({ page }) => {
   await editBrew.click()
   await expect(page).toHaveURL(/\/aeropress\/[^/]+\/edit$/)
 
-  // Change the steep time to a distinctive value and save.
-  await page.getByPlaceholder('90').fill('123')
+  // Change the steep time via minutes + seconds (seeded 90s opens as 1 / 30)
+  // and save. 2 minutes + 3 seconds is stored as 123 whole seconds.
+  await page.getByLabel('Steep Time (minutes)').fill('2')
+  await page.getByLabel('Steep Time (seconds)').fill('3')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(/\/brews$/)
   await page.getByRole('tab', { name: 'AeroPress' }).click()
-  await expect(page.getByText('123s').first()).toBeVisible()
+  await expect(page.getByText('2m 3s').first()).toBeVisible()
 })
