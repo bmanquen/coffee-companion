@@ -121,7 +121,10 @@ describe('EditFrenchpressBrew form', () => {
     render(<EditFrenchpressBrew />, { wrapper: Wrapper })
 
     // The dose/water/temp inputs and Method select are prefilled from the brew.
-    expect(screen.getByDisplayValue('30')).toBeTruthy()
+    // Dose is 30; do not use getByDisplayValue('30') — seconds is also 30.
+    expect(screen.getByPlaceholderText<HTMLInputElement>('30.0').value).toBe(
+      '30',
+    )
     expect(screen.getByDisplayValue('500')).toBeTruthy()
     expect(screen.getByDisplayValue('95')).toBeTruthy()
     expect(screen.getByDisplayValue('Standard')).toBeTruthy()
