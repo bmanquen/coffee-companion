@@ -161,6 +161,12 @@ describe('NewPouroverBrew form', () => {
       fireEvent.change(screen.getByPlaceholderText('94'), {
         target: { value: '96' },
       })
+      fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {
+        target: { value: '2' },
+      })
+      fireEvent.change(screen.getByLabelText('Brew Time (seconds)'), {
+        target: { value: '45' },
+      })
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 
@@ -171,7 +177,126 @@ describe('NewPouroverBrew form', () => {
       expect(body).toContain('20')
       expect(body).toContain('340')
       expect(body).toContain('96')
+      expect(body).toMatch(/"brewTime":165/)
       expect(body).toContain(COFFEE)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('normalizes 165 seconds alone to a brew time of 165', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response('[]', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    try {
+      const { Wrapper } = seeded()
+      render(<NewPouroverBrew />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fireEvent.change(screen.getByLabelText('Brew Time (seconds)'), {
+        target: { value: '165' },
+      })
+
+      expect(
+        screen.getByLabelText<HTMLInputElement>('Brew Time (minutes)').value,
+      ).toBe('2')
+      expect(
+        screen.getByLabelText<HTMLInputElement>('Brew Time (seconds)').value,
+      ).toBe('45')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      const [url, init] = fetchSpy.mock.calls[0]
+      expect(String(url)).toContain('pouroverBrew.create')
+      expect(String(init?.body ?? '')).toMatch(/"brewTime":165/)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('sends no brew time when both boxes are left empty', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response('[]', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    try {
+      const { Wrapper } = seeded()
+      render(<NewPouroverBrew />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(
+        screen.getByLabelText<HTMLInputElement>('Brew Time (minutes)').value,
+      ).toBe('')
+      expect(
+        screen.getByLabelText<HTMLInputElement>('Brew Time (seconds)').value,
+      ).toBe('')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      expect(String(fetchSpy.mock.calls[0][0])).toContain('pouroverBrew.create')
+      expect(String(fetchSpy.mock.calls[0][1]?.body ?? '')).toMatch(
+        /"brewTime":null/,
+      )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('counts a lone minutes or seconds box as that many minutes or seconds', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response('[]', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    try {
+      const { Wrapper } = seeded()
+      render(<NewPouroverBrew />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {
+        target: { value: '4' },
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      expect(String(fetchSpy.mock.calls[0][1]?.body ?? '')).toMatch(
+        /"brewTime":240/,
+      )
+
+      fetchSpy.mockClear()
+      fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {
+        target: { value: '' },
+      })
+      fireEvent.change(screen.getByLabelText('Brew Time (seconds)'), {
+        target: { value: '45' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      expect(String(fetchSpy.mock.calls[0][1]?.body ?? '')).toMatch(
+        /"brewTime":45/,
+      )
     } finally {
       fetchSpy.mockRestore()
     }

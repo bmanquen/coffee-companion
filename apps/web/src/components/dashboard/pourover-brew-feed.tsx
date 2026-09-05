@@ -9,6 +9,7 @@ import {
 import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
+import { formatBrewSeconds } from '@/lib/brew'
 
 const columnHelper = createColumnHelper<PouroverBrewWithRelations>()
 
@@ -40,7 +41,7 @@ const columns = [
   }),
   columnHelper.accessor('brewTime', {
     header: 'Brew',
-    cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
+    cell: (info) => formatBrewSeconds(info.getValue()),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   expanderColumn<PouroverBrewWithRelations>(),

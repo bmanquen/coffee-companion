@@ -28,3 +28,16 @@ export function formatSteepMinutes(minutes: number | null): string {
   if (mins === 0) return `${hours}h`
   return `${hours}h ${mins}m`
 }
+
+// Pour Over, French Press, and AeroPress store brew/steep time as whole
+// seconds. Render it the way it's entered — minutes and seconds, e.g. 165 ->
+// "2m 45s", 240 -> "4m", 45 -> "45s" — or "-" when unknown. Pure so it can
+// be unit tested.
+export function formatBrewSeconds(seconds: number | null): string {
+  if (seconds == null) return '-'
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  if (mins === 0) return `${secs}s`
+  if (secs === 0) return `${mins}m`
+  return `${mins}m ${secs}s`
+}
