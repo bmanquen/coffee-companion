@@ -25,10 +25,10 @@ Launch does all of this, in order:
 
 1. Refuses if `.run/state.json` already records a live pid, or if `VERIFY_PORT` (default `3000`) is taken.
 2. Runs `pnpm install --frozen-lockfile` when `node_modules` is missing.
-3. Ensures a local Postgres database named `coffee_companion_test` via `helpers/ensure-postgres.sh`. That script is **verification scaffolding**: it may install Postgres and create the throwaway database. It never touches a database that is not named `*_test`. It starts whichever cluster `pg_lsclusters` lists (the Ubuntu `postgresql` package here is 16; CI's service container is 17 — majors may differ, the throwaway `*_test` database is what matters). Auth is `VERIFY_DATABASE_URL`, or `VERIFY_DB_PASSWORD`, or an ephemeral password generated at runtime. The connection string is written to `.run/database.url` (gitignored, mode 600). Stdout is only `ok host:port/db` — never a URI with a password.
+3. Ensures a local Postgres database named `coffee_companion_test` via `helpers/ensure-postgres.sh`. That script is **verification scaffolding**: it may install Postgres and create the throwaway database. It starts whichever cluster `pg_lsclusters` lists (the Ubuntu `postgresql` package here is 16; CI's service container is 17 — majors may differ, the throwaway `*_test` database is what matters). Auth is `VERIFY_DATABASE_URL`, or `VERIFY_DB_PASSWORD`, or an ephemeral password generated at runtime. The connection string is written to `.run/database.url` (gitignored, mode 600). Stdout is only `ok host:port/db` — never a URI with a password. **Boundary (same as `packages/api/test/database.ts`):** host must be loopback (`127.0.0.1`, `localhost`, `::1`) and the database name must end with `_test`. `VERIFY_DATABASE_URL` and `VERIFY_DB_NAME` / `VERIFY_DB_HOST` are refused otherwise — a reachable non-test URL is not used.
 4. Applies migrations with `pnpm db:migrate` against that URL.
 5. Seeds the e2e bypass users (`e2e-user-with-data` on a Pro Grant, `e2e-user-free` on Free, same library). The empty identity is left unseeded.
-6. Builds `apps/web` with `pnpm --filter coffee-companion build` when `apps/web/.output/server/index.mjs` is missing.
+6. Always rebuilds `apps/web` with `pnpm --filter coffee-companion build`. Existence of `.output` is not enough: a leftover build from another branch would invalidate the proof. The production build is short (~15s here); launch does not reuse a stale artifact.
 7. Starts `node apps/web/.output/server/index.mjs` with `DATABASE_URL`, `PORT`, and `E2E_BYPASS_AUTH=true`. `BETTER_AUTH_SECRET` and `GOOGLE_CLIENT_SECRET` come from the environment or are generated for this process; they are not literals in the skill. Billing stays off (no `STRIPE_SECRET_KEY`).
 8. Waits until `GET http://127.0.0.1:$PORT` answers. Writes `.cursor/skills/verify-coffee-companion/.run/state.json`.
 
@@ -38,7 +38,7 @@ Isolation:
 
 - One verification instance at a time on a given port. A second `launch` must fail closed rather than attach to the first.
 - Side-by-side runs need both `VERIFY_PORT` and a distinct `VERIFY_DB_NAME` (still ending in `_test`). Default is to refuse, not to share.
-- Do not export a development `DATABASE_URL`. The test helper only trusts `packages/api/.env.test` or a local URL whose database name ends in `_test`.
+- Do not export a development `DATABASE_URL`. Launch refuses anything that is not loopback + `*_test`, matching `loadTestDatabaseUrl`.
 
 Human-facing `pnpm dev` (turbo, Vite on port 3000, `.env.local`) is the wrong server for this skill: no auth bypass, development data.
 
@@ -156,7 +156,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 
 | Command | What it does |
 | --- | --- |
-| `helpers/control launch` | Postgres (test DB) → migrate → seed → build → `node .output/server/index.mjs` |
+| `helpers/control launch` | Postgres (test DB, loopback + `*_test`) → migrate → seed → always rebuild → `node .output/server/index.mjs` |
 | `helpers/control doctor` | Pid, port ownership, HTTP + `Coffee Companion` marker |
 | `helpers/control seed` | `helpers/seed.mjs` → `seedE2eUsers()` |
 | `helpers/control browser …` | Playwright daemon (see Drive) |

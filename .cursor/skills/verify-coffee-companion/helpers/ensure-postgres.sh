@@ -14,6 +14,46 @@ DB_PORT="${VERIFY_DB_PORT:-5432}"
 
 log() { printf 'ensure-postgres: %s\n' "$*" >&2; }
 
+# Same boundary as packages/api/test/database.ts isLocalTestDatabase:
+# loopback host and a database name ending in _test. Seed/migrate delete rows.
+is_loopback_host() {
+  case "$1" in
+    localhost|127.0.0.1|::1|'[::1]') return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+refuse_unless_local_test() {
+  local host="$1" name="$2"
+  if ! is_loopback_host "$host" || [[ "$name" != *_test ]]; then
+    log "refusing ${host}/${name}: host must be loopback (127.0.0.1, localhost, ::1) and the database name must end with _test."
+    log "This script migrates and reseeds; a development or production URL would lose data."
+    exit 1
+  fi
+}
+
+# Parse a postgresql:// URI without printing userinfo. Node's URL.hostname
+# for IPv6 is unbracketed (::1); accept that plus the bracketed form.
+refuse_unless_local_test_url() {
+  local url="$1"
+  local parsed
+  parsed="$(
+    node --input-type=module -e '
+      const url = new URL(process.argv[1])
+      const host = url.hostname
+      const db = decodeURIComponent((url.pathname.replace(/^\//, "").split("/")[0]) ?? "")
+      process.stdout.write(`${host}\n${db}\n`)
+    ' "$url"
+  )" || {
+    log "VERIFY_DATABASE_URL is not a usable URL"
+    exit 1
+  }
+  local host name
+  host="$(printf '%s\n' "$parsed" | sed -n '1p')"
+  name="$(printf '%s\n' "$parsed" | sed -n '2p')"
+  refuse_unless_local_test "$host" "$name"
+}
+
 # $1 is a postgresql:// URI. psql accepts the URI as its first argument.
 can_connect() {
   local url="$1"
@@ -46,11 +86,18 @@ emit_ok() {
   printf 'ok %s:%s/%s\n' "$DB_HOST" "$DB_PORT" "$DB_NAME"
 }
 
-if [ -n "${VERIFY_DATABASE_URL:-}" ] && can_connect "$VERIFY_DATABASE_URL"; then
-  log "already reachable via VERIFY_DATABASE_URL at ${DB_HOST}:${DB_PORT}/${DB_NAME}"
-  emit_ok "$VERIFY_DATABASE_URL"
-  exit 0
+if [ -n "${VERIFY_DATABASE_URL:-}" ]; then
+  refuse_unless_local_test_url "$VERIFY_DATABASE_URL"
+  if can_connect "$VERIFY_DATABASE_URL"; then
+    log "already reachable via VERIFY_DATABASE_URL"
+    emit_ok "$VERIFY_DATABASE_URL"
+    exit 0
+  fi
+  log "VERIFY_DATABASE_URL passed the test-database boundary but is not reachable"
+  exit 1
 fi
+
+refuse_unless_local_test "$DB_HOST" "$DB_NAME"
 
 DB_PASSWORD="$(ephemeral_password)"
 TARGET_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
