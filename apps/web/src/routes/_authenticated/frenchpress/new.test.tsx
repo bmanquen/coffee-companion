@@ -82,12 +82,24 @@ function seeded() {
       id: FP_DEVICE,
       name: 'Chambord',
       brand: 'Bodum',
-      type: { id: 't4', userId: null, name: 'French Press', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't4',
+        userId: null,
+        name: 'French Press',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't2',
+        userId: null,
+        name: 'Espresso',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
   ])
   // The coffee's most recent brew, used for prefill.
@@ -111,7 +123,9 @@ describe('NewFrenchpressBrew form', () => {
     const { Wrapper } = seeded()
     render(<NewFrenchpressBrew />, { wrapper: Wrapper })
 
-    const deviceSelect = screen.getByRole('combobox', { name: 'Brewing Device' })
+    const deviceSelect = screen.getByRole('combobox', {
+      name: 'Brewing Device',
+    })
     expect(
       within(deviceSelect).getByRole('option', { name: 'Chambord' }),
     ).toBeTruthy()
@@ -136,14 +150,12 @@ describe('NewFrenchpressBrew form', () => {
   })
 
   it('submits a create with the entered recipe, including steep time and water temp', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
     try {
       const { Wrapper } = seeded()
       render(<NewFrenchpressBrew />, { wrapper: Wrapper })
