@@ -45,7 +45,7 @@ export function formatSteepMinutes(minutes: number | null): string {
   )
 }
 
-// Pour Over (and later French Press / AeroPress) already store seconds.
+// Pour Over and French Press (and later AeroPress) already store seconds.
 export function formatBrewSeconds(seconds: number | null): string {
   return formatApplicableParts(seconds, ['hours', 'minutes', 'seconds'], '0s')
 }

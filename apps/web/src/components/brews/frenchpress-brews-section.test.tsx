@@ -90,11 +90,63 @@ describe('FrenchpressBrewsSection', () => {
     const table = within(screen.getByRole('table'))
     expect(table.getByText('30g')).toBeTruthy() // dose
     expect(table.getByText('500g')).toBeTruthy() // water
-    expect(table.getByText('240s')).toBeTruthy() // steep time
+    expect(table.getByText('4m')).toBeTruthy() // steep time
     expect(table.getByText('30')).toBeTruthy() // grind setting
     // Water temp is no longer a summary column — it lives in the expander
     // (BrewDetails `extra`), still present in the always-rendered sub-row.
     expect(table.getByText('95°C')).toBeTruthy() // water temp
+  })
+
+  it('formats steep time as minutes and seconds on the table and card', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [
+      makeFrenchpressBrew({
+        id: 'f1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        coffeeId: 'c1',
+        steepTime: 210,
+      }),
+      makeFrenchpressBrew({
+        id: 'f2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+        coffeeId: 'c2',
+        steepTime: 240,
+      }),
+      makeFrenchpressBrew({
+        id: 'f3',
+        coffee: makeRecentCoffee({ id: 'c3', name: 'Kenya AA' }),
+        coffeeId: 'c3',
+        steepTime: 45,
+      }),
+      makeFrenchpressBrew({
+        id: 'f4',
+        coffee: makeRecentCoffee({ id: 'c4', name: 'Brazil Cerrado' }),
+        coffeeId: 'c4',
+        steepTime: null,
+      }),
+    ])
+
+    const { container } = render(<FrenchpressBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('3m 30s')).toBeTruthy()
+    expect(table.getByText('4m')).toBeTruthy()
+    expect(table.getByText('45s')).toBeTruthy()
+    expect(
+      within(table.getByText('Brazil Cerrado').closest('tr')!).getByText('-'),
+    ).toBeTruthy()
+
+    // The card summary uses the same formatter; scope to the mobile layout
+    // so we don't match the desktop table jsdom also renders.
+    const cards = container.querySelector<HTMLElement>('.lg\\:hidden')!
+    expect(within(cards).getByText('3m 30s')).toBeTruthy()
+    expect(within(cards).getByText('4m')).toBeTruthy()
+    expect(within(cards).getByText('45s')).toBeTruthy()
+    const noneCard = within(cards)
+      .getByText('Brazil Cerrado')
+      .closest('.rounded-lg') as HTMLElement
+    const steepStat = within(noneCard).getByText('Steep').closest('div') as HTMLElement
+    expect(within(steepStat).getByText('-')).toBeTruthy()
   })
 
   it('falls back to a dash for missing recipe values', () => {
