@@ -79,6 +79,29 @@ describe('MinutesSecondsInput', () => {
     expect(onChange).toHaveBeenCalledWith(null)
   })
 
+  it('folds a stored hour into the minutes box so the two fields hold the whole time', () => {
+    const { minutes, seconds } = renderInput(3661) // 1h 1m 1s
+
+    expect(minutes.value).toBe('61')
+    expect(seconds.value).toBe('1')
+  })
+
+  it('lets an edit drop a stored hour instead of keeping it hidden', () => {
+    const { minutes, onChange } = renderInput(3661) // 61m 1s in the boxes
+
+    fireEvent.change(minutes, { target: { value: '2' } })
+
+    expect(onChange).toHaveBeenCalledWith(121)
+  })
+
+  it('clears a brew time of an hour or more when the minutes box is emptied', () => {
+    const { minutes, onChange } = renderInput(3600) // 60m 0s in the boxes
+
+    fireEvent.change(minutes, { target: { value: '' } })
+
+    expect(onChange).toHaveBeenCalledWith(null)
+  })
+
   it('reports a blur from either field, so the form can validate on leave', () => {
     const { minutes, seconds, onBlur } = renderInput(60)
 
