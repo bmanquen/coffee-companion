@@ -45,6 +45,14 @@ describe('fromSeconds', () => {
       seconds: '',
     })
   })
+
+  it('shows every part empty when the stored value is not a finite number', () => {
+    expect(fromSeconds(Number.NaN)).toEqual({
+      hours: '',
+      minutes: '',
+      seconds: '',
+    })
+  })
 })
 
 describe('toSeconds', () => {
@@ -72,11 +80,17 @@ describe('toSeconds', () => {
     expect(toSeconds('', '', '165')).toBe(165)
   })
 
-  it('reads a cleared hours field as zero while minutes still holds a value', () => {
-    expect(toSeconds('', '0', '0')).toBe(0)
+  it('saves no time when leftover zeros are the only parts left', () => {
+    expect(toSeconds('', '0', '0')).toBeNull()
+    expect(toSeconds('0', '', '0')).toBeNull()
+    expect(toSeconds('', '', '0')).toBeNull()
   })
 
   it('saves no time when every box is empty', () => {
     expect(toSeconds('', '', '')).toBeNull()
+  })
+
+  it('saves no time when a box is not a finite number', () => {
+    expect(toSeconds('', 'two', '45')).toBeNull()
   })
 })

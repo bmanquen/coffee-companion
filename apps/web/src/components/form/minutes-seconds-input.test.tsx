@@ -71,13 +71,12 @@ describe('MinutesSecondsInput', () => {
     expect(onChange).toHaveBeenCalledWith(165)
   })
 
-  it('reads a cleared minutes field as zero while seconds still holds a value', () => {
+  it('sends no brew time when minutes is cleared and seconds is only a leftover zero', () => {
     const { minutes, onChange } = renderInput(120) // seconds renders as '0'
 
     fireEvent.change(minutes, { target: { value: '' } })
 
-    // '0' is not empty, so this is zero minutes — not "no brew time".
-    expect(onChange).toHaveBeenCalledWith(0)
+    expect(onChange).toHaveBeenCalledWith(null)
   })
 
   it('reports a blur from either field, so the form can validate on leave', () => {
