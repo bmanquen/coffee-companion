@@ -1,3 +1,4 @@
+import { durationInputClassName } from '@/components/form/duration-input'
 import { Field, FieldContent, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { fromSeconds, toSeconds } from '@/lib/duration'
@@ -41,6 +42,7 @@ export function MinutesSecondsInput({
             type="number"
             inputMode="numeric"
             placeholder="2 min"
+            className={durationInputClassName}
             value={minutes}
             onBlur={onBlur}
             onChange={(e) => setTime(e.target.value, seconds)}
@@ -50,6 +52,7 @@ export function MinutesSecondsInput({
             type="number"
             inputMode="numeric"
             placeholder="45 sec"
+            className={durationInputClassName}
             value={seconds}
             onBlur={onBlur}
             onChange={(e) => setTime(minutes, e.target.value)}
