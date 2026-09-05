@@ -1,5 +1,6 @@
 import { Field, FieldContent, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { combineDurationFields, splitDurationFields } from '@/lib/duration'
 
 // Two inputs (minutes + seconds) that together edit a brew time stored as
 // whole seconds. Pour Over, French Press, and AeroPress are spoken in m + s
@@ -18,14 +19,9 @@ export function MinutesSecondsInput({
   onChange: (seconds: number | null) => void
   onBlur: () => void
 }) {
-  const minutes = value === null ? '' : Math.floor(value / 60).toString()
-  const seconds = value === null ? '' : (value % 60).toString()
+  const { major: minutes, minor: seconds } = splitDurationFields(value)
   const setTime = (m: string, s: string) => {
-    if (m === '' && s === '') {
-      onChange(null)
-      return
-    }
-    onChange((m === '' ? 0 : Number(m)) * 60 + (s === '' ? 0 : Number(s)))
+    onChange(combineDurationFields(m, s))
   }
   const minutesId = `${label.replace(/\s+/g, '-').toLowerCase()}-minutes`
 

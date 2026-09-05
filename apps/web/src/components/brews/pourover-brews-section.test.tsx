@@ -144,8 +144,8 @@ describe('PouroverBrewsSection', () => {
     expect(within(cards).getByText('45s')).toBeTruthy()
     const noneCard = within(cards)
       .getByText('Brazil Cerrado')
-      .closest('.rounded-lg')!
-    const brewStat = within(noneCard).getByText('Brew').closest('div')!
+      .closest('.rounded-lg') as HTMLElement
+    const brewStat = within(noneCard).getByText('Brew').closest('div') as HTMLElement
     expect(within(brewStat).getByText('-')).toBeTruthy()
   })
 
