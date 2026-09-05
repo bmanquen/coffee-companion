@@ -175,7 +175,6 @@ function NewAeropressBrew() {
           {(field) => (
             <field.TextField
               label="Steep Time (s)"
-              placeholder="seconds"
               type="number"
             />
           )}

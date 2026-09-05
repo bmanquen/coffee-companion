@@ -170,7 +170,6 @@ function EditPouroverBrew() {
           {(field) => (
             <field.TextField
               label="Water Temp (°C)"
-              placeholder="°C"
               type="number"
             />
           )}

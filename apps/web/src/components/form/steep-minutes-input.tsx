@@ -30,7 +30,6 @@ export function SteepMinutesInput({
             aria-label="Steep Time (hours)"
             type="number"
             inputMode="numeric"
-            placeholder="hours"
             value={hours}
             onBlur={onBlur}
             onChange={(e) => setSteep(e.target.value, minutes)}
@@ -39,7 +38,6 @@ export function SteepMinutesInput({
             aria-label="Steep Time (minutes)"
             type="number"
             inputMode="numeric"
-            placeholder="minutes"
             value={minutes}
             onBlur={onBlur}
             onChange={(e) => setSteep(hours, e.target.value)}

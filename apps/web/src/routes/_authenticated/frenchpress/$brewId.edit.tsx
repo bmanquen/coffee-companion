@@ -165,7 +165,6 @@ function EditFrenchpressBrew() {
           {(field) => (
             <field.TextField
               label="Steep Time (s)"
-              placeholder="seconds"
               type="number"
             />
           )}
@@ -174,7 +173,6 @@ function EditFrenchpressBrew() {
           {(field) => (
             <field.TextField
               label="Water Temp (°C)"
-              placeholder="°C"
               type="number"
             />
           )}
