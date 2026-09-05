@@ -129,7 +129,6 @@ function NewColdBrewBrew() {
           {(field) => (
             <field.TextField
               label="Dose (g)"
-              placeholder="grams"
               type="number"
               step="any"
               inputMode="decimal"
@@ -140,7 +139,6 @@ function NewColdBrewBrew() {
           {(field) => (
             <field.TextField
               label="Water (g)"
-              placeholder="grams"
               type="number"
               step="any"
               inputMode="decimal"
