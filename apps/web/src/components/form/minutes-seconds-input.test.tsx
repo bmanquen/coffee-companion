@@ -121,7 +121,7 @@ describe('MinutesSecondsInput', () => {
   it('hints the unit instead of an example time', () => {
     const { minutes, seconds } = renderInput(null)
 
-    expect(minutes.placeholder).toBe('min')
-    expect(seconds.placeholder).toBe('sec')
+    expect(minutes.placeholder).toBe('minutes')
+    expect(seconds.placeholder).toBe('seconds')
   })
 })

@@ -31,7 +31,7 @@ export function SteepMinutesInput({
             aria-label="Steep Time (hours)"
             type="number"
             inputMode="numeric"
-            placeholder="hr"
+            placeholder="hours"
             className={durationInputClassName}
             value={hours}
             onBlur={onBlur}
@@ -41,7 +41,7 @@ export function SteepMinutesInput({
             aria-label="Steep Time (minutes)"
             type="number"
             inputMode="numeric"
-            placeholder="min"
+            placeholder="minutes"
             className={durationInputClassName}
             value={minutes}
             onBlur={onBlur}

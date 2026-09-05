@@ -130,7 +130,7 @@ function NewEspressoShot() {
           {(field) => (
             <field.TextField
               label="Dose (g)"
-              placeholder="g"
+              placeholder="grams"
               type="number"
               step="any"
               inputMode="decimal"
@@ -141,7 +141,7 @@ function NewEspressoShot() {
           {(field) => (
             <field.TextField
               label="Yield (g)"
-              placeholder="g"
+              placeholder="grams"
               type="number"
               step="any"
               inputMode="decimal"
@@ -150,7 +150,7 @@ function NewEspressoShot() {
         </form.AppField>
         <form.AppField name="time">
           {(field) => (
-            <field.TextField label="Time (s)" placeholder="s" type="number" />
+            <field.TextField label="Time (s)" placeholder="seconds" type="number" />
           )}
         </form.AppField>
         <form.AppField name="grindSetting">
