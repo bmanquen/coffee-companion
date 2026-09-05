@@ -6,7 +6,8 @@ import { fromSeconds, toSeconds } from '@/lib/duration'
 // whole seconds. fromSeconds fills the boxes; toSeconds is what the mutation
 // sends. Hours are folded into the minutes box so a value past 60 minutes
 // stays fully editable — this UI has no hours field. The caller supplies
-// the label.
+// the label. Placeholders name the timeframe: one visible label covers both
+// boxes, so the omit-if-echoes-label rule does not apply here.
 export function MinutesSecondsInput({
   label,
   value,
@@ -40,6 +41,7 @@ export function MinutesSecondsInput({
             aria-label={`${label} (minutes)`}
             type="number"
             inputMode="numeric"
+            placeholder="minutes"
             value={minutes}
             onBlur={onBlur}
             onChange={(e) => setTime(e.target.value, seconds)}
@@ -48,6 +50,7 @@ export function MinutesSecondsInput({
             aria-label={`${label} (seconds)`}
             type="number"
             inputMode="numeric"
+            placeholder="seconds"
             value={seconds}
             onBlur={onBlur}
             onChange={(e) => setTime(minutes, e.target.value)}

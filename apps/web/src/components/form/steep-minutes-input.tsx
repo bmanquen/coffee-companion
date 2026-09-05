@@ -4,7 +4,8 @@ import { fromSeconds, toSeconds } from '@/lib/duration'
 
 // Hours + minutes boxes for Cold Brew. The column is still whole minutes
 // (no migration); this input converts at the edge: minutes × 60 into
-// fromSeconds / toSeconds, then back to minutes for the form.
+// fromSeconds / toSeconds, then back to minutes for the form. Placeholders
+// name the timeframe: one visible label covers both boxes.
 export function SteepMinutesInput({
   value,
   onChange,
@@ -30,6 +31,7 @@ export function SteepMinutesInput({
             aria-label="Steep Time (hours)"
             type="number"
             inputMode="numeric"
+            placeholder="hours"
             value={hours}
             onBlur={onBlur}
             onChange={(e) => setSteep(e.target.value, minutes)}
@@ -38,6 +40,7 @@ export function SteepMinutesInput({
             aria-label="Steep Time (minutes)"
             type="number"
             inputMode="numeric"
+            placeholder="minutes"
             value={minutes}
             onBlur={onBlur}
             onChange={(e) => setSteep(hours, e.target.value)}
