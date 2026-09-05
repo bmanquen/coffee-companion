@@ -14,7 +14,7 @@ describe('fromSeconds', () => {
     })
   })
 
-  it('splits a whole-minute pour over into minutes and zero seconds', () => {
+  it('splits a whole-minute Pour Over into minutes and zero seconds', () => {
     expect(fromSeconds(240)).toEqual({
       hours: '0',
       minutes: '4',

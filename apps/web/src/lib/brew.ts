@@ -18,24 +18,34 @@ export function daysOffRoast(
   return days < 0 ? 0 : days
 }
 
-function formatFromSeconds(total: number | null): string {
+// Collapse empty higher units from a fromSeconds breakdown. `units` is which
+// parts are applicable (Cold Brew: hours + minutes; Pour Over: all three).
+function formatApplicableParts(
+  total: number | null,
+  units: ReadonlyArray<'hours' | 'minutes' | 'seconds'>,
+  zero: string,
+): string {
   if (total == null) return '-'
-  const { hours, minutes, seconds } = fromSeconds(total)
-  const parts = [
-    Number(hours) && `${Number(hours)}h`,
-    Number(minutes) && `${Number(minutes)}m`,
-    Number(seconds) && `${Number(seconds)}s`,
-  ].filter(Boolean)
-  return parts.length === 0 ? '0s' : parts.join(' ')
+  const parts = fromSeconds(total)
+  const suffix = { hours: 'h', minutes: 'm', seconds: 's' } as const
+  const shown = units
+    .map((unit) => Number(parts[unit]) && `${Number(parts[unit])}${suffix[unit]}`)
+    .filter(Boolean)
+  return shown.length === 0 ? zero : shown.join(' ')
 }
 
-// Cold brew's column is still whole minutes (#85: no migration). Convert to
-// seconds at this edge, then collapse the fromSeconds parts (18h, 1h 30m).
+// Cold Brew's column is still whole minutes (#85: no migration). Convert to
+// seconds at this edge, then show only the applicable hours + minutes parts
+// (18h, 1h 30m, 0m — never seconds).
 export function formatSteepMinutes(minutes: number | null): string {
-  return formatFromSeconds(minutes == null ? null : minutes * 60)
+  return formatApplicableParts(
+    minutes == null ? null : minutes * 60,
+    ['hours', 'minutes'],
+    '0m',
+  )
 }
 
 // Pour Over (and later French Press / AeroPress) already store seconds.
 export function formatBrewSeconds(seconds: number | null): string {
-  return formatFromSeconds(seconds)
+  return formatApplicableParts(seconds, ['hours', 'minutes', 'seconds'], '0s')
 }

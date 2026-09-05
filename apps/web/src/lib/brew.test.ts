@@ -32,6 +32,10 @@ describe('formatSteepMinutes', () => {
     expect(formatSteepMinutes(45)).toBe('45m')
   })
 
+  it('renders a zero steep as minutes, not seconds', () => {
+    expect(formatSteepMinutes(0)).toBe('0m')
+  })
+
   it('is a dash when unknown', () => {
     expect(formatSteepMinutes(null)).toBe('-')
   })
@@ -48,6 +52,10 @@ describe('formatBrewSeconds', () => {
 
   it('renders sub-minute times as seconds only', () => {
     expect(formatBrewSeconds(45)).toBe('45s')
+  })
+
+  it('renders a zero brew time as seconds', () => {
+    expect(formatBrewSeconds(0)).toBe('0s')
   })
 
   it('is a dash when unknown', () => {
