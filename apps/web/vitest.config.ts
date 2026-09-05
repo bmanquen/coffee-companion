@@ -25,9 +25,9 @@ export default defineConfig({
         'src/router.tsx', // router setup (wiring)
         'src/client.tsx',
         'src/server.ts',
-        'src/start.ts',
         'src/instrument.client.ts',
         'src/instrument.server.ts',
+        'src/lib/sentry-client-report.ts',
         'src/lib/auth-client.ts', // better-auth client config (wiring)
         'src/lib/request-headers.ts', // isomorphic SSR header helper (wiring)
       ],

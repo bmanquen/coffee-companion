@@ -2,10 +2,10 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { RootError } from './root-error'
 
-const captureException = vi.fn()
+const reportClientError = vi.fn()
 
-vi.mock('@sentry/tanstackstart-react', () => ({
-  captureException: (...args: Array<unknown>) => captureException(...args),
+vi.mock('@/lib/sentry-client-report', () => ({
+  reportClientError: (...args: Array<unknown>) => reportClientError(...args),
 }))
 
 describe('RootError', () => {
@@ -17,6 +17,6 @@ describe('RootError', () => {
     expect(
       screen.getByRole('heading', { name: 'Something went wrong' }),
     ).toBeTruthy()
-    expect(captureException).toHaveBeenCalledWith(error)
+    expect(reportClientError).toHaveBeenCalledWith(error)
   })
 })
