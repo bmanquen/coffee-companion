@@ -21,6 +21,11 @@ function sentrySourceMaps() {
 // bundled by Nitro's Rollup pass — the dual client/server export map
 // crashes getVariableForExportName. Leave them as Node builtins of the
 // output so `node .output/server/index.mjs` loads them from node_modules.
+//
+// better-auth starts importing @opentelemetry/semantic-conventions once
+// Sentry brings @opentelemetry/api onto the graph. The SSR router leaves
+// that import bare, so the package is a direct apps/web dependency —
+// otherwise Node cannot resolve it from .output/server/_ssr.
 const sentryServerExternals = [
   /^@sentry\//,
   /^@opentelemetry\//,
