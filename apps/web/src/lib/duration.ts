@@ -3,7 +3,7 @@
 // Both pairs are 60-based, so split, combine, overflow, empty-versus-zero,
 // and the collapsing display rule live here once.
 
-function parts(total: number): { major: number; minor: number } {
+function splitSixty(total: number): { major: number; minor: number } {
   return { major: Math.floor(total / 60), minor: total % 60 }
 }
 
@@ -14,7 +14,7 @@ export function splitDurationFields(total: number | null): {
   minor: string
 } {
   if (total === null) return { major: '', minor: '' }
-  const { major, minor } = parts(total)
+  const { major, minor } = splitSixty(total)
   return { major: major.toString(), minor: minor.toString() }
 }
 
@@ -36,7 +36,7 @@ export function formatDuration(
   units: { major: string; minor: string },
 ): string {
   if (total == null) return '-'
-  const { major, minor } = parts(total)
+  const { major, minor } = splitSixty(total)
   if (major === 0) return `${minor}${units.minor}`
   if (minor === 0) return `${major}${units.major}`
   return `${major}${units.major} ${minor}${units.minor}`
