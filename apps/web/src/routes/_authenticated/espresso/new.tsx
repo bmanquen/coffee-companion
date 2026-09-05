@@ -148,7 +148,7 @@ function NewEspressoShot() {
         </form.AppField>
         <form.AppField name="time">
           {(field) => (
-            <field.TextField label="Time (s)" placeholder="seconds" type="number" />
+            <field.TextField label="Time (s)" type="number" />
           )}
         </form.AppField>
         <form.AppField name="grindSetting">

@@ -40,7 +40,6 @@ export function MinutesSecondsInput({
             aria-label={`${label} (minutes)`}
             type="number"
             inputMode="numeric"
-            placeholder="minutes"
             value={minutes}
             onBlur={onBlur}
             onChange={(e) => setTime(e.target.value, seconds)}
@@ -49,7 +48,6 @@ export function MinutesSecondsInput({
             aria-label={`${label} (seconds)`}
             type="number"
             inputMode="numeric"
-            placeholder="seconds"
             value={seconds}
             onBlur={onBlur}
             onChange={(e) => setTime(minutes, e.target.value)}
