@@ -1,4 +1,3 @@
-import { durationInputClassName } from '@/components/form/duration-input'
 import { Field, FieldContent, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { fromSeconds, toSeconds } from '@/lib/duration'
@@ -32,7 +31,6 @@ export function SteepMinutesInput({
             type="number"
             inputMode="numeric"
             placeholder="hours"
-            className={durationInputClassName}
             value={hours}
             onBlur={onBlur}
             onChange={(e) => setSteep(e.target.value, minutes)}
@@ -42,7 +40,6 @@ export function SteepMinutesInput({
             type="number"
             inputMode="numeric"
             placeholder="minutes"
-            className={durationInputClassName}
             value={minutes}
             onBlur={onBlur}
             onChange={(e) => setSteep(hours, e.target.value)}
