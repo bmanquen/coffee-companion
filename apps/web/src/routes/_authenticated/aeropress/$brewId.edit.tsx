@@ -138,7 +138,7 @@ function EditAeropressBrew() {
           {(field) => (
             <field.TextField
               label="Dose (g)"
-              placeholder="15.0"
+              placeholder="g"
               type="number"
               step="any"
               inputMode="decimal"
@@ -149,7 +149,7 @@ function EditAeropressBrew() {
           {(field) => (
             <field.TextField
               label="Water (g)"
-              placeholder="220"
+              placeholder="g"
               type="number"
               step="any"
               inputMode="decimal"
@@ -160,14 +160,14 @@ function EditAeropressBrew() {
           {(field) => (
             <field.TextField
               label="Steep Time (s)"
-              placeholder="90"
+              placeholder="s"
               type="number"
             />
           )}
         </form.AppField>
         <form.AppField name="grindSetting">
           {(field) => (
-            <field.TextField label="Grind Setting" placeholder="e.g. 18" />
+            <field.TextField label="Grind Setting" />
           )}
         </form.AppField>
         <form.AppField name="notes">

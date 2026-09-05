@@ -152,13 +152,13 @@ describe('NewPouroverBrew form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
-      fireEvent.change(screen.getByPlaceholderText('18.0'), {
+      fireEvent.change(screen.getByLabelText('Dose (g)'), {
         target: { value: '20' },
       })
-      fireEvent.change(screen.getByPlaceholderText('300'), {
+      fireEvent.change(screen.getByLabelText('Water (g)'), {
         target: { value: '340' },
       })
-      fireEvent.change(screen.getByPlaceholderText('94'), {
+      fireEvent.change(screen.getByLabelText('Water Temp (°C)'), {
         target: { value: '96' },
       })
       fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {

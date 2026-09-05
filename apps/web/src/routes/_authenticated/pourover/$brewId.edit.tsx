@@ -140,7 +140,7 @@ function EditPouroverBrew() {
           {(field) => (
             <field.TextField
               label="Dose (g)"
-              placeholder="18.0"
+              placeholder="g"
               type="number"
               step="any"
               inputMode="decimal"
@@ -151,7 +151,7 @@ function EditPouroverBrew() {
           {(field) => (
             <field.TextField
               label="Water (g)"
-              placeholder="300"
+              placeholder="g"
               type="number"
               step="any"
               inputMode="decimal"
@@ -172,14 +172,14 @@ function EditPouroverBrew() {
           {(field) => (
             <field.TextField
               label="Water Temp (°C)"
-              placeholder="94"
+              placeholder="°C"
               type="number"
             />
           )}
         </form.AppField>
         <form.AppField name="grindSetting">
           {(field) => (
-            <field.TextField label="Grind Setting" placeholder="e.g. 22" />
+            <field.TextField label="Grind Setting" />
           )}
         </form.AppField>
         <form.AppField name="notes">

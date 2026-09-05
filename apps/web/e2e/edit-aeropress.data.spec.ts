@@ -15,7 +15,7 @@ test('edit an aeropress brew updates it in the log', async ({ page }) => {
   await expect(page).toHaveURL(/\/aeropress\/[^/]+\/edit$/)
 
   // Change the steep time to a distinctive value and save.
-  await page.getByPlaceholder('90').fill('123')
+  await page.getByLabel('Steep Time (s)').fill('123')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(/\/brews$/)

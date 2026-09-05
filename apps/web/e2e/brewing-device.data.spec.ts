@@ -7,8 +7,8 @@ import type { Page } from '@playwright/test'
 
 async function createDevice(page: Page, name: string) {
   await page.goto('/equipment/brewing-devices/new')
-  await page.getByPlaceholder('e.g. Linea Mini').fill(name)
-  await page.getByPlaceholder('e.g. La Marzocco').fill('Test Brand')
+  await page.getByLabel('Name').fill(name)
+  await page.getByLabel('Brand').fill('Test Brand')
 
   // Type SearchSelect — pick the seeded Espresso type. Scope to the dropdown
   // option so we match the type, not any other "Espresso" text on the page.
@@ -39,7 +39,7 @@ test('edit a brewing device updates its name in the list', async ({ page }) => {
     page.getByRole('heading', { name: 'Edit Brewing Device' }),
   ).toBeVisible()
 
-  await page.getByPlaceholder('e.g. Linea Mini').fill(updated)
+  await page.getByLabel('Name').fill(updated)
   await page.getByRole('button', { name: 'Save' }).click()
 
   await expect(page).toHaveURL(/\/equipment$/)

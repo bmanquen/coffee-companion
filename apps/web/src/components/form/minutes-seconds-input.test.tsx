@@ -117,4 +117,11 @@ describe('MinutesSecondsInput', () => {
     expect(minutes.className).toContain('placeholder:text-muted-foreground/40')
     expect(seconds.className).toContain('placeholder:text-muted-foreground/40')
   })
+
+  it('hints the unit instead of an example time', () => {
+    const { minutes, seconds } = renderInput(null)
+
+    expect(minutes.placeholder).toBe('min')
+    expect(seconds.placeholder).toBe('sec')
+  })
 })

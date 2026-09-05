@@ -58,12 +58,12 @@ function NewGrinder() {
       >
         <form.AppField name="name">
           {(field) => (
-            <field.TextField label="Name" placeholder="e.g. Niche Zero" />
+            <field.TextField label="Name" placeholder="name" />
           )}
         </form.AppField>
         <form.AppField name="brand">
           {(field) => (
-            <field.TextField label="Brand" placeholder="e.g. Niche" />
+            <field.TextField label="Brand" placeholder="brand" />
           )}
         </form.AppField>
         {limitMessage && <PlanLimitNotice message={limitMessage} />}

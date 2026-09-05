@@ -129,7 +129,7 @@ function NewColdBrewBrew() {
           {(field) => (
             <field.TextField
               label="Dose (g)"
-              placeholder="50.0"
+              placeholder="g"
               type="number"
               step="any"
               inputMode="decimal"
@@ -140,7 +140,7 @@ function NewColdBrewBrew() {
           {(field) => (
             <field.TextField
               label="Water (g)"
-              placeholder="500"
+              placeholder="g"
               type="number"
               step="any"
               inputMode="decimal"
@@ -180,7 +180,7 @@ function NewColdBrewBrew() {
         </form.AppField>
         <form.AppField name="grindSetting">
           {(field) => (
-            <field.TextField label="Grind Setting" placeholder="e.g. coarse" />
+            <field.TextField label="Grind Setting" />
           )}
         </form.AppField>
         <form.AppField name="notes">

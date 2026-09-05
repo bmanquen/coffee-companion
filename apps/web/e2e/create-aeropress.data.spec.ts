@@ -17,8 +17,8 @@ test('log an aeropress brew via the new-brew form', async ({ page }) => {
   await expect(page.getByText('Niche Zero', { exact: true })).toBeVisible()
   await expect(page.getByText('AeroPress Go', { exact: true })).toBeVisible()
 
-  await page.getByPlaceholder('15.0').fill('15')
-  await page.getByPlaceholder('220').fill('220')
+  await page.getByLabel('Dose (g)').fill('15')
+  await page.getByLabel('Water (g)').fill('220')
 
   await page.getByRole('button', { name: 'Log', exact: true }).click()
 

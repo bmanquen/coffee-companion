@@ -7,8 +7,8 @@ import type { Page } from '@playwright/test'
 
 async function createGrinder(page: Page, name: string) {
   await page.goto('/equipment/grinders/new')
-  await page.getByPlaceholder('e.g. Niche Zero').fill(name)
-  await page.getByPlaceholder('e.g. Niche', { exact: true }).fill('Test Brand')
+  await page.getByLabel('Name').fill(name)
+  await page.getByLabel('Brand').fill('Test Brand')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/equipment$/)
   // Grinders is the default tab. Match exactly: the mobile card also renders the
@@ -32,7 +32,7 @@ test('edit a grinder updates its name in the list', async ({ page }) => {
     page.getByRole('heading', { name: 'Edit Grinder' }),
   ).toBeVisible()
 
-  await page.getByPlaceholder('e.g. Niche Zero').fill(updated)
+  await page.getByLabel('Name').fill(updated)
   await page.getByRole('button', { name: 'Save' }).click()
 
   await expect(page).toHaveURL(/\/equipment$/)

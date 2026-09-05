@@ -110,9 +110,9 @@ test('an off-Shelf coffee is still loggable, and the new brew reads straight awa
   await pick(page, 'grinderId', FREE_GEAR.grinder)
   await pick(page, 'brewingDeviceId', FREE_GEAR.brewingDevice)
 
-  await page.getByPlaceholder('18.0').fill('18')
-  await page.getByPlaceholder('36.0').fill('36')
-  await page.getByPlaceholder('e.g. 2.5').fill(grindSetting)
+  await page.getByLabel('Dose (g)').fill('18')
+  await page.getByLabel('Yield (g)').fill('36')
+  await page.getByLabel('Grind Setting').fill(grindSetting)
 
   await page.getByRole('button', { name: 'Log', exact: true }).click()
   await expect(page).toHaveURL(/\/brews$/)
