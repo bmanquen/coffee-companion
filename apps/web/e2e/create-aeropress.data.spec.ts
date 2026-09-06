@@ -19,7 +19,8 @@ test('log an aeropress brew via the new-brew form', async ({ page }) => {
 
   await page.getByLabel('Dose (g)').fill('15')
   await page.getByLabel('Water (g)').fill('220')
-  await page.getByLabel('Steep Time (s)').fill('90')
+  await page.getByLabel('Steep Time (minutes)').fill('1')
+  await page.getByLabel('Steep Time (seconds)').fill('30')
   await page.getByLabel('Grind Setting').fill('18')
 
   await page.getByRole('button', { name: 'Log', exact: true }).click()
