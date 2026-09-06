@@ -160,7 +160,7 @@ function EditPouroverBrew() {
           {(field) => (
             <MinutesSecondsInput
               label="Brew Time"
-              value={field.state.value ?? null}
+              value={field.state.value}
               onChange={(seconds) => field.handleChange(seconds as never)}
               onBlur={field.handleBlur}
             />

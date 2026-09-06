@@ -6,8 +6,8 @@ import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import {
   batchedCallerFor,
   callerFor,
-  deviceTypes,
   createCoffeeFor,
+  deviceTypes,
   expireGrants,
   grantPlan,
   seedUsers,
