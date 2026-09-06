@@ -142,11 +142,13 @@ describe('EditFrenchpressBrew form', () => {
 
     // The dose/water/temp inputs and Method select are prefilled from the brew.
     // Dose is 30; do not use getByDisplayValue('30') — seconds is also 30.
-    expect(screen.getByPlaceholderText<HTMLInputElement>('30.0').value).toBe(
-      '30',
+    expect(screen.getByLabelText<HTMLInputElement>(/^Dose/).value).toBe('30')
+    expect(screen.getByLabelText<HTMLInputElement>(/^Water \(g\)/).value).toBe(
+      '500',
     )
-    expect(screen.getByDisplayValue('500')).toBeTruthy()
-    expect(screen.getByDisplayValue('95')).toBeTruthy()
+    expect(screen.getByLabelText<HTMLInputElement>(/^Water Temp/).value).toBe(
+      '95',
+    )
     expect(screen.getByDisplayValue('Standard')).toBeTruthy()
     // 210 seconds is entered as minutes + seconds, not a raw seconds box.
     expect(
