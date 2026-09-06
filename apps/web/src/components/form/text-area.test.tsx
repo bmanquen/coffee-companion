@@ -78,7 +78,9 @@ describe('TextArea', () => {
   it('keeps the label reachable when it is visually hidden', () => {
     render(<DescribedHarness showLabel={false} />)
 
-    expect(screen.getByText('Notes').className).toContain('sr-only')
+    expect(
+      screen.getByText('Notes').closest('[data-slot="field-label"]')?.className,
+    ).toContain('sr-only')
     expect(screen.getByLabelText('Notes')).toBeTruthy()
   })
 })

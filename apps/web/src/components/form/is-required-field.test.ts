@@ -9,8 +9,8 @@ import {
   insertPouroverBrewSchema,
 } from '@coffee-companion/api/db/zod'
 import { describe, expect, it } from 'vitest'
-import { isRequiredField, isRequiredSchema } from './is-required-field'
 import { z } from 'zod'
+import { isRequiredField, isRequiredSchema } from './is-required-field'
 
 describe('isRequiredSchema', () => {
   it('treats a min-length string as required', () => {

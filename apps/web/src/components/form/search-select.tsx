@@ -1,5 +1,7 @@
 import { CheckIcon, ChevronDownIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
+import { FormLabel } from './form-label'
+import { useFieldRequired } from './use-field-required'
 import {
   Command,
   CommandEmpty,
@@ -9,8 +11,6 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command'
-import { FormLabel } from './form-label'
-import { useFieldRequired } from './use-field-required'
 import {
   Field,
   FieldContent,
