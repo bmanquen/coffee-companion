@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MinutesSecondsInput } from './minutes-seconds-input'
+import { useAppForm } from '@/hooks/form'
 
 // The value is stored as whole seconds but entered as minutes + seconds, so the
 // conversion is the thing worth pinning: a pour over of 2:45 must not become
@@ -8,14 +9,22 @@ import { MinutesSecondsInput } from './minutes-seconds-input'
 function renderInput(value: number | null) {
   const onChange = vi.fn()
   const onBlur = vi.fn()
-  render(
-    <MinutesSecondsInput
-      label="Brew Time"
-      value={value}
-      onChange={onChange}
-      onBlur={onBlur}
-    />,
-  )
+  function Harness() {
+    const form = useAppForm({ defaultValues: { brewTime: value } })
+    return (
+      <form.AppField name="brewTime">
+        {() => (
+          <MinutesSecondsInput
+            label="Brew Time"
+            value={value}
+            onChange={onChange}
+            onBlur={onBlur}
+          />
+        )}
+      </form.AppField>
+    )
+  }
+  render(<Harness />)
   return {
     onChange,
     onBlur,

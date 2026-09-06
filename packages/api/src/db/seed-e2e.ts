@@ -15,6 +15,7 @@ import {
   espressoShots,
   grinders,
   planGrants,
+  roastLevels,
   roasters,
   user,
 } from './schema'
@@ -25,6 +26,20 @@ const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS)
 
 // Device types are globally-unique system defaults (null userId); reuse or
 // create so repeated runs don't collide on the unique name.
+async function roastLevelId(name: string) {
+  const existing = await db
+    .select()
+    .from(roastLevels)
+    .where(eq(roastLevels.name, name))
+  if (existing[0]) return existing[0].id
+
+  const [created] = await db
+    .insert(roastLevels)
+    .values({ name })
+    .returning()
+  return created.id
+}
+
 async function deviceTypeId(name: string) {
   const existing = await db
     .select()
@@ -106,6 +121,7 @@ async function seedGrantedUser() {
   await seedLibrary(E2E_USER_WITH_DATA, grinder.id, device.id)
 
   await db.insert(roasters).values({ userId: E2E_USER_WITH_DATA, name: 'Sey' })
+  await roastLevelId('Medium')
 
   // Brewed now, against a library brewed days ago, so this stays the most
   // recent Shot. The other `.data` specs read it as the log's first row, so

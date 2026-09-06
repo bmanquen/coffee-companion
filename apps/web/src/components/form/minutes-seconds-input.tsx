@@ -1,4 +1,5 @@
 import { FormLabel } from './form-label'
+import { useFieldRequired } from './use-field-required'
 import { Field, FieldContent } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { fromSeconds, toSeconds } from '@/lib/duration'
@@ -31,10 +32,13 @@ export function MinutesSecondsInput({
     onChange(toSeconds('', m, s))
   }
   const minutesId = `${label.replace(/\s+/g, '-').toLowerCase()}-minutes`
+  const required = useFieldRequired()
 
   return (
     <Field>
-      <FormLabel htmlFor={minutesId}>{label}</FormLabel>
+      <FormLabel htmlFor={minutesId} required={required}>
+        {label}
+      </FormLabel>
       <FieldContent>
         <div className="flex gap-2">
           <Input
@@ -46,6 +50,7 @@ export function MinutesSecondsInput({
             value={minutes}
             onBlur={onBlur}
             onChange={(e) => setTime(e.target.value, seconds)}
+            aria-required={required || undefined}
           />
           <Input
             aria-label={`${label} (seconds)`}
@@ -55,6 +60,7 @@ export function MinutesSecondsInput({
             value={seconds}
             onBlur={onBlur}
             onChange={(e) => setTime(minutes, e.target.value)}
+            aria-required={required || undefined}
           />
         </div>
       </FieldContent>

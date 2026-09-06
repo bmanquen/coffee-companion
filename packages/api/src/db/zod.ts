@@ -88,6 +88,8 @@ export type GreenCoffee = z.infer<typeof selectGreenCoffeeSchema>
 // Coffees
 export const insertCoffeeSchema = createInsertSchema(coffees, {
   name: (schema) => schema.min(1),
+  roasterId: () => z.uuid('Select a roaster'),
+  roastLevelId: () => z.uuid('Select a roast level'),
 }).omit({ id: true, userId: true })
 export const selectCoffeeSchema = createSelectSchema(coffees)
 export type InsertCoffee = z.infer<typeof insertCoffeeSchema>
@@ -128,15 +130,26 @@ export type BrewingDevice = z.infer<typeof selectBrewingDeviceSchema>
 
 // Accepts an integer or decimal string, e.g. "16", "36.5", "2.5"
 const decimalString = () =>
+  z.string().regex(/^\d+(\.\d+)?$/, 'Must be a number')
+
+// Recipe integers (seconds, minutes, °C). Text fields send numeric strings;
+// duration inputs and tRPC callers send numbers. Null/blank still fail.
+const requiredInt = () =>
   z
-    .string()
-    .regex(/^\d+(\.\d+)?$/, 'Must be a number')
-    .nullish()
+    .union([
+      z.number({ error: 'Required' }).int(),
+      z.string().regex(/^-?\d+$/, 'Must be a whole number'),
+    ])
+    .transform((value) => (typeof value === 'string' ? Number(value) : value))
+
+const requiredGrindSetting = () => z.string().min(1)
 
 // Espresso Shots
 export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
   dose: decimalString,
   yield: decimalString,
+  time: requiredInt,
+  grindSetting: requiredGrindSetting,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
@@ -162,6 +175,8 @@ export type AeropressMethod = z.infer<typeof selectAeropressMethodSchema>
 export const insertAeropressBrewSchema = createInsertSchema(aeropressBrews, {
   dose: decimalString,
   water: decimalString,
+  steepTime: requiredInt,
+  grindSetting: requiredGrindSetting,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
@@ -188,6 +203,9 @@ export type PouroverMethod = z.infer<typeof selectPouroverMethodSchema>
 export const insertPouroverBrewSchema = createInsertSchema(pouroverBrews, {
   dose: decimalString,
   water: decimalString,
+  brewTime: requiredInt,
+  waterTemp: requiredInt,
+  grindSetting: requiredGrindSetting,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
@@ -220,6 +238,9 @@ export type FrenchpressMethod = z.infer<typeof selectFrenchpressMethodSchema>
 export const insertFrenchpressBrewSchema = createInsertSchema(frenchpressBrews, {
   dose: decimalString,
   water: decimalString,
+  steepTime: requiredInt,
+  waterTemp: requiredInt,
+  grindSetting: requiredGrindSetting,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
@@ -236,10 +257,13 @@ export type FrenchpressBrew = z.infer<typeof selectFrenchpressBrewSchema>
 // Cold Brew Brews. Methodless (no methodId) per ADR-0001. Weights (dose/water)
 // are decimal strings like the other immersion methods; steepTime is whole
 // MINUTES (not seconds); brewEnvironment is the Counter/Fridge enum (mapped
-// automatically from the pgEnum column), optional.
+// automatically from the pgEnum column).
 export const insertColdBrewBrewSchema = createInsertSchema(coldBrewBrews, {
   dose: decimalString,
   water: decimalString,
+  steepTime: requiredInt,
+  brewEnvironment: () => z.enum(['Counter', 'Fridge']),
+  grindSetting: requiredGrindSetting,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),

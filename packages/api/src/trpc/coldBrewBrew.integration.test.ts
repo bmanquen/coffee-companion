@@ -4,13 +4,20 @@ import { db } from '../db'
 import { brewingDeviceTypes } from '../db/schema'
 import { COLD_BREW_DEVICE_TYPE } from '../lib/cold-brew'
 import { FRENCH_PRESS_DEVICE_TYPE } from '../lib/frenchpress'
-import { UNKNOWN_UUID, callerFor, seedUsers, uniqFor } from '../../test/trpc'
+import {
+  UNKNOWN_UUID,
+  callerFor,
+  createCoffeeFor,
+  seedUsers,
+  uniqFor,
+} from '../../test/trpc'
 
 const USER_A = 'coldbrew-user-a'
 const USER_B = 'coldbrew-user-b'
 const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
 const uniq = uniqFor(USER_A)
+const createCoffee = createCoffeeFor(asA, uniq)
 
 let coldBrewDeviceId: string
 let espressoDeviceId: string
@@ -63,7 +70,7 @@ beforeAll(async () => {
   const grinder = await asA.grinder.create({ name: uniq('Ode'), brand: 'Fellow' })
   grinderId = grinder.id
 
-  const coffee = await asA.coffee.create({ name: uniq('Ethiopia Guji') })
+  const coffee = await createCoffee(uniq('Ethiopia Guji'))
   coffeeAId = coffee.id
 
   // A French Press device + method so a coffee can also have a dialed-in french
@@ -90,6 +97,7 @@ const baseBrew = () => ({
   // 18 hours, stored as whole minutes (not seconds like the hot methods).
   steepTime: 1080,
   brewEnvironment: 'Fridge' as const,
+  grindSetting: 'coarse',
 })
 
 describe('coldBrewBrew.create', () => {
@@ -102,12 +110,13 @@ describe('coldBrewBrew.create', () => {
     expect(brew.brewEnvironment).toBe('Fridge')
   })
 
-  it('creates a brew without a brew environment', async () => {
-    const brew = await asA.coldBrewBrew.create({
-      ...baseBrew(),
-      brewEnvironment: null,
-    })
-    expect(brew.brewEnvironment).toBeNull()
+  it('rejects a brew without a brew environment', async () => {
+    await expect(
+      asA.coldBrewBrew.create({
+        ...baseBrew(),
+        brewEnvironment: null,
+      }),
+    ).rejects.toThrow()
   })
 
   it('rejects a non-cold brew brewing device', async () => {
@@ -306,7 +315,7 @@ describe('coldBrewBrew.getRecent', () => {
 
 describe('coldBrewBrew.setDialedIn / getDialedIn', () => {
   it('dials in at most one cold brew per coffee, replacing the previous', async () => {
-    const coffee = await asA.coffee.create({ name: uniq('One Per Coffee') })
+    const coffee = await createCoffee(uniq('One Per Coffee'))
     const first = await asA.coldBrewBrew.create({
       ...baseBrew(),
       coffeeId: coffee.id,
@@ -326,7 +335,7 @@ describe('coldBrewBrew.setDialedIn / getDialedIn', () => {
   })
 
   it('clears the dialed-in cold brew with a null brewId', async () => {
-    const coffee = await asA.coffee.create({ name: uniq('Clear Dialed') })
+    const coffee = await createCoffee(uniq('Clear Dialed'))
     const brew = await asA.coldBrewBrew.create({
       ...baseBrew(),
       coffeeId: coffee.id,
@@ -337,8 +346,8 @@ describe('coldBrewBrew.setDialedIn / getDialedIn', () => {
   })
 
   it('rejects dialing in a brew from a different coffee without disturbing state', async () => {
-    const coffeeX = await asA.coffee.create({ name: uniq('Guard X') })
-    const coffeeY = await asA.coffee.create({ name: uniq('Guard Y') })
+    const coffeeX = await createCoffee(uniq('Guard X'))
+    const coffeeY = await createCoffee(uniq('Guard Y'))
     const xDialed = await asA.coldBrewBrew.create({
       ...baseBrew(),
       coffeeId: coffeeX.id,
@@ -366,7 +375,7 @@ describe('coldBrewBrew.setDialedIn / getDialedIn', () => {
   })
 
   it('does not touch another method’s dialed-in brew for the same coffee', async () => {
-    const coffee = await asA.coffee.create({ name: uniq('Cross Method') })
+    const coffee = await createCoffee(uniq('Cross Method'))
 
     // A dialed-in french press brew for this coffee.
     const fpBrew = await asA.frenchpressBrew.create({
@@ -378,6 +387,7 @@ describe('coldBrewBrew.setDialedIn / getDialedIn', () => {
       water: '500',
       steepTime: 240,
       waterTemp: 95,
+      grindSetting: '28',
     })
     await asA.frenchpressBrew.setDialedIn({
       coffeeId: coffee.id,
@@ -398,7 +408,7 @@ describe('coldBrewBrew.setDialedIn / getDialedIn', () => {
   })
 
   it('getDialedIn returns only the user’s dialed-in cold brews', async () => {
-    const coffee = await asA.coffee.create({ name: uniq('Dialed List') })
+    const coffee = await createCoffee(uniq('Dialed List'))
     const brew = await asA.coldBrewBrew.create({
       ...baseBrew(),
       coffeeId: coffee.id,

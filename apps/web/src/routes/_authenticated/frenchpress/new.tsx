@@ -85,19 +85,19 @@ function NewFrenchpressBrew() {
     }),
   )
 
-  const defaultBrew: InsertFrenchpressBrew = {
+  const defaultBrew = {
     coffeeId: '',
     methodId: '',
     grinderId: '',
     brewingDeviceId: '',
     roastDate: null,
-    dose: null,
-    water: null,
+    dose: '',
+    water: '',
     steepTime: null,
     waterTemp: null,
-    grindSetting: null,
+    grindSetting: '',
     notes: null,
-  }
+  } as InsertFrenchpressBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,

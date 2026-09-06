@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { SteepMinutesInput } from './steep-minutes-input'
+import { useAppForm } from '@/hooks/form'
 
 // The value is stored as whole minutes but entered as hours + minutes, so the
 // conversion is the thing worth pinning: a cold brew steeps for 18 hours, and
@@ -8,9 +9,21 @@ import { SteepMinutesInput } from './steep-minutes-input'
 function renderInput(value: number | null) {
   const onChange = vi.fn()
   const onBlur = vi.fn()
-  render(
-    <SteepMinutesInput value={value} onChange={onChange} onBlur={onBlur} />,
-  )
+  function Harness() {
+    const form = useAppForm({ defaultValues: { steepTime: value } })
+    return (
+      <form.AppField name="steepTime">
+        {() => (
+          <SteepMinutesInput
+            value={value}
+            onChange={onChange}
+            onBlur={onBlur}
+          />
+        )}
+      </form.AppField>
+    )
+  }
+  render(<Harness />)
   return {
     onChange,
     onBlur,

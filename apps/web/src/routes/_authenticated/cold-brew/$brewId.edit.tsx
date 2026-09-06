@@ -67,19 +67,19 @@ function EditColdBrewBrew() {
     }),
   )
 
-  const defaultBrew: InsertColdBrewBrew = {
+  const defaultBrew = {
     coffeeId: brew.coffeeId,
     // Blank on a Sealed Brew: its equipment is withheld along with the rest.
     grinderId: brew.grinderId ?? '',
     brewingDeviceId: brew.brewingDeviceId ?? '',
     roastDate: brew.roastDate,
-    dose: brew.dose,
-    water: brew.water,
+    dose: brew.dose ?? '',
+    water: brew.water ?? '',
     steepTime: brew.steepTime,
     brewEnvironment: brew.brewEnvironment,
-    grindSetting: brew.grindSetting,
+    grindSetting: brew.grindSetting ?? '',
     notes: brew.notes,
-  }
+  } as InsertColdBrewBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,
@@ -148,7 +148,7 @@ function EditColdBrewBrew() {
           name="brewEnvironment"
           listeners={{
             // The SearchSelect emits '' when the current choice is toggled off;
-            // treat that as "no environment" so the optional enum stays valid.
+            // treat that as unset so required enum validation can fail closed.
             onChange: ({ value }) => {
               if ((value as unknown as string) === '') {
                 form.setFieldValue('brewEnvironment', null)

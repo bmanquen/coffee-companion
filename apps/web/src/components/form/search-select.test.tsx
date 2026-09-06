@@ -143,24 +143,24 @@ describe('SearchSelect', () => {
 
   it('leaves an optional select unmarked', () => {
     function OptionalHarness() {
-      const defaultCoffee: InsertCoffee = {
+      const defaultCoffee = {
         name: 'Ethiopia',
-        roasterId: null,
-        roastLevelId: null,
+        roasterId: '',
+        roastLevelId: '',
         countryId: null,
         regionId: null,
         processId: null,
         notes: null,
         isActive: false,
-      }
+      } as InsertCoffee
       const form = useAppForm({
         defaultValues: defaultCoffee,
         validators: { onChange: insertCoffeeSchema },
       })
       return (
-        <form.AppField name="roastLevelId">
+        <form.AppField name="countryId">
           {(field) => (
-            <field.SearchSelect label="Roast Level" options={options} />
+            <field.SearchSelect label="Country" options={options} />
           )}
         </form.AppField>
       )
@@ -169,7 +169,7 @@ describe('SearchSelect', () => {
     render(<OptionalHarness />)
     expect(
       screen
-        .getByRole('button', { name: 'Roast Level' })
+        .getByRole('button', { name: 'Country' })
         .getAttribute('aria-required'),
     ).toBeNull()
     expect(screen.queryByText('*')).toBeNull()

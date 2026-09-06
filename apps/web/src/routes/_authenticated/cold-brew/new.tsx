@@ -60,18 +60,18 @@ function NewColdBrewBrew() {
     }),
   )
 
-  const defaultBrew: InsertColdBrewBrew = {
+  const defaultBrew = {
     coffeeId: '',
     grinderId: '',
     brewingDeviceId: '',
     roastDate: null,
-    dose: null,
-    water: null,
+    dose: '',
+    water: '',
     steepTime: null,
     brewEnvironment: null,
-    grindSetting: null,
+    grindSetting: '',
     notes: null,
-  }
+  } as InsertColdBrewBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,
@@ -158,7 +158,7 @@ function NewColdBrewBrew() {
           name="brewEnvironment"
           listeners={{
             // The SearchSelect emits '' when the current choice is toggled off;
-            // treat that as "no environment" so the optional enum stays valid.
+            // treat that as unset so required enum validation can fail closed.
             onChange: ({ value }) => {
               if ((value as unknown as string) === '') {
                 form.setFieldValue('brewEnvironment', null)

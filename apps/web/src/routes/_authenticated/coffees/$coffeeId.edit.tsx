@@ -91,16 +91,16 @@ function EditCoffeeComponent() {
     }),
   )
 
-  const defaultCoffee: InsertCoffee = {
+  const defaultCoffee = {
     name: coffee.name,
-    roasterId: coffee.roasterId,
-    roastLevelId: coffee.roastLevelId,
+    roasterId: coffee.roasterId ?? '',
+    roastLevelId: coffee.roastLevelId ?? '',
     countryId: coffee.countryId,
     regionId: coffee.regionId,
     processId: coffee.processId,
     notes: coffee.notes,
     isActive: coffee.isActive,
-  }
+  } as InsertCoffee
 
   const form = useAppForm({
     defaultValues: defaultCoffee,

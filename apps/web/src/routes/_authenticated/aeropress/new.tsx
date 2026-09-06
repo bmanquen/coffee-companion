@@ -81,18 +81,18 @@ function NewAeropressBrew() {
     }),
   )
 
-  const defaultBrew: InsertAeropressBrew = {
+  const defaultBrew = {
     coffeeId: '',
     methodId: '',
     grinderId: '',
     brewingDeviceId: '',
     roastDate: null,
-    dose: null,
-    water: null,
+    dose: '',
+    water: '',
     steepTime: null,
-    grindSetting: null,
+    grindSetting: '',
     notes: null,
-  }
+  } as InsertAeropressBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,

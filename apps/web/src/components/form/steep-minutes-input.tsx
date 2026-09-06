@@ -1,4 +1,5 @@
 import { FormLabel } from './form-label'
+import { useFieldRequired } from './use-field-required'
 import { Field, FieldContent } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { fromSeconds, toSeconds } from '@/lib/duration'
@@ -21,10 +22,13 @@ export function SteepMinutesInput({
     const seconds = toSeconds(h, m, '')
     onChange(seconds == null ? null : seconds / 60)
   }
+  const required = useFieldRequired()
 
   return (
     <Field>
-      <FormLabel htmlFor="steepTimeHours">Steep Time</FormLabel>
+      <FormLabel htmlFor="steepTimeHours" required={required}>
+        Steep Time
+      </FormLabel>
       <FieldContent>
         <div className="flex gap-2">
           <Input
@@ -36,6 +40,7 @@ export function SteepMinutesInput({
             value={hours}
             onBlur={onBlur}
             onChange={(e) => setSteep(e.target.value, minutes)}
+            aria-required={required || undefined}
           />
           <Input
             aria-label="Steep Time (minutes)"
@@ -45,6 +50,7 @@ export function SteepMinutesInput({
             value={minutes}
             onBlur={onBlur}
             onChange={(e) => setSteep(hours, e.target.value)}
+            aria-required={required || undefined}
           />
         </div>
       </FieldContent>

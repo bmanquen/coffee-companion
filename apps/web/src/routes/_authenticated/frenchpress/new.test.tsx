@@ -164,6 +164,9 @@ describe('NewFrenchpressBrew form', () => {
       fireEvent.change(screen.getByLabelText('Water Temp (°C)'), {
         target: { value: '96' },
       })
+      fireEvent.change(screen.getByLabelText('Grind Setting'), {
+        target: { value: '28' },
+      })
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 

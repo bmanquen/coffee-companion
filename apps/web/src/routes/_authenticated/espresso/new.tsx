@@ -63,17 +63,17 @@ function NewEspressoShot() {
     }),
   )
 
-  const defaultShot: InsertEspressoShot = {
+  const defaultShot = {
     coffeeId: '',
     grinderId: '',
     brewingDeviceId: '',
     roastDate: null,
-    dose: null,
-    yield: null,
+    dose: '',
+    yield: '',
     time: null,
-    grindSetting: null,
+    grindSetting: '',
     notes: null,
-  }
+  } as InsertEspressoShot
 
   const form = useAppForm({
     defaultValues: defaultShot,
