@@ -3,6 +3,7 @@ import { billingConfig, hasLiveSubscription } from './billing'
 
 const retrieve = vi.fn()
 const list = vi.fn()
+const reportError = vi.hoisted(() => vi.fn())
 
 vi.mock('stripe', () => ({
   default: class {
@@ -10,6 +11,8 @@ vi.mock('stripe', () => ({
     subscriptions = { list }
   },
 }))
+
+vi.mock('./report-error', () => ({ reportError }))
 
 // Every variable these tests touch, so one is never left set for the next.
 const vars = [
@@ -105,6 +108,7 @@ describe('planPrices', () => {
 
   beforeEach(() => {
     retrieve.mockReset()
+    reportError.mockReset()
     vi.resetModules()
   })
 
@@ -166,6 +170,20 @@ describe('planPrices', () => {
     const planPrices = await load()
 
     expect(await planPrices()).toBe(null)
+  })
+
+  it('reports the outage so a silent Stripe miss is still visible', async () => {
+    configure()
+    const error = new Error('unreachable')
+    retrieve.mockRejectedValue(error)
+    const planPrices = await load()
+
+    await planPrices()
+
+    expect(reportError).toHaveBeenCalledWith(error, {
+      area: 'billing',
+      operation: 'planPrices',
+    })
   })
 })
 

@@ -15,6 +15,7 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import type { TRPCRouter } from '@coffee-companion/api/trpc/router'
 import type { TRPCOptionsProxy } from '@trpc/tanstack-react-query'
+import { RootError } from '@/components/root-error'
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -23,6 +24,7 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+  errorComponent: RootError,
   head: () => ({
     meta: [
       {

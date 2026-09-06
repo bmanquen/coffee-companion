@@ -23,6 +23,11 @@ export default defineConfig({
         'src/components/ui/**', // shadcn primitives (vendored)
         'src/integrations/**', // tRPC / React Query wiring
         'src/router.tsx', // router setup (wiring)
+        'src/client.tsx',
+        'src/server.ts',
+        'src/instrument.client.ts',
+        'src/instrument.server.ts',
+        'src/lib/sentry-client-report.ts',
         'src/lib/auth-client.ts', // better-auth client config (wiring)
         'src/lib/request-headers.ts', // isomorphic SSR header helper (wiring)
       ],
