@@ -138,7 +138,7 @@ function EditColdBrewBrew() {
         <form.AppField name="steepTime">
           {(field) => (
             <SteepMinutesInput
-              value={field.state.value ?? null}
+              value={field.state.value}
               onChange={(minutes) => field.handleChange(minutes as never)}
               onBlur={field.handleBlur}
             />
