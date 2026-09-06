@@ -132,16 +132,16 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
-      fireEvent.change(screen.getByLabelText('Dose (g)'), {
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '18' },
       })
-      fireEvent.change(screen.getByLabelText('Yield (g)'), {
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
         target: { value: '36' },
       })
-      fireEvent.change(screen.getByLabelText('Time (s)'), {
+      fireEvent.change(screen.getByLabelText(/^Time/), {
         target: { value: '30' },
       })
-      fireEvent.change(screen.getByLabelText('Grind Setting'), {
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
         target: { value: '1.5' },
       })
 

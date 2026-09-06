@@ -85,12 +85,16 @@ export const selectGreenCoffeeSchema = createSelectSchema(greenCoffees)
 export type InsertGreenCoffee = z.infer<typeof insertGreenCoffeeSchema>
 export type GreenCoffee = z.infer<typeof selectGreenCoffeeSchema>
 
-// Coffees
+// Coffees. Roaster and roast level are nullable columns; drizzle-zod keeps
+// those optional unless we replace them after the insert schema is built.
 export const insertCoffeeSchema = createInsertSchema(coffees, {
   name: (schema) => schema.min(1),
-  roasterId: () => z.uuid('Select a roaster'),
-  roastLevelId: () => z.uuid('Select a roast level'),
-}).omit({ id: true, userId: true })
+})
+  .omit({ id: true, userId: true })
+  .extend({
+    roasterId: z.uuid('Select a roaster'),
+    roastLevelId: z.uuid('Select a roast level'),
+  })
 export const selectCoffeeSchema = createSelectSchema(coffees)
 export type InsertCoffee = z.infer<typeof insertCoffeeSchema>
 export type Coffee = z.infer<typeof selectCoffeeSchema>
@@ -146,18 +150,21 @@ const requiredGrindSetting = () => z.string().min(1)
 
 // Espresso Shots
 export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
-  dose: decimalString,
-  yield: decimalString,
-  time: requiredInt,
-  grindSetting: requiredGrindSetting,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
-}).omit({
-  id: true,
-  userId: true,
-  isDialedIn: true,
 })
+  .omit({
+    id: true,
+    userId: true,
+    isDialedIn: true,
+  })
+  .extend({
+    dose: decimalString(),
+    yield: decimalString(),
+    time: requiredInt(),
+    grindSetting: requiredGrindSetting(),
+  })
 export const selectEspressoShotSchema = createSelectSchema(espressoShots)
 export type InsertEspressoShot = z.infer<typeof insertEspressoShotSchema>
 export type EspressoShot = z.infer<typeof selectEspressoShotSchema>
@@ -173,19 +180,22 @@ export type AeropressMethod = z.infer<typeof selectAeropressMethodSchema>
 // AeroPress Brews. Weights (dose/water) are decimal strings like espresso
 // dose/yield; steep time is whole seconds.
 export const insertAeropressBrewSchema = createInsertSchema(aeropressBrews, {
-  dose: decimalString,
-  water: decimalString,
-  steepTime: requiredInt,
-  grindSetting: requiredGrindSetting,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
   methodId: () => z.uuid('Select a method'),
-}).omit({
-  id: true,
-  userId: true,
-  isDialedIn: true,
 })
+  .omit({
+    id: true,
+    userId: true,
+    isDialedIn: true,
+  })
+  .extend({
+    dose: decimalString(),
+    water: decimalString(),
+    steepTime: requiredInt(),
+    grindSetting: requiredGrindSetting(),
+  })
 export const selectAeropressBrewSchema = createSelectSchema(aeropressBrews)
 export type InsertAeropressBrew = z.infer<typeof insertAeropressBrewSchema>
 export type AeropressBrew = z.infer<typeof selectAeropressBrewSchema>
@@ -201,20 +211,23 @@ export type PouroverMethod = z.infer<typeof selectPouroverMethodSchema>
 // Pour Over Brews. Weights (dose/water) are decimal strings like aeropress;
 // brew time is whole seconds and water temp is whole degrees Celsius.
 export const insertPouroverBrewSchema = createInsertSchema(pouroverBrews, {
-  dose: decimalString,
-  water: decimalString,
-  brewTime: requiredInt,
-  waterTemp: requiredInt,
-  grindSetting: requiredGrindSetting,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
   methodId: () => z.uuid('Select a method'),
-}).omit({
-  id: true,
-  userId: true,
-  isDialedIn: true,
 })
+  .omit({
+    id: true,
+    userId: true,
+    isDialedIn: true,
+  })
+  .extend({
+    dose: decimalString(),
+    water: decimalString(),
+    brewTime: requiredInt(),
+    waterTemp: requiredInt(),
+    grindSetting: requiredGrindSetting(),
+  })
 export const selectPouroverBrewSchema = createSelectSchema(pouroverBrews)
 export type InsertPouroverBrew = z.infer<typeof insertPouroverBrewSchema>
 export type PouroverBrew = z.infer<typeof selectPouroverBrewSchema>
@@ -236,20 +249,23 @@ export type FrenchpressMethod = z.infer<typeof selectFrenchpressMethodSchema>
 // French Press Brews. Weights (dose/water) are decimal strings like pourover;
 // steep time is whole seconds and water temp is whole degrees Celsius.
 export const insertFrenchpressBrewSchema = createInsertSchema(frenchpressBrews, {
-  dose: decimalString,
-  water: decimalString,
-  steepTime: requiredInt,
-  waterTemp: requiredInt,
-  grindSetting: requiredGrindSetting,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
   methodId: () => z.uuid('Select a method'),
-}).omit({
-  id: true,
-  userId: true,
-  isDialedIn: true,
 })
+  .omit({
+    id: true,
+    userId: true,
+    isDialedIn: true,
+  })
+  .extend({
+    dose: decimalString(),
+    water: decimalString(),
+    steepTime: requiredInt(),
+    waterTemp: requiredInt(),
+    grindSetting: requiredGrindSetting(),
+  })
 export const selectFrenchpressBrewSchema = createSelectSchema(frenchpressBrews)
 export type InsertFrenchpressBrew = z.infer<typeof insertFrenchpressBrewSchema>
 export type FrenchpressBrew = z.infer<typeof selectFrenchpressBrewSchema>
@@ -259,19 +275,22 @@ export type FrenchpressBrew = z.infer<typeof selectFrenchpressBrewSchema>
 // MINUTES (not seconds); brewEnvironment is the Counter/Fridge enum (mapped
 // automatically from the pgEnum column).
 export const insertColdBrewBrewSchema = createInsertSchema(coldBrewBrews, {
-  dose: decimalString,
-  water: decimalString,
-  steepTime: requiredInt,
-  brewEnvironment: () => z.enum(['Counter', 'Fridge']),
-  grindSetting: requiredGrindSetting,
   coffeeId: () => z.uuid('Select a coffee'),
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
-}).omit({
-  id: true,
-  userId: true,
-  isDialedIn: true,
 })
+  .omit({
+    id: true,
+    userId: true,
+    isDialedIn: true,
+  })
+  .extend({
+    dose: decimalString(),
+    water: decimalString(),
+    steepTime: requiredInt(),
+    brewEnvironment: z.enum(['Counter', 'Fridge']),
+    grindSetting: requiredGrindSetting(),
+  })
 export const selectColdBrewBrewSchema = createSelectSchema(coldBrewBrews)
 export type InsertColdBrewBrew = z.infer<typeof insertColdBrewBrewSchema>
 export type ColdBrewBrew = z.infer<typeof selectColdBrewBrewSchema>

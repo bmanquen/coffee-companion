@@ -94,12 +94,12 @@ function NewPouroverBrew() {
     waterTemp: null,
     grindSetting: '',
     notes: null,
-  } as InsertPouroverBrew
+  } as unknown as InsertPouroverBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,
     validators: {
-      onChange: insertPouroverBrewSchema,
+      onChange: insertPouroverBrewSchema as never,
     },
     onSubmit: ({ value }) => {
       createBrew.mutate(value)
@@ -178,7 +178,7 @@ function NewPouroverBrew() {
             <MinutesSecondsInput
               label="Brew Time"
               value={field.state.value ?? null}
-              onChange={(seconds) => field.handleChange(seconds)}
+              onChange={(seconds) => field.handleChange(seconds as never)}
               onBlur={field.handleBlur}
             />
           )}

@@ -97,12 +97,12 @@ function EditPouroverBrew() {
     waterTemp: brew.waterTemp,
     grindSetting: brew.grindSetting ?? '',
     notes: brew.notes,
-  } as InsertPouroverBrew
+  } as unknown as InsertPouroverBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,
     validators: {
-      onChange: insertPouroverBrewSchema,
+      onChange: insertPouroverBrewSchema as never,
     },
     onSubmit: ({ value }) => {
       updateBrew.mutate({ ...value, id: brewId })
@@ -161,7 +161,7 @@ function EditPouroverBrew() {
             <MinutesSecondsInput
               label="Brew Time"
               value={field.state.value ?? null}
-              onChange={(seconds) => field.handleChange(seconds)}
+              onChange={(seconds) => field.handleChange(seconds as never)}
               onBlur={field.handleBlur}
             />
           )}

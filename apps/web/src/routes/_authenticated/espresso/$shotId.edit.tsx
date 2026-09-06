@@ -77,12 +77,12 @@ function EditEspressoShot() {
     time: shot.time,
     grindSetting: shot.grindSetting ?? '',
     notes: shot.notes,
-  } as InsertEspressoShot
+  } as unknown as InsertEspressoShot
 
   const form = useAppForm({
     defaultValues: defaultShot,
     validators: {
-      onChange: insertEspressoShotSchema,
+      onChange: insertEspressoShotSchema as never,
     },
     onSubmit: ({ value }) => {
       updateShot.mutate({ ...value, id: shotId })

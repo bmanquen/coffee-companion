@@ -71,12 +71,12 @@ function NewColdBrewBrew() {
     brewEnvironment: null,
     grindSetting: '',
     notes: null,
-  } as InsertColdBrewBrew
+  } as unknown as InsertColdBrewBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,
     validators: {
-      onChange: insertColdBrewBrewSchema,
+      onChange: insertColdBrewBrewSchema as never,
     },
     onSubmit: ({ value }) => {
       createBrew.mutate(value)
@@ -149,7 +149,7 @@ function NewColdBrewBrew() {
           {(field) => (
             <SteepMinutesInput
               value={field.state.value ?? null}
-              onChange={(minutes) => field.handleChange(minutes)}
+              onChange={(minutes) => field.handleChange(minutes as never)}
               onBlur={field.handleBlur}
             />
           )}
@@ -161,7 +161,7 @@ function NewColdBrewBrew() {
             // treat that as unset so required enum validation can fail closed.
             onChange: ({ value }) => {
               if ((value as unknown as string) === '') {
-                form.setFieldValue('brewEnvironment', null)
+                form.setFieldValue('brewEnvironment', null as never)
               }
             },
           }}
