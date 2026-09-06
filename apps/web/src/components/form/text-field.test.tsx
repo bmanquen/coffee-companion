@@ -1,3 +1,4 @@
+import { insertGrinderSchema } from '@coffee-companion/api/db/zod'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
@@ -85,7 +86,49 @@ describe('TextField', () => {
     render(<DescribedHarness showLabel={false} />)
 
     const label = screen.getByText('Coffee name')
-    expect(label.className).toContain('sr-only')
+    expect(label.closest('[data-slot="field-label"]')?.className).toContain(
+      'sr-only',
+    )
     expect(screen.getByLabelText('Coffee name')).toBeTruthy()
+  })
+
+  it('marks the control required when the form schema blocks an empty value', () => {
+    function SchemaHarness() {
+      const form = useAppForm({
+        defaultValues: { name: '', brand: '' },
+        validators: { onChange: insertGrinderSchema },
+      })
+      return (
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Name" />}
+        </form.AppField>
+      )
+    }
+
+    render(<SchemaHarness />)
+    const input = screen.getByLabelText('Name')
+    expect(input.getAttribute('aria-required')).toBe('true')
+    expect(screen.getByText('*').getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('leaves optional fields unmarked even when the form has a schema', () => {
+    function OptionalHarness() {
+      const form = useAppForm({
+        defaultValues: { notes: null as string | null },
+        validators: {
+          onChange: z.object({ notes: z.string().nullish() }),
+        },
+      })
+      return (
+        <form.AppField name="notes">
+          {(field) => <field.TextField label="Notes" />}
+        </form.AppField>
+      )
+    }
+
+    render(<OptionalHarness />)
+    const input = screen.getByLabelText('Notes')
+    expect(input.getAttribute('aria-required')).toBeNull()
+    expect(screen.queryByText('*')).toBeNull()
   })
 })

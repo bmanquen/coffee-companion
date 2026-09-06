@@ -9,12 +9,13 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command'
+import { FormLabel } from './form-label'
+import { useFieldRequired } from './use-field-required'
 import {
   Field,
   FieldContent,
   FieldDescription,
   FieldError,
-  FieldLabel,
 } from '@/components/ui/field'
 import {
   Popover,
@@ -49,6 +50,7 @@ export function SearchSelect({
   disabled?: boolean
 }) {
   const field = useFieldContext<string>()
+  const required = useFieldRequired()
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const options = initialOptions
@@ -80,12 +82,13 @@ export function SearchSelect({
 
   return (
     <Field>
-      <FieldLabel
+      <FormLabel
         htmlFor={field.name}
+        required={required}
         className={showLabel ? undefined : 'sr-only'}
       >
         {label}
-      </FieldLabel>
+      </FormLabel>
       <FieldContent>
         <Popover
           open={open}
@@ -107,6 +110,7 @@ export function SearchSelect({
                 selectedOption ? 'text-foreground' : 'text-muted-foreground/40',
               )}
               disabled={disabled}
+              aria-required={required || undefined}
             >
               {selectedOption ? selectedOption.label : placeholder}
               <ChevronDownIcon className="size-4 opacity-50" />

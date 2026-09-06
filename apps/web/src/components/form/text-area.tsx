@@ -1,10 +1,6 @@
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from '../ui/field'
+import { FormLabel } from './form-label'
+import { useFieldRequired } from './use-field-required'
+import { Field, FieldContent, FieldDescription, FieldError } from '../ui/field'
 import { Textarea } from '../ui/textarea'
 import { useFieldContext } from '@/hooks/form-context'
 
@@ -22,15 +18,17 @@ export function TextArea({
   placeholder,
 }: Props) {
   const field = useFieldContext<string | null>()
+  const required = useFieldRequired()
 
   return (
     <Field>
-      <FieldLabel
+      <FormLabel
         htmlFor={field.name}
+        required={required}
         className={showLabel ? undefined : 'sr-only'}
       >
         {label}
-      </FieldLabel>
+      </FormLabel>
       <FieldContent>
         <Textarea
           id={field.name}
@@ -40,6 +38,7 @@ export function TextArea({
           onBlur={field.handleBlur}
           onChange={(e) => field.handleChange(e.target.value)}
           rows={10}
+          aria-required={required || undefined}
         />
         {description && <FieldDescription>{description}</FieldDescription>}
         {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
