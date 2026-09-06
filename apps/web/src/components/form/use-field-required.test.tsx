@@ -1,7 +1,12 @@
+import {
+  insertCoffeeSchema,
+  insertGrinderSchema,
+} from '@coffee-companion/api/db/zod'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { useFieldRequired } from './use-field-required'
+import type { InsertCoffee } from '@coffee-companion/api/db/zod'
 import { useAppForm } from '@/hooks/form'
 
 function RequiredFlag() {
@@ -26,13 +31,8 @@ describe('useFieldRequired', () => {
   it('is true when the form schema rejects empty for that field', () => {
     function Harness() {
       const form = useAppForm({
-        defaultValues: { name: '', notes: '' },
-        validators: {
-          onChange: z.object({
-            name: z.string().min(1),
-            notes: z.string().nullish(),
-          }),
-        },
+        defaultValues: { name: '', brand: '' },
+        validators: { onChange: insertGrinderSchema },
       })
       return <form.AppField name="name">{() => <RequiredFlag />}</form.AppField>
     }
@@ -43,11 +43,19 @@ describe('useFieldRequired', () => {
 
   it('is false when the form schema accepts empty', () => {
     function Harness() {
+      const defaultCoffee: InsertCoffee = {
+        name: 'Ethiopia',
+        roasterId: null,
+        roastLevelId: null,
+        countryId: null,
+        regionId: null,
+        processId: null,
+        notes: null,
+        isActive: false,
+      }
       const form = useAppForm({
-        defaultValues: { notes: null as string | null },
-        validators: {
-          onChange: z.object({ notes: z.string().nullish() }),
-        },
+        defaultValues: defaultCoffee,
+        validators: { onChange: insertCoffeeSchema },
       })
       return (
         <form.AppField name="notes">{() => <RequiredFlag />}</form.AppField>

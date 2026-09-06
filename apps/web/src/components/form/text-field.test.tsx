@@ -1,7 +1,11 @@
-import { insertGrinderSchema } from '@coffee-companion/api/db/zod'
+import {
+  insertCoffeeSchema,
+  insertGrinderSchema,
+} from '@coffee-companion/api/db/zod'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import type { InsertCoffee } from '@coffee-companion/api/db/zod'
 import { useAppForm } from '@/hooks/form'
 
 function Harness() {
@@ -106,18 +110,27 @@ describe('TextField', () => {
     }
 
     render(<SchemaHarness />)
-    const input = screen.getByLabelText('Name')
+    // The visible star is aria-hidden, so the accessible name stays "Name".
+    const input = screen.getByRole('textbox', { name: 'Name' })
     expect(input.getAttribute('aria-required')).toBe('true')
     expect(screen.getByText('*').getAttribute('aria-hidden')).toBe('true')
   })
 
   it('leaves optional fields unmarked even when the form has a schema', () => {
     function OptionalHarness() {
+      const defaultCoffee: InsertCoffee = {
+        name: 'Ethiopia',
+        roasterId: null,
+        roastLevelId: null,
+        countryId: null,
+        regionId: null,
+        processId: null,
+        notes: null,
+        isActive: false,
+      }
       const form = useAppForm({
-        defaultValues: { notes: null as string | null },
-        validators: {
-          onChange: z.object({ notes: z.string().nullish() }),
-        },
+        defaultValues: defaultCoffee,
+        validators: { onChange: insertCoffeeSchema },
       })
       return (
         <form.AppField name="notes">

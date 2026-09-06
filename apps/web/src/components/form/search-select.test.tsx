@@ -1,7 +1,10 @@
-import { insertEspressoShotSchema } from '@coffee-companion/api/db/zod'
+import {
+  insertCoffeeSchema,
+  insertEspressoShotSchema,
+} from '@coffee-companion/api/db/zod'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
+import type { InsertCoffee } from '@coffee-companion/api/db/zod'
 import type { ReactNode } from 'react'
 import { useAppForm } from '@/hooks/form'
 
@@ -140,11 +143,19 @@ describe('SearchSelect', () => {
 
   it('leaves an optional select unmarked', () => {
     function OptionalHarness() {
+      const defaultCoffee: InsertCoffee = {
+        name: 'Ethiopia',
+        roasterId: null,
+        roastLevelId: null,
+        countryId: null,
+        regionId: null,
+        processId: null,
+        notes: null,
+        isActive: false,
+      }
       const form = useAppForm({
-        defaultValues: { roastLevelId: null as string | null },
-        validators: {
-          onChange: z.object({ roastLevelId: z.string().nullish() }),
-        },
+        defaultValues: defaultCoffee,
+        validators: { onChange: insertCoffeeSchema },
       })
       return (
         <form.AppField name="roastLevelId">

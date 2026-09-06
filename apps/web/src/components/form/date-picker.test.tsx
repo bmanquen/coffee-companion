@@ -31,13 +31,7 @@ vi.mock('@/components/ui/calendar', () => ({
   ),
 }))
 
-function Harness({
-  value,
-  showLabel,
-}: {
-  value?: Date
-  showLabel?: boolean
-}) {
+function Harness({ value, showLabel }: { value?: Date; showLabel?: boolean }) {
   const form = useAppForm({
     defaultValues: { roastDate: value },
   })
@@ -81,6 +75,9 @@ describe('DatePicker', () => {
   it('keeps the label reachable when it is visually hidden', () => {
     render(<Harness showLabel={false} />)
 
-    expect(screen.getByText('Roast date').className).toContain('sr-only')
+    expect(
+      screen.getByText('Roast date').closest('[data-slot="field-label"]')
+        ?.className,
+    ).toContain('sr-only')
   })
 })
