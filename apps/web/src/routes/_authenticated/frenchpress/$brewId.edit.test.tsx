@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Route } from './$brewId.edit'
 import { useFieldContext } from '@/hooks/form-context'
@@ -73,12 +79,24 @@ function seeded() {
       id: FP_DEVICE,
       name: 'Chambord',
       brand: 'Bodum',
-      type: { id: 't4', userId: null, name: 'French Press', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't4',
+        userId: null,
+        name: 'French Press',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't2',
+        userId: null,
+        name: 'Espresso',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
   ])
   qc.setQueryData(
@@ -91,7 +109,7 @@ function seeded() {
       brewingDeviceId: FP_DEVICE,
       dose: '30',
       water: '500',
-      steepTime: 240,
+      steepTime: 210,
       waterTemp: 95,
       // Distinct from dose so getByDisplayValue('30') is unambiguous.
       grindSetting: '28',
@@ -107,7 +125,9 @@ describe('EditFrenchpressBrew form', () => {
     const { Wrapper } = seeded()
     render(<EditFrenchpressBrew />, { wrapper: Wrapper })
 
-    const deviceSelect = screen.getByRole('combobox', { name: 'Brewing Device' })
+    const deviceSelect = screen.getByRole('combobox', {
+      name: 'Brewing Device',
+    })
     expect(
       within(deviceSelect).getByRole('option', { name: 'Chambord' }),
     ).toBeTruthy()
@@ -120,29 +140,41 @@ describe('EditFrenchpressBrew form', () => {
     const { Wrapper } = seeded()
     render(<EditFrenchpressBrew />, { wrapper: Wrapper })
 
-    // The dose/water/steep/temp inputs and Method select are prefilled from the brew.
-    expect(screen.getByDisplayValue('30')).toBeTruthy()
-    expect(screen.getByDisplayValue('500')).toBeTruthy()
-    expect(screen.getByDisplayValue('240')).toBeTruthy()
-    expect(screen.getByDisplayValue('95')).toBeTruthy()
+    // The dose/water/temp inputs and Method select are prefilled from the brew.
+    // Dose is 30; do not use getByDisplayValue('30') — seconds is also 30.
+    expect(screen.getByLabelText<HTMLInputElement>(/^Dose/).value).toBe('30')
+    expect(screen.getByLabelText<HTMLInputElement>(/^Water \(g\)/).value).toBe(
+      '500',
+    )
+    expect(screen.getByLabelText<HTMLInputElement>(/^Water Temp/).value).toBe(
+      '95',
+    )
     expect(screen.getByDisplayValue('Standard')).toBeTruthy()
+    // 210 seconds is entered as minutes + seconds, not a raw seconds box.
+    expect(
+      screen.getByLabelText<HTMLInputElement>('Steep Time (minutes)').value,
+    ).toBe('3')
+    expect(
+      screen.getByLabelText<HTMLInputElement>('Steep Time (seconds)').value,
+    ).toBe('30')
   })
 
   it('submits an update carrying the brew id', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
     try {
       const { Wrapper } = seeded()
       render(<EditFrenchpressBrew />, { wrapper: Wrapper })
 
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '31' },
+      })
+      fireEvent.change(screen.getByLabelText('Steep Time (minutes)'), {
+        target: { value: '4' },
       })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -152,6 +184,8 @@ describe('EditFrenchpressBrew form', () => {
       const body = String(init?.body ?? '')
       expect(body).toContain(BREW)
       expect(body).toContain('31')
+      // 4 minutes + the loaded 30 seconds → 270 whole seconds.
+      expect(body).toMatch(/"steepTime":270/)
     } finally {
       fetchSpy.mockRestore()
     }

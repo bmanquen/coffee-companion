@@ -82,12 +82,24 @@ function seeded() {
       id: FP_DEVICE,
       name: 'Chambord',
       brand: 'Bodum',
-      type: { id: 't4', userId: null, name: 'French Press', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't4',
+        userId: null,
+        name: 'French Press',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't2',
+        userId: null,
+        name: 'Espresso',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
   ])
   // The coffee's most recent brew, used for prefill.
@@ -111,7 +123,9 @@ describe('NewFrenchpressBrew form', () => {
     const { Wrapper } = seeded()
     render(<NewFrenchpressBrew />, { wrapper: Wrapper })
 
-    const deviceSelect = screen.getByRole('combobox', { name: 'Brewing Device' })
+    const deviceSelect = screen.getByRole('combobox', {
+      name: 'Brewing Device',
+    })
     expect(
       within(deviceSelect).getByRole('option', { name: 'Chambord' }),
     ).toBeTruthy()
@@ -136,14 +150,12 @@ describe('NewFrenchpressBrew form', () => {
   })
 
   it('submits a create with the entered recipe, including steep time and water temp', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
     try {
       const { Wrapper } = seeded()
       render(<NewFrenchpressBrew />, { wrapper: Wrapper })
@@ -158,14 +170,18 @@ describe('NewFrenchpressBrew form', () => {
       fireEvent.change(screen.getByLabelText(/^Water \(g\)/), {
         target: { value: '520' },
       })
-      fireEvent.change(screen.getByLabelText(/^Steep Time/), {
-        target: { value: '300' },
-      })
       fireEvent.change(screen.getByLabelText(/^Water Temp/), {
         target: { value: '96' },
       })
       fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
         target: { value: '28' },
+      })
+      // 4 minutes + 0 seconds is stored as 240 whole seconds.
+      fireEvent.change(screen.getByLabelText(/^Steep Time \(minutes\)/), {
+        target: { value: '4' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Steep Time \(seconds\)/), {
+        target: { value: '0' },
       })
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
@@ -176,8 +192,8 @@ describe('NewFrenchpressBrew form', () => {
       const body = String(init?.body ?? '')
       expect(body).toContain('32')
       expect(body).toContain('520')
-      expect(body).toContain('300')
       expect(body).toContain('96')
+      expect(body).toMatch(/"steepTime":240/)
       expect(body).toContain(COFFEE)
     } finally {
       fetchSpy.mockRestore()

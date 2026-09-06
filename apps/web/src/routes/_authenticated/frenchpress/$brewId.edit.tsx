@@ -8,6 +8,7 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import type { InsertFrenchpressBrew } from '@coffee-companion/api/db/zod'
+import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -16,28 +17,28 @@ import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 
-export const Route = createFileRoute('/_authenticated/frenchpress/$brewId/edit')(
-  {
-    loader: async ({ context, params }) => {
-      await context.queryClient.ensureQueryData(
-        context.trpc.frenchpressBrew.getById.queryOptions(params.brewId),
-      )
-      await context.queryClient.ensureQueryData(
-        context.trpc.coffee.getAll.queryOptions(),
-      )
-      await context.queryClient.ensureQueryData(
-        context.trpc.frenchpressMethod.list.queryOptions(),
-      )
-      await context.queryClient.ensureQueryData(
-        context.trpc.grinder.list.queryOptions(),
-      )
-      await context.queryClient.ensureQueryData(
-        context.trpc.brewingDevice.list.queryOptions(),
-      )
-    },
-    component: EditFrenchpressBrew,
+export const Route = createFileRoute(
+  '/_authenticated/frenchpress/$brewId/edit',
+)({
+  loader: async ({ context, params }) => {
+    await context.queryClient.ensureQueryData(
+      context.trpc.frenchpressBrew.getById.queryOptions(params.brewId),
+    )
+    await context.queryClient.ensureQueryData(
+      context.trpc.coffee.getAll.queryOptions(),
+    )
+    await context.queryClient.ensureQueryData(
+      context.trpc.frenchpressMethod.list.queryOptions(),
+    )
+    await context.queryClient.ensureQueryData(
+      context.trpc.grinder.list.queryOptions(),
+    )
+    await context.queryClient.ensureQueryData(
+      context.trpc.brewingDevice.list.queryOptions(),
+    )
   },
-)
+  component: EditFrenchpressBrew,
+})
 
 function EditFrenchpressBrew() {
   const { brewId } = Route.useParams()
@@ -163,9 +164,11 @@ function EditFrenchpressBrew() {
         </form.AppField>
         <form.AppField name="steepTime">
           {(field) => (
-            <field.TextField
-              label="Steep Time (s)"
-              type="number"
+            <MinutesSecondsInput
+              label="Steep Time"
+              value={field.state.value}
+              onChange={(seconds) => field.handleChange(seconds as never)}
+              onBlur={field.handleBlur}
             />
           )}
         </form.AppField>

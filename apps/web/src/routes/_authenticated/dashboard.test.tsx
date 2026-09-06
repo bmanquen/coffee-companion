@@ -369,10 +369,29 @@ describe('Dashboard', () => {
   })
 
   it('renders the French Press feed', () => {
-    renderDashboard('frenchpress', [makeRecentShot()], {
+    const { container } = renderDashboard('frenchpress', [makeRecentShot()], {
       frenchpress: [
         makeFrenchpressBrew({
           coffee: makeRecentCoffee({ id: 'c8', name: 'Brazil Cerrado' }),
+          steepTime: 210,
+        }),
+        makeFrenchpressBrew({
+          id: 'f2',
+          coffee: makeRecentCoffee({ id: 'c13', name: 'Ethiopia Guji' }),
+          coffeeId: 'c13',
+          steepTime: 240,
+        }),
+        makeFrenchpressBrew({
+          id: 'f3',
+          coffee: makeRecentCoffee({ id: 'c14', name: 'Kenya AA' }),
+          coffeeId: 'c14',
+          steepTime: 45,
+        }),
+        makeFrenchpressBrew({
+          id: 'f4',
+          coffee: makeRecentCoffee({ id: 'c15', name: 'Colombia Huila' }),
+          coffeeId: 'c15',
+          steepTime: null,
         }),
       ],
     })
@@ -380,9 +399,27 @@ describe('Dashboard', () => {
     expect(
       screen.getByRole('link', { name: /Log Brew/i }).getAttribute('href'),
     ).toBe('/frenchpress/new')
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('Brazil Cerrado')).toBeTruthy()
+    // Steep time speaks minutes + seconds, collapsing empty parts, dash if none.
+    expect(table.getByText('3m 30s')).toBeTruthy()
+    expect(table.getByText('4m')).toBeTruthy()
+    expect(table.getByText('45s')).toBeTruthy()
     expect(
-      within(screen.getByRole('table')).getByText('Brazil Cerrado'),
+      within(table.getByText('Colombia Huila').closest('tr')!).getByText('-'),
     ).toBeTruthy()
+
+    const cards = container.querySelector<HTMLElement>('.lg\\:hidden')!
+    expect(within(cards).getByText('3m 30s')).toBeTruthy()
+    expect(within(cards).getByText('4m')).toBeTruthy()
+    expect(within(cards).getByText('45s')).toBeTruthy()
+    const noneCard = within(cards)
+      .getByText('Colombia Huila')
+      .closest('.rounded-lg') as HTMLElement
+    const steepStat = within(noneCard)
+      .getByText('Steep')
+      .closest('div') as HTMLElement
+    expect(within(steepStat).getByText('-')).toBeTruthy()
   })
 
   it('renders the AeroPress feed', () => {
