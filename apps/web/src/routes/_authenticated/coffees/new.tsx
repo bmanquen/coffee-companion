@@ -146,13 +146,7 @@ function NewCoffeeComponent() {
         }}
       >
         <form.AppField name="name">
-          {(field) => (
-            <field.TextField
-              showLabel={false}
-              label="Name"
-              placeholder="Name"
-            />
-          )}
+          {(field) => <field.TextField label="Name" placeholder="Name" />}
         </form.AppField>
         <form.AppField name="roasterId">
           {(field) => <field.SearchSelect label="Roaster" {...roaster} />}

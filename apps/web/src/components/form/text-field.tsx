@@ -1,9 +1,10 @@
+import { FormLabel } from './form-label'
+import { useFieldRequired } from './use-field-required'
 import {
   Field,
   FieldContent,
   FieldDescription,
   FieldError,
-  FieldLabel,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useFieldContext } from '@/hooks/form-context'
@@ -26,15 +27,17 @@ export function TextField({
   step?: React.ComponentProps<'input'>['step']
 }) {
   const field = useFieldContext<string>()
+  const required = useFieldRequired()
 
   return (
     <Field>
-      <FieldLabel
+      <FormLabel
         htmlFor={field.name}
+        required={required}
         className={showLabel ? undefined : 'sr-only'}
       >
         {label}
-      </FieldLabel>
+      </FormLabel>
       <FieldContent>
         <Input
           id={field.name}
@@ -47,6 +50,7 @@ export function TextField({
           onBlur={field.handleBlur}
           onChange={(e) => field.handleChange(e.target.value)}
           aria-invalid={field.state.meta.errors.length > 0}
+          aria-required={required || undefined}
         />
         {description && <FieldDescription>{description}</FieldDescription>}
         {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (

@@ -1,5 +1,7 @@
+import { insertEspressoShotSchema } from '@coffee-companion/api/db/zod'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 import type { ReactNode } from 'react'
 import { useAppForm } from '@/hooks/form'
 
@@ -108,5 +110,57 @@ describe('SearchSelect', () => {
       fireEvent.click(screen.getByRole('button', { name: /Add/ }))
     })
     expect(onAddItem).toHaveBeenCalledWith('Heart')
+  })
+
+  it('marks a required select from the form schema', () => {
+    function SchemaHarness() {
+      const form = useAppForm({
+        defaultValues: {
+          coffeeId: '',
+          grinderId: '',
+          brewingDeviceId: '',
+        },
+        validators: { onChange: insertEspressoShotSchema },
+      })
+      return (
+        <form.AppField name="coffeeId">
+          {(field) => <field.SearchSelect label="Coffee" options={options} />}
+        </form.AppField>
+      )
+    }
+
+    render(<SchemaHarness />)
+    expect(
+      screen
+        .getByRole('button', { name: 'Coffee' })
+        .getAttribute('aria-required'),
+    ).toBe('true')
+    expect(screen.getByText('*').getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('leaves an optional select unmarked', () => {
+    function OptionalHarness() {
+      const form = useAppForm({
+        defaultValues: { roastLevelId: null as string | null },
+        validators: {
+          onChange: z.object({ roastLevelId: z.string().nullish() }),
+        },
+      })
+      return (
+        <form.AppField name="roastLevelId">
+          {(field) => (
+            <field.SearchSelect label="Roast Level" options={options} />
+          )}
+        </form.AppField>
+      )
+    }
+
+    render(<OptionalHarness />)
+    expect(
+      screen
+        .getByRole('button', { name: 'Roast Level' })
+        .getAttribute('aria-required'),
+    ).toBeNull()
+    expect(screen.queryByText('*')).toBeNull()
   })
 })

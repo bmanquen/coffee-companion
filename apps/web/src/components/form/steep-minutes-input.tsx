@@ -1,4 +1,5 @@
-import { Field, FieldContent, FieldLabel } from '@/components/ui/field'
+import { FormLabel } from './form-label'
+import { Field, FieldContent } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { fromSeconds, toSeconds } from '@/lib/duration'
 
@@ -23,7 +24,7 @@ export function SteepMinutesInput({
 
   return (
     <Field>
-      <FieldLabel htmlFor="steepTimeHours">Steep Time</FieldLabel>
+      <FormLabel htmlFor="steepTimeHours">Steep Time</FormLabel>
       <FieldContent>
         <div className="flex gap-2">
           <Input

@@ -2,7 +2,9 @@ import { format } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
-import { Field, FieldContent, FieldLabel } from '@/components/ui/field'
+import { FormLabel } from './form-label'
+import { useFieldRequired } from './use-field-required'
+import { Field, FieldContent } from '@/components/ui/field'
 import {
   Popover,
   PopoverContent,
@@ -17,21 +19,24 @@ type DatePickerProps = {
 
 export function DatePicker({ label, showLabel = true }: DatePickerProps) {
   const field = useFieldContext<Date | undefined>()
+  const required = useFieldRequired()
 
   return (
     <Field>
-      <FieldLabel
+      <FormLabel
         htmlFor={field.name}
+        required={required}
         className={showLabel ? undefined : 'sr-only'}
       >
         {label}
-      </FieldLabel>
+      </FormLabel>
       <FieldContent>
         <Popover>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               className={`flex justify-between ${!field.state.value ? 'text-muted-foreground/40' : ''}`}
+              aria-required={required || undefined}
             >
               {field.state.value ? (
                 format(field.state.value, 'PPP')
