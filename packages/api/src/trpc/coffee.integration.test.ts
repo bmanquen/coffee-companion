@@ -91,8 +91,8 @@ describe('coffee.update', () => {
     const updated = await asA.coffee.update({
       id: created.id,
       name: newName,
-      roasterId: created.roasterId,
-      roastLevelId: created.roastLevelId,
+      roasterId: created.roasterId!,
+      roastLevelId: created.roastLevelId!,
     })
     expect(updated.name).toBe(newName)
     // A JS Date truncates to milliseconds, which a fast update shares with createdAt.
@@ -151,8 +151,8 @@ describe('coffee.getAll', () => {
     await asA.coffee.update({
       id: first.id,
       name: uniq('Order First Updated'),
-      roasterId: first.roasterId,
-      roastLevelId: first.roastLevelId,
+      roasterId: first.roasterId!,
+      roastLevelId: first.roastLevelId!,
     })
 
     const all = await asA.coffee.getAll()

@@ -102,12 +102,12 @@ function EditFrenchpressBrew() {
     waterTemp: brew.waterTemp,
     grindSetting: brew.grindSetting ?? '',
     notes: brew.notes,
-  } as InsertFrenchpressBrew
+  } as unknown as InsertFrenchpressBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,
     validators: {
-      onChange: insertFrenchpressBrewSchema,
+      onChange: insertFrenchpressBrewSchema as never,
     },
     onSubmit: ({ value }) => {
       updateBrew.mutate({ ...value, id: brewId })

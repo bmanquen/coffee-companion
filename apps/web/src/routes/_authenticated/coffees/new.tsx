@@ -89,7 +89,7 @@ function NewCoffeeComponent() {
     processId: null,
     notes: null,
     isActive: false,
-  } as InsertCoffee
+  } as unknown as InsertCoffee
 
   const form = useAppForm({
     defaultValues: defaultCoffee,

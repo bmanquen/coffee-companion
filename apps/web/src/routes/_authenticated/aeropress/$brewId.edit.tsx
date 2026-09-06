@@ -95,12 +95,12 @@ function EditAeropressBrew() {
     steepTime: brew.steepTime,
     grindSetting: brew.grindSetting ?? '',
     notes: brew.notes,
-  } as InsertAeropressBrew
+  } as unknown as InsertAeropressBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,
     validators: {
-      onChange: insertAeropressBrewSchema,
+      onChange: insertAeropressBrewSchema as never,
     },
     onSubmit: ({ value }) => {
       updateBrew.mutate({ ...value, id: brewId })

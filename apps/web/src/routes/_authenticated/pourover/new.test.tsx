@@ -115,25 +115,25 @@ function fillRequiredRecipe({
   brewMinutes?: string
   brewSeconds?: string
 } = {}) {
-  fireEvent.change(screen.getByLabelText('Dose (g)'), {
+  fireEvent.change(screen.getByLabelText(/^Dose/), {
     target: { value: '20' },
   })
-  fireEvent.change(screen.getByLabelText('Water (g)'), {
+  fireEvent.change(screen.getByLabelText(/^Water \(g\)/), {
     target: { value: '340' },
   })
-  fireEvent.change(screen.getByLabelText('Water Temp (°C)'), {
+  fireEvent.change(screen.getByLabelText(/^Water Temp/), {
     target: { value: '96' },
   })
-  fireEvent.change(screen.getByLabelText('Grind Setting'), {
+  fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
     target: { value: grindSetting },
   })
   if (brewMinutes != null) {
-    fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {
+    fireEvent.change(screen.getByLabelText(/^Brew Time \(minutes\)/), {
       target: { value: brewMinutes },
     })
   }
   if (brewSeconds != null) {
-    fireEvent.change(screen.getByLabelText('Brew Time (seconds)'), {
+    fireEvent.change(screen.getByLabelText(/^Brew Time \(seconds\)/), {
       target: { value: brewSeconds },
     })
   }
@@ -222,10 +222,10 @@ describe('NewPouroverBrew form', () => {
       fillRequiredRecipe({ brewSeconds: '165' })
 
       expect(
-        screen.getByLabelText<HTMLInputElement>('Brew Time (minutes)').value,
+        screen.getByLabelText<HTMLInputElement>(/^Brew Time \(minutes\)/).value,
       ).toBe('2')
       expect(
-        screen.getByLabelText<HTMLInputElement>('Brew Time (seconds)').value,
+        screen.getByLabelText<HTMLInputElement>(/^Brew Time \(seconds\)/).value,
       ).toBe('45')
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
@@ -257,10 +257,10 @@ describe('NewPouroverBrew form', () => {
       })
       fillRequiredRecipe()
       expect(
-        screen.getByLabelText<HTMLInputElement>('Brew Time (minutes)').value,
+        screen.getByLabelText<HTMLInputElement>(/^Brew Time \(minutes\)/).value,
       ).toBe('')
       expect(
-        screen.getByLabelText<HTMLInputElement>('Brew Time (seconds)').value,
+        screen.getByLabelText<HTMLInputElement>(/^Brew Time \(seconds\)/).value,
       ).toBe('')
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
@@ -298,10 +298,10 @@ describe('NewPouroverBrew form', () => {
       )
 
       fetchSpy.mockClear()
-      fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {
+      fireEvent.change(screen.getByLabelText(/^Brew Time \(minutes\)/), {
         target: { value: '' },
       })
-      fireEvent.change(screen.getByLabelText('Brew Time (seconds)'), {
+      fireEvent.change(screen.getByLabelText(/^Brew Time \(seconds\)/), {
         target: { value: '45' },
       })
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))

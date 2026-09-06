@@ -125,10 +125,10 @@ describe('EditPouroverBrew form', () => {
     expect(screen.getByDisplayValue('Standard')).toBeTruthy()
     // 165 seconds is entered as minutes + seconds, not a raw seconds box.
     expect(
-      screen.getByLabelText<HTMLInputElement>('Brew Time (minutes)').value,
+      screen.getByLabelText<HTMLInputElement>(/^Brew Time \(minutes\)/).value,
     ).toBe('2')
     expect(
-      screen.getByLabelText<HTMLInputElement>('Brew Time (seconds)').value,
+      screen.getByLabelText<HTMLInputElement>(/^Brew Time \(seconds\)/).value,
     ).toBe('45')
   })
 
@@ -145,10 +145,10 @@ describe('EditPouroverBrew form', () => {
       const { Wrapper } = seeded()
       render(<EditPouroverBrew />, { wrapper: Wrapper })
 
-      fireEvent.change(screen.getByLabelText('Dose (g)'), {
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '19' },
       })
-      fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {
+      fireEvent.change(screen.getByLabelText(/^Brew Time \(minutes\)/), {
         target: { value: '3' },
       })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))

@@ -151,20 +151,20 @@ describe('NewColdBrewBrew form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
-      fireEvent.change(screen.getByLabelText('Dose (g)'), {
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '55' },
       })
-      fireEvent.change(screen.getByLabelText('Water (g)'), {
+      fireEvent.change(screen.getByLabelText(/^Water \(g\)/), {
         target: { value: '520' },
       })
       // 18 hours -> 1080 minutes.
-      fireEvent.change(screen.getByLabelText('Steep Time (hours)'), {
+      fireEvent.change(screen.getByLabelText(/^Steep Time \(hours\)/), {
         target: { value: '18' },
       })
       fireEvent.change(screen.getByRole('combobox', { name: 'Brew Environment' }), {
         target: { value: 'Fridge' },
       })
-      fireEvent.change(screen.getByLabelText('Grind Setting'), {
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
         target: { value: 'coarse' },
       })
 

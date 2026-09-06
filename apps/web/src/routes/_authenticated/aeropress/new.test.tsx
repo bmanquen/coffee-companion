@@ -147,16 +147,16 @@ describe('NewAeropressBrew form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
-      fireEvent.change(screen.getByLabelText('Dose (g)'), {
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '16' },
       })
-      fireEvent.change(screen.getByLabelText('Water (g)'), {
+      fireEvent.change(screen.getByLabelText(/^Water \(g\)/), {
         target: { value: '240' },
       })
-      fireEvent.change(screen.getByLabelText('Steep Time (s)'), {
+      fireEvent.change(screen.getByLabelText(/^Steep Time/), {
         target: { value: '90' },
       })
-      fireEvent.change(screen.getByLabelText('Grind Setting'), {
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
         target: { value: '18' },
       })
 

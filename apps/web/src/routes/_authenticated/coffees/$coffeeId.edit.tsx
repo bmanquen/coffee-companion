@@ -100,7 +100,7 @@ function EditCoffeeComponent() {
     processId: coffee.processId,
     notes: coffee.notes,
     isActive: coffee.isActive,
-  } as InsertCoffee
+  } as unknown as InsertCoffee
 
   const form = useAppForm({
     defaultValues: defaultCoffee,

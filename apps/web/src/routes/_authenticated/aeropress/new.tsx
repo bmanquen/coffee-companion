@@ -92,12 +92,12 @@ function NewAeropressBrew() {
     steepTime: null,
     grindSetting: '',
     notes: null,
-  } as InsertAeropressBrew
+  } as unknown as InsertAeropressBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,
     validators: {
-      onChange: insertAeropressBrewSchema,
+      onChange: insertAeropressBrewSchema as never,
     },
     onSubmit: ({ value }) => {
       createBrew.mutate(value)

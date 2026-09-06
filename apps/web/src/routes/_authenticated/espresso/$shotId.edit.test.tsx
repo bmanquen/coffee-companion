@@ -123,7 +123,7 @@ describe('EditEspressoShot form', () => {
       const { Wrapper } = seeded()
       render(<EditEspressoShot />, { wrapper: Wrapper })
 
-      fireEvent.change(screen.getByLabelText('Dose (g)'), {
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '19' },
       })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))

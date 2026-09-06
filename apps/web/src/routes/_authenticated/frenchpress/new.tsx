@@ -97,12 +97,12 @@ function NewFrenchpressBrew() {
     waterTemp: null,
     grindSetting: '',
     notes: null,
-  } as InsertFrenchpressBrew
+  } as unknown as InsertFrenchpressBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,
     validators: {
-      onChange: insertFrenchpressBrewSchema,
+      onChange: insertFrenchpressBrewSchema as never,
     },
     onSubmit: ({ value }) => {
       createBrew.mutate(value)

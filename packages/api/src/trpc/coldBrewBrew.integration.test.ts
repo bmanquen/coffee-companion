@@ -111,11 +111,9 @@ describe('coldBrewBrew.create', () => {
   })
 
   it('rejects a brew without a brew environment', async () => {
+    const { brewEnvironment: _, ...withoutEnvironment } = baseBrew()
     await expect(
-      asA.coldBrewBrew.create({
-        ...baseBrew(),
-        brewEnvironment: null,
-      }),
+      asA.coldBrewBrew.create(withoutEnvironment as never),
     ).rejects.toThrow()
   })
 
