@@ -31,6 +31,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { useTRPC } from '@/integrations/trpc/react'
+import { formatBrewSeconds } from '@/lib/brew'
 
 type Brew = AeropressBrewWithRelations
 
@@ -151,7 +152,7 @@ const columns = [
   }),
   columnHelper.accessor('steepTime', {
     header: 'Steep',
-    cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
+    cell: (info) => formatBrewSeconds(info.getValue()),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.display({

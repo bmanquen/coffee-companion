@@ -8,6 +8,7 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import type { InsertAeropressBrew } from '@coffee-companion/api/db/zod'
+import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -156,9 +157,11 @@ function EditAeropressBrew() {
         </form.AppField>
         <form.AppField name="steepTime">
           {(field) => (
-            <field.TextField
-              label="Steep Time (s)"
-              type="number"
+            <MinutesSecondsInput
+              label="Steep Time"
+              value={field.state.value}
+              onChange={(seconds) => field.handleChange(seconds as never)}
+              onBlur={field.handleBlur}
             />
           )}
         </form.AppField>

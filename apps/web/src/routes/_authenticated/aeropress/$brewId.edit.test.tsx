@@ -116,6 +116,13 @@ describe('EditAeropressBrew form', () => {
     expect(screen.getByDisplayValue('15')).toBeTruthy()
     expect(screen.getByDisplayValue('220')).toBeTruthy()
     expect(screen.getByDisplayValue('Standard')).toBeTruthy()
+    // 90 seconds is entered as minutes + seconds, not a raw seconds box.
+    expect(
+      screen.getByLabelText<HTMLInputElement>('Steep Time (minutes)').value,
+    ).toBe('1')
+    expect(
+      screen.getByLabelText<HTMLInputElement>('Steep Time (seconds)').value,
+    ).toBe('30')
   })
 
   it('submits an update carrying the brew id', async () => {
@@ -134,6 +141,9 @@ describe('EditAeropressBrew form', () => {
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '17' },
       })
+      fireEvent.change(screen.getByLabelText('Steep Time (minutes)'), {
+        target: { value: '2' },
+      })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
@@ -142,6 +152,8 @@ describe('EditAeropressBrew form', () => {
       const body = String(init?.body ?? '')
       expect(body).toContain(BREW)
       expect(body).toContain('17')
+      // 2 minutes + the loaded 30 seconds → 150 whole seconds.
+      expect(body).toMatch(/"steepTime":150/)
     } finally {
       fetchSpy.mockRestore()
     }

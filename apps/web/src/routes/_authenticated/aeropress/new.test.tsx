@@ -153,11 +153,14 @@ describe('NewAeropressBrew form', () => {
       fireEvent.change(screen.getByLabelText(/^Water \(g\)/), {
         target: { value: '240' },
       })
-      fireEvent.change(screen.getByLabelText(/^Steep Time/), {
-        target: { value: '90' },
-      })
       fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
         target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Steep Time \(minutes\)/), {
+        target: { value: '1' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Steep Time \(seconds\)/), {
+        target: { value: '30' },
       })
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
@@ -168,6 +171,7 @@ describe('NewAeropressBrew form', () => {
       const body = String(init?.body ?? '')
       expect(body).toContain('16')
       expect(body).toContain('240')
+      expect(body).toMatch(/"steepTime":90/)
       expect(body).toContain(COFFEE)
     } finally {
       fetchSpy.mockRestore()
