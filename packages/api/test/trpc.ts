@@ -9,6 +9,7 @@ import {
 } from '../src/db/schema'
 import { createCallerFactory } from '../src/trpc/init'
 import { trpcRouter } from '../src/trpc/router'
+import type { InsertCoffee } from '../src/db/zod'
 import type { PlanId } from '../src/lib/plan'
 
 // Shared setup for the per-router integration tests. Each router has its own
@@ -156,6 +157,29 @@ export const deviceTypes = () => {
 // scope rows to a per-file test user so they cascade-delete with that user.
 export const uniqFor = (userId: string) => (label: string) =>
   `${label} ${userId} ${Math.random()}`
+
+// Coffee create now requires a roaster and roast level. Reuse one pair per
+// caller so files that used to pass only a name stay one call.
+export function createCoffeeFor(
+  caller: ReturnType<typeof callerFor>,
+  uniq: (label: string) => string,
+) {
+  let lookups: Promise<{ roasterId: string; roastLevelId: string }> | undefined
+  const ensureLookups = () => {
+    lookups ??= Promise.all([
+      caller.roaster.create({ name: uniq('Roaster') }),
+      caller.roastLevel.create({ name: uniq('Medium') }),
+    ]).then(([roaster, roastLevel]) => ({
+      roasterId: roaster.id,
+      roastLevelId: roastLevel.id,
+    }))
+    return lookups
+  }
+  return async (name: string, extras: Partial<InsertCoffee> = {}) => {
+    const ids = await ensureLookups()
+    return caller.coffee.create({ name, ...ids, ...extras })
+  }
+}
 
 // Registers beforeAll/afterAll to seed the given test users and tear them down.
 // Deleting the users cascades all their scoped rows, so most files need no other

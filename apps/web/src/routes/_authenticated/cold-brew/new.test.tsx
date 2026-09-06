@@ -164,6 +164,9 @@ describe('NewColdBrewBrew form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Brew Environment' }), {
         target: { value: 'Fridge' },
       })
+      fireEvent.change(screen.getByLabelText('Grind Setting'), {
+        target: { value: 'coarse' },
+      })
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 

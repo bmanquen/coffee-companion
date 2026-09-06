@@ -66,18 +66,18 @@ function EditEspressoShot() {
     }),
   )
 
-  const defaultShot: InsertEspressoShot = {
+  const defaultShot = {
     coffeeId: shot.coffeeId,
     // Blank on a Sealed shot: its equipment is withheld along with the rest.
     grinderId: shot.grinderId ?? '',
     brewingDeviceId: shot.brewingDeviceId ?? '',
     roastDate: shot.roastDate,
-    dose: shot.dose,
-    yield: shot.yield,
+    dose: shot.dose ?? '',
+    yield: shot.yield ?? '',
     time: shot.time,
-    grindSetting: shot.grindSetting,
+    grindSetting: shot.grindSetting ?? '',
     notes: shot.notes,
-  }
+  } as InsertEspressoShot
 
   const form = useAppForm({
     defaultValues: defaultShot,

@@ -106,6 +106,39 @@ function seeded() {
 
 const NewPouroverBrew = Route.options.component!
 
+function fillRequiredRecipe({
+  grindSetting = '22',
+  brewMinutes,
+  brewSeconds,
+}: {
+  grindSetting?: string
+  brewMinutes?: string
+  brewSeconds?: string
+} = {}) {
+  fireEvent.change(screen.getByLabelText('Dose (g)'), {
+    target: { value: '20' },
+  })
+  fireEvent.change(screen.getByLabelText('Water (g)'), {
+    target: { value: '340' },
+  })
+  fireEvent.change(screen.getByLabelText('Water Temp (°C)'), {
+    target: { value: '96' },
+  })
+  fireEvent.change(screen.getByLabelText('Grind Setting'), {
+    target: { value: grindSetting },
+  })
+  if (brewMinutes != null) {
+    fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {
+      target: { value: brewMinutes },
+    })
+  }
+  if (brewSeconds != null) {
+    fireEvent.change(screen.getByLabelText('Brew Time (seconds)'), {
+      target: { value: brewSeconds },
+    })
+  }
+}
+
 describe('NewPouroverBrew form', () => {
   it('offers only Pour Over-type brewing devices', () => {
     const { Wrapper } = seeded()
@@ -152,21 +185,7 @@ describe('NewPouroverBrew form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
-      fireEvent.change(screen.getByLabelText('Dose (g)'), {
-        target: { value: '20' },
-      })
-      fireEvent.change(screen.getByLabelText('Water (g)'), {
-        target: { value: '340' },
-      })
-      fireEvent.change(screen.getByLabelText('Water Temp (°C)'), {
-        target: { value: '96' },
-      })
-      fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {
-        target: { value: '2' },
-      })
-      fireEvent.change(screen.getByLabelText('Brew Time (seconds)'), {
-        target: { value: '45' },
-      })
+      fillRequiredRecipe({ brewMinutes: '2', brewSeconds: '45' })
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 
@@ -200,9 +219,7 @@ describe('NewPouroverBrew form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
-      fireEvent.change(screen.getByLabelText('Brew Time (seconds)'), {
-        target: { value: '165' },
-      })
+      fillRequiredRecipe({ brewSeconds: '165' })
 
       expect(
         screen.getByLabelText<HTMLInputElement>('Brew Time (minutes)').value,
@@ -222,7 +239,7 @@ describe('NewPouroverBrew form', () => {
     }
   })
 
-  it('sends no brew time when both boxes are left empty', async () => {
+  it('blocks submit when brew time is empty', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(
@@ -238,6 +255,7 @@ describe('NewPouroverBrew form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
+      fillRequiredRecipe()
       expect(
         screen.getByLabelText<HTMLInputElement>('Brew Time (minutes)').value,
       ).toBe('')
@@ -247,11 +265,8 @@ describe('NewPouroverBrew form', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 
-      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
-      expect(String(fetchSpy.mock.calls[0][0])).toContain('pouroverBrew.create')
-      expect(String(fetchSpy.mock.calls[0][1]?.body ?? '')).toMatch(
-        /"brewTime":null/,
-      )
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Log' })).toBeTruthy())
+      expect(fetchSpy).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }
@@ -273,9 +288,7 @@ describe('NewPouroverBrew form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
-      fireEvent.change(screen.getByLabelText('Brew Time (minutes)'), {
-        target: { value: '4' },
-      })
+      fillRequiredRecipe({ brewMinutes: '4' })
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 

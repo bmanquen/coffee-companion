@@ -11,9 +11,11 @@ test('create a coffee via the new-coffee form', async ({ page }) => {
   await page.getByPlaceholder('Name').fill(name)
 
   // SearchSelect: open (its label-derived a11y name differs from the visible
-  // text, so target the visible placeholder) and pick the seeded roaster.
+  // text, so target the visible placeholder) and pick the seeded lookups.
   await page.getByText('Select Roaster').click()
   await page.getByText('Sey', { exact: true }).click()
+  await page.getByText('Select Roast Level').click()
+  await page.getByText('Medium', { exact: true }).click()
 
   await page.getByRole('button', { name: 'Add', exact: true }).click()
 
@@ -31,6 +33,10 @@ test('edit a coffee updates its name in the list', async ({ page }) => {
 
   await page.goto('/coffees/new')
   await page.getByPlaceholder('Name').fill(name)
+  await page.getByText('Select Roaster').click()
+  await page.getByText('Sey', { exact: true }).click()
+  await page.getByText('Select Roast Level').click()
+  await page.getByText('Medium', { exact: true }).click()
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/coffees$/)
   await expect(page.getByText(name).first()).toBeVisible()
@@ -56,6 +62,10 @@ test('delete a coffee removes it from the list', async ({ page }) => {
 
   await page.goto('/coffees/new')
   await page.getByPlaceholder('Name').fill(name)
+  await page.getByText('Select Roaster').click()
+  await page.getByText('Sey', { exact: true }).click()
+  await page.getByText('Select Roast Level').click()
+  await page.getByText('Medium', { exact: true }).click()
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/coffees$/)
   await expect(page.getByText(name).first()).toBeVisible()

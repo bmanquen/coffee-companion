@@ -3,13 +3,20 @@ import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
-import { UNKNOWN_UUID, callerFor, seedUsers, uniqFor } from '../../test/trpc'
+import {
+  UNKNOWN_UUID,
+  callerFor,
+  createCoffeeFor,
+  seedUsers,
+  uniqFor,
+} from '../../test/trpc'
 
 const USER_A = 'aeropress-user-a'
 const USER_B = 'aeropress-user-b'
 const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
 const uniq = uniqFor(USER_A)
+const createCoffee = createCoffeeFor(asA, uniq)
 
 let aeropressDeviceId: string
 let espressoDeviceId: string
@@ -63,7 +70,7 @@ beforeAll(async () => {
   const grinder = await asA.grinder.create({ name: uniq('Ode'), brand: 'Fellow' })
   grinderId = grinder.id
 
-  const coffee = await asA.coffee.create({ name: uniq('Ethiopia Guji') })
+  const coffee = await createCoffee(uniq('Ethiopia Guji'))
   coffeeAId = coffee.id
 
   // Methods are user-scoped (they cascade-delete with the user), so unique names
@@ -85,6 +92,8 @@ const baseBrew = () => ({
   methodId: standardMethodId,
   dose: '15',
   water: '220',
+  steepTime: 90,
+  grindSetting: '18',
 })
 
 describe('aeropressBrew.create', () => {
@@ -238,7 +247,7 @@ describe('aeropressBrew.getAll / getRecent', () => {
 
 describe('aeropressBrew.setDialedIn / getDialedIn', () => {
   it('dials in one brew per method for the same coffee, independently', async () => {
-    const coffee = await asA.coffee.create({ name: uniq('Two Methods') })
+    const coffee = await createCoffee(uniq('Two Methods'))
 
     const standardBrew = await asA.aeropressBrew.create({
       ...baseBrew(),
@@ -271,7 +280,7 @@ describe('aeropressBrew.setDialedIn / getDialedIn', () => {
   })
 
   it('replacing a method’s dialed-in brew leaves the other method untouched', async () => {
-    const coffee = await asA.coffee.create({ name: uniq('Replace Standard') })
+    const coffee = await createCoffee(uniq('Replace Standard'))
     const firstStandard = await asA.aeropressBrew.create({
       ...baseBrew(),
       coffeeId: coffee.id,
@@ -316,7 +325,7 @@ describe('aeropressBrew.setDialedIn / getDialedIn', () => {
   })
 
   it('clears a method’s dialed-in brew with a null brewId', async () => {
-    const coffee = await asA.coffee.create({ name: uniq('Clear Dialed') })
+    const coffee = await createCoffee(uniq('Clear Dialed'))
     const brew = await asA.aeropressBrew.create({
       ...baseBrew(),
       coffeeId: coffee.id,
@@ -336,8 +345,8 @@ describe('aeropressBrew.setDialedIn / getDialedIn', () => {
   })
 
   it('rejects dialing in a brew from a different coffee without disturbing state', async () => {
-    const coffeeX = await asA.coffee.create({ name: uniq('Guard X') })
-    const coffeeY = await asA.coffee.create({ name: uniq('Guard Y') })
+    const coffeeX = await createCoffee(uniq('Guard X'))
+    const coffeeY = await createCoffee(uniq('Guard Y'))
     const xDialed = await asA.aeropressBrew.create({
       ...baseBrew(),
       coffeeId: coffeeX.id,

@@ -80,16 +80,16 @@ function NewCoffeeComponent() {
     }),
   )
 
-  const defaultCoffee: InsertCoffee = {
+  const defaultCoffee = {
     name: '',
-    roasterId: null,
-    roastLevelId: null,
+    roasterId: '',
+    roastLevelId: '',
     countryId: null,
     regionId: null,
     processId: null,
     notes: null,
     isActive: false,
-  }
+  } as InsertCoffee
 
   const form = useAppForm({
     defaultValues: defaultCoffee,

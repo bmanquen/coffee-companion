@@ -3,13 +3,20 @@ import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
-import { UNKNOWN_UUID, callerFor, seedUsers, uniqFor } from '../../test/trpc'
+import {
+  UNKNOWN_UUID,
+  callerFor,
+  createCoffeeFor,
+  seedUsers,
+  uniqFor,
+} from '../../test/trpc'
 
 const USER_A = 'espresso-user-a'
 const USER_B = 'espresso-user-b'
 const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
 const uniq = uniqFor(USER_A)
+const createCoffee = createCoffeeFor(asA, uniq)
 
 let espressoDeviceId: string
 let pourOverDeviceId: string
@@ -59,7 +66,7 @@ beforeAll(async () => {
   const grinder = await asA.grinder.create({ name: uniq('Niche'), brand: 'Niche' })
   grinderId = grinder.id
 
-  const coffee = await asA.coffee.create({ name: uniq('Ethiopia Guji') })
+  const coffee = await createCoffee(uniq('Ethiopia Guji'))
   coffeeAId = coffee.id
 })
 
@@ -71,6 +78,8 @@ describe('espressoShot.create', () => {
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
+      time: 30,
+      grindSetting: '1.5',
     })
     expect(shot.userId).toBe(USER_A)
     expect(shot.dose).toBe('18')
@@ -85,6 +94,8 @@ describe('espressoShot.create', () => {
         brewingDeviceId: pourOverDeviceId,
         dose: '18',
         yield: '36',
+        time: 30,
+        grindSetting: '1.5',
       }),
     ).rejects.toThrow(/Espresso/)
   })
@@ -97,6 +108,8 @@ describe('espressoShot.create', () => {
         brewingDeviceId: UNKNOWN_UUID,
         dose: '18',
         yield: '36',
+        time: 30,
+        grindSetting: '1.5',
       }),
     ).rejects.toThrow(/not found/i)
   })
@@ -110,6 +123,8 @@ describe('espressoShot.getById', () => {
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
+      time: 30,
+      grindSetting: '1.5',
     })
     const shot = await asA.espressoShot.getById(created.id)
     expect(shot.id).toBe(created.id)
@@ -129,6 +144,8 @@ describe('espressoShot.getById', () => {
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
+      time: 30,
+      grindSetting: '1.5',
     })
     await expect(asB.espressoShot.getById(created.id)).rejects.toThrow(
       /not found/i,
@@ -144,6 +161,8 @@ describe('espressoShot.update', () => {
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
+      time: 30,
+      grindSetting: '1.5',
     })
     const updated = await asA.espressoShot.update({
       id: created.id,
@@ -152,6 +171,8 @@ describe('espressoShot.update', () => {
       brewingDeviceId: espressoDeviceId,
       dose: '20',
       yield: '40',
+      time: 30,
+      grindSetting: '1.5',
     })
     expect(updated.dose).toBe('20')
     expect(updated.yield).toBe('40')
@@ -164,6 +185,8 @@ describe('espressoShot.update', () => {
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
+      time: 30,
+      grindSetting: '1.5',
     })
     await expect(
       asA.espressoShot.update({
@@ -173,6 +196,8 @@ describe('espressoShot.update', () => {
         brewingDeviceId: pourOverDeviceId,
         dose: '18',
         yield: '36',
+        time: 30,
+        grindSetting: '1.5',
       }),
     ).rejects.toThrow(/Espresso/)
   })
@@ -186,6 +211,8 @@ describe('espressoShot.update', () => {
         brewingDeviceId: espressoDeviceId,
         dose: '18',
         yield: '36',
+        time: 30,
+        grindSetting: '1.5',
       }),
     ).rejects.toThrow(/not found/i)
   })
@@ -197,6 +224,8 @@ describe('espressoShot.update', () => {
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
+      time: 30,
+      grindSetting: '1.5',
     })
     await expect(
       asB.espressoShot.update({
@@ -206,6 +235,8 @@ describe('espressoShot.update', () => {
         brewingDeviceId: espressoDeviceId,
         dose: '99',
         yield: '99',
+        time: 30,
+        grindSetting: '1.5',
       }),
     ).rejects.toThrow(/not found/i)
   })
@@ -219,6 +250,8 @@ describe('espressoShot.delete', () => {
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
+      time: 30,
+      grindSetting: '1.5',
     })
     const deleted = await asA.espressoShot.delete(created.id)
     expect(deleted.id).toBe(created.id)
@@ -228,13 +261,15 @@ describe('espressoShot.delete', () => {
   })
 
   it('clears the dialed-in reference when its shot is deleted', async () => {
-    const coffee = await asA.coffee.create({ name: uniq('Dialed To Delete') })
+    const coffee = await createCoffee(uniq('Dialed To Delete'))
     const shot = await asA.espressoShot.create({
       coffeeId: coffee.id,
       grinderId,
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
+      time: 30,
+      grindSetting: '1.5',
     })
     await asA.coffee.setDialedIn({ coffeeId: coffee.id, shotId: shot.id })
 
@@ -259,6 +294,8 @@ describe('espressoShot.delete', () => {
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
+      time: 30,
+      grindSetting: '1.5',
     })
     await expect(asB.espressoShot.delete(created.id)).rejects.toThrow(
       /not found/i,
@@ -284,6 +321,8 @@ describe('espressoShot.getAll / getRecent', () => {
         brewingDeviceId: espressoDeviceId,
         dose: '18',
         yield: '36',
+        time: 30,
+        grindSetting: '1.5',
       })
     }
     const page1 = await asA.espressoShot.getRecent({ limit: 2, offset: 0 })
@@ -297,13 +336,15 @@ describe('espressoShot.getAll / getRecent', () => {
 
 describe('espressoShot.getDialedIn', () => {
   it('returns only each coffee’s dialed-in reference shot, with relations', async () => {
-    const coffee = await asA.coffee.create({ name: uniq('Dialed Coffee') })
+    const coffee = await createCoffee(uniq('Dialed Coffee'))
     const dialedShot = await asA.espressoShot.create({
       coffeeId: coffee.id,
       grinderId,
       brewingDeviceId: espressoDeviceId,
       dose: '18',
       yield: '36',
+      time: 30,
+      grindSetting: '1.5',
     })
     // A second, non-dialed shot for the same coffee must be excluded.
     const otherShot = await asA.espressoShot.create({
@@ -312,6 +353,8 @@ describe('espressoShot.getDialedIn', () => {
       brewingDeviceId: espressoDeviceId,
       dose: '20',
       yield: '40',
+      time: 30,
+      grindSetting: '1.5',
     })
     await asA.coffee.setDialedIn({ coffeeId: coffee.id, shotId: dialedShot.id })
 
@@ -337,13 +380,15 @@ describe('espressoShot.getDialedIn', () => {
   it('caps the result to the requested limit', async () => {
     // Ensure at least two dialed-in coffees exist for this user.
     for (let i = 0; i < 2; i++) {
-      const c = await asA.coffee.create({ name: uniq('Capped Coffee') })
+      const c = await createCoffee(uniq('Capped Coffee'))
       const s = await asA.espressoShot.create({
         coffeeId: c.id,
         grinderId,
         brewingDeviceId: espressoDeviceId,
         dose: '18',
         yield: '36',
+        time: 30,
+        grindSetting: '1.5',
       })
       await asA.coffee.setDialedIn({ coffeeId: c.id, shotId: s.id })
     }

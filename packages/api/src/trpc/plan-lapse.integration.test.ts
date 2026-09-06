@@ -5,6 +5,7 @@ import { espressoShots } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import {
   callerFor,
+  createCoffeeFor,
   deviceTypes,
   grantPlan,
   scheduleCancellation,
@@ -45,6 +46,7 @@ async function subscriberWithSixCoffees(userId: string) {
   })
   const grinder = await as.grinder.create({ name: uniq('Niche'), brand: 'Niche' })
   const roaster = await as.roaster.create({ name: uniq('Sey') })
+  const createCoffee = createCoffeeFor(as, uniq)
 
   const logShot = (coffeeId: string) =>
     as.espressoShot.create({
@@ -54,13 +56,13 @@ async function subscriberWithSixCoffees(userId: string) {
       dose: '18',
       yield: '36',
       time: 28,
+      grindSetting: '1.5',
     })
 
   const shotIds: Array<string> = []
   const coffeeIds: Array<string> = []
   for (let i = 0; i < 6; i++) {
-    const coffee = await as.coffee.create({
-      name: uniq(`Coffee ${i}`),
+    const coffee = await createCoffee(uniq(`Coffee ${i}`), {
       roasterId: roaster.id,
     })
     coffeeIds.push(coffee.id)

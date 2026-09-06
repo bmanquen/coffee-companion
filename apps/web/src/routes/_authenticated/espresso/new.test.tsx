@@ -138,6 +138,12 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByLabelText('Yield (g)'), {
         target: { value: '36' },
       })
+      fireEvent.change(screen.getByLabelText('Time (s)'), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText('Grind Setting'), {
+        target: { value: '1.5' },
+      })
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 

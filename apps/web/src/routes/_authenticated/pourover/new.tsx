@@ -82,19 +82,19 @@ function NewPouroverBrew() {
     }),
   )
 
-  const defaultBrew: InsertPouroverBrew = {
+  const defaultBrew = {
     coffeeId: '',
     methodId: '',
     grinderId: '',
     brewingDeviceId: '',
     roastDate: null,
-    dose: null,
-    water: null,
+    dose: '',
+    water: '',
     brewTime: null,
     waterTemp: null,
-    grindSetting: null,
+    grindSetting: '',
     notes: null,
-  }
+  } as InsertPouroverBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,

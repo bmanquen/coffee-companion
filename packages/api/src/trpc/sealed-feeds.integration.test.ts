@@ -9,6 +9,7 @@ import { FRENCH_PRESS_DEVICE_TYPE } from '../lib/frenchpress'
 import { POUR_OVER_DEVICE_TYPE } from '../lib/pourover'
 import {
   callerFor,
+  createCoffeeFor,
   expireGrants,
   grantPlan,
   seedUsers,
@@ -23,6 +24,7 @@ import { trpcRouter } from './router'
 const USER = 'sealed-feeds-user'
 const asUser = callerFor(USER)
 const uniq = uniqFor(USER)
+const createCoffee = createCoffeeFor(asUser, uniq)
 
 const createdTypeIds: Array<string> = []
 async function findOrCreateDeviceType(name: string): Promise<string> {
@@ -93,17 +95,18 @@ beforeAll(async () => {
   })
 
   // The Coffee that will fall off the Shelf, brewed once with every method.
-  const fallen = await asUser.coffee.create({
-    name: uniq('Falls off'),
+  const fallen = await createCoffee(uniq('Falls off'), {
     roasterId: roaster.id,
   })
-  const base = { coffeeId: fallen.id, grinderId: grinder.id }
+  const base = { coffeeId: fallen.id, grinderId: grinder.id, grindSetting: '18' }
 
   sealedBrewIds.espressoShot = (
     await asUser.espressoShot.create({
       ...base,
       brewingDeviceId: espressoDevice,
       dose: '18',
+      yield: '36',
+      time: 30,
     })
   ).id
   sealedBrewIds.aeropressBrew = (
@@ -112,6 +115,8 @@ beforeAll(async () => {
       brewingDeviceId: aeropressDevice,
       methodId: aeroMethod.id,
       dose: '18',
+      water: '250',
+      steepTime: 90,
     })
   ).id
   sealedBrewIds.pouroverBrew = (
@@ -120,6 +125,9 @@ beforeAll(async () => {
       brewingDeviceId: pouroverDevice,
       methodId: pourMethod.id,
       dose: '18',
+      water: '250',
+      brewTime: 165,
+      waterTemp: 94,
     })
   ).id
   sealedBrewIds.frenchpressBrew = (
@@ -128,6 +136,9 @@ beforeAll(async () => {
       brewingDeviceId: frenchpressDevice,
       methodId: frenchMethod.id,
       dose: '18',
+      water: '250',
+      steepTime: 240,
+      waterTemp: 95,
     })
   ).id
   sealedBrewIds.coldBrewBrew = (
@@ -135,6 +146,9 @@ beforeAll(async () => {
       ...base,
       brewingDeviceId: coldBrewDevice,
       dose: '18',
+      water: '250',
+      steepTime: 1080,
+      brewEnvironment: 'Fridge',
     })
   ).id
 
@@ -168,8 +182,7 @@ beforeAll(async () => {
   // Five more Coffees, each brewed after it, so the one above falls off a
   // five-Coffee Shelf.
   for (let i = 0; i < 5; i++) {
-    const coffee = await asUser.coffee.create({
-      name: uniq(`On the shelf ${i}`),
+    const coffee = await createCoffee(uniq(`On the shelf ${i}`), {
       roasterId: roaster.id,
     })
     await asUser.espressoShot.create({
@@ -177,20 +190,29 @@ beforeAll(async () => {
       grinderId: grinder.id,
       brewingDeviceId: espressoDevice,
       dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '18',
     })
   }
 
   // One Coffee that stays on the Shelf, brewed and dialed in with every method.
-  const kept = await asUser.coffee.create({
-    name: uniq('Stays on the shelf'),
+  const kept = await createCoffee(uniq('Stays on the shelf'), {
     roasterId: roaster.id,
   })
-  const keptBase = { coffeeId: kept.id, grinderId: grinder.id, dose: '21' }
+  const keptBase = {
+    coffeeId: kept.id,
+    grinderId: grinder.id,
+    dose: '21',
+    grindSetting: '21',
+  }
 
   readableBrewIds.espressoShot = (
     await asUser.espressoShot.create({
       ...keptBase,
       brewingDeviceId: espressoDevice,
+      yield: '42',
+      time: 28,
     })
   ).id
   readableBrewIds.aeropressBrew = (
@@ -198,6 +220,8 @@ beforeAll(async () => {
       ...keptBase,
       brewingDeviceId: aeropressDevice,
       methodId: aeroMethod.id,
+      water: '280',
+      steepTime: 90,
     })
   ).id
   readableBrewIds.pouroverBrew = (
@@ -205,6 +229,9 @@ beforeAll(async () => {
       ...keptBase,
       brewingDeviceId: pouroverDevice,
       methodId: pourMethod.id,
+      water: '350',
+      brewTime: 165,
+      waterTemp: 94,
     })
   ).id
   readableBrewIds.frenchpressBrew = (
@@ -212,12 +239,18 @@ beforeAll(async () => {
       ...keptBase,
       brewingDeviceId: frenchpressDevice,
       methodId: frenchMethod.id,
+      water: '350',
+      steepTime: 240,
+      waterTemp: 95,
     })
   ).id
   readableBrewIds.coldBrewBrew = (
     await asUser.coldBrewBrew.create({
       ...keptBase,
       brewingDeviceId: coldBrewDevice,
+      water: '350',
+      steepTime: 1080,
+      brewEnvironment: 'Fridge',
     })
   ).id
 

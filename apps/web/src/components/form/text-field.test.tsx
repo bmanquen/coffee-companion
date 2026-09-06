@@ -118,16 +118,16 @@ describe('TextField', () => {
 
   it('leaves optional fields unmarked even when the form has a schema', () => {
     function OptionalHarness() {
-      const defaultCoffee: InsertCoffee = {
+      const defaultCoffee = {
         name: 'Ethiopia',
-        roasterId: null,
-        roastLevelId: null,
+        roasterId: '',
+        roastLevelId: '',
         countryId: null,
         regionId: null,
         processId: null,
         notes: null,
         isActive: false,
-      }
+      } as InsertCoffee
       const form = useAppForm({
         defaultValues: defaultCoffee,
         validators: { onChange: insertCoffeeSchema },

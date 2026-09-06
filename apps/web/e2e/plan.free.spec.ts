@@ -112,6 +112,7 @@ test('an off-Shelf coffee is still loggable, and the new brew reads straight awa
 
   await page.getByLabel('Dose (g)').fill('18')
   await page.getByLabel('Yield (g)').fill('36')
+  await page.getByLabel('Time (s)').fill('30')
   await page.getByLabel('Grind Setting').fill(grindSetting)
 
   await page.getByRole('button', { name: 'Log', exact: true }).click()

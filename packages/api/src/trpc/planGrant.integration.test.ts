@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { callerFor, grantPlan, seedUsers, uniqFor } from '../../test/trpc'
+import {
+  callerFor,
+  createCoffeeFor,
+  grantPlan,
+  seedUsers,
+  uniqFor,
+} from '../../test/trpc'
 
 // Grants have no interface of their own — they are observed through what a Plan
 // allows. The grinder limit is the cheapest observable, so these cases resolve a
@@ -70,12 +76,12 @@ describe('plan grants', () => {
 
   it('never limits what a user may log, only what they may own', async () => {
     const uniq = uniqFor(USER_NONE)
+    const createCoffee = createCoffeeFor(asNone, uniq)
     // USER_NONE is on Free and already at the grinder limit from the first case.
     const roaster = await asNone.roaster.create({ name: uniq('Roaster') })
 
     for (const label of ['One', 'Two', 'Three']) {
-      const coffee = await asNone.coffee.create({
-        name: uniq(label),
+      const coffee = await createCoffee(uniq(label), {
         roasterId: roaster.id,
       })
       expect(coffee.userId).toBe(USER_NONE)

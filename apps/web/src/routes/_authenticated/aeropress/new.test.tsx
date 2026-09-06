@@ -153,6 +153,12 @@ describe('NewAeropressBrew form', () => {
       fireEvent.change(screen.getByLabelText('Water (g)'), {
         target: { value: '240' },
       })
+      fireEvent.change(screen.getByLabelText('Steep Time (s)'), {
+        target: { value: '90' },
+      })
+      fireEvent.change(screen.getByLabelText('Grind Setting'), {
+        target: { value: '18' },
+      })
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 

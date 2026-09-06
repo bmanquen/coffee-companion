@@ -3,7 +3,7 @@ import Stripe from 'stripe'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes, subscription, user } from '../db/schema'
-import { callerFor, seedUsers, uniqFor } from '../../test/trpc'
+import { callerFor, createCoffeeFor, seedUsers, uniqFor } from '../../test/trpc'
 import { auth } from './auth'
 import { ESPRESSO_DEVICE_TYPE } from './espresso'
 
@@ -17,6 +17,7 @@ import { ESPRESSO_DEVICE_TYPE } from './espresso'
 const BUYER = 'stripe-webhook-buyer'
 const asBuyer = callerFor(BUYER)
 const uniq = uniqFor(BUYER)
+const createCoffee = createCoffeeFor(asBuyer, uniq)
 
 const CUSTOMER_ID = 'cus_fixtureBuyer'
 const SUBSCRIPTION_ID = 'sub_fixtureBuyer'
@@ -67,8 +68,7 @@ beforeAll(async () => {
   const roaster = await asBuyer.roaster.create({ name: uniq('Sey') })
 
   for (let i = 0; i < 6; i++) {
-    const coffee = await asBuyer.coffee.create({
-      name: uniq(`Coffee ${i}`),
+    const coffee = await createCoffee(uniq(`Coffee ${i}`), {
       roasterId: roaster.id,
     })
     const shot = await asBuyer.espressoShot.create({
@@ -78,6 +78,7 @@ beforeAll(async () => {
       dose: '18',
       yield: '36',
       time: 28,
+      grindSetting: '1.5',
     })
     shots.push(shot.id)
   }

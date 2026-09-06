@@ -89,20 +89,20 @@ function EditFrenchpressBrew() {
     }),
   )
 
-  const defaultBrew: InsertFrenchpressBrew = {
+  const defaultBrew = {
     coffeeId: brew.coffeeId,
     methodId: brew.methodId ?? '',
     // Blank on a Sealed Brew: its equipment is withheld along with the rest.
     grinderId: brew.grinderId ?? '',
     brewingDeviceId: brew.brewingDeviceId ?? '',
     roastDate: brew.roastDate,
-    dose: brew.dose,
-    water: brew.water,
+    dose: brew.dose ?? '',
+    water: brew.water ?? '',
     steepTime: brew.steepTime,
     waterTemp: brew.waterTemp,
-    grindSetting: brew.grindSetting,
+    grindSetting: brew.grindSetting ?? '',
     notes: brew.notes,
-  }
+  } as InsertFrenchpressBrew
 
   const form = useAppForm({
     defaultValues: defaultBrew,

@@ -18,6 +18,8 @@ test('log an espresso shot via the new-shot form', async ({ page }) => {
 
   await page.getByLabel('Dose (g)').fill('18')
   await page.getByLabel('Yield (g)').fill('36')
+  await page.getByLabel('Time (s)').fill('30')
+  await page.getByLabel('Grind Setting').fill('1.5')
 
   await page.getByRole('button', { name: 'Log', exact: true }).click()
 

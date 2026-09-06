@@ -7,6 +7,7 @@ import {
   batchedCallerFor,
   callerFor,
   deviceTypes,
+  createCoffeeFor,
   expireGrants,
   grantPlan,
   seedUsers,
@@ -19,12 +20,14 @@ import {
 const USER = 'shelf-user'
 const asUser = callerFor(USER)
 const uniq = uniqFor(USER)
+const createCoffee = createCoffeeFor(asUser, uniq)
 
 // A second user for the promotion tests at the foot of this file, so they build
 // their own Shelf instead of inheriting the one the tests above have churned.
 const PROMOTED = 'shelf-promoted-user'
 const asPromoted = callerFor(PROMOTED)
 const uniqPromoted = uniqFor(PROMOTED)
+const createPromotedCoffee = createCoffeeFor(asPromoted, uniqPromoted)
 
 const types = deviceTypes()
 
@@ -47,6 +50,7 @@ async function logShot(coffeeId: string) {
     dose: '18',
     yield: '36',
     time: 28,
+    grindSetting: '1.5',
   })
   shotsLogged++
   return shot.id
@@ -72,7 +76,7 @@ beforeAll(async () => {
   // five and coffees[0] falls off it.
   for (let i = 0; i < 6; i++) {
     const name = uniq(`Coffee ${i}`)
-    const coffee = await asUser.coffee.create({ name, roasterId })
+    const coffee = await createCoffee(name, { roasterId })
     const shotId = await logShot(coffee.id)
     coffees.push({ id: coffee.id, name, shotId })
   }
@@ -129,10 +133,7 @@ describe('a Coffee off the Shelf', () => {
   })
 
   it('never Seals a coffee on arrival', async () => {
-    const coffee = await asUser.coffee.create({
-      name: uniq('Just added'),
-      roasterId,
-    })
+    const coffee = await createCoffee(uniq('Just added'), { roasterId })
     const shotId = await logShot(coffee.id)
 
     expect((await shotById(shotId)).sealed).toBe(false)
@@ -201,10 +202,7 @@ describe('Sealing and the Plan', () => {
   })
 
   it('still lets a Free user log and edit whatever they like', async () => {
-    const coffee = await asUser.coffee.create({
-      name: uniq('Logging is free'),
-      roasterId,
-    })
+    const coffee = await createCoffee(uniq('Logging is free'), { roasterId })
     const shotId = await logShot(coffee.id)
 
     const updated = await asUser.espressoShot.update({
@@ -215,6 +213,7 @@ describe('Sealing and the Plan', () => {
       dose: '20',
       yield: '40',
       time: 30,
+      grindSetting: '1.5',
     })
     expect(updated.dose).toBe('20')
   })
@@ -301,9 +300,10 @@ describe('a Sealed shot', () => {
         coffeeId: coffees[1].id,
         grinderId,
         brewingDeviceId: deviceId,
-        dose: null,
-        yield: null,
-        time: null,
+        dose: '99',
+        yield: '99',
+        time: 99,
+        grindSetting: 'hacked',
       }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' })
 
@@ -331,13 +331,15 @@ describe('a Coffee promoted back onto the Shelf', () => {
         grinderId: promotedGrinder,
         brewingDeviceId: promotedDevice,
         dose: '18',
+        yield: '36',
+        time: 28,
+        grindSetting: '1.5',
       })
     ).id
 
   const addCoffee = async (label: string) =>
     (
-      await asPromoted.coffee.create({
-        name: uniqPromoted(label),
+      await createPromotedCoffee(uniqPromoted(label), {
         roasterId: promotedRoaster,
       })
     ).id

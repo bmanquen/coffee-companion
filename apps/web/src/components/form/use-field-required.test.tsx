@@ -43,16 +43,16 @@ describe('useFieldRequired', () => {
 
   it('is false when the form schema accepts empty', () => {
     function Harness() {
-      const defaultCoffee: InsertCoffee = {
+      const defaultCoffee = {
         name: 'Ethiopia',
-        roasterId: null,
-        roastLevelId: null,
+        roasterId: '',
+        roastLevelId: '',
         countryId: null,
         regionId: null,
         processId: null,
         notes: null,
         isActive: false,
-      }
+      } as InsertCoffee
       const form = useAppForm({
         defaultValues: defaultCoffee,
         validators: { onChange: insertCoffeeSchema },
