@@ -58,7 +58,11 @@ type MethodKey =
 
 const sealedBrewIds: Partial<Record<MethodKey, string>> = {}
 let fallenCoffeeId: string
+let userEspressoDeviceId: string
 let otherCoffeeId: string
+let otherCoffeeName: string
+let otherGrinderId: string
+let otherGrinderName: string
 let otherShotId: string
 
 beforeAll(async () => {
@@ -83,6 +87,7 @@ beforeAll(async () => {
     ).id
   }
   const espressoDevice = await device(ESPRESSO_DEVICE_TYPE)
+  userEspressoDeviceId = espressoDevice
   const aeropressDevice = await device(AEROPRESS_DEVICE_TYPE)
   const pouroverDevice = await device(POUR_OVER_DEVICE_TYPE)
   const frenchpressDevice = await device(FRENCH_PRESS_DEVICE_TYPE)
@@ -177,6 +182,8 @@ beforeAll(async () => {
     name: uniqOther('Other grinder'),
     brand: 'Other',
   })
+  otherGrinderId = otherGrinder.id
+  otherGrinderName = otherGrinder.name
   const otherTypeId = await findOrCreateDeviceType(ESPRESSO_DEVICE_TYPE)
   const otherDevice = await asOther.brewingDevice.create({
     name: uniqOther('Other device'),
@@ -185,6 +192,7 @@ beforeAll(async () => {
   })
   const otherCoffee = await createOtherCoffee(uniqOther('Other coffee'))
   otherCoffeeId = otherCoffee.id
+  otherCoffeeName = otherCoffee.name
   otherShotId = (
     await asOther.espressoShot.create({
       coffeeId: otherCoffee.id,
@@ -276,5 +284,33 @@ describe('account.export', () => {
     )
     expect(other.coffees.map((coffee) => coffee.id)).toContain(otherCoffeeId)
     expect(other.user.id).toBe(OTHER)
+  })
+
+  it('omits another user’s Coffee or grinder nested on an owned Brew', async () => {
+    const shot = await asUser.espressoShot.create({
+      coffeeId: otherCoffeeId,
+      grinderId: otherGrinderId,
+      brewingDeviceId: userEspressoDeviceId,
+      dose: '20',
+      yield: '40',
+      time: 25,
+      grindSetting: 'cross-user',
+    })
+
+    const exported = await asUser.account.export()
+    const brew = exported.brews.espresso.find((row) => row.id === shot.id)
+    expect(brew).toBeDefined()
+    expect(brew?.coffeeId).toBe(otherCoffeeId)
+    expect(brew?.grinderId).toBe(otherGrinderId)
+    expect(brew?.coffee ?? null).toBeNull()
+    expect(brew?.grinder ?? null).toBeNull()
+    expect(JSON.stringify(brew?.coffee)).not.toContain(otherCoffeeName)
+    expect(JSON.stringify(brew?.grinder)).not.toContain(otherGrinderName)
+
+    const ownBrew = exported.brews.espresso.find(
+      (row) => row.id === sealedId('espressoShot'),
+    )
+    expect(ownBrew?.coffee?.id).toBe(fallenCoffeeId)
+    expect(ownBrew?.grinder).toBeTruthy()
   })
 })

@@ -1,16 +1,19 @@
 import { db } from '../db'
 import { authedProcedure, createTRPCRouter } from './init'
 
-const brewWith = {
-  coffee: true,
-  grinder: true,
-  brewingDevice: { with: { type: true } },
-} as const
+// Creates accept any coffeeId/grinderId; only include nested rows this user owns.
+const brewWith = (userId: string) =>
+  ({
+    coffee: { where: { userId } },
+    grinder: { where: { userId } },
+    brewingDevice: { with: { type: true } },
+  }) as const
 
-const brewWithMethod = {
-  ...brewWith,
-  method: true,
-} as const
+const brewWithMethod = (userId: string) =>
+  ({
+    ...brewWith(userId),
+    method: true,
+  }) as const
 
 function accountOf(row: {
   id: string
@@ -62,27 +65,27 @@ export const accountRouter = createTRPCRouter({
       db.query.espressoShots.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        with: brewWith,
+        with: brewWith(userId),
       }),
       db.query.aeropressBrews.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        with: brewWithMethod,
+        with: brewWithMethod(userId),
       }),
       db.query.pouroverBrews.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        with: brewWithMethod,
+        with: brewWithMethod(userId),
       }),
       db.query.frenchpressBrews.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        with: brewWithMethod,
+        with: brewWithMethod(userId),
       }),
       db.query.coldBrewBrews.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        with: brewWith,
+        with: brewWith(userId),
       }),
     ])
 
