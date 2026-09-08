@@ -98,26 +98,31 @@ const MAX_SCRUB_DEPTH = 10
 
 function scrubValue(value: unknown, seen: WeakSet<object>, depth = 0): unknown {
   if (value == null || typeof value !== 'object') return value
+  if (value instanceof Date || value instanceof RegExp) return value
   if (depth >= MAX_SCRUB_DEPTH || seen.has(value)) return '[Truncated]'
   seen.add(value)
 
-  if (Array.isArray(value)) {
-    return value.map((item) => scrubValue(item, seen, depth + 1))
+  const next = depth + 1
+  if (Array.isArray(value) || value instanceof Set) {
+    return Array.from(value, (item) => scrubValue(item, seen, next))
   }
 
-  if (
-    Object.getPrototypeOf(value) !== Object.prototype &&
-    Object.getPrototypeOf(value) !== null
-  ) {
-    return value
+  const entries: [string, unknown][] =
+    value instanceof Map
+      ? Array.from(value, ([key, item]) => [String(key), item])
+      : Object.entries(value)
+  if (value instanceof Error) {
+    entries.unshift(
+      ['name', value.name],
+      ['message', value.message],
+      ['stack', value.stack],
+    )
   }
 
   return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [
+    entries.map(([key, item]) => [
       key,
-      SENSITIVE_KEY.test(key)
-        ? '[Filtered]'
-        : scrubValue(item, seen, depth + 1),
+      SENSITIVE_KEY.test(key) ? '[Filtered]' : scrubValue(item, seen, next),
     ]),
   )
 }

@@ -161,6 +161,40 @@ describe('scrubSentryEvent', () => {
     })
   })
 
+  it('scrubs class instances, Errors, Maps, and Sets', () => {
+    class Account {
+      constructor(
+        public id: string,
+        public email: string,
+      ) {}
+    }
+    const failure = Object.assign(new Error('boom'), { token: 'abc' })
+    const at = new Date('2026-01-01T00:00:00Z')
+
+    const event = scrubSentryEvent({
+      extra: {
+        account: new Account('user_123', 'ada@example.com'),
+        failure,
+        headers: new Map([['authorization', 'Bearer x']]),
+        secrets: new Set([{ password: 'hunter2' }]),
+        at,
+      },
+    })
+
+    expect(event.extra).toEqual({
+      account: { id: 'user_123', email: '[Filtered]' },
+      failure: {
+        name: 'Error',
+        message: 'boom',
+        stack: failure.stack,
+        token: '[Filtered]',
+      },
+      headers: { authorization: '[Filtered]' },
+      secrets: [{ password: '[Filtered]' }],
+      at,
+    })
+  })
+
   it('does not loop on self-referencing extras', () => {
     const loop: Record<string, unknown> = { email: 'ada@example.com' }
     loop.self = loop
