@@ -1,3 +1,4 @@
+import { accountRouter } from './account'
 import { aeropressBrewRouter } from './aeropressBrew'
 import { aeropressMethodRouter } from './aeropressMethod'
 import { brewingDeviceRouter } from './brewingDevice'
@@ -20,6 +21,7 @@ import { roasterRouter } from './roaster'
 import { roastLevelRouter } from './roastLevel'
 
 export const trpcRouter = createTRPCRouter({
+  account: accountRouter,
   country: countryRouter,
   roaster: roasterRouter,
   roastLevel: roastLevelRouter,
