@@ -1,8 +1,4 @@
-// Shared Sentry options. Init is skipped when no DSN is set, so a fresh clone
-// and CI run without monitoring and without crashing. The client only sees the
-// Vite-prefixed DSN; the server reads SENTRY_DSN. They are the same ingest
-// URL for one project, written twice because the browser is not allowed the
-// unprefixed name.
+// Same project DSN, two names: the browser may only see VITE_SENTRY_DSN.
 
 const SENSITIVE_HEADER =
   /^(cookie|set-cookie|authorization|proxy-authorization|x-api-key|stripe-signature)$/i
@@ -66,6 +62,8 @@ export function sentryCommonOptions(dsn: string) {
   }
 }
 
+// Sentry attaches cookies, bodies, and emails unless we strip them —
+// easy to drop.
 export function scrubSentryEvent<T>(event: T): T {
   const next = event as T & SentryEventLike
 

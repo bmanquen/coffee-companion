@@ -1,9 +1,3 @@
-// tRPC's HTTP adapter is where procedure crashes become responses. Expected
-// refusals (unauthenticated, not found, a validation miss) stay out of
-// Sentry; an INTERNAL_SERVER_ERROR is the one that means a user hit a bug
-// on a Plan, Sealing, or billing path. Tags carry the procedure and Plan,
-// never the session or the input.
-
 export type TrpcErrorLike = {
   code: string
   cause?: unknown
@@ -46,6 +40,7 @@ export function reportTrpcError(
   ctx: unknown,
   capture: CaptureException,
 ) {
+  // Only INTERNAL_SERVER_ERROR — expected refusals are not bugs.
   if (error.code !== 'INTERNAL_SERVER_ERROR') return
 
   const tags: Record<string, string> = {

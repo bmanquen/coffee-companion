@@ -115,9 +115,7 @@ export async function planPrices(): Promise<Array<PlanPrice> | null> {
     cached = { prices, until: Date.now() + PRICE_TTL_MS }
     return prices
   } catch (error) {
-    // Still advertise the catalogue rather than a pricing page with no
-    // prices — but a silent Stripe outage is exactly the launch-gate miss
-    // this report is for. No customer, no price id.
+    // Report so a Stripe outage is not silent. No customer or price id.
     reportError(error, { area: 'billing', operation: 'planPrices' })
     cached = { prices: null, until: Date.now() + PRICE_RETRY_MS }
     return null
