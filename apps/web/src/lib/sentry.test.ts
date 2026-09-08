@@ -144,4 +144,31 @@ describe('scrubSentryEvent', () => {
       operation: 'planPrices',
     })
   })
+
+  it('filters sensitive keys nested in objects and arrays', () => {
+    const event = scrubSentryEvent({
+      extra: {
+        user: { id: 'user_123', email: 'ada@example.com' },
+        attempts: [{ token: 'abc', status: 500 }, 'plain'],
+        input: { profile: { phone: '555-0100', name: 'Ada' } },
+      },
+    })
+
+    expect(event.extra).toEqual({
+      user: { id: 'user_123', email: '[Filtered]' },
+      attempts: [{ token: '[Filtered]', status: 500 }, 'plain'],
+      input: { profile: { phone: '[Filtered]', name: 'Ada' } },
+    })
+  })
+
+  it('does not loop on self-referencing extras', () => {
+    const loop: Record<string, unknown> = { email: 'ada@example.com' }
+    loop.self = loop
+
+    const event = scrubSentryEvent({ extra: { loop } })
+
+    expect(event.extra).toEqual({
+      loop: { email: '[Filtered]', self: '[Truncated]' },
+    })
+  })
 })
