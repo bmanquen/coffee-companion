@@ -21,7 +21,9 @@ import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute('/_authenticated/account')({
   loader: ({ context }) =>
-    context.queryClient.ensureQueryData(context.trpc.plan.current.queryOptions()),
+    context.queryClient.ensureQueryData(
+      context.trpc.plan.current.queryOptions(),
+    ),
   component: AccountContainer,
 })
 
