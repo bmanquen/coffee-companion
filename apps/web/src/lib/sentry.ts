@@ -91,10 +91,33 @@ export function scrubSentryEvent<T>(event: T): T {
 }
 
 function scrubRecord(record: Record<string, unknown>): Record<string, unknown> {
+  return scrubValue(record, new WeakSet()) as Record<string, unknown>
+}
+
+const MAX_SCRUB_DEPTH = 10
+
+function scrubValue(value: unknown, seen: WeakSet<object>, depth = 0): unknown {
+  if (value == null || typeof value !== 'object') return value
+  if (depth >= MAX_SCRUB_DEPTH || seen.has(value)) return '[Truncated]'
+  seen.add(value)
+
+  if (Array.isArray(value)) {
+    return value.map((item) => scrubValue(item, seen, depth + 1))
+  }
+
+  if (
+    Object.getPrototypeOf(value) !== Object.prototype &&
+    Object.getPrototypeOf(value) !== null
+  ) {
+    return value
+  }
+
   return Object.fromEntries(
-    Object.entries(record).map(([key, value]) => [
+    Object.entries(value).map(([key, item]) => [
       key,
-      SENSITIVE_KEY.test(key) ? '[Filtered]' : value,
+      SENSITIVE_KEY.test(key)
+        ? '[Filtered]'
+        : scrubValue(item, seen, depth + 1),
     ]),
   )
 }
