@@ -37,47 +37,54 @@ export const accountRouter = createTRPCRouter({
   export: authedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id
 
-    const [row, coffeeRows, espresso, aeropress, pourover, frenchPress, coldBrew] =
-      await Promise.all([
-        db.query.user.findFirst({ where: { id: userId } }),
-        db.query.coffees.findMany({
-          where: { userId },
-          orderBy: { updatedAt: 'desc' },
-          with: {
-            country: true,
-            region: true,
-            process: true,
-            roaster: true,
-            roastLevel: true,
-            coffeesVarieties: { with: { variety: true } },
-          },
-        }),
-        db.query.espressoShots.findMany({
-          where: { userId },
-          orderBy: { createdAt: 'desc' },
-          with: brewWith,
-        }),
-        db.query.aeropressBrews.findMany({
-          where: { userId },
-          orderBy: { createdAt: 'desc' },
-          with: brewWithMethod,
-        }),
-        db.query.pouroverBrews.findMany({
-          where: { userId },
-          orderBy: { createdAt: 'desc' },
-          with: brewWithMethod,
-        }),
-        db.query.frenchpressBrews.findMany({
-          where: { userId },
-          orderBy: { createdAt: 'desc' },
-          with: brewWithMethod,
-        }),
-        db.query.coldBrewBrews.findMany({
-          where: { userId },
-          orderBy: { createdAt: 'desc' },
-          with: brewWith,
-        }),
-      ])
+    const [
+      row,
+      coffeeRows,
+      espresso,
+      aeropress,
+      pourover,
+      frenchPress,
+      coldBrew,
+    ] = await Promise.all([
+      db.query.user.findFirst({ where: { id: userId } }),
+      db.query.coffees.findMany({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        with: {
+          country: true,
+          region: true,
+          process: true,
+          roaster: true,
+          roastLevel: true,
+          coffeesVarieties: { with: { variety: true } },
+        },
+      }),
+      db.query.espressoShots.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        with: brewWith,
+      }),
+      db.query.aeropressBrews.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        with: brewWithMethod,
+      }),
+      db.query.pouroverBrews.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        with: brewWithMethod,
+      }),
+      db.query.frenchpressBrews.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        with: brewWithMethod,
+      }),
+      db.query.coldBrewBrews.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        with: brewWith,
+      }),
+    ])
 
     return {
       user: accountOf(row ?? ctx.session.user),

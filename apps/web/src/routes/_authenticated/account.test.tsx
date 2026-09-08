@@ -101,9 +101,9 @@ describe('AccountScreen', () => {
     expect(
       screen.queryByRole('button', { name: 'Manage subscription' }),
     ).toBeNull()
-    expect(screen.getByRole('link', { name: 'See plans' }).getAttribute('href')).toBe(
-      '/pricing',
-    )
+    expect(
+      screen.getByRole('link', { name: 'See plans' }).getAttribute('href'),
+    ).toBe('/pricing')
   })
 
   it('says when access ends once a cancellation is pending', () => {
