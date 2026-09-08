@@ -38,6 +38,20 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 
 const user = { name: 'Ada Lovelace', email: 'ada@example.com' }
 
+function renderAccount(
+  props: Partial<Parameters<typeof AccountScreen>[0]> = {},
+) {
+  return render(
+    <AccountScreen
+      user={user}
+      plan="pro"
+      subscription={null}
+      onExport={vi.fn()}
+      {...props}
+    />,
+  )
+}
+
 describe('AccountScreen', () => {
   beforeEach(() => {
     mocks.billingPortal.mockReset()
@@ -46,7 +60,7 @@ describe('AccountScreen', () => {
   })
 
   it('shows who is signed in and the Plan they hold', () => {
-    render(<AccountScreen user={user} plan="pro" subscription={null} />)
+    renderAccount()
 
     expect(screen.getByText('Ada Lovelace')).toBeTruthy()
     expect(screen.getByText('ada@example.com')).toBeTruthy()
@@ -54,13 +68,9 @@ describe('AccountScreen', () => {
   })
 
   it('offers a subscriber the chance to manage their Subscription', async () => {
-    render(
-      <AccountScreen
-        user={user}
-        plan="pro"
-        subscription={{ plan: 'pro', endsAt: null }}
-      />,
-    )
+    renderAccount({
+      subscription: { plan: 'pro', endsAt: null },
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Manage subscription' }))
 
@@ -76,13 +86,9 @@ describe('AccountScreen', () => {
       data: null,
       error: { message: 'Customer not found' },
     })
-    render(
-      <AccountScreen
-        user={user}
-        plan="pro"
-        subscription={{ plan: 'pro', endsAt: null }}
-      />,
-    )
+    renderAccount({
+      subscription: { plan: 'pro', endsAt: null },
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Manage subscription' }))
 
@@ -90,7 +96,7 @@ describe('AccountScreen', () => {
   })
 
   it('points someone with no Subscription at the plans instead', () => {
-    render(<AccountScreen user={user} plan="pro" subscription={null} />)
+    renderAccount()
 
     expect(
       screen.queryByRole('button', { name: 'Manage subscription' }),
@@ -101,29 +107,50 @@ describe('AccountScreen', () => {
   })
 
   it('says when access ends once a cancellation is pending', () => {
-    render(
-      <AccountScreen
-        user={user}
-        plan="pro"
-        subscription={{
-          plan: 'pro',
-          endsAt: new Date('2026-10-14T09:30:00.000Z'),
-        }}
-      />,
-    )
+    renderAccount({
+      subscription: {
+        plan: 'pro',
+        endsAt: new Date('2026-10-14T09:30:00.000Z'),
+      },
+    })
 
     expect(screen.getByText(/Pro until October 14(th)?, 2026/)).toBeTruthy()
   })
 
   it('does not speak of an ending while none is pending', () => {
-    render(
-      <AccountScreen
-        user={user}
-        plan="pro"
-        subscription={{ plan: 'pro', endsAt: null }}
-      />,
-    )
+    renderAccount({
+      subscription: { plan: 'pro', endsAt: null },
+    })
 
     expect(screen.queryByText(/until/)).toBeNull()
+  })
+
+  it('offers an export of account data', () => {
+    renderAccount()
+
+    expect(screen.getByRole('button', { name: 'Export data' })).toBeTruthy()
+  })
+
+  it('exports when asked', async () => {
+    const onExport = vi.fn().mockResolvedValue(undefined)
+    renderAccount({ onExport })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export data' }))
+
+    await waitFor(() => expect(onExport).toHaveBeenCalled())
+  })
+
+  it('says so when the export could not be built', async () => {
+    const onExport = vi.fn().mockRejectedValue(new Error('unavailable'))
+    renderAccount({ onExport })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export data' }))
+
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        'We could not export your data',
+        expect.objectContaining({ description: 'Please try again.' }),
+      ),
+    )
   })
 })

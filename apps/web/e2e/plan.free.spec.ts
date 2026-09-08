@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import {
   FREE_GEAR,
   OFF_SHELF_COFFEE,
@@ -127,4 +128,31 @@ test('an off-Shelf coffee is still loggable, and the new brew reads straight awa
   await expect(
     rowFor(page, OFF_SHELF_COFFEE.name).filter({ hasText: 'Sealed' }).first(),
   ).toBeVisible()
+})
+
+test('a Free user can export Sealed Brews in full', async ({ page }) => {
+  await page.goto('/account')
+
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export data' }).click()
+  const download = await downloadPromise
+  const path = await download.path()
+  if (!path) throw new Error('export download wrote no file')
+
+  const exported = JSON.parse(readFileSync(path, 'utf8')) as {
+    brews: {
+      espresso: Array<{
+        coffee: { name: string }
+        grindSetting: string | null
+        dose: string | null
+      }>
+    }
+  }
+  const sealed = exported.brews.espresso.find(
+    (brew) => brew.coffee.name === OFF_SHELF_DIALED_IN_COFFEE.name,
+  )
+
+  expect(download.suggestedFilename()).toBe('coffee-companion-export.json')
+  expect(sealed?.grindSetting).toBe(OFF_SHELF_DIALED_IN_COFFEE.grindSetting)
+  expect(sealed?.dose).toBe('18')
 })

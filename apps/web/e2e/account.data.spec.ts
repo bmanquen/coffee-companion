@@ -21,6 +21,12 @@ test('shows the Plan a Grant confers, with nothing to manage', async ({
   )
 })
 
+test('offers an export of account data', async ({ page }) => {
+  await page.goto('/account')
+
+  await expect(page.getByRole('button', { name: 'Export data' })).toBeVisible()
+})
+
 test('is reachable from the account menu', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/dashboard')
