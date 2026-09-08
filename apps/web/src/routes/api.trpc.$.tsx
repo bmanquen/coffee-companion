@@ -11,9 +11,8 @@ function handler({ request }: { request: Request }) {
     endpoint: '/api/trpc',
     createContext: () => ({ headers: request.headers }),
     onError: ({ error, path, ctx }) => {
-      // Goes through the API reporter, not a Sentry import: this file sits
-      // in the route tree, and a static Sentry import here loads the Node
-      // SDK into the SSR router chunk.
+      // Not a Sentry import: this file is in the route tree and would
+      // pull the Node SDK into the SSR router.
       reportTrpcError(error, path, ctx, (exception, context) => {
         reportError(exception, context.tags)
       })

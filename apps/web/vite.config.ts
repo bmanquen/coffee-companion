@@ -7,8 +7,7 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
 
-// Source-map upload is optional and needs all three. Without them the plugin
-// is omitted so a fresh clone and CI still build.
+// Source-map upload needs org, project, and auth token together.
 function sentrySourceMaps() {
   const org = process.env.SENTRY_ORG
   const project = process.env.SENTRY_PROJECT
@@ -17,15 +16,12 @@ function sentrySourceMaps() {
   return [sentryTanstackStart({ org, project, authToken })]
 }
 
-// Sentry's Node SDK (and the OpenTelemetry hooks it pulls in) cannot be
-// bundled by Nitro's Rollup pass — the dual client/server export map
-// crashes getVariableForExportName. Leave them as Node builtins of the
-// output so `node .output/server/index.mjs` loads them from node_modules.
+// Nitro's Rollup crashes on Sentry's dual client/server export map — leave these
+// external so Node loads them from node_modules.
 //
-// better-auth starts importing @opentelemetry/semantic-conventions once
-// Sentry brings @opentelemetry/api onto the graph. The SSR router leaves
-// that import bare, so the package is a direct apps/web dependency —
-// otherwise Node cannot resolve it from .output/server/_ssr.
+// Sentry pulls @opentelemetry/api onto the graph; better-auth then imports
+// @opentelemetry/semantic-conventions. The SSR router leaves that import bare,
+// so it is a direct apps/web dependency.
 const sentryServerExternals = [
   /^@sentry\//,
   /^@opentelemetry\//,

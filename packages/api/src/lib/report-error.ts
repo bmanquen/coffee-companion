@@ -1,6 +1,5 @@
-// A place for swallowed errors to go so they can still be seen. The web app
-// wires this to Sentry when a DSN is set; without that, reporting is a no-op
-// and nothing fails — the same shape as outbound mail and billing.
+// Seam so the API never imports Sentry — a static import puts the Node
+// SDK on the SSR graph.
 
 export type ErrorTags = Record<string, string>
 
