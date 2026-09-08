@@ -107,7 +107,7 @@ function scrubValue(value: unknown, seen: WeakSet<object>, depth = 0): unknown {
     return Array.from(value, (item) => scrubValue(item, seen, next))
   }
 
-  const entries: [string, unknown][] =
+  const entries: Array<[string, unknown]> =
     value instanceof Map
       ? Array.from(value, ([key, item]) => [String(key), item])
       : Object.entries(value)
