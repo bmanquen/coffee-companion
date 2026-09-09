@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { inflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 
 import { APP_ICON_EXPORTS, APP_ICON_SOURCE } from './app-icon-exports'
@@ -19,27 +20,105 @@ function pngSize(bytes: Buffer) {
   }
 }
 
-function icoImageSizes(bytes: Buffer) {
+function paethPredictor(left: number, up: number, upLeft: number) {
+  const p = left + up - upLeft
+  const pa = Math.abs(p - left)
+  const pb = Math.abs(p - up)
+  const pc = Math.abs(p - upLeft)
+  if (pa <= pb && pa <= pc) return left
+  if (pb <= pc) return up
+  return upLeft
+}
+
+function pngRgbaAt(bytes: Buffer, x: number, y: number) {
+  expect(bytes[24]).toBe(8)
+  expect(bytes[25]).toBe(6)
+
+  const { width, height } = pngSize(bytes)
+  const idats: Array<Buffer> = []
+  let offset = 8
+  while (offset + 8 <= bytes.length) {
+    const length = bytes.readUInt32BE(offset)
+    const type = bytes.subarray(offset + 4, offset + 8).toString('ascii')
+    if (type === 'IDAT') {
+      idats.push(bytes.subarray(offset + 8, offset + 8 + length))
+    }
+    offset += 12 + length
+  }
+
+  const raw = inflateSync(Buffer.concat(idats))
+  const stride = width * 4
+  const pixels = Buffer.alloc(height * stride)
+  let src = 0
+  for (let row = 0; row < height; row++) {
+    const filter = raw[src++]
+    const dest = row * stride
+    for (let i = 0; i < stride; i++) {
+      const byte = raw[src++]
+      const left = i >= 4 ? pixels[dest + i - 4] : 0
+      const up = row > 0 ? pixels[dest - stride + i] : 0
+      const upLeft = row > 0 && i >= 4 ? pixels[dest - stride + i - 4] : 0
+      let recon = byte
+      if (filter === 1) recon = (byte + left) & 255
+      else if (filter === 2) recon = (byte + up) & 255
+      else if (filter === 3) recon = (byte + Math.floor((left + up) / 2)) & 255
+      else if (filter === 4)
+        recon = (byte + paethPredictor(left, up, upLeft)) & 255
+      else if (filter !== 0) throw new Error(`unsupported PNG filter ${filter}`)
+      pixels[dest + i] = recon
+    }
+  }
+
+  const i = (y * width + x) * 4
+  return {
+    r: pixels[i],
+    g: pixels[i + 1],
+    b: pixels[i + 2],
+    a: pixels[i + 3],
+  }
+}
+
+function icoPngs(bytes: Buffer) {
   expect(bytes.readUInt16LE(0)).toBe(0)
   expect(bytes.readUInt16LE(2)).toBe(1)
   const count = bytes.readUInt16LE(4)
-  const sizes: Array<number> = []
+  const images: Array<{ size: number; png: Buffer }> = []
   for (let i = 0; i < count; i++) {
     const entry = 6 + i * 16
-    const width = bytes.readUInt8(entry)
-    const height = bytes.readUInt8(entry + 1)
+    const size = bytes.readUInt8(entry)
     const byteCount = bytes.readUInt32LE(entry + 8)
     const offset = bytes.readUInt32LE(entry + 12)
-    expect(
-      pngSize(bytes.subarray(offset, offset + byteCount)),
-      `${width}x${height}`,
-    ).toEqual({
-      width,
-      height,
+    images.push({
+      size,
+      png: bytes.subarray(offset, offset + byteCount),
     })
-    sizes.push(width)
   }
-  return sizes
+  return images
+}
+
+function icoImageSizes(bytes: Buffer) {
+  return icoPngs(bytes).map(({ size, png }) => {
+    expect(pngSize(png), `${size}x${size}`).toEqual({
+      width: size,
+      height: size,
+    })
+    return size
+  })
+}
+
+function expectRoundedCornersStay(bytes: Buffer, label: string) {
+  const { width, height } = pngSize(bytes)
+  expect(pngRgbaAt(bytes, 0, 0).a, `${label} top-left`).toBe(0)
+  expect(pngRgbaAt(bytes, width - 1, 0).a, `${label} top-right`).toBe(0)
+  expect(pngRgbaAt(bytes, 0, height - 1).a, `${label} bottom-left`).toBe(0)
+  expect(
+    pngRgbaAt(bytes, width - 1, height - 1).a,
+    `${label} bottom-right`,
+  ).toBe(0)
+  expect(
+    pngRgbaAt(bytes, Math.floor(width / 2), Math.floor(height / 2)).a,
+    `${label} center`,
+  ).toBe(255)
 }
 
 describe('app icon exports', () => {
@@ -63,6 +142,7 @@ describe('app icon exports', () => {
         width: exp.size,
         height: exp.size,
       })
+      expectRoundedCornersStay(bytes, exp.file)
     }
   })
 
@@ -73,6 +153,12 @@ describe('app icon exports', () => {
 
     const bytes = readFileSync(join(webRoot, 'public', 'favicon.ico'))
     expect(icoImageSizes(bytes)).toEqual([16, 24, 32, 64])
+    for (const image of icoPngs(bytes)) {
+      expectRoundedCornersStay(
+        image.png,
+        `favicon.ico ${image.size}x${image.size}`,
+      )
+    }
   })
 
   it('rasterizes those files after a normal install, without a browser', () => {
@@ -86,14 +172,18 @@ describe('app icon exports', () => {
             width: exp.size,
             height: exp.size,
           })
+          expectRoundedCornersStay(bytes, exp.file)
         } else {
           expect(icoImageSizes(bytes), exp.file).toEqual([16, 24, 32, 64])
+          for (const image of icoPngs(bytes)) {
+            expectRoundedCornersStay(
+              image.png,
+              `${exp.file} ${image.size}x${image.size}`,
+            )
+          }
         }
+        expect(bytes).toEqual(readFileSync(join(webRoot, 'public', exp.file)))
       }
-      // Drift check: a forgotten regen would leave the scaffold .ico committed.
-      expect(readFileSync(join(dest, 'favicon.ico'))).toEqual(
-        readFileSync(join(webRoot, 'public', 'favicon.ico')),
-      )
     } finally {
       rmSync(dest, { recursive: true, force: true })
     }
