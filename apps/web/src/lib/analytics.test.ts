@@ -54,7 +54,7 @@ describe('analyticsHost', () => {
 })
 
 describe('pageViewFrom', () => {
-  it('carries the pathname and the matched route pattern, never the search', () => {
+  it('carries the matched route pattern, never the resolved id or the search', () => {
     const location = { pathname: '/brews/42/edit', search: { tab: 'notes' } }
     expect(
       pageViewFrom(location, [
@@ -62,9 +62,8 @@ describe('pageViewFrom', () => {
         { fullPath: '/brews/$brewId/edit' },
       ]),
     ).toEqual({
-      $pathname: '/brews/42/edit',
-      $current_url: '/brews/42/edit',
-      route: '/brews/$brewId/edit',
+      $pathname: '/brews/$brewId/edit',
+      $current_url: '/brews/$brewId/edit',
     })
   })
 
@@ -72,7 +71,6 @@ describe('pageViewFrom', () => {
     expect(pageViewFrom({ pathname: '/missing' }, [])).toEqual({
       $pathname: '/missing',
       $current_url: '/missing',
-      route: '/missing',
     })
   })
 })
@@ -93,18 +91,17 @@ describe('the analytics facade', () => {
     const client = fake()
     setAnalyticsClient(client)
 
-    trackPageView({ $pathname: '/', $current_url: '/', route: '/' })
+    trackPageView({ $pathname: '/', $current_url: '/' })
 
     expect(client.capture).toHaveBeenCalledWith('$pageview', {
       $pathname: '/',
       $current_url: '/',
-      route: '/',
     })
   })
 
   it('drops everything when no client was booted', () => {
     expect(() =>
-      trackPageView({ $pathname: '/', $current_url: '/', route: '/' }),
+      trackPageView({ $pathname: '/', $current_url: '/' }),
     ).not.toThrow()
   })
 
@@ -152,7 +149,7 @@ describe('the analytics facade', () => {
     setAnalyticsClient(client)
     vi.stubGlobal('window', undefined)
 
-    trackPageView({ $pathname: '/', $current_url: '/', route: '/' })
+    trackPageView({ $pathname: '/', $current_url: '/' })
 
     expect(client.capture).not.toHaveBeenCalled()
   })
