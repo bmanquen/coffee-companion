@@ -61,7 +61,9 @@ which would be a dev server on the development database.
 pnpm test:e2e
 ```
 
-## Error monitoring
+## Observability
+
+### Error monitoring
 
 Production errors go to [Sentry](https://sentry.io) when a DSN is set. Set both
 to the same project DSN — the Vite-prefixed name is what the browser bundle may
@@ -74,6 +76,18 @@ VITE_SENTRY_DSN=
 
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` together upload source
 maps at build time.
+
+### Product analytics
+
+Page views and a few named funnel events go to [PostHog](https://posthog.com)
+when a project key is set. Autocapture, session recording, and surveys are off;
+a signed-in user is known to PostHog by their user id only. The host defaults
+to PostHog's US cloud:
+
+```
+VITE_POSTHOG_KEY=
+VITE_POSTHOG_HOST=
+```
 
 ## Styling
 

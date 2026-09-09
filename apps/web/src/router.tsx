@@ -1,6 +1,7 @@
 import { createRouter } from '@tanstack/react-router'
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
 import { RootError } from './components/root-error'
+import { pageViewFrom, trackPageView } from './lib/analytics'
 import * as TanstackQuery from './integrations/tanstack-query/root-provider'
 
 // Import the generated route tree
@@ -25,6 +26,11 @@ export const getRouter = () => {
   })
 
   setupRouterSsrQueryIntegration({ router, queryClient: rqContext.queryClient })
+
+  // One page view per resolved navigation, the initial load included.
+  router.subscribe('onResolved', ({ toLocation }) => {
+    trackPageView(pageViewFrom(toLocation, router.state.matches))
+  })
 
   return router
 }

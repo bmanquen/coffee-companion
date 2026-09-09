@@ -1,5 +1,6 @@
 // Sentry first, so errors before hydration are still captured.
 import './instrument.client'
+import './analytics.client'
 
 import { StartClient } from '@tanstack/react-start/client'
 import { StrictMode } from 'react'
