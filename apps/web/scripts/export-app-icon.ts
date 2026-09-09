@@ -51,11 +51,14 @@ function pngsToIco(images: Array<{ size: number; png: Buffer }>) {
   ])
 }
 
-export function exportAppIcon(destDir = join(webRoot, 'public')) {
+export function exportAppIcon(
+  destDir = join(webRoot, 'public'),
+  targets: Array<(typeof APP_ICON_EXPORTS)[number]> = APP_ICON_EXPORTS,
+) {
   const svg = readFileSync(join(webRoot, APP_ICON_SOURCE))
   mkdirSync(destDir, { recursive: true })
 
-  for (const exp of APP_ICON_EXPORTS) {
+  for (const exp of targets) {
     if (exp.format === 'png') {
       writeFileSync(join(destDir, exp.file), rasterPng(svg, exp.size))
       continue
