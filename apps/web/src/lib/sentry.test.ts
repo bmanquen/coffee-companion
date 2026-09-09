@@ -6,18 +6,34 @@ import {
   sentryEnabled,
   sentryEnvironment,
   sentryServerDsn,
-  trimDsn,
+  sentryTracesSampleRate,
+  traceSampleRate,
+  trimSetting,
 } from './sentry'
 
-describe('trimDsn', () => {
+// Restores the named variables after each test in the enclosing describe.
+function restoreEnv(...names: Array<string>) {
+  const saved = Object.fromEntries(
+    names.map((name) => [name, process.env[name]]),
+  )
+
+  afterEach(() => {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+  })
+}
+
+describe('trimSetting', () => {
   it('treats blank and whitespace as unset', () => {
-    expect(trimDsn(undefined)).toBeUndefined()
-    expect(trimDsn('')).toBeUndefined()
-    expect(trimDsn('   ')).toBeUndefined()
+    expect(trimSetting(undefined)).toBeUndefined()
+    expect(trimSetting('')).toBeUndefined()
+    expect(trimSetting('   ')).toBeUndefined()
   })
 
-  it('keeps a real DSN', () => {
-    expect(trimDsn(' https://key@o1.ingest.sentry.io/1 ')).toBe(
+  it('keeps a real value', () => {
+    expect(trimSetting(' https://key@o1.ingest.sentry.io/1 ')).toBe(
       'https://key@o1.ingest.sentry.io/1',
     )
   })
@@ -34,12 +50,7 @@ describe('sentryEnabled', () => {
 })
 
 describe('sentryServerDsn', () => {
-  const saved = process.env.SENTRY_DSN
-
-  afterEach(() => {
-    if (saved === undefined) delete process.env.SENTRY_DSN
-    else process.env.SENTRY_DSN = saved
-  })
+  restoreEnv('SENTRY_DSN')
 
   it('reads SENTRY_DSN and ignores a blank value', () => {
     delete process.env.SENTRY_DSN
@@ -54,17 +65,7 @@ describe('sentryServerDsn', () => {
 })
 
 describe('sentryEnvironment', () => {
-  const saved = {
-    SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT,
-    NODE_ENV: process.env.NODE_ENV,
-  }
-
-  afterEach(() => {
-    for (const [name, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[name]
-      else process.env[name] = value
-    }
-  })
+  restoreEnv('SENTRY_ENVIRONMENT', 'NODE_ENV')
 
   it('prefers SENTRY_ENVIRONMENT over NODE_ENV', () => {
     process.env.NODE_ENV = 'production'
@@ -79,11 +80,74 @@ describe('sentryEnvironment', () => {
   })
 })
 
+describe('traceSampleRate', () => {
+  it('samples everything outside production by default', () => {
+    expect(traceSampleRate(undefined, 'development')).toBe(1)
+    expect(traceSampleRate(undefined, 'test')).toBe(1)
+  })
+
+  it('samples a tenth in production by default', () => {
+    expect(traceSampleRate(undefined, 'production')).toBe(0.1)
+  })
+
+  it('lets a valid value override the default', () => {
+    expect(traceSampleRate('0.25', 'production')).toBe(0.25)
+    expect(traceSampleRate(' 0 ', 'development')).toBe(0)
+    expect(traceSampleRate('1', 'production')).toBe(1)
+  })
+
+  it('falls back when the value is blank', () => {
+    expect(traceSampleRate('', 'production')).toBe(0.1)
+    expect(traceSampleRate('   ', 'development')).toBe(1)
+  })
+
+  it('falls back when the value is not a number', () => {
+    expect(traceSampleRate('lots', 'production')).toBe(0.1)
+    expect(traceSampleRate('NaN', 'development')).toBe(1)
+    expect(traceSampleRate('Infinity', 'development')).toBe(1)
+  })
+
+  it('falls back when the value is negative', () => {
+    expect(traceSampleRate('-0.5', 'production')).toBe(0.1)
+  })
+
+  it('falls back when the value is greater than one', () => {
+    expect(traceSampleRate('1.5', 'development')).toBe(1)
+    expect(traceSampleRate('10', 'production')).toBe(0.1)
+  })
+})
+
+describe('sentryTracesSampleRate', () => {
+  restoreEnv('SENTRY_TRACES_SAMPLE_RATE', 'SENTRY_ENVIRONMENT')
+
+  it('reads SENTRY_TRACES_SAMPLE_RATE against the Sentry environment', () => {
+    process.env.SENTRY_ENVIRONMENT = 'production'
+    delete process.env.SENTRY_TRACES_SAMPLE_RATE
+    expect(sentryTracesSampleRate()).toBe(0.1)
+
+    process.env.SENTRY_TRACES_SAMPLE_RATE = '0.5'
+    expect(sentryTracesSampleRate()).toBe(0.5)
+
+    process.env.SENTRY_TRACES_SAMPLE_RATE = 'nope'
+    expect(sentryTracesSampleRate()).toBe(0.1)
+  })
+})
+
 describe('sentryCommonOptions', () => {
+  restoreEnv('SENTRY_TRACES_SAMPLE_RATE', 'SENTRY_ENVIRONMENT')
+
   it('does not send default PII', () => {
     expect(
       sentryCommonOptions('https://key@o1.ingest.sentry.io/1').sendDefaultPii,
     ).toBe(false)
+  })
+
+  it('carries the traces sample rate', () => {
+    process.env.SENTRY_ENVIRONMENT = 'production'
+    process.env.SENTRY_TRACES_SAMPLE_RATE = '0.2'
+    expect(
+      sentryCommonOptions('https://key@o1.ingest.sentry.io/1').tracesSampleRate,
+    ).toBe(0.2)
   })
 })
 
@@ -156,6 +220,29 @@ describe('scrubSentryEvent', () => {
 
     expect(event.request).toEqual({
       headers: { 'Content-Type': 'application/json' },
+    })
+  })
+
+  it('scrubs a transaction the same way as an error', () => {
+    const event = scrubSentryEvent({
+      type: 'transaction' as const,
+      transaction: '/dashboard',
+      user: { id: 'user_123', email: 'ada@example.com' },
+      request: {
+        cookies: { better_auth: 'session' },
+        data: { email: 'ada@example.com' },
+        headers: {
+          Accept: 'text/html',
+          Cookie: 'better_auth=session',
+        },
+      },
+    })
+
+    expect(event).toEqual({
+      type: 'transaction',
+      transaction: '/dashboard',
+      user: { id: 'user_123' },
+      request: { headers: { Accept: 'text/html' } },
     })
   })
 

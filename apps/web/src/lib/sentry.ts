@@ -1,4 +1,4 @@
-// Same project DSN, two names: the browser may only see VITE_SENTRY_DSN.
+// Same project settings, two names: the browser may only see the VITE_ twins.
 
 const SENSITIVE_HEADER =
   /^(cookie|set-cookie|authorization|proxy-authorization|x-api-key|stripe-signature)$/i
@@ -26,18 +26,18 @@ export type SentryEventLike = {
   exception?: { values?: Array<{ type?: string }> }
 }
 
-export function trimDsn(value: string | undefined): string | undefined {
+export function trimSetting(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
   return trimmed || undefined
 }
 
 export function sentryClientDsn(): string | undefined {
-  return trimDsn(import.meta.env.VITE_SENTRY_DSN)
+  return trimSetting(import.meta.env.VITE_SENTRY_DSN)
 }
 
 export function sentryServerDsn(): string | undefined {
   if (typeof process === 'undefined') return undefined
-  return trimDsn(process.env.SENTRY_DSN)
+  return trimSetting(process.env.SENTRY_DSN)
 }
 
 export function sentryEnabled(dsn: string | undefined): dsn is string {
@@ -47,12 +47,32 @@ export function sentryEnabled(dsn: string | undefined): dsn is string {
 export function sentryEnvironment(): string {
   if (typeof process !== 'undefined') {
     return (
-      trimDsn(process.env.SENTRY_ENVIRONMENT) ??
-      trimDsn(process.env.NODE_ENV) ??
+      trimSetting(process.env.SENTRY_ENVIRONMENT) ??
+      trimSetting(process.env.NODE_ENV) ??
       'development'
     )
   }
   return import.meta.env.MODE || 'development'
+}
+
+export function traceSampleRate(
+  value: string | undefined,
+  environment: string,
+): number {
+  const fallback = environment === 'production' ? 0.1 : 1
+  const trimmed = trimSetting(value)
+  if (trimmed === undefined) return fallback
+  const rate = Number(trimmed)
+  if (!Number.isFinite(rate) || rate < 0 || rate > 1) return fallback
+  return rate
+}
+
+export function sentryTracesSampleRate(): number {
+  const value =
+    typeof process !== 'undefined'
+      ? process.env.SENTRY_TRACES_SAMPLE_RATE
+      : import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE
+  return traceSampleRate(value, sentryEnvironment())
 }
 
 export function sentryCommonOptions(dsn: string) {
@@ -60,6 +80,7 @@ export function sentryCommonOptions(dsn: string) {
     dsn,
     environment: sentryEnvironment(),
     sendDefaultPii: false,
+    tracesSampleRate: sentryTracesSampleRate(),
   }
 }
 

@@ -74,6 +74,16 @@ SENTRY_DSN=
 VITE_SENTRY_DSN=
 ```
 
+With a DSN set, page loads, navigations, tRPC calls, and server requests are
+traced too. The sample rate defaults to `1` outside production and `0.1` in
+production; a value from `0` to `1` in the same two-name shape overrides it, and
+anything else falls back to the default:
+
+```
+SENTRY_TRACES_SAMPLE_RATE=
+VITE_SENTRY_TRACES_SAMPLE_RATE=
+```
+
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` together upload source
 maps at build time.
 

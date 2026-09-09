@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/tanstackstart-react'
 import { createRouter } from '@tanstack/react-router'
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
 import { RootError } from './components/root-error'
@@ -26,6 +27,12 @@ export const getRouter = () => {
   })
 
   setupRouterSsrQueryIntegration({ router, queryClient: rqContext.queryClient })
+
+  if (!router.isServer) {
+    Sentry.addIntegration(
+      Sentry.tanstackRouterBrowserTracingIntegration(router),
+    )
+  }
 
   // onResolved fires for the initial load too.
   router.subscribe('onResolved', ({ toLocation }) => {
