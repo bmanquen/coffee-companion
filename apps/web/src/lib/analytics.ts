@@ -22,12 +22,12 @@ export function analyticsEnabled(key: string | undefined): key is string {
   return key != null
 }
 
+// Both carry the matched route pattern, so a Brew's edit page is one route
+// rather than one per id. $current_url overrides the SDK's own value, which
+// would carry the resolved ids and the query string.
 export type PageView = {
   $pathname: string
-  // Overrides the SDK's own value, which would carry the query string.
   $current_url: string
-  // The route pattern, so a Brew's edit page is one route rather than one per id.
-  route: string
 }
 
 export function pageViewFrom(
@@ -35,11 +35,7 @@ export function pageViewFrom(
   matches: ReadonlyArray<{ fullPath: string }>,
 ): PageView {
   const route = matches.at(-1)?.fullPath ?? location.pathname
-  return {
-    $pathname: location.pathname,
-    $current_url: location.pathname,
-    route,
-  }
+  return { $pathname: route, $current_url: route }
 }
 
 export type AnalyticsClient = {
