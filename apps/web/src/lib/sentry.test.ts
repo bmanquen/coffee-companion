@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  isAbortEvent,
   scrubSentryEvent,
   sentryCommonOptions,
   sentryEnabled,
@@ -83,6 +84,37 @@ describe('sentryCommonOptions', () => {
     expect(
       sentryCommonOptions('https://key@o1.ingest.sentry.io/1').sendDefaultPii,
     ).toBe(false)
+  })
+})
+
+describe('isAbortEvent', () => {
+  it('drops the aborted fetch WebKit reports after a batch stream drains', () => {
+    expect(
+      isAbortEvent({
+        exception: {
+          values: [{ type: 'AbortError', value: 'Fetch is aborted' }],
+        },
+      }),
+    ).toBe(true)
+  })
+
+  it('keeps a real failure, and one merely chained onto an abort', () => {
+    expect(
+      isAbortEvent({
+        exception: { values: [{ type: 'TypeError' }] },
+      }),
+    ).toBe(false)
+
+    expect(
+      isAbortEvent({
+        exception: { values: [{ type: 'AbortError' }, { type: 'TypeError' }] },
+      }),
+    ).toBe(false)
+  })
+
+  it('keeps an event that carries no exception', () => {
+    expect(isAbortEvent({})).toBe(false)
+    expect(isAbortEvent({ exception: { values: [] } })).toBe(false)
   })
 })
 

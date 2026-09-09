@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/tanstackstart-react'
 import { setErrorCapture } from '@coffee-companion/api/lib/report-error'
 import {
+  isAbortEvent,
   scrubSentryEvent,
   sentryCommonOptions,
   sentryEnabled,
@@ -12,6 +13,7 @@ if (sentryEnabled(dsn)) {
   Sentry.init({
     ...sentryCommonOptions(dsn),
     beforeSend(event) {
+      if (isAbortEvent(event)) return null
       return scrubSentryEvent(event)
     },
   })

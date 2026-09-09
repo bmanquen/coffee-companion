@@ -19,10 +19,15 @@ export type SentryRequest = {
   headers?: Record<string, string>
 }
 
+export type SentryExceptionLike = {
+  type?: string
+}
+
 export type SentryEventLike = {
   user?: SentryUser
   request?: SentryRequest
   extra?: Record<string, unknown>
+  exception?: { values?: Array<SentryExceptionLike> }
 }
 
 export function trimDsn(value: string | undefined): string | undefined {
@@ -60,6 +65,16 @@ export function sentryCommonOptions(dsn: string) {
     environment: sentryEnvironment(),
     sendDefaultPii: false,
   }
+}
+
+// A cancelled request is not a failure. `httpBatchStreamLink` aborts its own
+// controller once a batch's stream is drained, and WebKit reports that teardown
+// as an unhandled `AbortError: Fetch is aborted` after the request already
+// returned 200 — noise, and never actionable.
+export function isAbortEvent<T>(event: T): boolean {
+  const values = (event as T & SentryEventLike).exception?.values
+  if (!values?.length) return false
+  return values.every((value) => value.type === 'AbortError')
 }
 
 // Sentry attaches cookies, bodies, and emails unless we strip them —
