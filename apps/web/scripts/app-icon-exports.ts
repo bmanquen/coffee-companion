@@ -7,7 +7,7 @@ export const APP_ICON_SOURCE = 'public/icon.svg'
 
 export const APP_ICON_EXPORTS: Array<
   | { file: string; size: number; format: 'png' }
-  | { file: string; sizes: number[]; format: 'ico' }
+  | { file: string; sizes: Array<number>; format: 'ico' }
 > = [
   { file: 'logo192.png', size: 192, format: 'png' },
   { file: 'logo512.png', size: 512, format: 'png' },
