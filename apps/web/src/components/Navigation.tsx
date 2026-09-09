@@ -1,8 +1,9 @@
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { Bean, Coffee, Home, Menu, UserRound, Wrench } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet'
+import { useSignOut } from '@/hooks/use-sign-out'
 import { authClient } from '@/lib/auth-client'
 
 interface NavigationProps {
@@ -12,15 +13,10 @@ interface NavigationProps {
 
 export default function Navigation({ open, setOpen }: NavigationProps) {
   const { data: session } = authClient.useSession()
-  const navigate = useNavigate()
+  const handleSignOut = useSignOut()
 
   const handleSignIn = () => {
     authClient.signIn.social({ provider: 'google' })
-  }
-
-  const handleSignOut = async () => {
-    await authClient.signOut()
-    navigate({ to: '/' })
   }
 
   const initial = session?.user.name.charAt(0).toUpperCase() ?? '?'

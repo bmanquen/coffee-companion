@@ -12,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   signInSocial: vi.fn(),
   signOut: vi.fn(),
   navigate: vi.fn(),
+  resetAnalytics: vi.fn(),
+}))
+
+vi.mock('@/lib/analytics', () => ({
+  resetAnalytics: mocks.resetAnalytics,
 }))
 
 vi.mock('@/lib/auth-client', () => ({
@@ -23,14 +28,7 @@ vi.mock('@/lib/auth-client', () => ({
 }))
 
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({
-    to,
-    children,
-    ...props
-  }: {
-    to: string
-    children: ReactNode
-  }) => (
+  Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => (
     <a href={to} {...props}>
       {children}
     </a>
@@ -41,8 +39,12 @@ vi.mock('@tanstack/react-router', () => ({
 // Render the Radix Popover inline so its content is queryable in jsdom.
 vi.mock('@/components/ui/popover', () => ({
   Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  PopoverContent: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
 }))
 
 vi.mock('@/components/ui/avatar', () => ({
@@ -73,6 +75,11 @@ describe('MobileHeader', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }))
     })
     expect(mocks.signOut).toHaveBeenCalled()
+    expect(mocks.resetAnalytics).toHaveBeenCalledOnce()
+    expect(mocks.resetAnalytics.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.signOut.mock.invocationCallOrder[0],
+    )
+    expect(mocks.navigate).toHaveBeenCalledWith({ to: '/' })
   })
 
   it('shows a sign-in button and no account details when signed out', async () => {

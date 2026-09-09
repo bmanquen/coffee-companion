@@ -11,6 +11,11 @@ const mocks = vi.hoisted(() => ({
   signInSocial: vi.fn(),
   signOut: vi.fn(),
   navigate: vi.fn(),
+  resetAnalytics: vi.fn(),
+}))
+
+vi.mock('@/lib/analytics', () => ({
+  resetAnalytics: mocks.resetAnalytics,
 }))
 
 vi.mock('@/lib/auth-client', () => ({
@@ -88,6 +93,11 @@ describe('Navigation', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }))
     })
     expect(mocks.signOut).toHaveBeenCalled()
+    expect(mocks.resetAnalytics).toHaveBeenCalledOnce()
+    expect(mocks.resetAnalytics.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.signOut.mock.invocationCallOrder[0],
+    )
+    expect(mocks.navigate).toHaveBeenCalledWith({ to: '/' })
   })
 
   it('takes the user to their account from their avatar and name', () => {

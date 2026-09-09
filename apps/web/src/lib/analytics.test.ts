@@ -4,7 +4,10 @@ import {
   analyticsEnabled,
   analyticsHost,
   analyticsOptions,
+  identifyUser,
+  identityFrom,
   pageViewFrom,
+  resetAnalytics,
   setAnalyticsClient,
   trackPageView,
 } from './analytics'
@@ -104,6 +107,24 @@ describe('the analytics facade', () => {
     ).not.toThrow()
   })
 
+  it('identifies a person by id with the Plan as the only property', () => {
+    const client = fake()
+    setAnalyticsClient(client)
+
+    identifyUser({ id: 'user_123' }, { plan: 'Pro' })
+
+    expect(client.identify).toHaveBeenCalledWith('user_123', { plan: 'Pro' })
+  })
+
+  it('forwards a reset', () => {
+    const client = fake()
+    setAnalyticsClient(client)
+
+    resetAnalytics()
+
+    expect(client.reset).toHaveBeenCalledOnce()
+  })
+
   it('never touches the client without a window', () => {
     const client = fake()
     setAnalyticsClient(client)
@@ -128,5 +149,20 @@ describe('analyticsOptions', () => {
       disable_surveys: true,
       person_profiles: 'identified_only',
     })
+  })
+})
+
+describe('identityFrom', () => {
+  it('keeps the user id and nothing else from a session', () => {
+    const session = {
+      user: {
+        id: 'user_123',
+        email: 'ada@example.com',
+        name: 'Ada',
+        image: 'https://example.com/ada.png',
+      },
+    }
+
+    expect(identityFrom(session)).toEqual({ id: 'user_123' })
   })
 })

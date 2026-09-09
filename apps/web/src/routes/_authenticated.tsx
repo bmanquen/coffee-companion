@@ -1,10 +1,11 @@
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import BottomNav from '@/components/BottomNav'
 import MobileHeader from '@/components/MobileHeader'
 import Navigation from '@/components/Navigation'
 import { RenewalFailedNotice } from '@/components/renewal-failed-notice'
+import { identifyUser, identityFrom } from '@/lib/analytics'
 import { authClient } from '@/lib/auth-client'
 import { getForwardedHeaders } from '@/lib/request-headers'
 import { useTRPC } from '@/integrations/trpc/react'
@@ -35,6 +36,12 @@ function AuthenticatedLayout() {
   // Not suspended on: a failing renewal is worth saying wherever the user is,
   // but never worth holding the whole app up for.
   const { data: plan } = useQuery(trpc.plan.current.queryOptions())
+  const { session } = Route.useRouteContext()
+  const planId = plan?.plan
+
+  useEffect(() => {
+    if (planId) identifyUser(identityFrom(session), { plan: planId })
+  }, [session, planId])
 
   return (
     <>
