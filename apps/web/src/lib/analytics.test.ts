@@ -5,6 +5,7 @@ import {
   analyticsHost,
   analyticsOptions,
   identifyUser,
+  identityFrom,
   pageViewFrom,
   resetAnalytics,
   setAnalyticsClient,
@@ -75,6 +76,21 @@ describe('pageViewFrom', () => {
   })
 })
 
+describe('identityFrom', () => {
+  it('is the user id only, never the email, name, or avatar', () => {
+    const session = {
+      user: {
+        id: 'user_123',
+        email: 'ada@example.com',
+        name: 'Ada',
+        image: 'https://example.com/ada.png',
+      },
+      session: { token: 'secret' },
+    }
+    expect(identityFrom(session)).toEqual({ id: 'user_123' })
+  })
+})
+
 describe('the analytics facade', () => {
   const fake = () => ({
     capture: vi.fn(),
@@ -130,7 +146,7 @@ describe('the analytics facade', () => {
     const client = fake()
     setAnalyticsClient(client)
 
-    identifyUser('user_123', { plan: 'pro' })
+    identifyUser({ id: 'user_123' }, { plan: 'pro' })
 
     expect(client.identify).toHaveBeenCalledWith('user_123', { plan: 'pro' })
   })
