@@ -15,5 +15,8 @@ if (sentryEnabled(dsn)) {
       if (isAbortEvent(event)) return null
       return scrubSentryEvent(event)
     },
+    beforeSendTransaction(event) {
+      return scrubSentryEvent(event)
+    },
   })
 }
