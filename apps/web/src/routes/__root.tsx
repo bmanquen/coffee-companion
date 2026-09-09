@@ -43,6 +43,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         rel: 'stylesheet',
         href: appCss,
       },
+      // The tab reads rel=icon. The manifest lists favicon.ico for install,
+      // not the tab, so a bean in the PNGs never showed up here.
+      {
+        rel: 'icon',
+        href: '/favicon.ico',
+        type: 'image/x-icon',
+      },
       // The manifest shipped unreferenced until now, so its scaffold defaults
       // were never anyone's app identity. Linked here so the corrected name and
       // icons actually apply.
