@@ -62,6 +62,21 @@ export function trackPageView(view: PageView) {
   active()?.capture('$pageview', view)
 }
 
+export type Identity = { id: string }
+
+// The Plan is the only person property PostHog gets; never email or name.
+export function identityFrom(session: { user: { id: string } }): Identity {
+  return { id: session.user.id }
+}
+
+export function identifyUser(identity: Identity, properties: { plan: string }) {
+  active()?.identify(identity.id, properties)
+}
+
+export function resetAnalytics() {
+  active()?.reset()
+}
+
 export function analyticsOptions(host: string) {
   return {
     api_host: host,
