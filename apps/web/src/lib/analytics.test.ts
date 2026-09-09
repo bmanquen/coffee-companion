@@ -5,7 +5,6 @@ import {
   analyticsHost,
   analyticsOptions,
   identifyUser,
-  identityFrom,
   pageViewFrom,
   resetAnalytics,
   setAnalyticsClient,
@@ -56,8 +55,9 @@ describe('analyticsHost', () => {
 
 describe('pageViewFrom', () => {
   it('carries the pathname and the matched route pattern, never the search', () => {
+    const location = { pathname: '/brews/42/edit', search: { tab: 'notes' } }
     expect(
-      pageViewFrom({ pathname: '/brews/42/edit', search: { tab: 'notes' } }, [
+      pageViewFrom(location, [
         { fullPath: '/' },
         { fullPath: '/brews/$brewId/edit' },
       ]),
@@ -133,9 +133,9 @@ describe('the analytics facade', () => {
     const client = fake()
     setAnalyticsClient(client)
 
-    identifyUser({ id: 'user_123' }, { plan: 'Pro' })
+    identifyUser('user_123', { plan: 'pro' })
 
-    expect(client.identify).toHaveBeenCalledWith('user_123', { plan: 'Pro' })
+    expect(client.identify).toHaveBeenCalledWith('user_123', { plan: 'pro' })
   })
 
   it('forwards a reset', () => {
@@ -171,20 +171,5 @@ describe('analyticsOptions', () => {
       disable_surveys: true,
       person_profiles: 'identified_only',
     })
-  })
-})
-
-describe('identityFrom', () => {
-  it('keeps the user id and nothing else from a session', () => {
-    const session = {
-      user: {
-        id: 'user_123',
-        email: 'ada@example.com',
-        name: 'Ada',
-        image: 'https://example.com/ada.png',
-      },
-    }
-
-    expect(identityFrom(session)).toEqual({ id: 'user_123' })
   })
 })

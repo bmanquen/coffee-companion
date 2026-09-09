@@ -5,7 +5,7 @@ import BottomNav from '@/components/BottomNav'
 import MobileHeader from '@/components/MobileHeader'
 import Navigation from '@/components/Navigation'
 import { RenewalFailedNotice } from '@/components/renewal-failed-notice'
-import { identifyUser, identityFrom } from '@/lib/analytics'
+import { identifyUser } from '@/lib/analytics'
 import { authClient } from '@/lib/auth-client'
 import { getForwardedHeaders } from '@/lib/request-headers'
 import { useTRPC } from '@/integrations/trpc/react'
@@ -38,10 +38,13 @@ function AuthenticatedLayout() {
   const { data: plan } = useQuery(trpc.plan.current.queryOptions())
   const { session } = Route.useRouteContext()
   const planId = plan?.plan
+  // Keyed on the id, not the session object, which beforeLoad rebuilds on
+  // every navigation.
+  const userId = session.user.id
 
   useEffect(() => {
-    if (planId) identifyUser(identityFrom(session), { plan: planId })
-  }, [session, planId])
+    if (planId) identifyUser(userId, { plan: planId })
+  }, [userId, planId])
 
   return (
     <>

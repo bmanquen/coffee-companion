@@ -31,7 +31,7 @@ export type PageView = {
 }
 
 export function pageViewFrom(
-  location: { pathname: string; search?: unknown },
+  location: { pathname: string },
   matches: ReadonlyArray<{ fullPath: string }>,
 ): PageView {
   const route = matches.at(-1)?.fullPath ?? location.pathname
@@ -88,15 +88,8 @@ export function track<TEvent extends keyof Events>(
   active()?.capture(event, properties[0])
 }
 
-export type Identity = { id: string }
-
-// The Plan is the only person property PostHog gets; never email or name.
-export function identityFrom(session: { user: { id: string } }): Identity {
-  return { id: session.user.id }
-}
-
-export function identifyUser(identity: Identity, properties: { plan: string }) {
-  active()?.identify(identity.id, properties)
+export function identifyUser(id: string, properties: { plan: PlanId }) {
+  active()?.identify(id, properties)
 }
 
 export function resetAnalytics() {
