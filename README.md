@@ -87,6 +87,21 @@ VITE_SENTRY_TRACES_SAMPLE_RATE=
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` together upload source
 maps at build time.
 
+### Request logs
+
+The server writes one JSON line per page, tRPC, and auth request to stdout:
+method, path without the query string, status, duration, and request id. Asset,
+favicon, manifest, and health-check requests are not logged. In development the
+lines are pretty-printed instead. The level defaults to `info`:
+
+```
+LOG_LEVEL=
+```
+
+Every response carries an `x-request-id` header. An incoming header is
+honoured, otherwise an id is generated; Sentry events raised while handling the
+request carry the same id as a `request_id` tag.
+
 ### Product analytics
 
 Page views and a few named funnel events go to [PostHog](https://posthog.com)

@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/tanstackstart-react'
+import pino from 'pino'
 import { setErrorCapture } from '@coffee-companion/api/lib/report-error'
 import {
   isAbortEvent,
@@ -6,6 +7,7 @@ import {
   sentryCommonOptions,
   sentryEnabled,
   sentryServerDsn,
+  trimSetting,
 } from './lib/sentry'
 
 const dsn = sentryServerDsn()
@@ -24,3 +26,8 @@ if (sentryEnabled(dsn)) {
     Sentry.captureException(error, { tags })
   })
 }
+
+export const logger = pino({
+  level: trimSetting(process.env.LOG_LEVEL) ?? 'info',
+  transport: import.meta.env.DEV ? { target: 'pino-pretty' } : undefined,
+})
