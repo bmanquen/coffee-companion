@@ -30,7 +30,7 @@ function paethPredictor(left: number, up: number, upLeft: number) {
   return upLeft
 }
 
-function pngRgbaAt(bytes: Buffer, x: number, y: number) {
+function decodePngRgba(bytes: Buffer) {
   expect(bytes[24]).toBe(8)
   expect(bytes[25]).toBe(6)
 
@@ -69,12 +69,20 @@ function pngRgbaAt(bytes: Buffer, x: number, y: number) {
     }
   }
 
-  const i = (y * width + x) * 4
+  return { width, height, pixels }
+}
+
+function pngRgbaAt(
+  png: { width: number; pixels: Buffer },
+  x: number,
+  y: number,
+) {
+  const i = (y * png.width + x) * 4
   return {
-    r: pixels[i],
-    g: pixels[i + 1],
-    b: pixels[i + 2],
-    a: pixels[i + 3],
+    r: png.pixels[i],
+    g: png.pixels[i + 1],
+    b: png.pixels[i + 2],
+    a: png.pixels[i + 3],
   }
 }
 
@@ -107,16 +115,18 @@ function icoImageSizes(bytes: Buffer) {
 }
 
 function expectRoundedCornersStay(bytes: Buffer, label: string) {
-  const { width, height } = pngSize(bytes)
-  expect(pngRgbaAt(bytes, 0, 0).a, `${label} top-left`).toBe(0)
-  expect(pngRgbaAt(bytes, width - 1, 0).a, `${label} top-right`).toBe(0)
-  expect(pngRgbaAt(bytes, 0, height - 1).a, `${label} bottom-left`).toBe(0)
+  // Five samples used to inflate the 1024² scanlines five times and blow
+  // Vitest's 5s default on a loaded CI runner. Decode once, then sample.
+  const png = decodePngRgba(bytes)
+  expect(pngRgbaAt(png, 0, 0).a, `${label} top-left`).toBe(0)
+  expect(pngRgbaAt(png, png.width - 1, 0).a, `${label} top-right`).toBe(0)
+  expect(pngRgbaAt(png, 0, png.height - 1).a, `${label} bottom-left`).toBe(0)
   expect(
-    pngRgbaAt(bytes, width - 1, height - 1).a,
+    pngRgbaAt(png, png.width - 1, png.height - 1).a,
     `${label} bottom-right`,
   ).toBe(0)
   expect(
-    pngRgbaAt(bytes, Math.floor(width / 2), Math.floor(height / 2)).a,
+    pngRgbaAt(png, Math.floor(png.width / 2), Math.floor(png.height / 2)).a,
     `${label} center`,
   ).toBe(255)
 }
