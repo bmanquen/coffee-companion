@@ -15,6 +15,7 @@ import { useAppForm } from '@/hooks/form'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
+import { track } from '@/lib/analytics'
 
 export const Route = createFileRoute('/_authenticated/espresso/new')({
   loader: async ({ context }) => {
@@ -58,6 +59,7 @@ function NewEspressoShot() {
     trpc.espressoShot.create.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
+        track('brew_logged', { method: 'espresso' })
         navigate({ to: '/brews' })
       },
     }),
@@ -147,14 +149,10 @@ function NewEspressoShot() {
           )}
         </form.AppField>
         <form.AppField name="time">
-          {(field) => (
-            <field.TextField label="Time (s)" type="number" />
-          )}
+          {(field) => <field.TextField label="Time (s)" type="number" />}
         </form.AppField>
         <form.AppField name="grindSetting">
-          {(field) => (
-            <field.TextField label="Grind Setting" />
-          )}
+          {(field) => <field.TextField label="Grind Setting" />}
         </form.AppField>
         <form.AppField name="notes">
           {(field) => (

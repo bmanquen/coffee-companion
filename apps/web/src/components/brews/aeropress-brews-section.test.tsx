@@ -5,11 +5,18 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AeropressBrewsSection } from './aeropress-brews-section'
 import type * as ReactRouter from '@tanstack/react-router'
 import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 import { makeAeropressBrew, makeRecentCoffee } from '@/test/factories'
+
+const mocks = vi.hoisted(() => ({ track: vi.fn() }))
+
+vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
+
+beforeEach(() => mocks.track.mockClear())
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 // Resolve `params` into `to` (e.g. /aeropress/$brewId/edit -> /aeropress/a1/edit)
@@ -122,7 +129,9 @@ describe('AeropressBrewsSection', () => {
       }),
     ])
 
-    const { container } = render(<AeropressBrewsSection />, { wrapper: Wrapper })
+    const { container } = render(<AeropressBrewsSection />, {
+      wrapper: Wrapper,
+    })
 
     const table = within(screen.getByRole('table'))
     expect(table.getByText('1m 30s')).toBeTruthy()
@@ -299,12 +308,9 @@ describe('AeropressBrewsSection', () => {
   })
 
   it('fires setDialedIn with the coffee, method, and brew when toggled on', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [
@@ -332,18 +338,20 @@ describe('AeropressBrewsSection', () => {
       expect(body).toContain('a1')
       expect(body).toContain('c1')
       expect(body).toContain('m1')
+      await waitFor(() =>
+        expect(mocks.track).toHaveBeenCalledWith('brew_dialed_in', {
+          method: 'aeropress',
+        }),
+      )
     } finally {
       fetchSpy.mockRestore()
     }
   })
 
   it('clears the dialed-in brew (null brewId) when toggled off', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [
@@ -372,6 +380,8 @@ describe('AeropressBrewsSection', () => {
       expect(body).toContain('c1')
       expect(body).toContain('m1')
       expect(body).not.toContain('a1')
+      await waitFor(() => expect(queryClient.isMutating()).toBe(0))
+      expect(mocks.track).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }
@@ -408,7 +418,9 @@ describe('AeropressBrewsSection', () => {
   // The detail region for a row: its sibling sub-row's animating grid-rows wrap
   // (grid-rows-[1fr] open, grid-rows-[0fr] collapsed). Always in the DOM.
   const detailRegionFor = (name: string): HTMLElement => {
-    const dataRow = within(screen.getByRole('table')).getByText(name).closest('tr')!
+    const dataRow = within(screen.getByRole('table'))
+      .getByText(name)
+      .closest('tr')!
     return dataRow.nextElementSibling!.querySelector(
       '[class*="grid-rows-"]',
     ) as HTMLElement

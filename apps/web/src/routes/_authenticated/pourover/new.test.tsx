@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Route } from './new'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 import {
   makeBrewingDevice,
   makeCoffee,
@@ -17,7 +18,9 @@ import {
   makePouroverMethod,
 } from '@/test/factories'
 
-const mocks = vi.hoisted(() => ({ navigate: vi.fn() }))
+const mocks = vi.hoisted(() => ({ navigate: vi.fn(), track: vi.fn() }))
+
+vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
 
 // The form is a route component: stub createFileRoute so `Route.options.component`
 // is the plain component, and useNavigate so the submit handler doesn't need a router.
@@ -82,12 +85,24 @@ function seeded() {
       id: PO_DEVICE,
       name: 'V60',
       brand: 'Hario',
-      type: { id: 't3', userId: null, name: 'Pour Over', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't3',
+        userId: null,
+        name: 'Pour Over',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't2',
+        userId: null,
+        name: 'Espresso',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
   ])
   // The coffee's most recent brew, used for prefill.
@@ -144,7 +159,9 @@ describe('NewPouroverBrew form', () => {
     const { Wrapper } = seeded()
     render(<NewPouroverBrew />, { wrapper: Wrapper })
 
-    const deviceSelect = screen.getByRole('combobox', { name: 'Brewing Device' })
+    const deviceSelect = screen.getByRole('combobox', {
+      name: 'Brewing Device',
+    })
     expect(
       within(deviceSelect).getByRole('option', { name: 'V60' }),
     ).toBeTruthy()
@@ -171,12 +188,7 @@ describe('NewPouroverBrew form', () => {
   it('submits a create with the entered recipe, including water temp', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+      .mockResolvedValue(trpcSuccess())
     try {
       const { Wrapper } = seeded()
       render(<NewPouroverBrew />, { wrapper: Wrapper })
@@ -198,20 +210,23 @@ describe('NewPouroverBrew form', () => {
       expect(body).toContain('96')
       expect(body).toMatch(/"brewTime":165/)
       expect(body).toContain(COFFEE)
+      await waitFor(() =>
+        expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
+          method: 'pourover',
+        }),
+      )
     } finally {
       fetchSpy.mockRestore()
     }
   })
 
   it('normalizes 165 seconds alone to a brew time of 165', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
     try {
       const { Wrapper } = seeded()
       render(<NewPouroverBrew />, { wrapper: Wrapper })
@@ -240,14 +255,12 @@ describe('NewPouroverBrew form', () => {
   })
 
   it('blocks submit when brew time is empty', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
     try {
       const { Wrapper } = seeded()
       render(<NewPouroverBrew />, { wrapper: Wrapper })
@@ -265,7 +278,9 @@ describe('NewPouroverBrew form', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Log' })).toBeTruthy())
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toBeTruthy(),
+      )
       expect(fetchSpy).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
@@ -273,14 +288,12 @@ describe('NewPouroverBrew form', () => {
   })
 
   it('counts a lone minutes or seconds box as that many minutes or seconds', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
     try {
       const { Wrapper } = seeded()
       render(<NewPouroverBrew />, { wrapper: Wrapper })

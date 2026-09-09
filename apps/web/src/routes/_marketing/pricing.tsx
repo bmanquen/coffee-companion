@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { BillingPeriod, PlanId, PlanPrice } from '@/lib/plans'
 import { H1 } from '@/components/typography/h1'
+import { track } from '@/lib/analytics'
 import { authClient } from '@/lib/auth-client'
 import { useTRPC } from '@/integrations/trpc/react'
 import {
@@ -93,10 +94,12 @@ export function PricingScreen({
     trpc.planInterest.register.mutationOptions({
       // So a return visit reads Registered rather than offering the press
       // again, which would mail nobody and claim otherwise.
-      onSuccess: () =>
+      onSuccess: (_data, { planId }) => {
+        track('interest_registered', { plan: planId })
         queryClient.invalidateQueries({
           queryKey: trpc.planInterest.list.queryKey(),
-        }),
+        })
+      },
     }),
   )
   const registered = useQuery({
@@ -120,6 +123,7 @@ export function PricingScreen({
 
   const registerInterest = async (planId: PlanId) => {
     if (!session) {
+      track('sign_in_started', { from: 'pricing' })
       await authClient.signIn.social({
         provider: 'google',
         callbackURL: returnLink({ interest: planId }),
@@ -147,6 +151,7 @@ export function PricingScreen({
   // period and the tax is added on top.
   const startCheckout = async (planId: PlanId, period: BillingPeriod) => {
     if (!session) {
+      track('sign_in_started', { from: 'pricing' })
       await authClient.signIn.social({
         provider: 'google',
         // Free has nowhere to come back to — signing in is the whole of it.
@@ -174,6 +179,7 @@ export function PricingScreen({
       return
     }
 
+    track('checkout_started', { plan: planId, period })
     const { error } = await authClient.subscription.upgrade({
       plan: planId,
       annual: period === 'annual',

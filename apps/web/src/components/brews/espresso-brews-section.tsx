@@ -20,16 +20,14 @@ import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
-import {
-  SealedRowNotice,
-  sealedRowClass,
-} from '@/components/brews/sealed-row'
+import { SealedRowNotice, sealedRowClass } from '@/components/brews/sealed-row'
 import { DataTable, expanderColumn } from '@/components/data-table'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
+import { track } from '@/lib/analytics'
 
 type Shot = {
   id: string
@@ -55,9 +53,10 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
   const queryClient = useQueryClient()
   const setDialedIn = useMutation(
     trpc.coffee.setDialedIn.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (_data, variables) => {
         queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
         queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
+        if (variables.shotId) track('brew_dialed_in', { method: 'espresso' })
       },
     }),
   )
@@ -261,8 +260,8 @@ export function EspressoBrewsSection() {
               row.original.sealed
                 ? sealedRowClass
                 : row.original.isDialedIn
-                ? 'bg-primary/10 hover:bg-primary/15'
-                : undefined
+                  ? 'bg-primary/10 hover:bg-primary/15'
+                  : undefined
             }
           />
         </>

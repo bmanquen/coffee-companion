@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { MarketingHome } from './index'
 import type * as ReactRouter from '@tanstack/react-router'
 
+const mocks = vi.hoisted(() => ({ track: vi.fn() }))
+
+vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
+
 // Link needs router context; swap it for a plain anchor for unit rendering.
 // Mirrors the dashboard tests.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
@@ -45,6 +49,18 @@ describe('MarketingHome', () => {
 
     for (const cta of ctas) fireEvent.click(cta)
     expect(onSignIn).toHaveBeenCalledTimes(ctas.length)
+  })
+
+  it('reports each call to action as a sign-in started from the landing page', () => {
+    mocks.track.mockClear()
+    renderHome()
+
+    for (const cta of screen.getAllByRole('button')) fireEvent.click(cta)
+
+    expect(mocks.track).toHaveBeenCalledTimes(2)
+    expect(mocks.track).toHaveBeenCalledWith('sign_in_started', {
+      from: 'landing',
+    })
   })
 
   it('links to the pricing page', () => {

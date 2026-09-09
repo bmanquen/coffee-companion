@@ -16,6 +16,7 @@ import { useAppForm } from '@/hooks/form'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
+import { track } from '@/lib/analytics'
 
 export const Route = createFileRoute('/_authenticated/aeropress/new')({
   loader: async ({ context }) => {
@@ -77,6 +78,7 @@ function NewAeropressBrew() {
     trpc.aeropressBrew.create.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.aeropressBrew.getAll.queryOptions())
+        track('brew_logged', { method: 'aeropress' })
         navigate({ to: '/brews' })
       },
     }),
@@ -183,9 +185,7 @@ function NewAeropressBrew() {
           )}
         </form.AppField>
         <form.AppField name="grindSetting">
-          {(field) => (
-            <field.TextField label="Grind Setting" />
-          )}
+          {(field) => <field.TextField label="Grind Setting" />}
         </form.AppField>
         <form.AppField name="notes">
           {(field) => (

@@ -24,16 +24,14 @@ import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
-import {
-  SealedRowNotice,
-  sealedRowClass,
-} from '@/components/brews/sealed-row'
+import { SealedRowNotice, sealedRowClass } from '@/components/brews/sealed-row'
 import { DataTable, expanderColumn } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { useTRPC } from '@/integrations/trpc/react'
+import { track } from '@/lib/analytics'
 import { formatBrewSeconds } from '@/lib/brew'
 
 type Brew = FrenchpressBrewWithRelations
@@ -45,10 +43,11 @@ function DialedInCell({ row }: CellContext<Brew, unknown>) {
   const queryClient = useQueryClient()
   const setDialedIn = useMutation(
     trpc.frenchpressBrew.setDialedIn.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (_data, variables) => {
         queryClient.invalidateQueries(
           trpc.frenchpressBrew.getAll.queryOptions(),
         )
+        if (variables.brewId) track('brew_dialed_in', { method: 'frenchpress' })
       },
     }),
   )
@@ -269,8 +268,8 @@ export function FrenchpressBrewsSection() {
               row.original.sealed
                 ? sealedRowClass
                 : row.original.isDialedIn
-                ? 'bg-primary/10 hover:bg-primary/15'
-                : undefined
+                  ? 'bg-primary/10 hover:bg-primary/15'
+                  : undefined
             }
           />
         </>

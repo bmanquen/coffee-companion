@@ -16,6 +16,7 @@ import { useAppForm } from '@/hooks/form'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
+import { track } from '@/lib/analytics'
 
 export const Route = createFileRoute('/_authenticated/frenchpress/new')({
   loader: async ({ context }) => {
@@ -81,6 +82,7 @@ function NewFrenchpressBrew() {
         queryClient.invalidateQueries(
           trpc.frenchpressBrew.getAll.queryOptions(),
         )
+        track('brew_logged', { method: 'frenchpress' })
         navigate({ to: '/brews' })
       },
     }),
@@ -188,17 +190,10 @@ function NewFrenchpressBrew() {
           )}
         </form.AppField>
         <form.AppField name="waterTemp">
-          {(field) => (
-            <field.TextField
-              label="Water Temp (°C)"
-              type="number"
-            />
-          )}
+          {(field) => <field.TextField label="Water Temp (°C)" type="number" />}
         </form.AppField>
         <form.AppField name="grindSetting">
-          {(field) => (
-            <field.TextField label="Grind Setting" />
-          )}
+          {(field) => <field.TextField label="Grind Setting" />}
         </form.AppField>
         <form.AppField name="notes">
           {(field) => (

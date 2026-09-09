@@ -5,6 +5,7 @@ import { HeroBrewTable } from '@/components/marketing/hero-brew-table'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { track } from '@/lib/analytics'
 import { authClient } from '@/lib/auth-client'
 import { marketingHead } from '@/lib/marketing-head'
 import { getForwardedHeaders } from '@/lib/request-headers'
@@ -61,6 +62,10 @@ const brewCaptures = [
 // The public home page. Driven entirely by props — a single sign-in callback —
 // so it renders bare in tests with no router, no session and no network.
 export function MarketingHome({ onSignIn }: { onSignIn: () => void }) {
+  const startSignIn = () => {
+    track('sign_in_started', { from: 'landing' })
+    onSignIn()
+  }
   return (
     <div className="flex flex-col gap-24 py-12">
       <section className="flex flex-col gap-8">
@@ -75,7 +80,7 @@ export function MarketingHome({ onSignIn }: { onSignIn: () => void }) {
             that worked, so the second bag starts where the first one ended.
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <Button size="lg" onClick={onSignIn}>
+            <Button size="lg" onClick={startSignIn}>
               Save your first brew — free
             </Button>
             <Link
@@ -155,7 +160,7 @@ export function MarketingHome({ onSignIn }: { onSignIn: () => void }) {
           mornings and the same handful of throwaway cups. You only have to pay
           that once.
         </p>
-        <Button size="lg" onClick={onSignIn}>
+        <Button size="lg" onClick={startSignIn}>
           Save your first brew — free
         </Button>
       </section>

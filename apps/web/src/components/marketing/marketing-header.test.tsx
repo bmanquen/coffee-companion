@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { MarketingHeader } from './marketing-header'
 import type * as ReactRouter from '@tanstack/react-router'
 
+const mocks = vi.hoisted(() => ({ track: vi.fn() }))
+
+vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
+
 // Link needs router context; swap it for a plain anchor for unit rendering.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactRouter>()
@@ -50,6 +54,9 @@ describe('MarketingHeader', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
     expect(onSignIn).toHaveBeenCalledTimes(1)
+    expect(mocks.track).toHaveBeenCalledWith('sign_in_started', {
+      from: 'header',
+    })
   })
 
   it('offers a signed-in visitor the way back to the app, not a sign-in', () => {

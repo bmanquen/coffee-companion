@@ -9,6 +9,7 @@ import {
   pageViewFrom,
   resetAnalytics,
   setAnalyticsClient,
+  track,
   trackPageView,
 } from './analytics'
 
@@ -105,6 +106,27 @@ describe('the analytics facade', () => {
     expect(() =>
       trackPageView({ $pathname: '/', $current_url: '/', route: '/' }),
     ).not.toThrow()
+  })
+
+  it('forwards a named event with its properties', () => {
+    const client = fake()
+    setAnalyticsClient(client)
+
+    track('brew_logged', { method: 'espresso' })
+    track('coffee_created')
+
+    expect(client.capture).toHaveBeenCalledWith('brew_logged', {
+      method: 'espresso',
+    })
+    expect(client.capture).toHaveBeenCalledWith('coffee_created', undefined)
+  })
+
+  it('rejects an event outside the closed union at compile time', () => {
+    // @ts-expect-error a misspelled event is not in the union
+    track('brew_loged', { method: 'espresso' })
+    // @ts-expect-error a property outside the union is not allowed either
+    track('brew_logged', { method: 'espresso', coffeeId: 'c1' })
+    expect(true).toBe(true)
   })
 
   it('identifies a person by id with the Plan as the only property', () => {

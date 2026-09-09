@@ -5,11 +5,18 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FrenchpressBrewsSection } from './frenchpress-brews-section'
 import type * as ReactRouter from '@tanstack/react-router'
 import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 import { makeFrenchpressBrew, makeRecentCoffee } from '@/test/factories'
+
+const mocks = vi.hoisted(() => ({ track: vi.fn() }))
+
+vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
+
+beforeEach(() => mocks.track.mockClear())
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 // Resolve `params` into `to` (e.g. /frenchpress/$brewId/edit -> /frenchpress/f1/edit)
@@ -306,12 +313,9 @@ describe('FrenchpressBrewsSection', () => {
   })
 
   it('fires setDialedIn with the coffee, method, and brew when toggled on', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [
@@ -339,18 +343,20 @@ describe('FrenchpressBrewsSection', () => {
       expect(body).toContain('f1')
       expect(body).toContain('c1')
       expect(body).toContain('m1')
+      await waitFor(() =>
+        expect(mocks.track).toHaveBeenCalledWith('brew_dialed_in', {
+          method: 'frenchpress',
+        }),
+      )
     } finally {
       fetchSpy.mockRestore()
     }
   })
 
   it('clears the dialed-in brew (null brewId) when toggled off', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [
@@ -379,6 +385,8 @@ describe('FrenchpressBrewsSection', () => {
       expect(body).toContain('c1')
       expect(body).toContain('m1')
       expect(body).not.toContain('f1')
+      await waitFor(() => expect(queryClient.isMutating()).toBe(0))
+      expect(mocks.track).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }
