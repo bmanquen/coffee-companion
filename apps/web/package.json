@@ -12,7 +12,8 @@
     "test:e2e": "vite build && playwright test",
     "lint": "eslint",
     "format": "prettier",
-    "check": "prettier --write . && eslint --fix"
+    "check": "prettier --write . && eslint --fix",
+    "export:app-icon": "tsx scripts/export-app-icon.ts"
   },
   "dependencies": {
     "@better-auth/stripe": "1.6.26",
