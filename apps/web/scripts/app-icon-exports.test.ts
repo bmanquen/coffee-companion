@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import { APP_ICON_EXPORTS, APP_ICON_SOURCE } from './app-icon-exports'
+import { exportAppIcon } from './export-app-icon'
 
 const webRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -34,6 +36,19 @@ describe('app icon exports', () => {
     for (const { file, size } of APP_ICON_EXPORTS) {
       const bytes = readFileSync(join(webRoot, 'public', file))
       expect(pngSize(bytes), file).toEqual({ width: size, height: size })
+    }
+  })
+
+  it('rasterizes those PNGs after a normal install, without a browser', () => {
+    const dest = mkdtempSync(join(tmpdir(), 'app-icon-'))
+    try {
+      exportAppIcon(dest)
+      for (const { file, size } of APP_ICON_EXPORTS) {
+        const bytes = readFileSync(join(dest, file))
+        expect(pngSize(bytes), file).toEqual({ width: size, height: size })
+      }
+    } finally {
+      rmSync(dest, { recursive: true, force: true })
     }
   })
 })

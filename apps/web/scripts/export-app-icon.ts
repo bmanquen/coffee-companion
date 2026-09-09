@@ -1,59 +1,32 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { chromium } from '@playwright/test'
+import { Resvg } from '@resvg/resvg-js'
 
 import { APP_ICON_EXPORTS, APP_ICON_SOURCE } from './app-icon-exports'
 
-// Headless Chromium, not a library rasterizer: icon.svg documents that the
-// committed PNGs are browser renders at the target size.
-
 const webRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-async function exportAppIcon() {
-  const svg = readFileSync(join(webRoot, APP_ICON_SOURCE), 'utf8')
-  const browser = await chromium.launch()
+// resvg ships its native binary with the npm package, so `pnpm install` is
+// enough. Playwright's Chromium download is a separate step and is not.
 
-  try {
-    for (const { file, size } of APP_ICON_EXPORTS) {
-      const page = await browser.newPage({
-        deviceScaleFactor: 1,
-        viewport: { width: size, height: size },
-      })
-      await page.setContent(`<!doctype html>
-<html>
-  <head>
-    <style>
-      html,
-      body {
-        margin: 0;
-        width: ${size}px;
-        height: ${size}px;
-        background: #ffffff;
-      }
-      svg {
-        display: block;
-        width: ${size}px;
-        height: ${size}px;
-      }
-    </style>
-  </head>
-  <body>
-    ${svg}
-  </body>
-</html>`)
-      const png = await page.screenshot({
-        clip: { x: 0, y: 0, width: size, height: size },
-        omitBackground: false,
-        type: 'png',
-      })
-      writeFileSync(join(webRoot, 'public', file), png)
-      await page.close()
-    }
-  } finally {
-    await browser.close()
+export function exportAppIcon(destDir = join(webRoot, 'public')) {
+  const svg = readFileSync(join(webRoot, APP_ICON_SOURCE))
+  mkdirSync(destDir, { recursive: true })
+
+  for (const { file, size } of APP_ICON_EXPORTS) {
+    const png = new Resvg(svg, {
+      background: '#ffffff',
+      fitTo: { mode: 'width', value: size },
+    })
+      .render()
+      .asPng()
+    writeFileSync(join(destDir, file), png)
   }
 }
 
-await exportAppIcon()
+const invokedDirectly = process.argv[1]?.includes('export-app-icon')
+if (invokedDirectly) {
+  exportAppIcon()
+}
