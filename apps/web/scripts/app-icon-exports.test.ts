@@ -19,6 +19,29 @@ function pngSize(bytes: Buffer) {
   }
 }
 
+function icoImageSizes(bytes: Buffer) {
+  expect(bytes.readUInt16LE(0)).toBe(0)
+  expect(bytes.readUInt16LE(2)).toBe(1)
+  const count = bytes.readUInt16LE(4)
+  const sizes: Array<number> = []
+  for (let i = 0; i < count; i++) {
+    const entry = 6 + i * 16
+    const width = bytes.readUInt8(entry)
+    const height = bytes.readUInt8(entry + 1)
+    const byteCount = bytes.readUInt32LE(entry + 8)
+    const offset = bytes.readUInt32LE(entry + 12)
+    expect(
+      pngSize(bytes.subarray(offset, offset + byteCount)),
+      `${width}x${height}`,
+    ).toEqual({
+      width,
+      height,
+    })
+    sizes.push(width)
+  }
+  return sizes
+}
+
 describe('app icon exports', () => {
   it('uses the locked cream tile and rust bean as the source', () => {
     const svg = readFileSync(join(webRoot, APP_ICON_SOURCE), 'utf8')
@@ -33,20 +56,44 @@ describe('app icon exports', () => {
   })
 
   it('emits a PNG at each store and listing size', () => {
-    for (const { file, size } of APP_ICON_EXPORTS) {
-      const bytes = readFileSync(join(webRoot, 'public', file))
-      expect(pngSize(bytes), file).toEqual({ width: size, height: size })
+    for (const exp of APP_ICON_EXPORTS) {
+      if (exp.format !== 'png') continue
+      const bytes = readFileSync(join(webRoot, 'public', exp.file))
+      expect(pngSize(bytes), exp.file).toEqual({
+        width: exp.size,
+        height: exp.size,
+      })
     }
   })
 
-  it('rasterizes those PNGs after a normal install, without a browser', () => {
+  it('emits favicon.ico at the small sizes the manifest already lists', () => {
+    const ico = APP_ICON_EXPORTS.find((exp) => exp.format === 'ico')
+    expect(ico?.file).toBe('favicon.ico')
+    expect(ico?.sizes).toEqual([16, 24, 32, 64])
+
+    const bytes = readFileSync(join(webRoot, 'public', 'favicon.ico'))
+    expect(icoImageSizes(bytes)).toEqual([16, 24, 32, 64])
+  })
+
+  it('rasterizes those files after a normal install, without a browser', () => {
     const dest = mkdtempSync(join(tmpdir(), 'app-icon-'))
     try {
       exportAppIcon(dest)
-      for (const { file, size } of APP_ICON_EXPORTS) {
-        const bytes = readFileSync(join(dest, file))
-        expect(pngSize(bytes), file).toEqual({ width: size, height: size })
+      for (const exp of APP_ICON_EXPORTS) {
+        const bytes = readFileSync(join(dest, exp.file))
+        if (exp.format === 'png') {
+          expect(pngSize(bytes), exp.file).toEqual({
+            width: exp.size,
+            height: exp.size,
+          })
+        } else {
+          expect(icoImageSizes(bytes), exp.file).toEqual([16, 24, 32, 64])
+        }
       }
+      // Drift check: a forgotten regen would leave the scaffold .ico committed.
+      expect(readFileSync(join(dest, 'favicon.ico'))).toEqual(
+        readFileSync(join(webRoot, 'public', 'favicon.ico')),
+      )
     } finally {
       rmSync(dest, { recursive: true, force: true })
     }
