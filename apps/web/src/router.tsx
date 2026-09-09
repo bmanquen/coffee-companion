@@ -27,7 +27,7 @@ export const getRouter = () => {
 
   setupRouterSsrQueryIntegration({ router, queryClient: rqContext.queryClient })
 
-  // One page view per resolved navigation, the initial load included.
+  // onResolved fires for the initial load too.
   router.subscribe('onResolved', ({ toLocation }) => {
     trackPageView(pageViewFrom(toLocation, router.state.matches))
   })

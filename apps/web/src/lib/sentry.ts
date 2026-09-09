@@ -19,15 +19,11 @@ export type SentryRequest = {
   headers?: Record<string, string>
 }
 
-export type SentryExceptionLike = {
-  type?: string
-}
-
 export type SentryEventLike = {
   user?: SentryUser
   request?: SentryRequest
   extra?: Record<string, unknown>
-  exception?: { values?: Array<SentryExceptionLike> }
+  exception?: { values?: Array<{ type?: string }> }
 }
 
 export function trimDsn(value: string | undefined): string | undefined {

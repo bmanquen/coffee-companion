@@ -1,7 +1,6 @@
 import type { PostHogConfig } from 'posthog-js'
 import type { BillingPeriod, PlanId } from './plans'
-// Product analytics (PostHog), gated on a public key the same way Sentry is
-// gated on its DSN. Components import only this module, never the vendor SDK.
+// What may leave the app, and why, is ADR-0009.
 
 const DEFAULT_HOST = 'https://us.i.posthog.com'
 
@@ -22,9 +21,8 @@ export function analyticsEnabled(key: string | undefined): key is string {
   return key != null
 }
 
-// Both carry the matched route pattern, so a Brew's edit page is one route
-// rather than one per id. $current_url overrides the SDK's own value, which
-// would carry the resolved ids and the query string.
+// $current_url overrides the SDK's own value, which would carry the resolved
+// ids and the query string.
 export type PageView = {
   $pathname: string
   $current_url: string
@@ -59,20 +57,18 @@ export function trackPageView(view: PageView) {
   active()?.capture('$pageview', view)
 }
 
-export type BrewMethod =
+export type BrewingMethod =
   | 'espresso'
   | 'pourover'
   | 'frenchpress'
   | 'aeropress'
   | 'coldbrew'
 
-// The brewing funnel. Properties name a Plan, a period, or a Brewing Method;
-// never a Coffee, a Brew, or a piece of equipment.
 export type Events = {
   sign_in_started: { from: 'landing' | 'pricing' | 'header' }
   coffee_created: undefined
-  brew_logged: { method: BrewMethod }
-  brew_dialed_in: { method: BrewMethod }
+  brew_logged: { method: BrewingMethod }
+  brew_dialed_in: { method: BrewingMethod }
   interest_registered: { plan: PlanId }
   checkout_started: { plan: PlanId; period: BillingPeriod }
 }
@@ -84,8 +80,15 @@ export function track<TEvent extends keyof Events>(
   active()?.capture(event, properties[0])
 }
 
-export function identifyUser(id: string, properties: { plan: PlanId }) {
-  active()?.identify(id, properties)
+export type Identity = { id: string }
+
+// The session carries the email, name, and avatar; the id is all that leaves.
+export function identityFrom(session: { user: { id: string } }): Identity {
+  return { id: session.user.id }
+}
+
+export function identifyUser(identity: Identity, properties: { plan: PlanId }) {
+  active()?.identify(identity.id, properties)
 }
 
 export function resetAnalytics() {
