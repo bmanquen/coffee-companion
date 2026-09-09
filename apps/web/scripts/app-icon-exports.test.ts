@@ -18,15 +18,16 @@ function pngSize(bytes: Buffer) {
 }
 
 describe('app icon exports', () => {
-  it('uses the locked cream container and pour-over glyph as the source', () => {
+  it('uses the locked cream tile and rust bean as the source', () => {
     const svg = readFileSync(join(webRoot, APP_ICON_SOURCE), 'utf8')
 
-    expect(svg).toContain('viewBox="0 0 512 512"')
-    expect(svg).toContain('rx="96"')
-    expect(svg).toContain('fill="#f7f0e8"')
-    expect(svg).toContain('stroke="#c2703f"')
-    // Previous mark was a Dialed-in crosshair built from circles.
-    expect(svg).not.toContain('<circle')
+    expect(svg).toContain('viewBox="0 0 1024 1024"')
+    expect(svg).toContain('rx="227"')
+    expect(svg).toContain('#FDFAF7')
+    expect(svg).toContain('#E6DCCF')
+    expect(svg).toContain('#C4703F')
+    expect(svg).toContain('#2D4A3E')
+    expect(svg).not.toContain('c2pa')
   })
 
   it('emits a PNG at each store and listing size', () => {
