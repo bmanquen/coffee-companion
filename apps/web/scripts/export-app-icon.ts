@@ -14,7 +14,7 @@ const webRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 function rasterPng(svg: Buffer, size: number) {
   return Buffer.from(
     new Resvg(svg, {
-      background: '#ffffff',
+      background: 'transparent',
       fitTo: { mode: 'width', value: size },
     })
       .render()
