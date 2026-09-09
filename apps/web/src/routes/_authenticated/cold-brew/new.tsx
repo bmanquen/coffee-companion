@@ -1,6 +1,10 @@
 import { insertColdBrewBrewSchema } from '@coffee-companion/api/db/zod'
 import { COLD_BREW_DEVICE_TYPE } from '@coffee-companion/api/lib/cold-brew'
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertColdBrewBrew } from '@coffee-companion/api/db/zod'
@@ -12,6 +16,7 @@ import { useAppForm } from '@/hooks/form'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
+import { track } from '@/lib/analytics'
 
 export const Route = createFileRoute('/_authenticated/cold-brew/new')({
   loader: async ({ context }) => {
@@ -55,6 +60,7 @@ function NewColdBrewBrew() {
     trpc.coldBrewBrew.create.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.coldBrewBrew.getAll.queryOptions())
+        track('brew_logged', { method: 'coldbrew' })
         navigate({ to: '/brews' })
       },
     }),
@@ -177,9 +183,7 @@ function NewColdBrewBrew() {
           )}
         </form.AppField>
         <form.AppField name="grindSetting">
-          {(field) => (
-            <field.TextField label="Grind Setting" />
-          )}
+          {(field) => <field.TextField label="Grind Setting" />}
         </form.AppField>
         <form.AppField name="notes">
           {(field) => (

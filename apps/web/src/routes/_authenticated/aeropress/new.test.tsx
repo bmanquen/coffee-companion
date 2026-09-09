@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Route } from './new'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 import {
   makeAeropressBrew,
   makeAeropressMethod,
@@ -17,7 +18,9 @@ import {
   makeGrinder,
 } from '@/test/factories'
 
-const mocks = vi.hoisted(() => ({ navigate: vi.fn() }))
+const mocks = vi.hoisted(() => ({ navigate: vi.fn(), track: vi.fn() }))
+
+vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
 
 // The form is a route component: stub createFileRoute so `Route.options.component`
 // is the plain component, and useNavigate so the submit handler doesn't need a router.
@@ -82,7 +85,13 @@ function seeded() {
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't2',
+        userId: null,
+        name: 'Espresso',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
   ])
   // The coffee's most recent brew, used for prefill.
@@ -106,7 +115,9 @@ describe('NewAeropressBrew form', () => {
     const { Wrapper } = seeded()
     render(<NewAeropressBrew />, { wrapper: Wrapper })
 
-    const deviceSelect = screen.getByRole('combobox', { name: 'Brewing Device' })
+    const deviceSelect = screen.getByRole('combobox', {
+      name: 'Brewing Device',
+    })
     expect(
       within(deviceSelect).getByRole('option', { name: 'AeroPress Go' }),
     ).toBeTruthy()
@@ -133,12 +144,7 @@ describe('NewAeropressBrew form', () => {
   it('submits a create with the entered recipe', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+      .mockResolvedValue(trpcSuccess())
     try {
       const { Wrapper } = seeded()
       render(<NewAeropressBrew />, { wrapper: Wrapper })
@@ -173,6 +179,11 @@ describe('NewAeropressBrew form', () => {
       expect(body).toContain('240')
       expect(body).toMatch(/"steepTime":90/)
       expect(body).toContain(COFFEE)
+      await waitFor(() =>
+        expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
+          method: 'aeropress',
+        }),
+      )
     } finally {
       fetchSpy.mockRestore()
     }

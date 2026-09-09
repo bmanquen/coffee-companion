@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
+import { track } from '@/lib/analytics'
 
 export const Route = createFileRoute('/_authenticated/coffees/new')({
   loader: async ({ context }) => {
@@ -75,6 +76,7 @@ function NewCoffeeComponent() {
     trpc.coffee.create.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
+        track('coffee_created')
         navigate({ to: '/coffees' })
       },
     }),

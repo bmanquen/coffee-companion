@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
+import { track } from '@/lib/analytics'
 
 // The public site's header. Deliberately unrelated to the signed-in app's
 // Navigation/MobileHeader: even a signed-in visitor is only passing through, so
@@ -29,7 +30,13 @@ export function MarketingHeader({
               <Link to="/dashboard">Dashboard</Link>
             </Button>
           ) : (
-            <Button size="sm" onClick={onSignIn}>
+            <Button
+              size="sm"
+              onClick={() => {
+                track('sign_in_started', { from: 'header' })
+                onSignIn()
+              }}
+            >
               Sign in
             </Button>
           )}

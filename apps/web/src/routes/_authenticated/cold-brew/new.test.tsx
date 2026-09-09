@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Route } from './new'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 import {
   makeBrewingDevice,
   makeCoffee,
@@ -16,7 +17,9 @@ import {
   makeGrinder,
 } from '@/test/factories'
 
-const mocks = vi.hoisted(() => ({ navigate: vi.fn() }))
+const mocks = vi.hoisted(() => ({ navigate: vi.fn(), track: vi.fn() }))
+
+vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
 
 // The form is a route component: stub createFileRoute so `Route.options.component`
 // is the plain component, and useNavigate so the submit handler doesn't need a router.
@@ -77,12 +80,24 @@ function seeded() {
       id: CB_DEVICE,
       name: 'Toddy',
       brand: 'Toddy',
-      type: { id: 't5', userId: null, name: 'Cold Brew', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't5',
+        userId: null,
+        name: 'Cold Brew',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't2',
+        userId: null,
+        name: 'Espresso',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
   ])
   // The coffee's most recent brew, used for prefill.
@@ -105,7 +120,9 @@ describe('NewColdBrewBrew form', () => {
     const { Wrapper } = seeded()
     render(<NewColdBrewBrew />, { wrapper: Wrapper })
 
-    const deviceSelect = screen.getByRole('combobox', { name: 'Brewing Device' })
+    const deviceSelect = screen.getByRole('combobox', {
+      name: 'Brewing Device',
+    })
     expect(
       within(deviceSelect).getByRole('option', { name: 'Toddy' }),
     ).toBeTruthy()
@@ -137,12 +154,7 @@ describe('NewColdBrewBrew form', () => {
   it('submits a create with the entered recipe, converting steep hours to minutes', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+      .mockResolvedValue(trpcSuccess())
     try {
       const { Wrapper } = seeded()
       render(<NewColdBrewBrew />, { wrapper: Wrapper })
@@ -161,9 +173,12 @@ describe('NewColdBrewBrew form', () => {
       fireEvent.change(screen.getByLabelText(/^Steep Time \(hours\)/), {
         target: { value: '18' },
       })
-      fireEvent.change(screen.getByRole('combobox', { name: 'Brew Environment' }), {
-        target: { value: 'Fridge' },
-      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brew Environment' }),
+        {
+          target: { value: 'Fridge' },
+        },
+      )
       fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
         target: { value: 'coarse' },
       })
@@ -179,6 +194,11 @@ describe('NewColdBrewBrew form', () => {
       expect(body).toContain('1080')
       expect(body).toContain('Fridge')
       expect(body).toContain(COFFEE)
+      await waitFor(() =>
+        expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
+          method: 'coldbrew',
+        }),
+      )
     } finally {
       fetchSpy.mockRestore()
     }

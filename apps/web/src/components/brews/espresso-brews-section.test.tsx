@@ -5,11 +5,18 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EspressoBrewsSection } from './espresso-brews-section'
 import type * as ReactRouter from '@tanstack/react-router'
 import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
+
+const mocks = vi.hoisted(() => ({ track: vi.fn() }))
+
+vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
+
+beforeEach(() => mocks.track.mockClear())
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 // Resolve `params` into `to` (e.g. /espresso/$shotId/edit -> /espresso/s1/edit)
@@ -239,12 +246,9 @@ describe('EspressoBrewsSection', () => {
   })
 
   it('fires coffee.setDialedIn with the coffee and shot when toggled on', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
@@ -268,6 +272,45 @@ describe('EspressoBrewsSection', () => {
       const body = String(init?.body ?? '')
       expect(body).toContain('c1')
       expect(body).toContain('s1')
+      await waitFor(() =>
+        expect(mocks.track).toHaveBeenCalledWith('brew_dialed_in', {
+          method: 'espresso',
+        }),
+      )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+  it('clears the dialed-in shot (null shotId) when toggled off', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+        makeRecentShot({
+          id: 's1',
+          isDialedIn: true,
+          coffeeId: 'c1',
+          coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        }),
+      ])
+
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+      const table = within(screen.getByRole('table'))
+      fireEvent.click(
+        table.getByRole('button', { name: 'Dialed in Ethiopia Guji — clear' }),
+      )
+
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      const [url, init] = fetchSpy.mock.calls[0]
+      expect(String(url)).toContain('coffee.setDialedIn')
+      const body = String(init?.body ?? '')
+      // Clearing scopes to the coffee but sends no shot id.
+      expect(body).toContain('c1')
+      expect(body).not.toContain('s1')
+      await waitFor(() => expect(queryClient.isMutating()).toBe(0))
+      expect(mocks.track).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }
@@ -304,7 +347,9 @@ describe('EspressoBrewsSection', () => {
   // The detail region for a row: its sibling sub-row's animating grid-rows wrap
   // (grid-rows-[1fr] open, grid-rows-[0fr] collapsed). Always in the DOM.
   const detailRegionFor = (name: string): HTMLElement => {
-    const dataRow = within(screen.getByRole('table')).getByText(name).closest('tr')!
+    const dataRow = within(screen.getByRole('table'))
+      .getByText(name)
+      .closest('tr')!
     return dataRow.nextElementSibling!.querySelector(
       '[class*="grid-rows-"]',
     ) as HTMLElement

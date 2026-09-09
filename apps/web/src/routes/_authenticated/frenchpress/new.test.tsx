@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Route } from './new'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 import {
   makeBrewingDevice,
   makeCoffee,
@@ -17,7 +18,9 @@ import {
   makeGrinder,
 } from '@/test/factories'
 
-const mocks = vi.hoisted(() => ({ navigate: vi.fn() }))
+const mocks = vi.hoisted(() => ({ navigate: vi.fn(), track: vi.fn() }))
+
+vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
 
 // The form is a route component: stub createFileRoute so `Route.options.component`
 // is the plain component, and useNavigate so the submit handler doesn't need a router.
@@ -150,12 +153,9 @@ describe('NewFrenchpressBrew form', () => {
   })
 
   it('submits a create with the entered recipe, including steep time and water temp', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { Wrapper } = seeded()
       render(<NewFrenchpressBrew />, { wrapper: Wrapper })
@@ -195,6 +195,11 @@ describe('NewFrenchpressBrew form', () => {
       expect(body).toContain('96')
       expect(body).toMatch(/"steepTime":240/)
       expect(body).toContain(COFFEE)
+      await waitFor(() =>
+        expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
+          method: 'frenchpress',
+        }),
+      )
     } finally {
       fetchSpy.mockRestore()
     }

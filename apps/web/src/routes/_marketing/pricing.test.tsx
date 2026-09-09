@@ -10,6 +10,7 @@ import { planLimits } from '@coffee-companion/api/lib/plan'
 import { PricingPage, PricingScreen } from './pricing'
 import type { BillingPeriod, PlanId, PlanPrice } from '@/lib/plans'
 import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 
 const authState = vi.hoisted(() => ({
   session: null as { user: { id: string } } | null,
@@ -19,7 +20,10 @@ const mocks = vi.hoisted(() => ({
   upgrade: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  track: vi.fn(),
 }))
+
+vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
 
 vi.mock('@/lib/auth-client', () => ({
   authClient: {
@@ -36,6 +40,7 @@ vi.mock('sonner', () => ({
 beforeEach(() => {
   mocks.toastSuccess.mockClear()
   mocks.toastError.mockClear()
+  mocks.track.mockClear()
 })
 
 function renderPricing(
@@ -697,12 +702,9 @@ describe('PricingScreen', () => {
   }
 
   function stubbedFetch() {
-    return vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    return vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => Promise.resolve(trpcSuccess([])))
   }
 
   const registerCall = (spy: ReturnType<typeof stubbedFetch>) =>
@@ -725,6 +727,11 @@ describe('PricingScreen', () => {
         'proPlus',
       )
       expect(mocks.signInSocial).not.toHaveBeenCalled()
+      await waitFor(() =>
+        expect(mocks.track).toHaveBeenCalledWith('interest_registered', {
+          plan: 'proPlus',
+        }),
+      )
     } finally {
       fetchSpy.mockRestore()
     }
@@ -748,6 +755,13 @@ describe('PricingScreen', () => {
       )
       expect(fetchSpy).not.toHaveBeenCalled()
       expect(mocks.toastSuccess).not.toHaveBeenCalled()
+      expect(mocks.track).toHaveBeenCalledWith('sign_in_started', {
+        from: 'pricing',
+      })
+      expect(mocks.track).not.toHaveBeenCalledWith(
+        'interest_registered',
+        expect.anything(),
+      )
     } finally {
       fetchSpy.mockRestore()
     }
@@ -825,6 +839,10 @@ describe('PricingScreen', () => {
       ),
     )
     expect(mocks.signInSocial).not.toHaveBeenCalled()
+    expect(mocks.track).toHaveBeenCalledWith('checkout_started', {
+      plan: 'pro',
+      period: 'annual',
+    })
   })
 
   // The price the visitor is charged is chosen server-side from this flag, so
@@ -849,6 +867,13 @@ describe('PricingScreen', () => {
 
     await waitFor(() => expect(mocks.signInSocial).toHaveBeenCalled())
     expect(mocks.upgrade).not.toHaveBeenCalled()
+    expect(mocks.track).toHaveBeenCalledWith('sign_in_started', {
+      from: 'pricing',
+    })
+    expect(mocks.track).not.toHaveBeenCalledWith(
+      'checkout_started',
+      expect.anything(),
+    )
   })
 
   // The period decides the price, so a sign-in that carried only the Plan back

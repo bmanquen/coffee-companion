@@ -1,4 +1,5 @@
 import type { PostHogConfig } from 'posthog-js'
+import type { BillingPeriod, PlanId } from './plans'
 // Product analytics (PostHog), gated on a public key the same way Sentry is
 // gated on its DSN. Components import only this module, never the vendor SDK.
 
@@ -60,6 +61,31 @@ function active(): AnalyticsClient | undefined {
 
 export function trackPageView(view: PageView) {
   active()?.capture('$pageview', view)
+}
+
+export type BrewMethod =
+  | 'espresso'
+  | 'pourover'
+  | 'frenchpress'
+  | 'aeropress'
+  | 'coldbrew'
+
+// The brewing funnel. Properties name a Plan, a period, or a Brewing Method;
+// never a Coffee, a Brew, or a piece of equipment.
+export type Events = {
+  sign_in_started: { from: 'landing' | 'pricing' | 'header' }
+  coffee_created: undefined
+  brew_logged: { method: BrewMethod }
+  brew_dialed_in: { method: BrewMethod }
+  interest_registered: { plan: PlanId }
+  checkout_started: { plan: PlanId; period: BillingPeriod }
+}
+
+export function track<TEvent extends keyof Events>(
+  event: TEvent,
+  ...properties: Events[TEvent] extends undefined ? [] : [Events[TEvent]]
+) {
+  active()?.capture(event, properties[0])
 }
 
 export type Identity = { id: string }
