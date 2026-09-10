@@ -20,6 +20,16 @@ What leaves the app:
   where sign-in started. Never a Coffee, a Brew, a roaster, a note, or a piece of
   equipment, and never an id of any of them.
 - **The environment name**, the same one Sentry receives.
+- **No query string, on any event.** Overriding `$current_url` covers `$pageview` and
+  nothing else: every other `capture` keeps whatever the SDK read off `window.location`,
+  and `/pricing?press=pro` is a search param the user chose. A `before_send` hook cuts
+  every url-shaped property short of its `?` or `#`, so the rule holds for the funnel
+  events too, and for the referrer and the initial-URL person properties.
+- **What the SDK adds by itself**, which is not nothing: browser, operating system,
+  device type, screen size, and referrer travel on every event, and PostHog derives an
+  approximate location from the IP at its end. None of it is ours to send or withhold
+  short of turning the SDK off, and `/privacy` says so rather than implying the list
+  above is exhaustive.
 
 What we rejected:
 

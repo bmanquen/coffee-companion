@@ -1,4 +1,4 @@
-# Legitimate interests carries both vendors, and consent is unanswered
+# Legitimate interests carries the monitoring vendors, and consent is unanswered
 
 [ADR 0009](0009-analytics-sends-an-id-and-a-funnel-nothing-else.md) fixed what PostHog
 may receive and [ADR 0010](0010-a-replay-is-attached-to-an-error-never-to-a-session.md)
@@ -7,7 +7,7 @@ answer was owed to a user and had never been written anywhere, which is what
 `/privacy` now fixes — but a public page is a claim, and the claim has to be decided
 here first rather than drafted into prose and discovered later.
 
-The basis we claim, for both vendors, is **legitimate interests**.
+The basis we claim, for the two monitoring vendors, is **legitimate interests**.
 
 - **Sentry.** Keeping the app working is the interest, and an app that cannot see its
   own errors cannot fix them. What is sent is narrow by construction: `sendDefaultPii`
@@ -19,6 +19,22 @@ The basis we claim, for both vendors, is **legitimate interests**.
   payload to a random id, a route pattern, six counted events, and a Plan. There is no
   recording, no autocapture, no search params, and no contactable identifier. A balancing
   test that starts from that payload is not a close call.
+
+Three other companies receive something, and none of them is a monitoring decision.
+Their basis is **performance of a contract** — the user asked for the thing, and the
+sending is the thing:
+
+- **Google** is sign-in. There is no password of our own, so proving who you are runs
+  through Google or not at all.
+- **Stripe** is the payment, and by ADR 0006 the merchant of record. A checkout that
+  does not reach Stripe is not a checkout.
+- **Resend** delivers the single interest-confirmation email. Registering interest is a
+  request to be written to.
+
+They were missing from the first draft of this ADR and of `/privacy`, which claimed the
+app sent data to two companies. It sends to five. A page that undercounts its recipients
+is worse than no page, so the count is asserted in `privacy.test.ts` rather than left to
+prose.
 
 What we rejected:
 

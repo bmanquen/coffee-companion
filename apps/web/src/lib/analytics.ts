@@ -1,4 +1,4 @@
-import type { PostHogConfig } from 'posthog-js'
+import type { CaptureResult, PostHogConfig } from 'posthog-js'
 import type { BillingPeriod, PlanId } from './plans'
 // What may leave the app, and why, is ADR-0009.
 
@@ -21,8 +21,38 @@ export function analyticsEnabled(key: string | undefined): key is string {
   return key != null
 }
 
-// $current_url overrides the SDK's own value, which would carry the resolved
-// ids and the query string.
+// A route's search params are the user's own words — a Coffee's name typed into
+// a filter, the plan they pressed. `$pageview` rewrites $current_url to the
+// route pattern, but every other event keeps whatever posthog-js read off
+// `window.location`, so the cut happens once here for all of them.
+const URL_SHAPED_KEY = /(url|referrer|pathname)$/i
+
+function cutQuery(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  const end = value.search(/[?#]/)
+  return end === -1 ? value : value.slice(0, end)
+}
+
+function scrubProperties(properties: Record<string, unknown> | undefined) {
+  if (!properties) return properties
+  return Object.fromEntries(
+    Object.entries(properties).map(([key, value]) => [
+      key,
+      URL_SHAPED_KEY.test(key) ? cutQuery(value) : value,
+    ]),
+  )
+}
+
+export function scrubAnalyticsEvent(
+  result: CaptureResult | null,
+): CaptureResult | null {
+  if (!result) return null
+  const next = { ...result, properties: scrubProperties(result.properties)! }
+  if (result.$set) next.$set = scrubProperties(result.$set)!
+  if (result.$set_once) next.$set_once = scrubProperties(result.$set_once)!
+  return next
+}
+
 export type PageView = {
   $pathname: string
   $current_url: string
@@ -104,5 +134,6 @@ export function analyticsOptions(host: string) {
     disable_session_recording: true,
     disable_surveys: true,
     person_profiles: 'identified_only',
+    before_send: scrubAnalyticsEvent,
   } satisfies Partial<PostHogConfig>
 }
