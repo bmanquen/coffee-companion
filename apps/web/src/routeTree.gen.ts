@@ -13,6 +13,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as MarketingRouteImport } from './routes/_marketing'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as MarketingIndexRouteImport } from './routes/_marketing/index'
+import { Route as MarketingPrivacyRouteImport } from './routes/_marketing/privacy'
 import { Route as MarketingPricingRouteImport } from './routes/_marketing/pricing'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
@@ -54,6 +55,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const MarketingIndexRoute = MarketingIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => MarketingRoute,
+} as any)
+const MarketingPrivacyRoute = MarketingPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => MarketingRoute,
 } as any)
 const MarketingPricingRoute = MarketingPricingRouteImport.update({
@@ -200,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AuthenticatedAccountRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/pricing': typeof MarketingPricingRoute
+  '/privacy': typeof MarketingPrivacyRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/cold-brew/new': typeof AuthenticatedColdBrewNewRoute
@@ -228,6 +235,7 @@ export interface FileRoutesByTo {
   '/account': typeof AuthenticatedAccountRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/pricing': typeof MarketingPricingRoute
+  '/privacy': typeof MarketingPrivacyRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/cold-brew/new': typeof AuthenticatedColdBrewNewRoute
@@ -258,6 +266,7 @@ export interface FileRoutesById {
   '/_authenticated/account': typeof AuthenticatedAccountRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_marketing/pricing': typeof MarketingPricingRoute
+  '/_marketing/privacy': typeof MarketingPrivacyRoute
   '/_marketing/': typeof MarketingIndexRoute
   '/_authenticated/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/_authenticated/coffees/new': typeof AuthenticatedCoffeesNewRoute
@@ -289,6 +298,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/dashboard'
     | '/pricing'
+    | '/privacy'
     | '/aeropress/new'
     | '/coffees/new'
     | '/cold-brew/new'
@@ -317,6 +327,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/dashboard'
     | '/pricing'
+    | '/privacy'
     | '/aeropress/new'
     | '/coffees/new'
     | '/cold-brew/new'
@@ -346,6 +357,7 @@ export interface FileRouteTypes {
     | '/_authenticated/account'
     | '/_authenticated/dashboard'
     | '/_marketing/pricing'
+    | '/_marketing/privacy'
     | '/_marketing/'
     | '/_authenticated/aeropress/new'
     | '/_authenticated/coffees/new'
@@ -406,6 +418,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof MarketingIndexRouteImport
+      parentRoute: typeof MarketingRoute
+    }
+    '/_marketing/privacy': {
+      id: '/_marketing/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof MarketingPrivacyRouteImport
       parentRoute: typeof MarketingRoute
     }
     '/_marketing/pricing': {
@@ -638,11 +657,13 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 
 interface MarketingRouteChildren {
   MarketingPricingRoute: typeof MarketingPricingRoute
+  MarketingPrivacyRoute: typeof MarketingPrivacyRoute
   MarketingIndexRoute: typeof MarketingIndexRoute
 }
 
 const MarketingRouteChildren: MarketingRouteChildren = {
   MarketingPricingRoute: MarketingPricingRoute,
+  MarketingPrivacyRoute: MarketingPrivacyRoute,
   MarketingIndexRoute: MarketingIndexRoute,
 }
 

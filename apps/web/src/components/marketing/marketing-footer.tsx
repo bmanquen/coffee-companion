@@ -12,6 +12,9 @@ export function MarketingFooter() {
           <Link to="/pricing" className="hover:text-foreground">
             Pricing
           </Link>
+          <Link to="/privacy" className="hover:text-foreground">
+            Privacy
+          </Link>
         </nav>
       </div>
     </footer>
