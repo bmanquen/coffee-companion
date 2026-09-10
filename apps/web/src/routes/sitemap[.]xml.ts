@@ -4,7 +4,7 @@ import { absoluteUrl } from '@/lib/site-url'
 // Served rather than shipped as a static file so the URLs use the configured
 // canonical origin — a static sitemap would have to hardcode one host and would
 // be wrong everywhere else.
-const paths = ['/', '/pricing']
+const paths = ['/', '/pricing', '/privacy']
 
 function handler() {
   const urls = paths

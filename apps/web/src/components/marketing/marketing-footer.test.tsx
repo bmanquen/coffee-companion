@@ -24,15 +24,20 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 })
 
 describe('MarketingFooter', () => {
-  it('names the site and links to both public pages', () => {
+  it('names the site and links to every public page', () => {
     render(<MarketingFooter />)
 
     expect(screen.getByText('Coffee Companion')).toBeTruthy()
 
     const nav = within(screen.getByRole('navigation', { name: 'Footer' }))
-    expect(nav.getByRole('link', { name: 'Home' }).getAttribute('href')).toBe('/')
-    expect(nav.getByRole('link', { name: 'Pricing' }).getAttribute('href')).toBe(
-      '/pricing',
+    expect(nav.getByRole('link', { name: 'Home' }).getAttribute('href')).toBe(
+      '/',
     )
+    expect(
+      nav.getByRole('link', { name: 'Pricing' }).getAttribute('href'),
+    ).toBe('/pricing')
+    expect(
+      nav.getByRole('link', { name: 'Privacy' }).getAttribute('href'),
+    ).toBe('/privacy')
   })
 })
