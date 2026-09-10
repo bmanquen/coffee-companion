@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   isAbortEvent,
   scrubSentryEvent,
+  sentryBrowserOptions,
   sentryCommonOptions,
   sentryEnabled,
   sentryEnvironment,
@@ -148,6 +149,36 @@ describe('sentryCommonOptions', () => {
     expect(
       sentryCommonOptions('https://key@o1.ingest.sentry.io/1').tracesSampleRate,
     ).toBe(0.2)
+  })
+})
+
+describe('sentryBrowserOptions', () => {
+  restoreEnv('SENTRY_TRACES_SAMPLE_RATE', 'SENTRY_ENVIRONMENT')
+
+  const DSN = 'https://key@o1.ingest.sentry.io/1'
+
+  it('uploads no ordinary session and every session that errors', () => {
+    const { init } = sentryBrowserOptions(DSN)
+
+    expect(init.replaysSessionSampleRate).toBe(0)
+    expect(init.replaysOnErrorSampleRate).toBe(1)
+  })
+
+  it('masks every text node and input, and blocks every image', () => {
+    expect(sentryBrowserOptions(DSN).replay).toEqual({
+      maskAllText: true,
+      maskAllInputs: true,
+      blockAllMedia: true,
+    })
+  })
+
+  it('carries the common options', () => {
+    process.env.SENTRY_ENVIRONMENT = 'production'
+    process.env.SENTRY_TRACES_SAMPLE_RATE = '0.2'
+
+    expect(sentryBrowserOptions(DSN).init).toMatchObject(
+      sentryCommonOptions(DSN),
+    )
   })
 })
 

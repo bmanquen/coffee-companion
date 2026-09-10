@@ -84,6 +84,23 @@ export function sentryCommonOptions(dsn: string) {
   }
 }
 
+// Session rate zero with error rate one is Sentry's buffer mode: the browser
+// records into a rolling buffer and uploads it only when an error is captured.
+export function sentryBrowserOptions(dsn: string) {
+  return {
+    init: {
+      ...sentryCommonOptions(dsn),
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: 1,
+    },
+    replay: {
+      maskAllText: true,
+      maskAllInputs: true,
+      blockAllMedia: true,
+    },
+  }
+}
+
 // A cancelled request is not a failure. `httpBatchStreamLink` aborts its own
 // controller once a batch's stream is drained, and WebKit reports that teardown
 // as an unhandled `AbortError: Fetch is aborted` after the request already
