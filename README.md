@@ -84,6 +84,13 @@ SENTRY_TRACES_SAMPLE_RATE=
 VITE_SENTRY_TRACES_SAMPLE_RATE=
 ```
 
+A browser error also arrives with a session replay of the seconds before it.
+Nothing leaves the browser for an ordinary session — the recording sits in a
+rolling in-memory buffer and is uploaded only when an error is captured — and
+every text node and input is masked and every image blocked, so a replay shows
+the shape of what happened and none of its content. There is nothing to
+configure. See `docs/adr/0010-a-replay-is-attached-to-an-error-never-to-a-session.md`.
+
 `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` together upload source
 maps at build time.
 
