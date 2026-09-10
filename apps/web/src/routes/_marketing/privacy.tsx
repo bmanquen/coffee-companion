@@ -7,7 +7,7 @@ import { recipients } from '@/lib/privacy'
 
 const TITLE = 'Privacy — Coffee Companion'
 const DESCRIPTION =
-  'The two companies Coffee Companion sends data to, exactly what each one receives, how long they keep it, and why we send it at all.'
+  'Every company Coffee Companion sends data to, exactly what each one receives, how long they keep it, and why we send it at all.'
 
 export const Route = createFileRoute('/_marketing/privacy')({
   head: () =>
@@ -22,45 +22,81 @@ export function PrivacyPage() {
         <H1>What we collect, and who we send it to</H1>
         <p className="max-w-2xl text-muted-foreground">
           Your brewing log is yours. Nothing in it — no coffee, no roaster, no
-          tasting note — is ever sent to anyone else. Two companies do receive
-          something, and this page says exactly what, for how long, and why.
+          tasting note — is ever sent to anyone else. A handful of companies do
+          receive something, and this page names every one of them, what each
+          gets, for how long, and why.
         </p>
       </header>
 
       {recipients.map((recipient) => (
-        <RecipientSection key={recipient.name} recipient={recipient} />
+        <RecipientSection key={recipient.slug} recipient={recipient} />
       ))}
 
-      <ReplaySection />
+      <Section id="session-replay" title="Session replay">
+        <p className="text-muted-foreground">
+          Sentry can record what happened in the browser just before a crash, so
+          a bug report comes with the steps that caused it. We use it{' '}
+          <strong className="font-medium text-foreground">
+            only when the app throws an error
+          </strong>
+          , and{' '}
+          <strong className="font-medium text-foreground">
+            never for an ordinary visit
+          </strong>
+          . If nothing goes wrong, nothing is sent and the recording is
+          discarded as you go.
+        </p>
+        <p className="text-muted-foreground">
+          A replay is not a video of your screen.{' '}
+          <strong className="font-medium text-foreground">
+            Every piece of text on the page is masked
+          </strong>
+          , every field you type into is masked, and images and video are
+          blocked outright. What survives is the shape of the page and where you
+          clicked — boxes and timing, not their contents.
+        </p>
+      </Section>
 
-      <section
-        aria-labelledby="your-data"
-        className="flex max-w-2xl flex-col gap-3"
-      >
-        <h2 id="your-data" className="text-xl font-semibold tracking-tight">
-          Your own data
-        </h2>
+      <Section id="your-data" title="Your own data">
         <p className="text-muted-foreground">
           Everything the app holds about you can be exported from your account
-          page, on any plan and whatever a plan hides from view. Deleting your
-          account deletes it.
+          page, on any plan and whatever a plan hides from view. There is no
+          button that deletes your account yet — until there is, write to us and
+          we will do it by hand.
         </p>
-      </section>
+      </Section>
     </div>
   )
 }
 
-function RecipientSection({ recipient }: { recipient: Recipient }) {
-  const id = recipient.name.toLowerCase()
-
+function Section({
+  id,
+  title,
+  children,
+  className = 'max-w-2xl',
+}: {
+  id: string
+  title: string
+  children: React.ReactNode
+  className?: string
+}) {
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <h2 id={id} className="text-xl font-semibold tracking-tight">
-          {recipient.name}
-        </h2>
-        <p className="max-w-2xl text-muted-foreground">{recipient.purpose}</p>
-      </div>
+    <section
+      aria-labelledby={id}
+      className={`flex flex-col gap-3 ${className}`}
+    >
+      <h2 id={id} className="text-2xl font-bold tracking-tight">
+        {title}
+      </h2>
+      {children}
+    </section>
+  )
+}
+
+function RecipientSection({ recipient }: { recipient: Recipient }) {
+  return (
+    <Section id={recipient.slug} title={recipient.name} className="">
+      <p className="max-w-2xl text-muted-foreground">{recipient.purpose}</p>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <ItemList title="What it receives" items={recipient.receives} />
@@ -84,7 +120,7 @@ function RecipientSection({ recipient }: { recipient: Recipient }) {
           {recipient.name}'s privacy policy
         </a>
       </Card>
-    </section>
+    </Section>
   )
 }
 
@@ -107,40 +143,5 @@ function Fact({ label, children }: { label: string; children: string }) {
       <span className="font-medium">{label}</span>
       <span className="text-muted-foreground">{children}</span>
     </p>
-  )
-}
-
-function ReplaySection() {
-  return (
-    <section
-      aria-labelledby="session-replay"
-      className="flex max-w-2xl flex-col gap-3"
-    >
-      <h2 id="session-replay" className="text-xl font-semibold tracking-tight">
-        Session replay
-      </h2>
-      <p className="text-muted-foreground">
-        Sentry can record what happened in the browser just before a crash, so a
-        bug report comes with the steps that caused it. We use it{' '}
-        <strong className="font-medium text-foreground">
-          only when the app throws an error
-        </strong>
-        , and{' '}
-        <strong className="font-medium text-foreground">
-          never for an ordinary visit
-        </strong>
-        . If nothing goes wrong, nothing is sent and the recording is discarded
-        as you go.
-      </p>
-      <p className="text-muted-foreground">
-        A replay is not a video of your screen.{' '}
-        <strong className="font-medium text-foreground">
-          Every piece of text on the page is masked
-        </strong>
-        , every field you type into is masked, and images and video are blocked
-        outright. What survives is the shape of the page and where you clicked —
-        boxes and timing, not their contents.
-      </p>
-    </section>
   )
 }

@@ -8,6 +8,7 @@ import {
   identityFrom,
   pageViewFrom,
   resetAnalytics,
+  scrubAnalyticsEvent,
   setAnalyticsClient,
   track,
   trackPageView,
@@ -184,5 +185,41 @@ describe('analyticsOptions', () => {
       disable_surveys: true,
       person_profiles: 'identified_only',
     })
+  })
+})
+
+describe('scrubAnalyticsEvent', () => {
+  it('cuts the query string and hash off every url-shaped property', () => {
+    const event = scrubAnalyticsEvent({
+      uuid: 'e1',
+      event: 'checkout_started',
+      properties: {
+        $current_url: 'https://app.test/pricing?press=pro&email=a@b.com',
+        $referrer: 'https://google.test/search?q=coffee+companion',
+        $pathname: '/pricing?press=pro',
+        plan: 'pro',
+      },
+      $set: { $initial_current_url: 'https://app.test/?invite=secret' },
+    })
+
+    expect(event?.properties).toMatchObject({
+      $current_url: 'https://app.test/pricing',
+      $referrer: 'https://google.test/search',
+      $pathname: '/pricing',
+      plan: 'pro',
+    })
+    expect(event?.$set).toEqual({ $initial_current_url: 'https://app.test/' })
+  })
+
+  it('leaves a route pattern and a null event alone', () => {
+    expect(
+      scrubAnalyticsEvent({
+        uuid: 'e2',
+        event: '$pageview',
+        properties: { $current_url: '/coffees/$coffeeId', $pathname: '/coffees/$coffeeId' },
+      })?.properties.$current_url,
+    ).toBe('/coffees/$coffeeId')
+
+    expect(scrubAnalyticsEvent(null)).toBeNull()
   })
 })

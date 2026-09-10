@@ -27,7 +27,7 @@ describe('PrivacyPage', () => {
     }
   })
 
-  it('links out to each recipient own policy', () => {
+  it("links out to each recipient's own policy", () => {
     render(<PrivacyPage />)
 
     for (const recipient of recipients) {
@@ -50,5 +50,16 @@ describe('PrivacyPage', () => {
     expect(replay.getByText(/only when the app throws an error/i)).toBeTruthy()
     expect(replay.getByText(/never for an ordinary visit/i)).toBeTruthy()
     expect(replay.getByText(/every piece of text .* is masked/i)).toBeTruthy()
+  })
+
+  // A privacy page may only promise a right the app can actually honour. There
+  // is no deletion path yet, so the page has to say so rather than imply one.
+  it('promises no deletion button while none exists', () => {
+    render(<PrivacyPage />)
+
+    const own = within(screen.getByRole('region', { name: 'Your own data' }))
+    expect(own.getByText(/exported from your account page/i)).toBeTruthy()
+    expect(own.getByText(/no button that deletes your account/i)).toBeTruthy()
+    expect(screen.queryByText(/deleting your account deletes it/i)).toBeNull()
   })
 })
