@@ -1,10 +1,8 @@
-// Vendor plan defaults, not yet checked against our own account settings
-// (issue #122). Confirm both in the Sentry and PostHog dashboards before this
-// page is served publicly.
-const SENTRY_RETENTION =
-  'Sentry keeps errors, traces, and replays for 90 days, then deletes them.'
-const POSTHOG_RETENTION =
-  'PostHog keeps events for 7 years and profiles for as long as the project exists.'
+// Confirmed against our own dashboard settings (issue #122), not vendor plan
+// defaults. A figure here that drifts from the dashboard is the one sentence on
+// the page that is actively false rather than merely incomplete.
+const SENTRY_RETENTION = 'Sentry keeps errors for 90 days, then deletes them.'
+const POSTHOG_RETENTION = 'PostHog keeps events for a year, then deletes them.'
 
 const CONTRACT_BASIS =
   'Performing the contract you asked us for. Without this the feature you pressed cannot happen at all.'
