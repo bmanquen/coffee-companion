@@ -4,7 +4,7 @@ import { RootError } from './root-error'
 
 const reportClientError = vi.fn()
 
-vi.mock('@/lib/sentry-client-report', () => ({
+vi.mock('@/lib/sentry-client', () => ({
   reportClientError: (...args: Array<unknown>) => reportClientError(...args),
 }))
 

@@ -26,12 +26,13 @@ export const recipients: Array<Recipient> = [
       'Tells us when the app throws an error, and shows us enough to reproduce it.',
     receives: [
       'The error itself — its message, its stack trace, and the page you were on when it happened.',
+      'A random id for your account, if you were signed in when it happened.',
       'Your browser and operating system, and which environment of ours you were using.',
       'A sampled trace of how long a page load, a navigation, or a request took.',
       'A masked replay of the seconds before an error, and only then — see below.',
     ],
     neverReceives: [
-      'Your name, your address, or anything else that says who you are. Nothing in the app tells Sentry your identity, so an error report carries at most a random account id.',
+      'Your name, your address, or anything else that says who you are. The random account id is the only thing we attach that is about you at all.',
       'Cookies, request bodies, or authorization headers. These are stripped from every report before it is sent.',
       'Any extra value we attach to a report under a key that looks like a password, a token, a secret, or an address we could contact you at. This filter covers the values we attach ourselves, not the text of the error message itself — so we keep error messages free of your data at the point they are written.',
     ],

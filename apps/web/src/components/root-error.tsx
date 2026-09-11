@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { ErrorComponentProps } from '@tanstack/react-router'
 import { H1 } from '@/components/typography/h1'
-import { reportClientError } from '@/lib/sentry-client-report'
+import { reportClientError } from '@/lib/sentry-client'
 
 // Error boundaries swallow the exception; Sentry only sees it if we
 // report here.
