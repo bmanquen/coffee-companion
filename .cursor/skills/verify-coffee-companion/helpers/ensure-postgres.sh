@@ -129,8 +129,17 @@ if command -v pg_isready >/dev/null 2>&1; then
       sudo service postgresql start
     elif command -v systemctl >/dev/null 2>&1; then
       sudo systemctl start postgresql
+    elif command -v brew >/dev/null 2>&1; then
+      # Homebrew on macOS — start whichever postgresql@N formula is installed.
+      for formula in postgresql@18 postgresql@17 postgresql@16 postgresql; do
+        if brew list --formula "$formula" >/dev/null 2>&1; then
+          log "starting Homebrew $formula"
+          brew services start "$formula" >/dev/null
+          break
+        fi
+      done
     else
-      log "could not start postgresql: no pg_ctlcluster/service/systemctl"
+      log "could not start postgresql: no pg_ctlcluster/service/systemctl/brew"
       exit 1
     fi
     for _ in $(seq 1 30); do
@@ -140,9 +149,49 @@ if command -v pg_isready >/dev/null 2>&1; then
   fi
 fi
 
-# Peer-auth as the cluster OS user to create the login role and database.
+# Peer-auth / superuser bootstrap.
+# Ubuntu packages use OS user `postgres`. Homebrew uses the installing macOS user.
+bootstrap_psql() {
+  if id -u postgres >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+    sudo -u postgres psql "$@"
+  else
+    psql -h "$DB_HOST" -p "$DB_PORT" -d postgres "$@"
+  fi
+}
+
+bootstrap_createdb() {
+  if id -u postgres >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+    sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
+  else
+    createdb -h "$DB_HOST" -p "$DB_PORT" -O "$DB_USER" "$DB_NAME" 2>/dev/null || createdb -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME"
+  fi
+}
+
+# Prefer connecting as the current OS user on Homebrew (role often matches whoami).
+if ! id -u postgres >/dev/null 2>&1; then
+  OS_USER="$(id -un)"
+  # Trust/peer URLs without a password for the OS superuser role.
+  HOMEBREW_URL="postgresql://${OS_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+  if can_connect "$HOMEBREW_URL"; then
+    log "already reachable via Homebrew role ${OS_USER}"
+    emit_ok "$HOMEBREW_URL"
+    exit 0
+  fi
+  # Create DB if the cluster is up but the database is missing.
+  if pg_isready -h "$DB_HOST" -p "$DB_PORT" >/dev/null 2>&1; then
+    if ! psql -h "$DB_HOST" -p "$DB_PORT" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1; then
+      log "creating ${DB_NAME} via Homebrew role ${OS_USER}"
+      createdb -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME"
+    fi
+    if can_connect "$HOMEBREW_URL"; then
+      emit_ok "$HOMEBREW_URL"
+      exit 0
+    fi
+  fi
+fi
+
 # The password is the runtime value only — never a default baked into this file.
-sudo -u postgres psql -v ON_ERROR_STOP=1 >/dev/null <<SQL
+bootstrap_psql -v ON_ERROR_STOP=1 >/dev/null <<SQL
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$DB_USER') THEN
@@ -154,8 +203,8 @@ END
 \$\$;
 SQL
 
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1; then
-  sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
+if ! bootstrap_psql -tAc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1; then
+  bootstrap_createdb
 fi
 
 if ! can_connect "$TARGET_URL"; then

@@ -42,6 +42,8 @@ Isolation:
 
 Human-facing `pnpm dev` (turbo, Vite on port 3000, `.env.local`) is the wrong server for this skill: no auth bypass, development data.
 
+macOS / Homebrew: `ensure-postgres.sh` starts `postgresql@18` (or `@17`/`@16`) via `brew services` and creates `coffee_companion_test` as your OS user. If you already have a loopback `*_test` database, export `VERIFY_DATABASE_URL` (password optional under trust) before `launch`. Do **not** point verify at `packages/api/.env.test` when that file is a remote Railway URL — launch refuses non-loopback hosts.
+
 Teardown is `helpers/control cleanup` (see Cleanup). Run cleanup after every failed iteration too.
 
 ## Doctor
