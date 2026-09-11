@@ -36,8 +36,21 @@ describe('recipients', () => {
     for (const slug of slugs) expect(slug).toMatch(/^[a-z0-9-]+$/)
   })
 
-  // ADR 0009 and ADR 0010 both turn on the monitoring vendors never being told
-  // who a user is. A claim added here that contradicts them should fail.
+  // ADR 0012 allows exactly one thing about a user to reach Sentry. A page that
+  // stopped saying so, or that started claiming nothing does, should fail.
+  it('says Sentry receives the account id, and nothing else about a user', () => {
+    const sentry = recipients.find((recipient) => recipient.slug === 'sentry')!
+    expect(
+      sentry.receives.filter((item) => /id for your account/i.test(item)),
+    ).toHaveLength(1)
+    expect(
+      sentry.neverReceives.some((item) => /your name/i.test(item)),
+    ).toBe(true)
+  })
+
+  // ADR 0009 and ADR 0012 both turn on the monitoring vendors never being told
+  // who a user is beyond that id. A claim added here that contradicts them
+  // should fail.
   it('claims neither monitoring vendor receives a name or an email', () => {
     const monitoring = recipients.filter((recipient) =>
       ['sentry', 'posthog'].includes(recipient.slug),

@@ -28,7 +28,7 @@ export default defineConfig({
         'src/instrument.client.ts',
         'src/instrument.server.ts',
         'src/analytics.client.ts',
-        'src/lib/sentry-client.ts',
+        'src/lib/sentry-client.ts', // browser Sentry SDK seam (wiring)
         'src/lib/auth-client.ts', // better-auth client config (wiring)
         'src/lib/request-headers.ts', // isomorphic SSR header helper (wiring)
       ],

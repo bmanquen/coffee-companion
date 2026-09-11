@@ -49,7 +49,7 @@ function AuthenticatedLayout() {
   }, [userId, planId])
 
   useEffect(() => {
-    setSentryUser(sentryUserFrom(session))
+    void setSentryUser(sentryUserFrom(session))
   }, [userId])
 
   return (
