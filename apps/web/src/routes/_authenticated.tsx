@@ -8,6 +8,8 @@ import { RenewalFailedNotice } from '@/components/renewal-failed-notice'
 import { identifyUser, identityFrom } from '@/lib/analytics'
 import { authClient } from '@/lib/auth-client'
 import { getForwardedHeaders } from '@/lib/request-headers'
+import { sentryUserFrom } from '@/lib/sentry'
+import { setSentryUser } from '@/lib/sentry-client'
 import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute('/_authenticated')({
@@ -45,6 +47,10 @@ function AuthenticatedLayout() {
   useEffect(() => {
     if (planId) identifyUser({ id: userId }, { plan: planId })
   }, [userId, planId])
+
+  useEffect(() => {
+    setSentryUser(sentryUserFrom(session))
+  }, [userId])
 
   return (
     <>

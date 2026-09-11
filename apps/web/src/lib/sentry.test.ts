@@ -8,6 +8,7 @@ import {
   sentryEnvironment,
   sentryServerDsn,
   sentryTracesSampleRate,
+  sentryUserFrom,
   traceSampleRate,
   trimSetting,
 } from './sentry'
@@ -179,6 +180,26 @@ describe('sentryBrowserOptions', () => {
     expect(sentryBrowserOptions(DSN).init).toMatchObject(
       sentryCommonOptions(DSN),
     )
+  })
+})
+
+describe('sentryUserFrom', () => {
+  it('is the user id only, never the email, name, or avatar', () => {
+    const session = {
+      user: {
+        id: 'user_123',
+        email: 'ada@example.com',
+        name: 'Ada',
+        image: 'https://example.com/ada.png',
+      },
+      session: { token: 'secret' },
+    }
+    expect(sentryUserFrom(session)).toEqual({ id: 'user_123' })
+  })
+
+  it('names nobody when there is no session', () => {
+    expect(sentryUserFrom(null)).toBeUndefined()
+    expect(sentryUserFrom(undefined)).toBeUndefined()
   })
 })
 

@@ -101,6 +101,13 @@ export function sentryBrowserOptions(dsn: string) {
   }
 }
 
+// The session carries the name, email, and avatar; the id is all Sentry gets.
+export function sentryUserFrom(
+  session: { user: { id: string } } | null | undefined,
+): SentryUser | undefined {
+  return session ? { id: session.user.id } : undefined
+}
+
 // A cancelled request is not a failure. `httpBatchStreamLink` aborts its own
 // controller once a batch's stream is drained, and WebKit reports that teardown
 // as an unhandled `AbortError: Fetch is aborted` after the request already

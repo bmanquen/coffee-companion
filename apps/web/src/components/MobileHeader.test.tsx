@@ -13,10 +13,15 @@ const mocks = vi.hoisted(() => ({
   signOut: vi.fn(),
   navigate: vi.fn(),
   resetAnalytics: vi.fn(),
+  setSentryUser: vi.fn(),
 }))
 
 vi.mock('@/lib/analytics', () => ({
   resetAnalytics: mocks.resetAnalytics,
+}))
+
+vi.mock('@/lib/sentry-client', () => ({
+  setSentryUser: mocks.setSentryUser,
 }))
 
 vi.mock('@/lib/auth-client', () => ({
@@ -77,6 +82,10 @@ describe('MobileHeader', () => {
     expect(mocks.signOut).toHaveBeenCalled()
     expect(mocks.resetAnalytics).toHaveBeenCalledOnce()
     expect(mocks.resetAnalytics.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.signOut.mock.invocationCallOrder[0],
+    )
+    expect(mocks.setSentryUser).toHaveBeenCalledWith(undefined)
+    expect(mocks.setSentryUser.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.signOut.mock.invocationCallOrder[0],
     )
     expect(mocks.navigate).toHaveBeenCalledWith({ to: '/' })
