@@ -1,4 +1,23 @@
 import { expect, test } from '@playwright/test'
+import { pickOption } from './helpers'
+import type { Page } from '@playwright/test'
+
+// The seeded roaster and roast level, chosen before the name is typed. A
+// SearchSelect is opened by its visible placeholder, because its label-derived
+// a11y name differs from it — and choosing one is the first thing every one of
+// these tests does after a navigation, because a click is what survives the
+// hydration gap (see clickUntil) and a fill is not: an unhydrated fill reaches
+// the DOM, React never hears it, and the form submits an empty name.
+async function pickLookups(page: Page) {
+  await pickOption(
+    page.getByText('Select Roaster'),
+    page.getByText('Sey', { exact: true }),
+  )
+  await pickOption(
+    page.getByText('Select Roast Level'),
+    page.getByText('Medium', { exact: true }),
+  )
+}
 
 // Exercises the form components in a real browser end-to-end: the TextField,
 // the SearchSelect dropdown (selecting a seeded roaster), and form submission
@@ -8,14 +27,8 @@ test('create a coffee via the new-coffee form', async ({ page }) => {
 
   await page.goto('/coffees/new')
 
+  await pickLookups(page)
   await page.getByPlaceholder('Name').fill(name)
-
-  // SearchSelect: open (its label-derived a11y name differs from the visible
-  // text, so target the visible placeholder) and pick the seeded lookups.
-  await page.getByText('Select Roaster').click()
-  await page.getByText('Sey', { exact: true }).click()
-  await page.getByText('Select Roast Level').click()
-  await page.getByText('Medium', { exact: true }).click()
 
   await page.getByRole('button', { name: 'Add', exact: true }).click()
 
@@ -32,11 +45,8 @@ test('edit a coffee updates its name in the list', async ({ page }) => {
   const updated = `${name} Updated`
 
   await page.goto('/coffees/new')
+  await pickLookups(page)
   await page.getByPlaceholder('Name').fill(name)
-  await page.getByText('Select Roaster').click()
-  await page.getByText('Sey', { exact: true }).click()
-  await page.getByText('Select Roast Level').click()
-  await page.getByText('Medium', { exact: true }).click()
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/coffees$/)
   await expect(page.getByText(name).first()).toBeVisible()
@@ -61,11 +71,8 @@ test('delete a coffee removes it from the list', async ({ page }) => {
   const name = `E2E Delete ${Date.now()}`
 
   await page.goto('/coffees/new')
+  await pickLookups(page)
   await page.getByPlaceholder('Name').fill(name)
-  await page.getByText('Select Roaster').click()
-  await page.getByText('Sey', { exact: true }).click()
-  await page.getByText('Select Roast Level').click()
-  await page.getByText('Medium', { exact: true }).click()
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/coffees$/)
   await expect(page.getByText(name).first()).toBeVisible()

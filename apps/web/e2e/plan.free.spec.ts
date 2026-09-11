@@ -6,7 +6,7 @@ import {
   ON_SHELF_COFFEE,
 } from '@coffee-companion/api/db/e2e-library'
 import { expect, test } from '@playwright/test'
-import { expandRow, rowFor } from './helpers'
+import { expandRow, pickOption, rowFor } from './helpers'
 import type { Page } from '@playwright/test'
 
 // The Free reading experience, driven in a real browser. Runs in the
@@ -27,8 +27,7 @@ import type { Page } from '@playwright/test'
 async function pick(page: Page, field: string, option: string) {
   const trigger = page.locator(`#${field}`)
   if (((await trigger.textContent()) ?? '').includes(option)) return
-  await trigger.click()
-  await page.getByRole('option', { name: option }).click()
+  await pickOption(trigger, page.getByRole('option', { name: option }))
 }
 
 test('a coffee off the Shelf reads as Sealed, and says how to reopen it', async ({

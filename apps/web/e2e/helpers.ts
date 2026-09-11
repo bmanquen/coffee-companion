@@ -41,3 +41,26 @@ export async function clickUntil(control: Locator, effect: Locator) {
     await expect(effect).toBeVisible({ timeout: 2_000 })
   }).toPass({ timeout: 30_000 })
 }
+
+// Opening a picker and choosing a row, driven by the option so the open
+// survives the gap above. The only way any spec should open one.
+export async function pickOption(trigger: Locator, option: Locator) {
+  await clickUntil(trigger, option)
+  await option.click()
+}
+
+// The counterpart for an interaction with no effect to drive it. An unhydrated
+// fill sets the DOM value and React never hears it, so the form state stays
+// empty and the submit that follows fails validation instead of navigating; an
+// unhydrated tap on a card does nothing at all. Nothing on the page tells
+// either apart from the hydrated case, so wait on React itself: it tags a host
+// node with the props its delegated listener dispatches through as it hydrates
+// that node, and it hydrates the document in one pass.
+export async function waitForHydration(node: Locator) {
+  await expect(async () => {
+    const hydrated = await node.evaluate((el) =>
+      Object.keys(el).some((key) => key.startsWith('__reactProps$')),
+    )
+    expect(hydrated).toBe(true)
+  }).toPass({ timeout: 30_000 })
+}

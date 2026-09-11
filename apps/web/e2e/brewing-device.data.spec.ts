@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { pickOption, waitForHydration } from './helpers'
 import type { Page } from '@playwright/test'
 
 // Covers the brewing device CRUD forms. Each spec creates the device it acts on
@@ -7,13 +8,17 @@ import type { Page } from '@playwright/test'
 
 async function createDevice(page: Page, name: string) {
   await page.goto('/equipment/brewing-devices/new')
-  await page.getByLabel('Name').fill(name)
+  const nameField = page.getByLabel('Name')
+  await waitForHydration(nameField)
+  await nameField.fill(name)
   await page.getByLabel('Brand').fill('Test Brand')
 
   // Type SearchSelect — pick the seeded Espresso type. Scope to the dropdown
   // option so we match the type, not any other "Espresso" text on the page.
-  await page.getByText('Select Type').click()
-  await page.getByRole('option', { name: 'Espresso', exact: true }).click()
+  await pickOption(
+    page.getByText('Select Type'),
+    page.getByRole('option', { name: 'Espresso', exact: true }),
+  )
 
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/equipment$/)

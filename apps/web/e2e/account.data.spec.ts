@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { clickUntil } from './helpers'
 
 // Runs in the `authed-data` project, whose identity holds a Pro Grant and no
 // Subscription. A subscriber's Manage subscription action stops at the portal
@@ -31,8 +32,12 @@ test('is reachable from the account menu', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/dashboard')
 
-  await page.getByRole('button', { name: 'Account menu' }).click()
-  await page.getByRole('link', { name: 'Account' }).click()
+  const accountLink = page.getByRole('link', { name: 'Account' })
+  await clickUntil(
+    page.getByRole('button', { name: 'Account menu' }),
+    accountLink,
+  )
+  await accountLink.click()
 
   await expect(page).toHaveURL(/\/account$/)
   await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible()

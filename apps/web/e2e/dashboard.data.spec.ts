@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { clickUntil } from './helpers'
+import { clickUntil, pickOption } from './helpers'
 import type { Page } from '@playwright/test'
 
 // Runs in the `authed-data` project, which carries the e2e_auth bypass cookie
@@ -12,10 +12,15 @@ function methodTrigger(page: Page, method: string) {
   return page.getByRole('button', { name: method, exact: true })
 }
 async function pickMethod(page: Page, current: string, next: RegExp) {
-  const option = page.getByRole('option', { name: next })
-  await clickUntil(methodTrigger(page, current), option)
-  await option.click()
+  await pickOption(
+    methodTrigger(page, current),
+    page.getByRole('option', { name: next }),
+  )
 }
+
+// The same open on its own, for the tests that drive the listbox themselves.
+const openPicker = (page: Page, method: string) =>
+  clickUntil(methodTrigger(page, method), page.getByRole('option').first())
 
 test('the dashboard renders at its own URL', async ({ page }) => {
   await page.goto('/dashboard')
@@ -57,7 +62,7 @@ test('the picker lists every method alphabetically and switches feeds', async ({
   await expect(page.locator('button[aria-label="Account menu"]')).toBeAttached()
 
   // Opening the picker lists all five methods alphabetically.
-  await methodTrigger(page, 'Espresso').click()
+  await openPicker(page, 'Espresso')
   await expect(page.getByRole('option')).toHaveText([
     /^AeroPress/,
     /^Cold Brew/,
@@ -88,7 +93,7 @@ test('the picker is keyboard-navigable', async ({ page }) => {
 
   // Open the picker and drive it entirely from the keyboard: focus lands in the
   // Command, arrow to the next row, Enter to choose it.
-  await methodTrigger(page, 'Espresso').click()
+  await openPicker(page, 'Espresso')
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('Enter')
 

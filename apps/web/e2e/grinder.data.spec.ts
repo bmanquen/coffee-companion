@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { waitForHydration } from './helpers'
 import type { Page } from '@playwright/test'
 
 // Covers the grinder CRUD forms. Each spec creates the grinder it acts on with a
@@ -7,7 +8,9 @@ import type { Page } from '@playwright/test'
 
 async function createGrinder(page: Page, name: string) {
   await page.goto('/equipment/grinders/new')
-  await page.getByLabel('Name').fill(name)
+  const nameField = page.getByLabel('Name')
+  await waitForHydration(nameField)
+  await nameField.fill(name)
   await page.getByLabel('Brand').fill('Test Brand')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveURL(/\/equipment$/)
