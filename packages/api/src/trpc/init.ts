@@ -10,8 +10,15 @@ import type { PlanId } from '../lib/plan'
 export interface TRPCContext {
   headers: Headers
   // Written by authedProcedure, not passed through `next`: onError only ever
-  // sees what createContext returned. See ADR-0012.
-  caller?: { id: string; plan?: PlanId }
+  // sees what createContext returned. Keyed by procedure because one context
+  // serves a whole batch, and a public procedure in that batch belongs to
+  // nobody however the rest of it authed. See ADR-0012.
+  callers?: Map<string, Caller>
+}
+
+export interface Caller {
+  id: string
+  plan?: PlanId
 }
 
 const t = initTRPC.context<TRPCContext>().create({
@@ -50,7 +57,7 @@ function allowanceFor(ctx: TRPCContext, userId: string): Promise<Allowance> {
   return pending
 }
 
-export const authedProcedure = t.procedure.use(async ({ ctx, next }) => {
+export const authedProcedure = t.procedure.use(async ({ ctx, next, path }) => {
   // e2e bypass (test builds only) takes precedence; otherwise resolve the real
   // session from better-auth.
   const session =
@@ -63,10 +70,11 @@ export const authedProcedure = t.procedure.use(async ({ ctx, next }) => {
 
   // Before the allowance: a failure resolving it is exactly the error worth
   // naming a caller on.
-  ctx.caller = { id: session.user.id }
+  const caller: Caller = { id: session.user.id }
+  ctx.callers = (ctx.callers ?? new Map()).set(path, caller)
 
   const { plan, shelf } = await allowanceFor(ctx, session.user.id)
-  ctx.caller.plan = plan
+  caller.plan = plan
 
   return next({ ctx: { ...ctx, session, plan, shelf } })
 })
