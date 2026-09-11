@@ -50,6 +50,11 @@ function AuthenticatedLayout() {
 
   useEffect(() => {
     void setSentryUser(sentryUserFrom(session))
+    // Leaving this layout is the other way to stop being signed in: an expired
+    // session redirects out of it without going near the sign-out helper.
+    return () => {
+      void setSentryUser(null)
+    }
   }, [userId])
 
   return (

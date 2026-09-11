@@ -8,8 +8,9 @@ export function useSignOut() {
   return async () => {
     resetAnalytics()
     // Awaited: clearing is a dynamic import away, and an error thrown after
-    // sign-out must not still carry the id.
-    await setSentryUser(null)
+    // sign-out must not still carry the id. Swallowed because signing out is
+    // what the user pressed — a chunk that will not load must not strand them.
+    await setSentryUser(null)?.catch(() => {})
     await authClient.signOut()
     navigate({ to: '/' })
   }
