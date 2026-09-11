@@ -1,9 +1,13 @@
 // Seam so the API never imports Sentry — a static import puts the Node
 // SDK on the SSR graph.
 
-export type ErrorTags = Record<string, string>
+export interface ErrorReport {
+  tags?: Record<string, string>
+  // The id and nothing else, per ADR-0012.
+  user?: { id: string }
+}
 
-export type ErrorCapture = (error: unknown, tags: ErrorTags) => void
+export type ErrorCapture = (error: unknown, report: ErrorReport) => void
 
 let capture: ErrorCapture | null = null
 
@@ -11,6 +15,6 @@ export function setErrorCapture(next: ErrorCapture | null) {
   capture = next
 }
 
-export function reportError(error: unknown, tags: ErrorTags = {}) {
-  capture?.(error, tags)
+export function reportError(error: unknown, report: ErrorReport = {}) {
+  capture?.(error, report)
 }

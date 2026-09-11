@@ -5,9 +5,9 @@
 that is its own ADR" — and [ADR 0010](0010-a-replay-is-attached-to-an-error-never-to-a-session.md)
 warned that whoever made it was making a second decision at the same time. This is both.
 
-Sentry now receives the signed-in user's account id on a browser error. It is the same
-random id PostHog already receives, and it is the only thing about a person that reaches
-Sentry at all.
+Sentry now receives the signed-in user's account id on an error, in the browser and on
+the server. It is the same random id PostHog already receives, and it is the only thing
+about a person that reaches Sentry at all.
 
 What that buys is the question an error report could not answer before: whether a stack
 trace is one person hitting one broken state or everybody hitting a broken deploy. Two
@@ -16,16 +16,26 @@ two hundred accounts is an outage. Without an id the two are the same report.
 
 What is sent, and what is not:
 
-- **The id, and nothing else.** `sentryUserFrom` maps a session to `{ id }` and is the
-  only producer of a Sentry user. `scrubSentryEvent` independently reduces `event.user` to
-  its id, so a `username`, an `email`, or an `ip_address` arriving from the SDK's own
-  defaults is dropped on the way out. Two mechanisms, because the first is a convention
-  and the second is enforcement.
+- **The id, and nothing else.** There are exactly two producers of a Sentry user:
+  `sentryUserFrom`, which maps a browser session to `{ id }`, and `ctx.caller` on the
+  server, whose type holds an id and a Plan and cannot hold a name or an address to begin
+  with. `scrubSentryEvent` independently reduces `event.user` to its id, so a `username`,
+  an `email`, or an `ip_address` arriving from the SDK's own defaults is dropped on the way
+  out. Two mechanisms, because the first is a convention and the second is enforcement.
+- **On the server, an error is named by the procedure's caller.** A tRPC error report
+  reads `ctx.caller`, which `authedProcedure` writes onto the request context. It has to be
+  written there rather than passed forward: the fetch adapter hands `onError` the object
+  `createContext` returned, never the context a middleware extended, so a session read off
+  the procedure's own context would name nobody in production while a unit test went green.
+  `ctx.caller` is a report's view of the request and never an authorization signal — a
+  procedure learns its caller from its own `ctx.session`. A public procedure writes nothing,
+  so an anonymous call's error belongs to nobody, and the API package still never imports
+  Sentry: `reportError(error, { tags, user })` is the seam, wired in `instrument.server.ts`.
 - **`sendDefaultPii` stays off.** It is what would otherwise attach an IP address to the
   user object without anyone asking.
-- **The authenticated layout is the only place it is set.** Keyed on the id, once the
-  route context's session has resolved. The marketing layout never sets a user, so an
-  error on a public page belongs to nobody.
+- **In the browser, the authenticated layout is the only place it is set.** Keyed on the
+  id, once the route context's session has resolved. The marketing layout never sets a
+  user, so an error on a public page belongs to nobody.
 - **Sign-out clears it, and waits — but never at the cost of signing out.** The shared
   sign-out helper introduced by 0009 calls `Sentry.setUser(null)` and awaits it before
   signing out and navigating. The browser seam is behind a dynamic import; not awaiting it
@@ -44,9 +54,11 @@ What we rejected:
   three are one property away in the helper. None of them buys anything the id does not:
   grouping by account needs an opaque key, not a contactable one. A support reply that
   needs an address looks it up in our own database against the id.
-- **Setting the user on the server.** The server-side half is its own ticket, and the
-  server's session is resolved per request rather than held. It gets the same id and the
-  same rule, or it gets nothing.
+- **Handing the server's session to the error reporter.** The reporter could have taken
+  the session and narrowed it itself, the way the browser helper does. Carrying only
+  `{ id, plan }` onto the request context is the stronger version of the same rule: the
+  session never reaches the reporter, so there is nothing there to narrow and nothing to
+  widen by accident later.
 - **Naming the user only when a replay is off.** That would make the id conditional on a
   sampling decision, which is not a privacy boundary anyone could describe on a page.
 

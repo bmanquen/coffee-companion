@@ -181,8 +181,7 @@ describe('planPrices', () => {
     await planPrices()
 
     expect(reportError).toHaveBeenCalledWith(error, {
-      area: 'billing',
-      operation: 'planPrices',
+      tags: { area: 'billing', operation: 'planPrices' },
     })
   })
 })
