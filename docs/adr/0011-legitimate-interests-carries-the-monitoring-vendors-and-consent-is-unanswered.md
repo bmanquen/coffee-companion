@@ -59,11 +59,14 @@ Consequences to understand before changing anything here:
 - **Legitimate interests carries a right to object.** Whoever answers #124 owns this too;
   the page has nowhere to object today because there is no mechanism to object with, and
   a banner is the mechanism.
-- **The page's retention figures are vendor plan defaults, not our settings.** They are
-  two constants at the top of `apps/web/src/lib/privacy.ts` and both need confirming in
-  the Sentry and PostHog dashboards before the page is served publicly. A retention claim
-  that does not match the vendor's configuration is the one sentence on the page that is
-  actively false rather than merely incomplete.
+- **The page's retention figures are our dashboard settings, and go stale silently.**
+  Sentry keeps errors for 90 days; PostHog keeps events for a year. They live as two
+  constants at the top of `apps/web/src/lib/privacy.ts`. Nothing in the repo can notice
+  when someone changes a retention setting in a vendor dashboard, so changing one there
+  without changing the constant here makes the one sentence on the page that is actively
+  false rather than merely incomplete. Two figures are still unstated: Sentry's retention
+  for traces and replays, and how long a PostHog person profile survives its events.
+  Both are named in #124.
 - **The Sentry DPA has not been checked.** Sentry is US-based, so international transfer
   terms apply and someone has to confirm the DPA is executed on our account. Nothing in
   the repo can establish that.
