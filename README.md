@@ -109,9 +109,15 @@ lines are pretty-printed instead. The level defaults to `info`:
 LOG_LEVEL=
 ```
 
+Every tRPC procedure call adds a line of its own: the procedure's path and
+type, whether it succeeded, the tRPC code when it did not, the duration, and the
+user id of whoever was signed in. No input, output, or stack is logged. A
+refusal is a warning; a failure nothing could name is an error.
+
 Every response carries an `x-request-id` header. An incoming header is
 honoured, otherwise an id is generated; Sentry events raised while handling the
-request carry the same id as a `request_id` tag.
+request carry the same id as a `request_id` tag, and so does every procedure
+line from that request — batched calls included.
 
 ### Product analytics
 

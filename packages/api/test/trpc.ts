@@ -1,6 +1,7 @@
-import { afterAll, beforeAll } from 'vitest'
+import { afterAll, beforeAll, beforeEach } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../src/db'
+import { REQUEST_ID_HEADER, setLogSink } from '../src/lib/log'
 import {
   brewingDeviceTypes,
   planGrants,
@@ -11,6 +12,7 @@ import { createCallerFactory } from '../src/trpc/init'
 import { trpcRouter } from '../src/trpc/router'
 import type { InsertCoffee } from '../src/db/zod'
 import type { PlanId } from '../src/lib/plan'
+import type { LogLevel } from '../src/lib/log'
 
 // Shared setup for the per-router integration tests. Each router has its own
 // `<router>.integration.test.ts` file; they all authenticate through the e2e
@@ -23,8 +25,14 @@ process.env.E2E_BYPASS_AUTH = 'true'
 
 export const UNKNOWN_UUID = '00000000-0000-4000-8000-000000000000'
 
+// A request id per headers object, the way the server entry puts one on every
+// request it handles: procedures sharing one context share the id, and each
+// context built afresh gets its own.
+const requestHeaders = (extra: Record<string, string> = {}) =>
+  new Headers({ [REQUEST_ID_HEADER]: crypto.randomUUID(), ...extra })
+
 const cookieFor = (userId: string) =>
-  new Headers({ cookie: `e2e_auth=${userId}` })
+  requestHeaders({ cookie: `e2e_auth=${userId}` })
 
 // A caller authenticated as the given user id (must exist in the `user` table).
 // Builds a context per call, so each procedure is its own request — matching an
@@ -42,9 +50,30 @@ export const batchedCallerFor = (userId: string) => {
 }
 
 // A caller with no bypass cookie → treated as unauthenticated.
-export const anonCaller = createCallerFactory(trpcRouter)({
-  headers: new Headers(),
-})
+export const anonCaller = createCallerFactory(trpcRouter)(() => ({
+  headers: requestHeaders(),
+}))
+
+// What the procedures under test wrote through the logging seam. Emptied before
+// each test and unwired at the end of the file, so one file's lines never reach
+// another's assertions.
+export function captureLogLines() {
+  const lines: Array<{
+    level: LogLevel
+    message: string
+    fields: Record<string, unknown>
+  }> = []
+
+  beforeEach(() => {
+    lines.length = 0
+    setLogSink((level, message, fields) =>
+      lines.push({ level, message, fields }),
+    )
+  })
+  afterAll(() => setLogSink(null))
+
+  return lines
+}
 
 // Puts a user on a paid Plan without any payment, the way a comp or a
 // developer's own account does. Call it before any fixture that exercises a
