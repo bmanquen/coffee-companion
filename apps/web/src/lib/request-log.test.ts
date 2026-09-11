@@ -1,11 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
-import {
-  REQUEST_ID_HEADER,
-  requestId,
-  requestRecord,
-  withRequestLog,
-} from './request-log'
+import { REQUEST_ID_HEADER } from '@coffee-companion/api/lib/log'
+import { requestId, requestRecord, withRequestLog } from './request-log'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 

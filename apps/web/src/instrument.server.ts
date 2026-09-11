@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/tanstackstart-react'
 import pino from 'pino'
+import { setLogSink } from '@coffee-companion/api/lib/log'
 import { setErrorCapture } from '@coffee-companion/api/lib/report-error'
 import {
   isAbortEvent,
@@ -30,4 +31,8 @@ if (sentryEnabled(dsn)) {
 export const logger = pino({
   level: trimSetting(process.env.LOG_LEVEL) ?? 'info',
   transport: import.meta.env.DEV ? { target: 'pino-pretty' } : undefined,
+})
+
+setLogSink((level, message, fields) => {
+  logger[level](fields, message)
 })

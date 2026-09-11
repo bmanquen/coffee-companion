@@ -1,4 +1,4 @@
-export const REQUEST_ID_HEADER = 'x-request-id'
+import { REQUEST_ID_HEADER } from '@coffee-companion/api/lib/log'
 
 const SKIPPED_PATHS = new Set(['/favicon.ico', '/manifest.json', '/api/health'])
 

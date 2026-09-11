@@ -3,7 +3,12 @@ import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
 import { planInterests } from '../db/schema'
 import { sendInterestConfirmation } from '../lib/email'
-import { anonCaller, callerFor, seedUsers } from '../../test/trpc'
+import {
+  anonCaller,
+  callerFor,
+  captureLogLines,
+  seedUsers,
+} from '../../test/trpc'
 
 vi.mock('../lib/email', () => ({ sendInterestConfirmation: vi.fn() }))
 const confirmations = vi.mocked(sendInterestConfirmation)
@@ -24,6 +29,8 @@ beforeEach(async () => {
     .where(inArray(planInterests.userId, [USER, USER_NEIGHBOUR]))
   confirmations.mockReset()
 })
+
+const lines = captureLogLines()
 
 const rowsFor = (userId: string) =>
   db.select().from(planInterests).where(eq(planInterests.userId, userId))
@@ -64,6 +71,27 @@ describe('planInterest.register', () => {
 
     expect(recorded).toMatchObject({ userId: USER })
     expect(await rowsFor(USER)).toHaveLength(1)
+  })
+
+  it('says so in the log when the confirmation cannot be sent', async () => {
+    confirmations.mockRejectedValueOnce(new Error('mail is down'))
+
+    await asUser.planInterest.register({ planId: 'proPlus' })
+
+    expect(
+      lines.filter((line) => line.message === 'interest confirmation not sent'),
+    ).toEqual([
+      {
+        level: 'warn',
+        message: 'interest confirmation not sent',
+        fields: {
+          path: 'planInterest.register',
+          userId: USER,
+          requestId: expect.any(String),
+          error: 'mail is down',
+        },
+      },
+    ])
   })
 
   it('confers no Plan on the visitor who registered', async () => {
