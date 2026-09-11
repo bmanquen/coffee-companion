@@ -28,20 +28,25 @@ describe('reportTrpcError', () => {
       'BAD_REQUEST',
       'CONFLICT',
     ]) {
-      reportTrpcError({ code }, 'plan.current', { plan: 'pro' }, capture)
+      reportTrpcError(
+        { code },
+        'plan.current',
+        { caller: { id: 'user_123', plan: 'pro' } },
+        capture,
+      )
     }
 
     expect(capture).not.toHaveBeenCalled()
   })
 
-  it('reports an internal error with procedure, area, and Plan', () => {
+  it('reports an internal error with procedure, area, Plan, and caller', () => {
     const capture = vi.fn()
     const cause = new Error('relation "espresso_shots" does not exist')
 
     reportTrpcError(
       { code: 'INTERNAL_SERVER_ERROR', cause },
       'espressoShot.create',
-      { plan: 'free' },
+      { caller: { id: 'user_123', plan: 'free' } },
       capture,
     )
 
@@ -51,16 +56,33 @@ describe('reportTrpcError', () => {
         procedure: 'espressoShot.create',
         plan: 'free',
       },
+      user: { id: 'user_123' },
     })
   })
 
-  it('does not invent a Plan tag from a public procedure', () => {
+  it('names nobody, and invents no Plan tag, for a public procedure', () => {
     const capture = vi.fn()
 
     reportTrpcError(
       { code: 'INTERNAL_SERVER_ERROR' },
       'plan.prices',
-      { headers: new Headers() },
+      {},
+      capture,
+    )
+
+    expect(capture).toHaveBeenCalledWith(
+      { code: 'INTERNAL_SERVER_ERROR' },
+      { tags: { area: 'billing', procedure: 'plan.prices' } },
+    )
+  })
+
+  it('names nobody when the request never built a context', () => {
+    const capture = vi.fn()
+
+    reportTrpcError(
+      { code: 'INTERNAL_SERVER_ERROR' },
+      'plan.prices',
+      undefined,
       capture,
     )
 

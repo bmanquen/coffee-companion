@@ -22,8 +22,8 @@ if (sentryEnabled(dsn)) {
       return scrubSentryEvent(event)
     },
   })
-  setErrorCapture((error, tags) => {
-    Sentry.captureException(error, { tags })
+  setErrorCapture((error, { tags, user }) => {
+    Sentry.captureException(error, { tags, user })
   })
 }
 

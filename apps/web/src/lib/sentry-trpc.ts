@@ -1,12 +1,10 @@
+import type { ErrorCapture } from '@coffee-companion/api/lib/report-error'
+import type { TRPCContext } from '@coffee-companion/api/trpc/init'
+
 export type TrpcErrorLike = {
   code: string
   cause?: unknown
 }
-
-export type CaptureException = (
-  error: unknown,
-  context: { tags: Record<string, string> },
-) => void
 
 export function sentryAreaForProcedure(path: string | undefined): string {
   if (!path) return 'trpc'
@@ -23,32 +21,24 @@ export function sentryAreaForProcedure(path: string | undefined): string {
   return 'trpc'
 }
 
-function planFrom(ctx: unknown): string | undefined {
-  if (
-    ctx &&
-    typeof ctx === 'object' &&
-    'plan' in ctx &&
-    typeof ctx.plan === 'string'
-  ) {
-    return ctx.plan
-  }
-}
-
 export function reportTrpcError(
   error: TrpcErrorLike,
   path: string | undefined,
-  ctx: unknown,
-  capture: CaptureException,
+  ctx: Pick<TRPCContext, 'caller'> | undefined,
+  capture: ErrorCapture,
 ) {
   // Only INTERNAL_SERVER_ERROR — expected refusals are not bugs.
   if (error.code !== 'INTERNAL_SERVER_ERROR') return
 
+  const caller = ctx?.caller
   const tags: Record<string, string> = {
     area: sentryAreaForProcedure(path),
     procedure: path ?? 'unknown',
   }
-  const plan = planFrom(ctx)
-  if (plan) tags.plan = plan
+  if (caller?.plan) tags.plan = caller.plan
 
-  capture(error.cause ?? error, { tags })
+  capture(
+    error.cause ?? error,
+    caller ? { tags, user: { id: caller.id } } : { tags },
+  )
 }

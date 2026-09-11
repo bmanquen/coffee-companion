@@ -9,6 +9,9 @@ import type { PlanId } from '../lib/plan'
 
 export interface TRPCContext {
   headers: Headers
+  // Written by authedProcedure, not passed through `next`: onError only ever
+  // sees what createContext returned. See ADR-0012.
+  caller?: { id: string; plan?: PlanId }
 }
 
 const t = initTRPC.context<TRPCContext>().create({
@@ -58,7 +61,12 @@ export const authedProcedure = t.procedure.use(async ({ ctx, next }) => {
     throw new TRPCError({ code: 'UNAUTHORIZED' })
   }
 
+  // Before the allowance: a failure resolving it is exactly the error worth
+  // naming a caller on.
+  ctx.caller = { id: session.user.id }
+
   const { plan, shelf } = await allowanceFor(ctx, session.user.id)
+  ctx.caller.plan = plan
 
   return next({ ctx: { ...ctx, session, plan, shelf } })
 })

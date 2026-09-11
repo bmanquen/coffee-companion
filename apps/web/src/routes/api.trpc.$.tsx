@@ -13,9 +13,7 @@ function handler({ request }: { request: Request }) {
     onError: ({ error, path, ctx }) => {
       // Not a Sentry import: this file is in the route tree and would
       // pull the Node SDK into the SSR router.
-      reportTrpcError(error, path, ctx, (exception, context) => {
-        reportError(exception, context.tags)
-      })
+      reportTrpcError(error, path, ctx, reportError)
     },
   })
 }
