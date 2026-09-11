@@ -26,11 +26,17 @@ What is sent, and what is not:
 - **The authenticated layout is the only place it is set.** Keyed on the id, once the
   route context's session has resolved. The marketing layout never sets a user, so an
   error on a public page belongs to nobody.
-- **Sign-out clears it, and waits.** The shared sign-out helper introduced by 0009 calls
-  `Sentry.setUser(null)` and awaits it before signing out and navigating. The browser
-  seam is behind a dynamic import; not awaiting it would let the clear land after the next
-  page had already started, which on a shared device attributes the next person's error to
-  the previous one.
+- **Sign-out clears it, and waits — but never at the cost of signing out.** The shared
+  sign-out helper introduced by 0009 calls `Sentry.setUser(null)` and awaits it before
+  signing out and navigating. The browser seam is behind a dynamic import; not awaiting it
+  would let the clear land after the next page had already started, which on a shared
+  device attributes the next person's error to the previous one. The wait is best-effort:
+  a chunk that will not load rejects, and that rejection is swallowed, because leaving a
+  user signed in to protect a telemetry call has the harm backwards.
+- **Leaving the authenticated layout clears it too.** Pressing sign out is not the only
+  way to stop being signed in — an expired or revoked session makes `beforeLoad` redirect
+  to `/` without going near the helper. The layout clears the user when it unmounts, so
+  whichever exit is taken, the identity is set in exactly the place it is cleared.
 
 What we rejected:
 
