@@ -4,6 +4,7 @@ import { createTRPCClient, httpBatchStreamLink } from '@trpc/client'
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query'
 import { createIsomorphicFn } from '@tanstack/react-start'
 
+import type { TRPCClient } from '@trpc/client'
 import type { TRPCRouter } from '@coffee-companion/api/trpc/router'
 
 import { TRPCProvider } from '@/integrations/trpc/react'
@@ -25,16 +26,10 @@ const getHeaders = createIsomorphicFn()
     return cookie ? { cookie } : {}
   })
 
-export const trpcClient = createTRPCClient<TRPCRouter>({
-  links: [
-    httpBatchStreamLink({
-      transformer: superjson,
-      url: getUrl(),
-      headers: () => getHeaders(),
-    }),
-  ],
-})
-
+// One client per request, alongside the request's own QueryClient. The batch
+// link merges the calls that reach it in the same tick, so a client shared
+// across requests merges two readers' calls into one HTTP request — which
+// carries one of their cookies, and answers both of them with that one's rows.
 export function getContext() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -43,12 +38,23 @@ export function getContext() {
     },
   })
 
+  const trpcClient = createTRPCClient<TRPCRouter>({
+    links: [
+      httpBatchStreamLink({
+        transformer: superjson,
+        url: getUrl(),
+        headers: () => getHeaders(),
+      }),
+    ],
+  })
+
   const serverHelpers = createTRPCOptionsProxy({
     client: trpcClient,
     queryClient: queryClient,
   })
   return {
     queryClient,
+    trpcClient,
     trpc: serverHelpers,
   }
 }
@@ -56,9 +62,11 @@ export function getContext() {
 export function Provider({
   children,
   queryClient,
+  trpcClient,
 }: {
   children: React.ReactNode
   queryClient: QueryClient
+  trpcClient: TRPCClient<TRPCRouter>
 }) {
   return (
     <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
