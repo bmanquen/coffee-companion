@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { waitForHydration } from './helpers'
 import type { Locator } from '@playwright/test'
 
 // The expandable-card system at runtime (behaviours jsdom can't verify: CSS
@@ -34,6 +35,7 @@ test.describe('dashboard brew cards', () => {
     // Detail region is collapsed (zero height) until the card is tapped.
     expect(await regionHeight(cards.first())).toBeLessThan(4)
     await expect(cards.first().getByText('Grinder', { exact: false })).toBeAttached()
+    await waitForHydration(cards.first())
     await cards.first().click()
     await expect
       .poll(() => regionHeight(cards.first()))
@@ -49,6 +51,7 @@ test.describe('dashboard brew cards', () => {
     await expect(cards.first()).toBeVisible()
     test.skip((await cards.count()) < 2, 'needs at least two brews')
 
+    await waitForHydration(cards.first())
     await cards.first().click()
     await expect.poll(() => regionHeight(cards.first())).toBeGreaterThan(20)
 
@@ -69,6 +72,7 @@ test.describe('dashboard brew cards', () => {
     const region = table.locator('tbody [class*="grid-rows-"]').first()
     expect((await region.boundingBox())?.height ?? 0).toBeLessThan(4)
 
+    await waitForHydration(table.locator('tbody tr').first())
     await table.locator('tbody tr').first().click()
     await expect.poll(() => region.boundingBox().then((b) => b?.height ?? 0)).toBeGreaterThan(20)
   })
@@ -85,6 +89,7 @@ test('coffees page: cards live in a panel and expand', async ({ page }) => {
   // Process lives in the expander; the detail region is collapsed until tapped.
   await expect(cards.first().getByText('Process', { exact: false })).toBeAttached()
   expect(await regionHeight(cards.first())).toBeLessThan(4)
+  await waitForHydration(cards.first())
   await cards.first().click()
   await expect.poll(() => regionHeight(cards.first())).toBeGreaterThan(20)
 })
