@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { reportTrpcError, sentryAreaForProcedure } from './sentry-trpc'
+import type { Caller } from '@coffee-companion/api/trpc/init'
+
+const callers = (byPath: Record<string, Caller>) =>
+  new Map(Object.entries(byPath))
 
 describe('sentryAreaForProcedure', () => {
   it('names billing, Plan, and Sealing paths so they can be filtered', () => {
@@ -31,7 +35,9 @@ describe('reportTrpcError', () => {
       reportTrpcError(
         { code },
         'plan.current',
-        { caller: { id: 'user_123', plan: 'pro' } },
+        {
+          callers: callers({ 'plan.current': { id: 'user_123', plan: 'pro' } }),
+        },
         capture,
       )
     }
@@ -46,7 +52,11 @@ describe('reportTrpcError', () => {
     reportTrpcError(
       { code: 'INTERNAL_SERVER_ERROR', cause },
       'espressoShot.create',
-      { caller: { id: 'user_123', plan: 'free' } },
+      {
+        callers: callers({
+          'espressoShot.create': { id: 'user_123', plan: 'free' },
+        }),
+      },
       capture,
     )
 
@@ -67,6 +77,22 @@ describe('reportTrpcError', () => {
       { code: 'INTERNAL_SERVER_ERROR' },
       'plan.prices',
       {},
+      capture,
+    )
+
+    expect(capture).toHaveBeenCalledWith(
+      { code: 'INTERNAL_SERVER_ERROR' },
+      { tags: { area: 'billing', procedure: 'plan.prices' } },
+    )
+  })
+
+  it('names nobody for a public procedure batched with an authed one', () => {
+    const capture = vi.fn()
+
+    reportTrpcError(
+      { code: 'INTERNAL_SERVER_ERROR' },
+      'plan.prices',
+      { callers: callers({ 'plan.current': { id: 'user_123', plan: 'pro' } }) },
       capture,
     )
 

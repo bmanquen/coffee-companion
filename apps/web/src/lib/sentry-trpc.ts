@@ -24,13 +24,15 @@ export function sentryAreaForProcedure(path: string | undefined): string {
 export function reportTrpcError(
   error: TrpcErrorLike,
   path: string | undefined,
-  ctx: Pick<TRPCContext, 'caller'> | undefined,
+  ctx: Pick<TRPCContext, 'callers'> | undefined,
   capture: ErrorCapture,
 ) {
   // Only INTERNAL_SERVER_ERROR — expected refusals are not bugs.
   if (error.code !== 'INTERNAL_SERVER_ERROR') return
 
-  const caller = ctx?.caller
+  // By path, not the whole request: one context serves a batch, so a public
+  // procedure failing alongside an authed one still belongs to nobody.
+  const caller = path ? ctx?.callers?.get(path) : undefined
   const tags: Record<string, string> = {
     area: sentryAreaForProcedure(path),
     procedure: path ?? 'unknown',

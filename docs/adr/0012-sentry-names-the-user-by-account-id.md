@@ -17,20 +17,24 @@ two hundred accounts is an outage. Without an id the two are the same report.
 What is sent, and what is not:
 
 - **The id, and nothing else.** There are exactly two producers of a Sentry user:
-  `sentryUserFrom`, which maps a browser session to `{ id }`, and `ctx.caller` on the
-  server, whose type holds an id and a Plan and cannot hold a name or an address to begin
-  with. `scrubSentryEvent` independently reduces `event.user` to its id, so a `username`,
+  `sentryUserFrom`, which maps a browser session to `{ id }`, and the server's `Caller`,
+  whose type holds an id and a Plan and cannot hold a name or an address to begin with. `scrubSentryEvent` independently reduces `event.user` to its id, so a `username`,
   an `email`, or an `ip_address` arriving from the SDK's own defaults is dropped on the way
   out. Two mechanisms, because the first is a convention and the second is enforcement.
-- **On the server, an error is named by the procedure's caller.** A tRPC error report
-  reads `ctx.caller`, which `authedProcedure` writes onto the request context. It has to be
-  written there rather than passed forward: the fetch adapter hands `onError` the object
-  `createContext` returned, never the context a middleware extended, so a session read off
-  the procedure's own context would name nobody in production while a unit test went green.
-  `ctx.caller` is a report's view of the request and never an authorization signal — a
-  procedure learns its caller from its own `ctx.session`. A public procedure writes nothing,
-  so an anonymous call's error belongs to nobody, and the API package still never imports
-  Sentry: `reportError(error, { tags, user })` is the seam, wired in `instrument.server.ts`.
+- **On the server, an error is named by the procedure that failed, not the request.**
+  A tRPC error report reads `ctx.callers.get(path)`, a map `authedProcedure` writes onto the
+  request context. It has to be written there rather than passed forward: the fetch adapter
+  hands `onError` the object `createContext` returned, never the context a middleware
+  extended, so a session read off the procedure's own context would name nobody in
+  production while a unit test went green. It is a map rather than one caller because a
+  batch is one HTTP request and so one context: the signed-in pricing page batches the
+  public `plan.prices` with authenticated Plan queries, and a single caller there would
+  stamp a Stripe outage with one account and make a shared failure read as account-specific.
+  Keying by procedure means a public procedure's error belongs to nobody however the rest of
+  its batch authed. `callers` is a report's view of the request and never an authorization
+  signal — a procedure learns its caller from its own `ctx.session`. The API package still
+  never imports Sentry: `reportError(error, { tags, user })` is the seam, wired in
+  `instrument.server.ts`.
 - **`sendDefaultPii` stays off.** It is what would otherwise attach an IP address to the
   user object without anyone asking.
 - **In the browser, the authenticated layout is the only place it is set.** Keyed on the
@@ -55,10 +59,10 @@ What we rejected:
   grouping by account needs an opaque key, not a contactable one. A support reply that
   needs an address looks it up in our own database against the id.
 - **Handing the server's session to the error reporter.** The reporter could have taken
-  the session and narrowed it itself, the way the browser helper does. Carrying only
-  `{ id, plan }` onto the request context is the stronger version of the same rule: the
-  session never reaches the reporter, so there is nothing there to narrow and nothing to
-  widen by accident later.
+  the session and narrowed it itself, the way the browser helper does. Carrying only a
+  `Caller` of `{ id, plan }` onto the request context is the stronger version of the same
+  rule: the session never reaches the reporter, so there is nothing there to narrow and
+  nothing to widen by accident later.
 - **Naming the user only when a replay is off.** That would make the id conditional on a
   sampling decision, which is not a privacy boundary anyone could describe on a page.
 
