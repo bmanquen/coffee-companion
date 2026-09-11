@@ -67,5 +67,6 @@ Consequences to understand before changing anything here:
 - **The marketing layout never identifies.** Identify runs once in the authenticated
   layout, keyed on the user id and Plan, so it fires once per user rather than once per
   navigation.
-- **Sentry is a separate decision.** Sentry does not yet name the user; when it does, it
-  is the same id and nothing else, and that is its own ADR.
+- **Sentry is a separate decision.** It was made in
+  [ADR 0012](0012-sentry-names-the-user-by-account-id.md): Sentry receives this same id
+  and nothing else. The shared sign-out helper above clears both vendors.

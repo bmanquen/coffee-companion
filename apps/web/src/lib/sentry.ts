@@ -102,10 +102,12 @@ export function sentryBrowserOptions(dsn: string) {
 }
 
 // The session carries the name, email, and avatar; the id is all Sentry gets.
+// `null` is Sentry's own word for nobody, so the browser seam passes whatever
+// this returns straight to `setUser` and decides nothing itself.
 export function sentryUserFrom(
   session: { user: { id: string } } | null | undefined,
-): SentryUser | undefined {
-  return session ? { id: session.user.id } : undefined
+): { id: string } | null {
+  return session ? { id: session.user.id } : null
 }
 
 // A cancelled request is not a failure. `httpBatchStreamLink` aborts its own

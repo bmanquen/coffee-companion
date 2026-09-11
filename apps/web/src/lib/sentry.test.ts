@@ -198,8 +198,8 @@ describe('sentryUserFrom', () => {
   })
 
   it('names nobody when there is no session', () => {
-    expect(sentryUserFrom(null)).toBeUndefined()
-    expect(sentryUserFrom(undefined)).toBeUndefined()
+    expect(sentryUserFrom(null)).toBeNull()
+    expect(sentryUserFrom(undefined)).toBeNull()
   })
 })
 

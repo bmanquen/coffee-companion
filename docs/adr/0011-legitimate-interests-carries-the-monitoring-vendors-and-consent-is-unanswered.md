@@ -11,8 +11,10 @@ The basis we claim, for the two monitoring vendors, is **legitimate interests**.
 
 - **Sentry.** Keeping the app working is the interest, and an app that cannot see its
   own errors cannot fix them. What is sent is narrow by construction: `sendDefaultPii`
-  is off, `scrubSentryEvent` strips cookies, bodies, and sensitive headers, and nothing
-  calls `Sentry.setUser`, so an error belongs to no account. The replay is the strongest
+  is off, `scrubSentryEvent` strips cookies, bodies, and sensitive headers, and the only
+  thing naming a user is the account id that
+  [ADR 0012](0012-sentry-names-the-user-by-account-id.md) allows — an opaque key, useless
+  outside our own database, and cleared on sign-out. The replay is the strongest
   part of the case, not the weakest — it exists only where there is already a stack
   trace to explain, which is the distinction 0010 is entirely about.
 - **PostHog.** Knowing where people stop is the interest. 0009 already reduced the
@@ -70,6 +72,10 @@ Consequences to understand before changing anything here:
 - **The Sentry DPA has not been checked.** Sentry is US-based, so international transfer
   terms apply and someone has to confirm the DPA is executed on our account. Nothing in
   the repo can establish that.
-- **Naming the user in Sentry breaks this.** 0010 already says a replay tied to an id is a
-  different thing to hold. It is also a different balancing test, and this ADR is written
-  against a Sentry that names nobody.
+- **Naming the user in Sentry reopened this, and it was reopened deliberately.** This ADR
+  was first written against a Sentry that named nobody.
+  [ADR 0012](0012-sentry-names-the-user-by-account-id.md) added the account id and
+  reweighed the balancing test there: the interest is unchanged, the payload grows by one
+  opaque id, and the replay 0010 describes now belongs to an identifiable account. The
+  basis holds, but it is a closer call than the first draft of this ADR was making, and
+  whoever answers #124 is weighing a vendor that can tell two users apart.

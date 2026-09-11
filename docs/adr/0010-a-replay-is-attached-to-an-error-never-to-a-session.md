@@ -49,13 +49,15 @@ Consequences to understand before changing anything here:
   element and is not blocked. There is no `background-image` in `apps/web/src` today; if
   one ever renders user content — an avatar, a Coffee bag photo — it needs an explicit
   `.sentry-block` class, or this ADR is quietly untrue.
-- **Nothing names the user, and that is what keeps a replay anonymous.** No code calls
-  `Sentry.setUser`, so a replay today is masked interaction timing belonging to no
-  account. ADR 0009 left naming the user in Sentry as its own decision; whoever makes
-  that decision is also making this one. A replay tied to an id stops being anonymous
-  behavioural data and becomes a recording of an identified person — a different thing
-  to hold, and a different thing to answer for if asked. Decide it as that, not as a
-  one-line addition to `scrubSentryEvent`.
+- **A replay is attributable, and masking is the only thing left.** This ADR was
+  written against a Sentry that named nobody, and warned that naming the user would make
+  a replay "a recording of an identified person — a different thing to hold, and a
+  different thing to answer for if asked."
+  [ADR 0012](0012-sentry-names-the-user-by-account-id.md) made that decision: the
+  authenticated layout calls `Sentry.setUser({ id })`. Nothing above changes — the
+  buffer, the flags, the rejections all stand — but they now carry more weight, because
+  what they protect is a named account's screen rather than anonymous interaction
+  timing. An `unmask` exemption is a larger decision than it was here.
 - **No DSN, no recorder.** The replay integration is registered inside the existing
   `sentryEnabled(dsn)` guard in `apps/web/src/instrument.client.ts`, so local development
   and CI never construct it.

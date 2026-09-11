@@ -7,7 +7,9 @@ export function useSignOut() {
   const navigate = useNavigate()
   return async () => {
     resetAnalytics()
-    setSentryUser(undefined)
+    // Awaited: clearing is a dynamic import away, and an error thrown after
+    // sign-out must not still carry the id.
+    await setSentryUser(null)
     await authClient.signOut()
     navigate({ to: '/' })
   }

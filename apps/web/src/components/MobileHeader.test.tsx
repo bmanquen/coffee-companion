@@ -84,7 +84,7 @@ describe('MobileHeader', () => {
     expect(mocks.resetAnalytics.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.signOut.mock.invocationCallOrder[0],
     )
-    expect(mocks.setSentryUser).toHaveBeenCalledWith(undefined)
+    expect(mocks.setSentryUser).toHaveBeenCalledWith(null)
     expect(mocks.setSentryUser.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.signOut.mock.invocationCallOrder[0],
     )
