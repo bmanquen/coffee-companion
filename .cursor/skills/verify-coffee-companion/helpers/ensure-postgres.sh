@@ -212,11 +212,12 @@ END
 SQL
 
 if ! bootstrap_psql -tAc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1; then
-  bootstrap_createdb
+  # A concurrent launch may have won the race; the connect check below decides.
+  bootstrap_createdb || true
 fi
 
 if ! can_connect "$TARGET_URL"; then
-  log "database exists but TCP auth failed for ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+  log "could not reach ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}: the database is missing or TCP auth failed"
   exit 1
 fi
 
