@@ -131,13 +131,20 @@ if command -v pg_isready >/dev/null 2>&1; then
       sudo systemctl start postgresql
     elif command -v brew >/dev/null 2>&1; then
       # Homebrew on macOS — start whichever postgresql@N formula is installed.
+      started=
       for formula in postgresql@18 postgresql@17 postgresql@16 postgresql; do
         if brew list --formula "$formula" >/dev/null 2>&1; then
           log "starting Homebrew $formula"
           brew services start "$formula" >/dev/null
+          started=1
           break
         fi
       done
+      if [ -z "$started" ]; then
+        log "Homebrew is installed but no postgresql formula is."
+        log "Run 'brew install postgresql@18', or set VERIFY_DATABASE_URL to a local ${DB_NAME}, then rerun launch."
+        exit 1
+      fi
     else
       log "could not start postgresql: no pg_ctlcluster/service/systemctl/brew"
       exit 1
@@ -181,7 +188,8 @@ if ! id -u postgres >/dev/null 2>&1; then
   if pg_isready -h "$DB_HOST" -p "$DB_PORT" >/dev/null 2>&1; then
     if ! psql -h "$DB_HOST" -p "$DB_PORT" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1; then
       log "creating ${DB_NAME} via Homebrew role ${OS_USER}"
-      createdb -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME"
+      # A concurrent launch may have won the race; the connect check below decides.
+      createdb -h "$DB_HOST" -p "$DB_PORT" "$DB_NAME" || true
     fi
     if can_connect "$HOMEBREW_URL"; then
       emit_ok "$HOMEBREW_URL"
