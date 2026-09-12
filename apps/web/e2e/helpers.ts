@@ -55,12 +55,20 @@ export async function pickOption(trigger: Locator, option: Locator) {
 // unhydrated tap on a card does nothing at all. Nothing on the page tells
 // either apart from the hydrated case, so wait on React itself: it tags a host
 // node with the props its delegated listener dispatches through as it hydrates
-// that node, and it hydrates the document in one pass.
+// that node.
+//
+// Per node rather than per document, because the feeds render through
+// useSuspenseQuery: the document hydrates around a boundary that is still
+// streaming, so a flag the app raised once would go up while the node under
+// test was still inert.
 export async function waitForHydration(node: Locator) {
   await expect(async () => {
     const hydrated = await node.evaluate((el) =>
       Object.keys(el).some((key) => key.startsWith('__reactProps$')),
     )
-    expect(hydrated).toBe(true)
+    expect(
+      hydrated,
+      'React never tagged this node. If the page is interactive in a browser, the tag has been renamed.',
+    ).toBe(true)
   }).toPass({ timeout: 30_000 })
 }
