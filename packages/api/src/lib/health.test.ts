@@ -12,6 +12,13 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+// Under fake timers a check of a query that never answers settles only once the
+// bounded wait has been run out.
+async function waitedOut(answer: Promise<string>) {
+  await vi.advanceTimersByTimeAsync(2_000)
+  return answer
+}
+
 describe('checkDatabase', () => {
   it('is ok when the query answers', async () => {
     const checkDatabase = await loadCheckDatabase()
@@ -69,6 +76,51 @@ describe('checkDatabase', () => {
       'unreachable',
     ])
     expect(queries).toBe(1)
+  })
+
+  it('stops sharing a probe that has been outstanding far past the wait, so a lost connection cannot wedge the endpoint', async () => {
+    const checkDatabase = await loadCheckDatabase()
+    vi.useFakeTimers()
+
+    let queries = 0
+    const query = () => {
+      queries += 1
+      return new Promise<unknown>(() => {})
+    }
+
+    await expect(waitedOut(checkDatabase(query))).resolves.toBe('unreachable')
+    expect(queries).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    await expect(waitedOut(checkDatabase(query))).resolves.toBe('unreachable')
+    expect(queries).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    await expect(waitedOut(checkDatabase(query))).resolves.toBe('unreachable')
+    expect(queries).toBe(2)
+  })
+
+  it('keeps the newer probe when the one it replaced finally answers', async () => {
+    const checkDatabase = await loadCheckDatabase()
+    vi.useFakeTimers()
+
+    const answers: Array<(value: unknown) => void> = []
+    let queries = 0
+    const query = () => {
+      queries += 1
+      return new Promise<unknown>((resolve) => answers.push(resolve))
+    }
+
+    await expect(waitedOut(checkDatabase(query))).resolves.toBe('unreachable')
+    await vi.advanceTimersByTimeAsync(30_000)
+    await expect(waitedOut(checkDatabase(query))).resolves.toBe('unreachable')
+    expect(queries).toBe(2)
+
+    answers[0](undefined)
+    await vi.advanceTimersByTimeAsync(0)
+
+    await expect(waitedOut(checkDatabase(query))).resolves.toBe('unreachable')
+    expect(queries).toBe(2)
   })
 
   it('queries again once the database has answered', async () => {
