@@ -1,6 +1,7 @@
 import { REQUEST_ID_HEADER } from '@coffee-companion/api/lib/log'
+import { HEALTH_PATH } from './health'
 
-const SKIPPED_PATHS = new Set(['/favicon.ico', '/manifest.json', '/api/health'])
+const SKIPPED_PATHS = new Set(['/favicon.ico', '/manifest.json', HEALTH_PATH])
 
 export type RequestRecord = {
   method: string

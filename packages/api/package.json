@@ -35,6 +35,7 @@
     "./lib/cold-brew": "./src/lib/cold-brew.ts",
     "./lib/report-error": "./src/lib/report-error.ts",
     "./lib/log": "./src/lib/log.ts",
+    "./lib/health": "./src/lib/health.ts",
     "./test/database": "./test/database.ts"
   },
   "dependencies": {

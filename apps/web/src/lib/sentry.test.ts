@@ -7,6 +7,7 @@ import {
   sentryEnabled,
   sentryEnvironment,
   sentryServerDsn,
+  sentryServerOptions,
   sentryTracesSampleRate,
   sentryUserFrom,
   traceSampleRate,
@@ -150,6 +151,23 @@ describe('sentryCommonOptions', () => {
     expect(
       sentryCommonOptions('https://key@o1.ingest.sentry.io/1').tracesSampleRate,
     ).toBe(0.2)
+  })
+})
+
+describe('sentryServerOptions', () => {
+  restoreEnv('SENTRY_TRACES_SAMPLE_RATE', 'SENTRY_ENVIRONMENT')
+
+  const DSN = 'https://key@o1.ingest.sentry.io/1'
+
+  it('traces no health check', () => {
+    expect(sentryServerOptions(DSN).ignoreTransactions).toEqual(['/api/health'])
+  })
+
+  it('carries the common options', () => {
+    process.env.SENTRY_ENVIRONMENT = 'production'
+    process.env.SENTRY_TRACES_SAMPLE_RATE = '0.2'
+
+    expect(sentryServerOptions(DSN)).toMatchObject(sentryCommonOptions(DSN))
   })
 })
 

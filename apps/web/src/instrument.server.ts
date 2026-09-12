@@ -5,16 +5,16 @@ import { setErrorCapture } from '@coffee-companion/api/lib/report-error'
 import {
   isAbortEvent,
   scrubSentryEvent,
-  sentryCommonOptions,
   sentryEnabled,
   sentryServerDsn,
+  sentryServerOptions,
   trimSetting,
 } from './lib/sentry'
 
 const dsn = sentryServerDsn()
 if (sentryEnabled(dsn)) {
   Sentry.init({
-    ...sentryCommonOptions(dsn),
+    ...sentryServerOptions(dsn),
     beforeSend(event) {
       if (isAbortEvent(event)) return null
       return scrubSentryEvent(event)
