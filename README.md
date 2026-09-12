@@ -63,6 +63,18 @@ pnpm test:e2e
 
 ## Observability
 
+### Health check
+
+`GET /api/health` answers `200` with `{ "status": "ok", "db": "ok" }` while the
+database answers a trivial query within two seconds, and `503` with
+`{ "status": "degraded", "db": "unreachable" }` when it does not. It is never
+cached and reveals nothing else.
+
+Railway is told to poll it in the service's settings — Settings → Deploy →
+Health Check Path, set to `/api/health` — not from a file in this repo, so each
+new environment needs it set once. Railway keeps a deploy whose health check
+never passes from taking traffic.
+
 ### Error monitoring
 
 Production errors go to [Sentry](https://sentry.io) when a DSN is set. Set both

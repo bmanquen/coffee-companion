@@ -9,7 +9,7 @@ import { loadTestDatabaseUrl } from '@coffee-companion/api/test/database'
 // End-to-end tests. Boots the app and drives it in a real browser.
 //
 // Projects:
-// - `public`       — unauthenticated pages (no cookie).
+// - `public`       — unauthenticated pages and endpoints (no cookie).
 // - `authed-data`  — acts as the seeded user, whose Grant puts them on Pro
 //                    (data-state tests, and the granted reading experience).
 // - `authed-empty` — acts as an unseeded user (empty-state tests).
@@ -71,7 +71,7 @@ export default defineConfig({
   projects: [
     {
       name: 'public',
-      testMatch: /marketing\.spec\.ts/,
+      testMatch: /(marketing|health)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
     {

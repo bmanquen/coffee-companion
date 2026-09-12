@@ -1,5 +1,7 @@
 // Same project settings, two names: the browser may only see the VITE_ twins.
 
+import { HEALTH_PATH } from './health'
+
 const SENSITIVE_HEADER =
   /^(cookie|set-cookie|authorization|proxy-authorization|x-api-key|stripe-signature)$/i
 
@@ -81,6 +83,16 @@ export function sentryCommonOptions(dsn: string) {
     environment: sentryEnvironment(),
     sendDefaultPii: false,
     tracesSampleRate: sentryTracesSampleRate(),
+  }
+}
+
+// Railway polls the health check every few seconds; a trace each time would be
+// most of production's traffic. Matched as a substring, so it holds whatever
+// the transaction ends up named.
+export function sentryServerOptions(dsn: string) {
+  return {
+    ...sentryCommonOptions(dsn),
+    ignoreTransactions: [HEALTH_PATH],
   }
 }
 
