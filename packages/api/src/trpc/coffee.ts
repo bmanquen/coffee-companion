@@ -1,4 +1,4 @@
-import { and, count, eq } from 'drizzle-orm'
+import { and, count, eq, ne } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
@@ -6,6 +6,39 @@ import { coffees, espressoShots } from '../db/schema'
 import { insertCoffeeSchema } from '../db/zod'
 import { isSealed, sealNestedBrew, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
+import type { InsertCoffee } from '../db/zod'
+
+function coffeeValues(input: InsertCoffee) {
+  const isBlend = input.isBlend ?? false
+  if (!isBlend) return { ...input, isBlend: false }
+  return { ...input, isBlend: true, countryId: null, regionId: null }
+}
+
+async function assertUniqueCoffee(
+  userId: string,
+  name: string,
+  roasterId: string,
+  exceptId?: string,
+) {
+  const filters = [
+    eq(coffees.userId, userId),
+    eq(coffees.name, name),
+    eq(coffees.roasterId, roasterId),
+  ]
+  if (exceptId) filters.push(ne(coffees.id, exceptId))
+
+  const duplicate = await db
+    .select({ id: coffees.id })
+    .from(coffees)
+    .where(and(...filters))
+    .limit(1)
+  if (duplicate[0]) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'A coffee with this name already exists for this roaster',
+    })
+  }
+}
 
 export const coffeeRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
@@ -72,9 +105,10 @@ export const coffeeRouter = createTRPCRouter({
   create: authedProcedure
     .input(insertCoffeeSchema)
     .mutation(async ({ ctx, input }) => {
+      await assertUniqueCoffee(ctx.session.user.id, input.name, input.roasterId)
       const [coffee] = await db
         .insert(coffees)
-        .values({ ...input, userId: ctx.session.user.id })
+        .values({ ...coffeeValues(input), userId: ctx.session.user.id })
         .returning()
       return coffee
     }),
@@ -83,9 +117,15 @@ export const coffeeRouter = createTRPCRouter({
     .input(insertCoffeeSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
+      await assertUniqueCoffee(
+        ctx.session.user.id,
+        data.name,
+        data.roasterId,
+        id,
+      )
       const updated = await db
         .update(coffees)
-        .set(data)
+        .set(coffeeValues(data))
         .where(and(eq(coffees.id, id), eq(coffees.userId, ctx.session.user.id)))
         .returning()
       if (updated.length === 0) {

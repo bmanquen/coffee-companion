@@ -5,8 +5,8 @@ Coffees is the user's library of roaster offerings. A user adds a Coffee, edits 
 ## Sub-features
 
 - `coffees-list` lists the seeded library on `/coffees`.
-- `coffees-create` saves a new Coffee from `/coffees/new`.
-- `coffees-edit` renames a Coffee from that row's `Edit coffee` control.
+- `coffees-create` saves a new Coffee from `/coffees/new`. Origin defaults to Single origin; Blend hides Country and Region.
+- `coffees-edit` renames a Coffee from that row's `Edit coffee` control, and can switch origin between Single origin and Blend.
 - `coffees-delete` removes a Coffee after the confirm dialog.
 - `coffees-dial-in` shows Dialed-in espresso settings in the expanded row (or a Sealed notice on Free).
 
@@ -36,7 +36,7 @@ Preconditions:
 
 - SearchSelect's accessible name is not the visible `Select Roaster` label. Click the visible text, then the option.
 - `Add` (create) and `Save` (edit) are different buttons. `Delete coffee` opens the dialog; the dialog's confirm is exactly `Delete`.
-- Name uniqueness is per user. Timestamp the name so a retry does not collide.
+- Name uniqueness is per user per roaster. Timestamp the name so a retry does not collide. A blend occupies that same uniqueness — it cannot share a roaster and name with another Coffee.
 - Expanding a row to read Dialed-in settings is a click on the name cell of the desktop table (`apps/web/e2e/helpers.ts` `expandRow`). On `data`, Sumatra Lintong's expander shows `18g → 36g`. On `free`, that same Coffee shows `This Brew is Sealed` — see [Plans and Shelf](./plans-and-shelf.md).
 - Do not edit or delete seeded Coffees (`Ethiopia Guji`, the E2E_LIBRARY names). Create your own, then remove them.
 - Roaster `Sey` exists only on `data`. Identity `empty` has no roaster to pick; type-create one or skip the roaster.

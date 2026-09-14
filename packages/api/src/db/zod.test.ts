@@ -102,6 +102,27 @@ describe('insertCoffeeSchema', () => {
       }).success,
     ).toBe(false)
   })
+
+  it('treats an omitted blend flag as a single origin', () => {
+    const parsed = insertCoffeeSchema.safeParse({
+      name: 'Ethiopia Guji',
+      roasterId: uuid,
+      roastLevelId: uuid,
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) expect(parsed.data.isBlend).toBeUndefined()
+  })
+
+  it('accepts a blend without origin fields', () => {
+    expect(
+      insertCoffeeSchema.safeParse({
+        name: 'House Blend',
+        roasterId: uuid,
+        roastLevelId: uuid,
+        isBlend: true,
+      }).success,
+    ).toBe(true)
+  })
 })
 
 describe('insertPouroverBrewSchema', () => {

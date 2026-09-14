@@ -9,6 +9,7 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import type { InsertCoffee } from '@coffee-companion/api/db/zod'
+import { CoffeeOriginFields } from '@/components/coffees/coffee-origin-fields'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -100,6 +101,7 @@ function EditCoffeeComponent() {
     processId: coffee.processId,
     notes: coffee.notes,
     isActive: coffee.isActive,
+    isBlend: coffee.isBlend,
   } as unknown as InsertCoffee
 
   const form = useAppForm({
@@ -113,6 +115,7 @@ function EditCoffeeComponent() {
   })
 
   const selectedCountryId = useStore(form.store, (s) => s.values.countryId)
+  const isBlend = useStore(form.store, (s) => s.values.isBlend)
   const { data: regions } = useQuery(
     trpc.region.getAll.queryOptions(selectedCountryId!, {
       enabled: !!selectedCountryId,
@@ -167,16 +170,33 @@ function EditCoffeeComponent() {
             <field.SearchSelect label="Roast Level" {...roastLevel} />
           )}
         </form.AppField>
-        <form.AppField name="countryId">
-          {(field) => <field.SearchSelect label="Country" {...country} />}
-        </form.AppField>
-        <form.AppField name="regionId">
+        <form.AppField name="isBlend">
           {(field) => (
-            <field.SearchSelect
-              label="Region"
-              disabled={!selectedCountryId}
-              {...region}
-            />
+            <CoffeeOriginFields
+              isBlend={isBlend ?? false}
+              onBlendChange={(next) => {
+                field.handleChange(next)
+                if (next) {
+                  form.setFieldValue('countryId', null)
+                  form.setFieldValue('regionId', null)
+                }
+              }}
+            >
+              <form.AppField name="countryId">
+                {(countryField) => (
+                  <countryField.SearchSelect label="Country" {...country} />
+                )}
+              </form.AppField>
+              <form.AppField name="regionId">
+                {(regionField) => (
+                  <regionField.SearchSelect
+                    label="Region"
+                    disabled={!selectedCountryId}
+                    {...region}
+                  />
+                )}
+              </form.AppField>
+            </CoffeeOriginFields>
           )}
         </form.AppField>
         <form.AppField name="processId">

@@ -94,6 +94,7 @@ export const insertCoffeeSchema = createInsertSchema(coffees, {
   .extend({
     roasterId: z.uuid('Select a roaster'),
     roastLevelId: z.uuid('Select a roast level'),
+    isBlend: z.boolean().optional(),
   })
 export const selectCoffeeSchema = createSelectSchema(coffees)
 export type InsertCoffee = z.infer<typeof insertCoffeeSchema>

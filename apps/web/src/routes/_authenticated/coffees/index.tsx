@@ -56,6 +56,7 @@ type CoffeeRow = {
   id: string
   name: string
   notes: string | null
+  isBlend: boolean
   roaster: { name: string } | null
   roastLevel: { name: string } | null
   country: { name: string } | null
@@ -167,13 +168,15 @@ const columns = [
   columnHelper.accessor((row) => row.country?.name ?? '', {
     id: 'country',
     header: 'Country',
-    cell: (info) => info.getValue() || '-',
+    cell: (info) =>
+      info.row.original.isBlend ? 'Blend' : info.getValue() || '-',
     meta: { cardSummary: true },
   }),
   columnHelper.accessor((row) => row.region?.name ?? '', {
     id: 'region',
     header: 'Region',
-    cell: (info) => info.getValue() || '-',
+    cell: (info) =>
+      info.row.original.isBlend ? '-' : info.getValue() || '-',
     meta: { cardSummary: true },
   }),
   columnHelper.display({

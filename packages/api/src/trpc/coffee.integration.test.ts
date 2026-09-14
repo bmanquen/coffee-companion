@@ -79,6 +79,51 @@ describe('coffee.getById', () => {
   })
 })
 
+describe('coffee.create', () => {
+  it('creates a blend without storing a country or region', async () => {
+    const country = await asA.country.create({ name: uniq('Ethiopia') })
+    const created = await createCoffee(uniq('House Blend'), {
+      isBlend: true,
+      countryId: country.id,
+    })
+    expect(created.isBlend).toBe(true)
+    expect(created.countryId).toBeNull()
+    expect(created.regionId).toBeNull()
+  })
+
+  it('defaults a coffee to single origin', async () => {
+    const created = await createCoffee(uniq('Ethiopia Guji'))
+    expect(created.isBlend).toBe(false)
+  })
+
+  it('rejects a second coffee with the same roaster and name', async () => {
+    const name = uniq('House Blend')
+    const first = await createCoffee(name)
+    await expect(
+      asA.coffee.create({
+        name,
+        roasterId: first.roasterId!,
+        roastLevelId: first.roastLevelId!,
+        isBlend: true,
+      }),
+    ).rejects.toThrow(/already exists/i)
+  })
+
+  it('allows the same name from a different roaster', async () => {
+    const name = uniq('House Blend')
+    const first = await createCoffee(name)
+    const otherRoaster = await asA.roaster.create({ name: uniq('Other') })
+    const second = await asA.coffee.create({
+      name,
+      roasterId: otherRoaster.id,
+      roastLevelId: first.roastLevelId!,
+      isBlend: false,
+    })
+    expect(second.id).not.toBe(first.id)
+    expect(second.name).toBe(name)
+  })
+})
+
 describe('coffee.update', () => {
   it('updates fields and never moves updatedAt before createdAt', async () => {
     const created = await createCoffee(uniq('Before'))
@@ -99,6 +144,40 @@ describe('coffee.update', () => {
     expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(
       new Date(updated.createdAt).getTime(),
     )
+  })
+
+  it('clears origin fields when a coffee becomes a blend', async () => {
+    const country = await asA.country.create({ name: uniq('Ethiopia') })
+    const created = await createCoffee(uniq('Before Blend'), {
+      countryId: country.id,
+    })
+    expect(created.isBlend).toBe(false)
+    expect(created.countryId).toBe(country.id)
+
+    const updated = await asA.coffee.update({
+      id: created.id,
+      name: created.name,
+      roasterId: created.roasterId!,
+      roastLevelId: created.roastLevelId!,
+      isBlend: true,
+      countryId: country.id,
+    })
+    expect(updated.isBlend).toBe(true)
+    expect(updated.countryId).toBeNull()
+    expect(updated.regionId).toBeNull()
+  })
+
+  it('rejects renaming onto another coffee of the same roaster', async () => {
+    const taken = await createCoffee(uniq('Taken'))
+    const other = await createCoffee(uniq('Other'))
+    await expect(
+      asA.coffee.update({
+        id: other.id,
+        name: taken.name,
+        roasterId: taken.roasterId!,
+        roastLevelId: other.roastLevelId!,
+      }),
+    ).rejects.toThrow(/already exists/i)
   })
 
   it('throws NOT_FOUND for an unknown id', async () => {

@@ -15,6 +15,8 @@ UI labels keep their casing either way. See ADR-0005.
 **Coffee**:
 A roaster's product — a named offering, not a single bag. Buying the same offering
 twice is the same Coffee, so a Coffee is unique per user by roaster and name.
+A Coffee may be a single origin or a blend; that is a property of the offering,
+not a second kind of Coffee, and a blend still occupies that same uniqueness.
 _Avoid_: Bean, bag, lot
 
 **Brewing Method**:

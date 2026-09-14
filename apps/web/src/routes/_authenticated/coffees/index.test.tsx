@@ -46,6 +46,7 @@ function makeCoffeeRow(over: {
   id: string
   name: string
   notes?: string | null
+  isBlend?: boolean
   roaster?: string | null
   country?: string | null
   region?: string | null
@@ -61,7 +62,12 @@ function makeCoffeeRow(over: {
   } | null
 }): CoffeeGetAllRow {
   return {
-    ...makeCoffee({ id: over.id, name: over.name, notes: over.notes ?? null }),
+    ...makeCoffee({
+      id: over.id,
+      name: over.name,
+      notes: over.notes ?? null,
+      isBlend: over.isBlend ?? false,
+    }),
     roaster: over.roaster ? { name: over.roaster } : null,
     country: over.country ? { name: over.country } : null,
     region: over.region ? { name: over.region } : null,
@@ -110,6 +116,26 @@ describe('Coffees page', () => {
     expect(table.getByText('Onyx')).toBeTruthy()
     expect(table.getByText('Ethiopia')).toBeTruthy()
     expect(table.getByText('Guji')).toBeTruthy()
+  })
+
+  it('shows Blend in place of country for a blend coffee', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [
+      makeCoffeeRow({
+        id: 'cf1',
+        name: 'House Blend',
+        roaster: 'Onyx',
+        isBlend: true,
+        country: 'Ethiopia',
+      }),
+    ])
+
+    render(<Coffee />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('House Blend')).toBeTruthy()
+    expect(table.getByText('Blend')).toBeTruthy()
+    expect(table.queryByText('Ethiopia')).toBeNull()
   })
 
   it('expands a desktop row on click to reveal the coffee detail', () => {

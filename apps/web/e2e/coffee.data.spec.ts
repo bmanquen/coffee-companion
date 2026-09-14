@@ -38,6 +38,23 @@ test('create a coffee via the new-coffee form', async ({ page }) => {
   await expect(page.getByText(name).first()).toBeVisible()
 })
 
+test('create a blend coffee via the new-coffee form', async ({ page }) => {
+  const name = `E2E Blend ${Date.now()}`
+
+  await page.goto('/coffees/new')
+
+  await pickLookups(page)
+  await page.getByPlaceholder('Name').fill(name)
+  await page.getByRole('radio', { name: 'Blend' }).click()
+  await expect(page.getByText('Select Country')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/coffees$/)
+  await expect(page.getByText(name).first()).toBeVisible()
+  await expect(page.getByText('Blend').first()).toBeVisible()
+})
+
 // Edits a coffee through the edit route. Creates its own coffee first (unique
 // name) so it never mutates the seeded data other specs depend on.
 test('edit a coffee updates its name in the list', async ({ page }) => {
