@@ -7,6 +7,30 @@ import { insertCoffeeSchema } from '../db/zod'
 import { isSealed, sealNestedBrew, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isPgUniqueViolation(err: unknown): boolean {
+  let current: unknown = err
+  for (let i = 0; i < 5; i++) {
+    if (!isRecord(current)) return false
+    if (current.code === '23505') return true
+    current = current.cause
+  }
+  return false
+}
+
+function rethrowUniqueCoffeeConflict(err: unknown): never {
+  if (isPgUniqueViolation(err)) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'A coffee with this name already exists for this roaster',
+    })
+  }
+  throw err
+}
+
 export const coffeeRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
     const [rows, shelf] = await Promise.all([
@@ -72,26 +96,37 @@ export const coffeeRouter = createTRPCRouter({
   create: authedProcedure
     .input(insertCoffeeSchema)
     .mutation(async ({ ctx, input }) => {
-      const [coffee] = await db
-        .insert(coffees)
-        .values({ ...input, userId: ctx.session.user.id })
-        .returning()
-      return coffee
+      try {
+        const [coffee] = await db
+          .insert(coffees)
+          .values({ ...input, userId: ctx.session.user.id })
+          .returning()
+        return coffee
+      } catch (err) {
+        rethrowUniqueCoffeeConflict(err)
+      }
     }),
 
   update: authedProcedure
     .input(insertCoffeeSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
-      const updated = await db
-        .update(coffees)
-        .set(data)
-        .where(and(eq(coffees.id, id), eq(coffees.userId, ctx.session.user.id)))
-        .returning()
-      if (updated.length === 0) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
+      try {
+        const updated = await db
+          .update(coffees)
+          .set(data)
+          .where(
+            and(eq(coffees.id, id), eq(coffees.userId, ctx.session.user.id)),
+          )
+          .returning()
+        if (updated.length === 0) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
+        }
+        return updated[0]
+      } catch (err) {
+        if (err instanceof TRPCError) throw err
+        rethrowUniqueCoffeeConflict(err)
       }
-      return updated[0]
     }),
 
   delete: authedProcedure
