@@ -4,6 +4,7 @@ import {
   callerFor,
   grantPlan,
   seedUsers,
+  subscribePlan,
   uniqFor,
 } from '../../test/trpc'
 
@@ -11,13 +12,18 @@ const USER_A = 'device-user-a'
 const USER_B = 'device-user-b'
 // A user with no Grant, so on Free — the equipment limits apply to them alone.
 const USER_FREE = 'device-user-free'
+const USER_PAID = 'device-user-paid'
+// Hits the Free cap, then a Subscription — the upgrade path a paying user takes.
+const USER_UPGRADED = 'device-user-upgraded'
 const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
 const asFree = callerFor(USER_FREE)
+const asPaid = callerFor(USER_PAID)
+const asUpgraded = callerFor(USER_UPGRADED)
 const uniq = uniqFor(USER_A)
 const uniqFree = uniqFor(USER_FREE)
 
-seedUsers([USER_A, USER_B, USER_FREE])
+seedUsers([USER_A, USER_B, USER_FREE, USER_PAID, USER_UPGRADED])
 
 let typeId: string
 let deviceAId: string
@@ -152,13 +158,21 @@ describe('brewingDevice.delete', () => {
 
 describe('brewingDevice plan limits', () => {
   it('allows three brewing devices on Free and refuses the fourth', async () => {
-    for (const label of ['One', 'Two', 'Three']) {
-      await asFree.brewingDevice.create({
-        name: uniqFree(label),
-        brand: 'Brand',
-        typeId,
-      })
-    }
+    const first = await asFree.brewingDevice.create({
+      name: uniqFree('One'),
+      brand: 'Brand',
+      typeId,
+    })
+    await asFree.brewingDevice.create({
+      name: uniqFree('Two'),
+      brand: 'Brand',
+      typeId,
+    })
+    await asFree.brewingDevice.create({
+      name: uniqFree('Three'),
+      brand: 'Brand',
+      typeId,
+    })
 
     await expect(
       asFree.brewingDevice.create({
@@ -168,18 +182,57 @@ describe('brewingDevice plan limits', () => {
       }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' })
 
-    // The three they own are untouched.
+    // The three they own are untouched, and update is not an addition.
     expect((await asFree.brewingDevice.list()).length).toBe(3)
-  })
-
-  it('lets a granted paid Plan add devices past the Free limit', async () => {
-    await grantPlan(USER_FREE, 'pro')
-
-    const fourth = await asFree.brewingDevice.create({
-      name: uniqFree('Now allowed'),
+    const renamed = await asFree.brewingDevice.update({
+      id: first.id,
+      name: uniqFree('Renamed'),
       brand: 'Brand',
       typeId,
     })
-    expect(fourth.userId).toBe(USER_FREE)
+    expect(renamed.id).toBe(first.id)
+  })
+
+  it('lets a granted paid Plan add devices past the Free limit', async () => {
+    const uniqPaid = uniqFor(USER_PAID)
+    await grantPlan(USER_PAID, 'pro')
+
+    for (const label of ['One', 'Two', 'Three', 'Four']) {
+      await asPaid.brewingDevice.create({
+        name: uniqPaid(label),
+        brand: 'Brand',
+        typeId,
+      })
+    }
+
+    expect((await asPaid.brewingDevice.list()).length).toBe(4)
+  })
+
+  it('lets a Subscription add devices after Free had already hit the cap', async () => {
+    const uniqUpgraded = uniqFor(USER_UPGRADED)
+    for (const label of ['One', 'Two', 'Three']) {
+      await asUpgraded.brewingDevice.create({
+        name: uniqUpgraded(label),
+        brand: 'Brand',
+        typeId,
+      })
+    }
+    await expect(
+      asUpgraded.brewingDevice.create({
+        name: uniqUpgraded('Blocked'),
+        brand: 'Brand',
+        typeId,
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+
+    await subscribePlan(USER_UPGRADED, 'pro')
+
+    const fourth = await asUpgraded.brewingDevice.create({
+      name: uniqUpgraded('Now allowed'),
+      brand: 'Brand',
+      typeId,
+    })
+    expect(fourth.userId).toBe(USER_UPGRADED)
+    expect((await asUpgraded.brewingDevice.list()).length).toBe(4)
   })
 })

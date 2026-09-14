@@ -5,6 +5,7 @@ import {
   expireGrants,
   grantPlan,
   seedUsers,
+  subscribePlan,
   uniqFor,
 } from '../../test/trpc'
 
@@ -14,15 +15,18 @@ const USER_B = 'grinder-user-b'
 const USER_FREE = 'grinder-user-free'
 const USER_PAID = 'grinder-user-paid'
 const USER_LAPSED = 'grinder-user-lapsed'
+// Hits the Free cap, then a Subscription — the upgrade path a paying user takes.
+const USER_UPGRADED = 'grinder-user-upgraded'
 const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
 const asFree = callerFor(USER_FREE)
 const asPaid = callerFor(USER_PAID)
 const asLapsed = callerFor(USER_LAPSED)
+const asUpgraded = callerFor(USER_UPGRADED)
 const uniq = uniqFor(USER_A)
 const uniqFree = uniqFor(USER_FREE)
 
-seedUsers([USER_A, USER_B, USER_FREE, USER_PAID, USER_LAPSED])
+seedUsers([USER_A, USER_B, USER_FREE, USER_PAID, USER_LAPSED, USER_UPGRADED])
 
 let grinderAId: string
 
@@ -144,12 +148,26 @@ describe('grinder.delete', () => {
 })
 
 describe('grinder plan limits', () => {
-  it('refuses a second grinder on Free', async () => {
-    await asFree.grinder.create({ name: uniqFree('Only one'), brand: 'Brand' })
+  it('allows the first grinder on Free and refuses a second', async () => {
+    const first = await asFree.grinder.create({
+      name: uniqFree('Only one'),
+      brand: 'Brand',
+    })
+    expect(first.userId).toBe(USER_FREE)
 
     await expect(
       asFree.grinder.create({ name: uniqFree('Second'), brand: 'Brand' }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+
+    // Update is not an addition: the cap must not freeze the one they own.
+    const newName = uniqFree('Renamed')
+    const renamed = await asFree.grinder.update({
+      id: first.id,
+      name: newName,
+      brand: 'Brand',
+    })
+    expect(renamed.id).toBe(first.id)
+    expect(renamed.name).toBe(newName)
   })
 
   it('lets a granted paid Plan add grinders past the Free limit', async () => {
@@ -161,6 +179,29 @@ describe('grinder plan limits', () => {
     }
 
     expect((await asPaid.grinder.list()).length).toBe(3)
+  })
+
+  it('lets a Subscription add grinders after Free had already hit the cap', async () => {
+    const uniqUpgraded = uniqFor(USER_UPGRADED)
+    await asUpgraded.grinder.create({
+      name: uniqUpgraded('Free cap'),
+      brand: 'Brand',
+    })
+    await expect(
+      asUpgraded.grinder.create({
+        name: uniqUpgraded('Blocked'),
+        brand: 'Brand',
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+
+    await subscribePlan(USER_UPGRADED, 'pro')
+
+    const extra = await asUpgraded.grinder.create({
+      name: uniqUpgraded('Now allowed'),
+      brand: 'Brand',
+    })
+    expect(extra.userId).toBe(USER_UPGRADED)
+    expect((await asUpgraded.grinder.list()).length).toBe(2)
   })
 
   it('keeps the grinders a user already owns when their Plan lapses', async () => {
