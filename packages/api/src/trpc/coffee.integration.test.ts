@@ -79,6 +79,57 @@ describe('coffee.getById', () => {
   })
 })
 
+describe('coffee.create', () => {
+  it('rejects a second coffee with the same roaster and name', async () => {
+    const name = uniq('House Blend')
+    const first = await createCoffee(name)
+    await expect(
+      asA.coffee.create({
+        name,
+        roasterId: first.roasterId!,
+        roastLevelId: first.roastLevelId!,
+      }),
+    ).rejects.toThrow(/already exists/i)
+  })
+
+  it('allows the same name from a different roaster', async () => {
+    const name = uniq('House Blend')
+    const first = await createCoffee(name)
+    const otherRoaster = await asA.roaster.create({ name: uniq('Other') })
+    const second = await asA.coffee.create({
+      name,
+      roasterId: otherRoaster.id,
+      roastLevelId: first.roastLevelId!,
+    })
+    expect(second.id).not.toBe(first.id)
+    expect(second.name).toBe(name)
+  })
+
+  it('returns CONFLICT when two creates race on the same roaster and name', async () => {
+    const seed = await createCoffee(uniq('Race seed'))
+    const name = uniq('Raced Blend')
+    const payload = {
+      name,
+      roasterId: seed.roasterId!,
+      roastLevelId: seed.roastLevelId!,
+    }
+    const results = await Promise.allSettled([
+      asA.coffee.create(payload),
+      asA.coffee.create(payload),
+    ])
+    const fulfilled = results.filter((r) => r.status === 'fulfilled')
+    const rejected = results.filter(
+      (r): r is PromiseRejectedResult => r.status === 'rejected',
+    )
+    expect(fulfilled).toHaveLength(1)
+    expect(rejected).toHaveLength(1)
+    expect(rejected[0].reason).toMatchObject({
+      code: 'CONFLICT',
+      message: expect.stringMatching(/already exists/i),
+    })
+  })
+})
+
 describe('coffee.update', () => {
   it('updates fields and never moves updatedAt before createdAt', async () => {
     const created = await createCoffee(uniq('Before'))
@@ -99,6 +150,19 @@ describe('coffee.update', () => {
     expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(
       new Date(updated.createdAt).getTime(),
     )
+  })
+
+  it('rejects renaming onto another coffee of the same roaster', async () => {
+    const taken = await createCoffee(uniq('Taken'))
+    const other = await createCoffee(uniq('Other'))
+    await expect(
+      asA.coffee.update({
+        id: other.id,
+        name: taken.name,
+        roasterId: taken.roasterId!,
+        roastLevelId: other.roastLevelId!,
+      }),
+    ).rejects.toThrow(/already exists/i)
   })
 
   it('throws NOT_FOUND for an unknown id', async () => {

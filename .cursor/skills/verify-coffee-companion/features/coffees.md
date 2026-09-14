@@ -36,7 +36,7 @@ Preconditions:
 
 - SearchSelect's accessible name is not the visible `Select Roaster` label. Click the visible text, then the option.
 - `Add` (create) and `Save` (edit) are different buttons. `Delete coffee` opens the dialog; the dialog's confirm is exactly `Delete`.
-- Name uniqueness is per user. Timestamp the name so a retry does not collide.
+- Name uniqueness is per user by roaster and name. Timestamp the name so a retry does not collide.
 - Expanding a row to read Dialed-in settings is a click on the name cell of the desktop table (`apps/web/e2e/helpers.ts` `expandRow`). On `data`, Sumatra Lintong's expander shows `18g → 36g`. On `free`, that same Coffee shows `This Brew is Sealed` — see [Plans and Shelf](./plans-and-shelf.md).
 - Do not edit or delete seeded Coffees (`Ethiopia Guji`, the E2E_LIBRARY names). Create your own, then remove them.
 - Roaster `Sey` exists only on `data`. Identity `empty` has no roaster to pick; type-create one or skip the roaster.

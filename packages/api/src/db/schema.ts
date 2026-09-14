@@ -138,6 +138,11 @@ export const coffees = pgTable(
     index('coffees_user_name_idx').on(table.name, table.userId),
     index('coffees_user_process_id_idx').on(table.processId, table.userId),
     index('coffees_user_country_idx').on(table.countryId, table.userId),
+    uniqueIndex('coffees_user_roaster_name_idx').on(
+      table.userId,
+      table.roasterId,
+      table.name,
+    ),
   ],
 )
 
