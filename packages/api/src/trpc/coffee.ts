@@ -21,9 +21,9 @@ function sortedOrigins<T extends { country?: { name: string } | null }>(
   )
 }
 
-function coffeeColumnValues(input: InsertCoffee, storedIsBlend = false) {
+function coffeeColumnValues(input: InsertCoffee) {
   const { origins: _origins, ...columns } = input
-  return { ...columns, isBlend: input.isBlend ?? storedIsBlend }
+  return columns
 }
 
 function isPgUniqueViolation(err: unknown): boolean {
@@ -47,15 +47,6 @@ function rethrowUniqueCoffeeConflict(err: unknown): never {
     })
   }
   throw err
-}
-
-function assertOriginKind(isBlend: boolean, originCount: number) {
-  if (!isBlend && originCount > 1) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'A single origin coffee can have only one country',
-    })
-  }
 }
 
 function originRows(coffeeId: string, origins: Array<CoffeeOriginInput>) {
@@ -177,9 +168,7 @@ export const coffeeRouter = createTRPCRouter({
   create: authedProcedure
     .input(insertCoffeeSchema)
     .mutation(async ({ ctx, input }) => {
-      const isBlend = input.isBlend ?? false
       const origins = input.origins ?? []
-      assertOriginKind(isBlend, origins.length)
       await assertRegionsBelongToCountries(origins)
       try {
         return await db.transaction(async (tx) => {
@@ -204,14 +193,11 @@ export const coffeeRouter = createTRPCRouter({
       const { id, ...data } = input
       const existing = await db.query.coffees.findFirst({
         where: { id, userId: ctx.session.user.id },
-        with: { origins: true },
+        columns: { id: true },
       })
       if (!existing) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
       }
-      const isBlend = data.isBlend ?? existing.isBlend
-      const nextOrigins = data.origins ?? existing.origins
-      assertOriginKind(isBlend, nextOrigins.length)
       if (data.origins) {
         await assertRegionsBelongToCountries(data.origins)
       }
@@ -219,7 +205,7 @@ export const coffeeRouter = createTRPCRouter({
         return await db.transaction(async (tx) => {
           const updated = await tx
             .update(coffees)
-            .set(coffeeColumnValues(data, existing.isBlend))
+            .set(coffeeColumnValues(data))
             .where(
               and(eq(coffees.id, id), eq(coffees.userId, ctx.session.user.id)),
             )

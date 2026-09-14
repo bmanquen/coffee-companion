@@ -121,7 +121,6 @@ describe('NewCoffee', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Roast Level' }), {
         target: { value: ROAST_LEVEL },
       })
-      fireEvent.click(screen.getByRole('radio', { name: 'Blend' }))
       expect(screen.getByRole('combobox', { name: 'Country' })).toBeTruthy()
       fireEvent.click(screen.getByRole('button', { name: 'Add country' }))
       expect(screen.getAllByRole('combobox', { name: 'Country' })).toHaveLength(
@@ -142,7 +141,7 @@ describe('NewCoffee', () => {
       )!
       const body = String(init?.body ?? '')
       expect(body).toContain('House Blend')
-      expect(body).toContain('"isBlend":true')
+      expect(body).not.toContain('isBlend')
     } finally {
       fetchSpy.mockRestore()
     }

@@ -129,7 +129,6 @@ export const coffees = pgTable(
     processId: uuid('process_id').references(() => coffeeProcesses.id),
     notes: text(),
     isActive: boolean('is_active'),
-    isBlend: boolean('is_blend').notNull().default(false),
     ...timestamps,
   },
   (table) => [

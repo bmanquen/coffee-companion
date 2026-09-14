@@ -150,7 +150,6 @@ describe('SearchSelect', () => {
         processId: null,
         notes: null,
         isActive: false,
-        isBlend: false,
       } as InsertCoffee
       const form = useAppForm({
         defaultValues: defaultCoffee,
@@ -158,9 +157,7 @@ describe('SearchSelect', () => {
       })
       return (
         <form.AppField name="processId">
-          {(field) => (
-            <field.SearchSelect label="Process" options={options} />
-          )}
+          {(field) => <field.SearchSelect label="Process" options={options} />}
         </form.AppField>
       )
     }

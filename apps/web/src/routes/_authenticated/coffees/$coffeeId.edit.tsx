@@ -102,7 +102,6 @@ function EditCoffeeComponent() {
     processId: coffee.processId,
     notes: coffee.notes,
     isActive: coffee.isActive,
-    isBlend: coffee.isBlend,
     origins: formOriginsFromCoffee(coffee.origins),
   }
 

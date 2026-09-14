@@ -206,7 +206,7 @@ export function createCoffeeFor(
   }
   return async (name: string, extras: Partial<InsertCoffee> = {}) => {
     const ids = await ensureLookups()
-    return caller.coffee.create({ name, isBlend: false, ...ids, ...extras })
+    return caller.coffee.create({ name, ...ids, ...extras })
   }
 }
 

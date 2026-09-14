@@ -57,7 +57,6 @@ type CoffeeRow = {
   id: string
   name: string
   notes: string | null
-  isBlend: boolean
   roaster: { name: string } | null
   roastLevel: { name: string } | null
   origins: Array<{

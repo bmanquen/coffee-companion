@@ -50,7 +50,6 @@ describe('useFieldRequired', () => {
         processId: null,
         notes: null,
         isActive: false,
-        isBlend: false,
       } as InsertCoffee
       const form = useAppForm({
         defaultValues: defaultCoffee,

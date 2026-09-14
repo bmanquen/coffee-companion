@@ -46,7 +46,6 @@ function makeCoffeeRow(over: {
   id: string
   name: string
   notes?: string | null
-  isBlend?: boolean
   roaster?: string | null
   origins?: Array<{ country?: string | null; region?: string | null }>
   process?: string | null
@@ -65,7 +64,6 @@ function makeCoffeeRow(over: {
       id: over.id,
       name: over.name,
       notes: over.notes ?? null,
-      isBlend: over.isBlend ?? false,
     }),
     roaster: over.roaster ? { name: over.roaster } : null,
     origins: (over.origins ?? []).map((origin) => ({
@@ -127,7 +125,6 @@ describe('Coffees page', () => {
         id: 'cf1',
         name: 'House Blend',
         roaster: 'Onyx',
-        isBlend: true,
         origins: [
           { country: 'Ethiopia', region: 'Guji' },
           { country: 'Colombia', region: 'Huila' },

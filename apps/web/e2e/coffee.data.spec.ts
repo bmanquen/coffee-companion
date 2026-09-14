@@ -45,7 +45,6 @@ test('create a blend coffee via the new-coffee form', async ({ page }) => {
 
   await pickLookups(page)
   await page.getByPlaceholder('Name').fill(name)
-  await page.getByRole('radio', { name: 'Blend' }).click()
   await pickOption(
     page.getByText('Select Country').first(),
     page.getByText('Ethiopia', { exact: true }),

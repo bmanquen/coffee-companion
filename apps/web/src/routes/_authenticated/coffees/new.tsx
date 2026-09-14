@@ -93,7 +93,6 @@ function NewCoffeeComponent() {
     processId: null,
     notes: null,
     isActive: false,
-    isBlend: false,
     origins: [{ ...emptyOrigin }],
   }
 

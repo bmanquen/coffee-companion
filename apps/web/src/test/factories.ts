@@ -82,7 +82,6 @@ export function makeRecentCoffee(
     processId: null,
     notes: null,
     isActive: false,
-    isBlend: false,
     createdAt,
     updatedAt,
     ...overrides,

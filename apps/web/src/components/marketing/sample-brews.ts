@@ -49,7 +49,6 @@ const coffee = {
   processId: null,
   notes: null,
   isActive: true,
-  isBlend: false,
   createdAt,
   updatedAt,
 }

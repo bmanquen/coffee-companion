@@ -92,13 +92,11 @@ describe('coffee.create', () => {
       countryId: colombia.id,
     })
     const created = await createCoffee(uniq('House Blend'), {
-      isBlend: true,
       origins: [
         { countryId: ethiopia.id, regionId: guji.id },
         { countryId: colombia.id, regionId: huila.id },
       ],
     })
-    expect(created.isBlend).toBe(true)
     const found = await asA.coffee.getById(created.id)
     expect(found.origins).toHaveLength(2)
     const byCountry = new Map(
@@ -113,37 +111,25 @@ describe('coffee.create', () => {
     const created = await createCoffee(uniq('Ethiopia Guji'), {
       origins: [{ countryId: country.id }],
     })
-    expect(created.isBlend).toBe(false)
     const found = await asA.coffee.getById(created.id)
     expect(found.origins).toEqual([
       expect.objectContaining({ countryId: country.id, regionId: null }),
     ])
   })
 
-  it('rejects two origin countries on a single origin coffee', async () => {
-    const ethiopia = await asA.country.create({ name: uniq('Ethiopia') })
-    const colombia = await asA.country.create({ name: uniq('Colombia') })
-    await expect(
-      createCoffee(uniq('Confused'), {
-        isBlend: false,
-        origins: [{ countryId: ethiopia.id }, { countryId: colombia.id }],
-      }),
-    ).rejects.toThrow(/only one country/i)
-  })
-
   it('rejects listing the same country twice', async () => {
     const country = await asA.country.create({ name: uniq('Ethiopia') })
     await expect(
       createCoffee(uniq('Twice'), {
-        isBlend: true,
         origins: [{ countryId: country.id }, { countryId: country.id }],
       }),
     ).rejects.toThrow(/country only once/i)
   })
 
-  it('defaults a coffee to single origin', async () => {
+  it('creates a coffee with no origin countries', async () => {
     const created = await createCoffee(uniq('Ethiopia Guji'))
-    expect(created.isBlend).toBe(false)
+    const found = await asA.coffee.getById(created.id)
+    expect(found.origins).toEqual([])
   })
 
   it('rejects a second coffee with the same roaster and name', async () => {
@@ -154,7 +140,6 @@ describe('coffee.create', () => {
         name,
         roasterId: first.roasterId!,
         roastLevelId: first.roastLevelId!,
-        isBlend: true,
       }),
     ).rejects.toThrow(/already exists/i)
   })
@@ -167,7 +152,6 @@ describe('coffee.create', () => {
       name,
       roasterId: otherRoaster.id,
       roastLevelId: first.roastLevelId!,
-      isBlend: false,
     })
     expect(second.id).not.toBe(first.id)
     expect(second.name).toBe(name)
@@ -180,7 +164,6 @@ describe('coffee.create', () => {
       name,
       roasterId: seed.roasterId!,
       roastLevelId: seed.roastLevelId!,
-      isBlend: false,
     }
     const results = await Promise.allSettled([
       asA.coffee.create(payload),
@@ -221,47 +204,10 @@ describe('coffee.update', () => {
     )
   })
 
-  it('keeps a blend a blend when isBlend is omitted', async () => {
-    const created = await createCoffee(uniq('Stay Blend'), { isBlend: true })
-    expect(created.isBlend).toBe(true)
-
-    const updated = await asA.coffee.update({
-      id: created.id,
-      name: uniq('Renamed Blend'),
-      roasterId: created.roasterId!,
-      roastLevelId: created.roastLevelId!,
-    })
-    expect(updated.isBlend).toBe(true)
-    expect(updated.name).not.toBe(created.name)
-  })
-
-  it('keeps origin rows when a coffee becomes a blend', async () => {
-    const country = await asA.country.create({ name: uniq('Ethiopia') })
-    const created = await createCoffee(uniq('Before Blend'), {
-      origins: [{ countryId: country.id }],
-    })
-    expect(created.isBlend).toBe(false)
-
-    const updated = await asA.coffee.update({
-      id: created.id,
-      name: created.name,
-      roasterId: created.roasterId!,
-      roastLevelId: created.roastLevelId!,
-      isBlend: true,
-      origins: [{ countryId: country.id }],
-    })
-    expect(updated.isBlend).toBe(true)
-    const found = await asA.coffee.getById(updated.id)
-    expect(found.origins).toEqual([
-      expect.objectContaining({ countryId: country.id }),
-    ])
-  })
-
   it('keeps stored origins when origins are omitted', async () => {
     const ethiopia = await asA.country.create({ name: uniq('Ethiopia') })
     const colombia = await asA.country.create({ name: uniq('Colombia') })
     const created = await createCoffee(uniq('Stay Origins'), {
-      isBlend: true,
       origins: [{ countryId: ethiopia.id }, { countryId: colombia.id }],
     })
 
@@ -272,7 +218,6 @@ describe('coffee.update', () => {
       roastLevelId: created.roastLevelId!,
     })
     const found = await asA.coffee.getById(created.id)
-    expect(found.isBlend).toBe(true)
     expect(found.origins.map((origin) => origin.countryId).sort()).toEqual(
       [ethiopia.id, colombia.id].sort(),
     )
