@@ -122,6 +122,31 @@ describe('coffee.create', () => {
     expect(second.id).not.toBe(first.id)
     expect(second.name).toBe(name)
   })
+
+  it('returns CONFLICT when two creates race on the same roaster and name', async () => {
+    const seed = await createCoffee(uniq('Race seed'))
+    const name = uniq('Raced Blend')
+    const payload = {
+      name,
+      roasterId: seed.roasterId!,
+      roastLevelId: seed.roastLevelId!,
+      isBlend: false,
+    }
+    const results = await Promise.allSettled([
+      asA.coffee.create(payload),
+      asA.coffee.create(payload),
+    ])
+    const fulfilled = results.filter((r) => r.status === 'fulfilled')
+    const rejected = results.filter(
+      (r): r is PromiseRejectedResult => r.status === 'rejected',
+    )
+    expect(fulfilled).toHaveLength(1)
+    expect(rejected).toHaveLength(1)
+    expect(rejected[0].reason).toMatchObject({
+      code: 'CONFLICT',
+      message: expect.stringMatching(/already exists/i),
+    })
+  })
 })
 
 describe('coffee.update', () => {
@@ -144,6 +169,20 @@ describe('coffee.update', () => {
     expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(
       new Date(updated.createdAt).getTime(),
     )
+  })
+
+  it('keeps a blend a blend when isBlend is omitted', async () => {
+    const created = await createCoffee(uniq('Stay Blend'), { isBlend: true })
+    expect(created.isBlend).toBe(true)
+
+    const updated = await asA.coffee.update({
+      id: created.id,
+      name: uniq('Renamed Blend'),
+      roasterId: created.roasterId!,
+      roastLevelId: created.roastLevelId!,
+    })
+    expect(updated.isBlend).toBe(true)
+    expect(updated.name).not.toBe(created.name)
   })
 
   it('clears origin fields when a coffee becomes a blend', async () => {

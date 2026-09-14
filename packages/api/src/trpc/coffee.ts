@@ -1,4 +1,4 @@
-import { and, count, eq, ne } from 'drizzle-orm'
+import { and, count, eq } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
@@ -8,36 +8,34 @@ import { isSealed, sealNestedBrew, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 import type { InsertCoffee } from '../db/zod'
 
-function coffeeValues(input: InsertCoffee) {
-  const isBlend = input.isBlend ?? false
+function coffeeValues(input: InsertCoffee, storedIsBlend = false) {
+  // Update passes the stored flag so omitting isBlend cannot un-blend a coffee.
+  const isBlend = input.isBlend ?? storedIsBlend
   if (!isBlend) return { ...input, isBlend: false }
   return { ...input, isBlend: true, countryId: null, regionId: null }
 }
 
-async function assertUniqueCoffee(
-  userId: string,
-  name: string,
-  roasterId: string,
-  exceptId?: string,
-) {
-  const filters = [
-    eq(coffees.userId, userId),
-    eq(coffees.name, name),
-    eq(coffees.roasterId, roasterId),
-  ]
-  if (exceptId) filters.push(ne(coffees.id, exceptId))
+function isPgUniqueViolation(err: unknown): boolean {
+  let current: unknown = err
+  for (let i = 0; i < 5; i++) {
+    if (typeof current !== 'object' || current === null) return false
+    if ('code' in current && (current as { code: unknown }).code === '23505') {
+      return true
+    }
+    current =
+      'cause' in current ? (current as { cause: unknown }).cause : undefined
+  }
+  return false
+}
 
-  const duplicate = await db
-    .select({ id: coffees.id })
-    .from(coffees)
-    .where(and(...filters))
-    .limit(1)
-  if (duplicate[0]) {
+function rethrowUniqueCoffeeConflict(err: unknown): never {
+  if (isPgUniqueViolation(err)) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'A coffee with this name already exists for this roaster',
     })
   }
+  throw err
 }
 
 export const coffeeRouter = createTRPCRouter({
@@ -105,33 +103,44 @@ export const coffeeRouter = createTRPCRouter({
   create: authedProcedure
     .input(insertCoffeeSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertUniqueCoffee(ctx.session.user.id, input.name, input.roasterId)
-      const [coffee] = await db
-        .insert(coffees)
-        .values({ ...coffeeValues(input), userId: ctx.session.user.id })
-        .returning()
-      return coffee
+      try {
+        const [coffee] = await db
+          .insert(coffees)
+          .values({ ...coffeeValues(input), userId: ctx.session.user.id })
+          .returning()
+        return coffee
+      } catch (err) {
+        rethrowUniqueCoffeeConflict(err)
+      }
     }),
 
   update: authedProcedure
     .input(insertCoffeeSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
-      await assertUniqueCoffee(
-        ctx.session.user.id,
-        data.name,
-        data.roasterId,
-        id,
-      )
-      const updated = await db
-        .update(coffees)
-        .set(coffeeValues(data))
-        .where(and(eq(coffees.id, id), eq(coffees.userId, ctx.session.user.id)))
-        .returning()
-      if (updated.length === 0) {
+      const existing = await db.query.coffees.findFirst({
+        where: { id, userId: ctx.session.user.id },
+        columns: { isBlend: true },
+      })
+      if (!existing) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
       }
-      return updated[0]
+      try {
+        const updated = await db
+          .update(coffees)
+          .set(coffeeValues(data, existing.isBlend))
+          .where(
+            and(eq(coffees.id, id), eq(coffees.userId, ctx.session.user.id)),
+          )
+          .returning()
+        if (updated.length === 0) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
+        }
+        return updated[0]
+      } catch (err) {
+        if (err instanceof TRPCError) throw err
+        rethrowUniqueCoffeeConflict(err)
+      }
     }),
 
   delete: authedProcedure
