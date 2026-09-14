@@ -104,7 +104,7 @@ describe('NewCoffee', () => {
     }
   })
 
-  it('submits a blend without country or region', async () => {
+  it('submits a blend with origin countries', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementation(() => Promise.resolve(trpcSuccess([])))
@@ -122,10 +122,13 @@ describe('NewCoffee', () => {
         target: { value: ROAST_LEVEL },
       })
       fireEvent.click(screen.getByRole('radio', { name: 'Blend' }))
-      expect(screen.queryByRole('combobox', { name: 'Country' })).toBeNull()
-      expect(screen.queryByRole('combobox', { name: 'Region' })).toBeNull()
+      expect(screen.getByRole('combobox', { name: 'Country' })).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Add country' }))
+      expect(screen.getAllByRole('combobox', { name: 'Country' })).toHaveLength(
+        2,
+      )
 
-      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+      fireEvent.click(screen.getByRole('button', { name: (n) => n === 'Add' }))
 
       await waitFor(() =>
         expect(

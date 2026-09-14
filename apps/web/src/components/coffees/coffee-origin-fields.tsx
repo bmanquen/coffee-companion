@@ -1,14 +1,17 @@
 import type { ReactNode } from 'react'
 import { FormLabel } from '@/components/form/form-label'
+import { Button } from '@/components/ui/button'
 import { Field, FieldContent } from '@/components/ui/field'
 
 export function CoffeeOriginFields({
   isBlend,
   onBlendChange,
+  onAddOrigin,
   children,
 }: {
   isBlend: boolean
   onBlendChange: (isBlend: boolean) => void
+  onAddOrigin?: () => void
   children: ReactNode
 }) {
   return (
@@ -42,7 +45,12 @@ export function CoffeeOriginFields({
           </div>
         </FieldContent>
       </Field>
-      {isBlend ? null : children}
+      {children}
+      {isBlend ? (
+        <Button type="button" variant="outline" size="sm" onClick={onAddOrigin}>
+          Add country
+        </Button>
+      ) : null}
     </>
   )
 }

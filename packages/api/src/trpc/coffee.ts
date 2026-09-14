@@ -1,18 +1,29 @@
-import { and, count, eq } from 'drizzle-orm'
+import { and, count, eq, inArray } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
-import { coffees, espressoShots } from '../db/schema'
+import { coffeeOrigins, coffees, espressoShots, regions } from '../db/schema'
 import { insertCoffeeSchema } from '../db/zod'
 import { isSealed, sealNestedBrew, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
-import type { InsertCoffee } from '../db/zod'
+import type { CoffeeOriginInput, InsertCoffee } from '../db/zod'
 
-function coffeeValues(input: InsertCoffee, storedIsBlend = false) {
-  // Update passes the stored flag so omitting isBlend cannot un-blend a coffee.
-  const isBlend = input.isBlend ?? storedIsBlend
-  if (!isBlend) return { ...input, isBlend: false }
-  return { ...input, isBlend: true, countryId: null, regionId: null }
+const originWithPlace = {
+  country: true,
+  region: true,
+} as const
+
+function sortedOrigins<T extends { country?: { name: string } | null }>(
+  origins: Array<T>,
+) {
+  return [...origins].sort((a, b) =>
+    (a.country?.name ?? '').localeCompare(b.country?.name ?? ''),
+  )
+}
+
+function coffeeColumnValues(input: InsertCoffee, storedIsBlend = false) {
+  const { origins: _origins, ...columns } = input
+  return { ...columns, isBlend: input.isBlend ?? storedIsBlend }
 }
 
 function isPgUniqueViolation(err: unknown): boolean {
@@ -38,6 +49,68 @@ function rethrowUniqueCoffeeConflict(err: unknown): never {
   throw err
 }
 
+function assertOriginKind(isBlend: boolean, originCount: number) {
+  if (!isBlend && originCount > 1) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'A single origin coffee can have only one country',
+    })
+  }
+}
+
+function originRows(coffeeId: string, origins: Array<CoffeeOriginInput>) {
+  const seen = new Set<string>()
+  return origins.map((origin) => {
+    if (seen.has(origin.countryId)) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'A coffee can list a country only once',
+      })
+    }
+    seen.add(origin.countryId)
+    return {
+      coffeeId,
+      countryId: origin.countryId,
+      regionId: origin.regionId || null,
+    }
+  })
+}
+
+async function assertRegionsBelongToCountries(
+  origins: Array<CoffeeOriginInput>,
+) {
+  const regionIds = origins.flatMap((origin) =>
+    origin.regionId ? [origin.regionId] : [],
+  )
+  if (regionIds.length === 0) return
+  const found = await db
+    .select({ id: regions.id, countryId: regions.countryId })
+    .from(regions)
+    .where(inArray(regions.id, regionIds))
+  const countryByRegion = new Map(found.map((row) => [row.id, row.countryId]))
+  for (const origin of origins) {
+    if (!origin.regionId) continue
+    if (countryByRegion.get(origin.regionId) !== origin.countryId) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Region must belong to its origin country',
+      })
+    }
+  }
+}
+
+async function replaceOrigins(
+  tx: Pick<typeof db, 'delete' | 'insert'>,
+  coffeeId: string,
+  origins: Array<CoffeeOriginInput>,
+) {
+  const rows = originRows(coffeeId, origins)
+  await tx.delete(coffeeOrigins).where(eq(coffeeOrigins.coffeeId, coffeeId))
+  if (rows.length > 0) {
+    await tx.insert(coffeeOrigins).values(rows)
+  }
+}
+
 export const coffeeRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
     const [rows, shelf] = await Promise.all([
@@ -45,11 +118,10 @@ export const coffeeRouter = createTRPCRouter({
         where: { userId: ctx.session.user.id },
         orderBy: { updatedAt: 'desc' },
         with: {
-          country: true,
-          region: true,
           process: true,
           roaster: true,
           roastLevel: true,
+          origins: { with: originWithPlace },
           // Varieties are a many-to-many via the join table; flatten below.
           coffeesVarieties: { with: { variety: true } },
           // The coffee's dialed-in espresso shot, if one is set.
@@ -59,8 +131,9 @@ export const coffeeRouter = createTRPCRouter({
       ctx.shelf(),
     ])
     return rows.map(
-      ({ espressoShots: dialedIn, coffeesVarieties, ...coffee }) => ({
+      ({ espressoShots: dialedIn, coffeesVarieties, origins, ...coffee }) => ({
         ...coffee,
+        origins: sortedOrigins(origins),
         varieties: coffeesVarieties.map((cv) => cv.variety),
         // Blanked rather than dropped, like every Brew feed: a Sealed dial-in
         // is still the coffee's reference shot, and the list is where a user
@@ -73,11 +146,12 @@ export const coffeeRouter = createTRPCRouter({
   getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {
     const coffee = await db.query.coffees.findFirst({
       where: { id: input, userId: ctx.session.user.id },
+      with: { origins: { with: originWithPlace } },
     })
     if (!coffee) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
     }
-    return coffee
+    return { ...coffee, origins: sortedOrigins(coffee.origins) }
   }),
 
   getRecent: authedProcedure
@@ -103,12 +177,22 @@ export const coffeeRouter = createTRPCRouter({
   create: authedProcedure
     .input(insertCoffeeSchema)
     .mutation(async ({ ctx, input }) => {
+      const isBlend = input.isBlend ?? false
+      const origins = input.origins ?? []
+      assertOriginKind(isBlend, origins.length)
+      await assertRegionsBelongToCountries(origins)
       try {
-        const [coffee] = await db
-          .insert(coffees)
-          .values({ ...coffeeValues(input), userId: ctx.session.user.id })
-          .returning()
-        return coffee
+        return await db.transaction(async (tx) => {
+          const [coffee] = await tx
+            .insert(coffees)
+            .values({
+              ...coffeeColumnValues(input),
+              userId: ctx.session.user.id,
+            })
+            .returning()
+          await replaceOrigins(tx, coffee.id, origins)
+          return coffee
+        })
       } catch (err) {
         rethrowUniqueCoffeeConflict(err)
       }
@@ -120,23 +204,37 @@ export const coffeeRouter = createTRPCRouter({
       const { id, ...data } = input
       const existing = await db.query.coffees.findFirst({
         where: { id, userId: ctx.session.user.id },
-        columns: { isBlend: true },
+        with: { origins: true },
       })
       if (!existing) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
       }
+      const isBlend = data.isBlend ?? existing.isBlend
+      const nextOrigins = data.origins ?? existing.origins
+      assertOriginKind(isBlend, nextOrigins.length)
+      if (data.origins) {
+        await assertRegionsBelongToCountries(data.origins)
+      }
       try {
-        const updated = await db
-          .update(coffees)
-          .set(coffeeValues(data, existing.isBlend))
-          .where(
-            and(eq(coffees.id, id), eq(coffees.userId, ctx.session.user.id)),
-          )
-          .returning()
-        if (updated.length === 0) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
-        }
-        return updated[0]
+        return await db.transaction(async (tx) => {
+          const updated = await tx
+            .update(coffees)
+            .set(coffeeColumnValues(data, existing.isBlend))
+            .where(
+              and(eq(coffees.id, id), eq(coffees.userId, ctx.session.user.id)),
+            )
+            .returning()
+          if (updated.length === 0) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Coffee not found',
+            })
+          }
+          if (data.origins) {
+            await replaceOrigins(tx, id, data.origins)
+          }
+          return updated[0]
+        })
       } catch (err) {
         if (err instanceof TRPCError) throw err
         rethrowUniqueCoffeeConflict(err)

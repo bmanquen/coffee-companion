@@ -37,6 +37,7 @@ export function SearchSelect({
   placeholder = `Select ${label}`,
   options: initialOptions,
   onAddItem,
+  onValueChange,
   disabled = false,
 }: {
   label: string
@@ -47,6 +48,7 @@ export function SearchSelect({
   onAddItem?: (
     value: string,
   ) => SearchSelectOption | Promise<SearchSelectOption>
+  onValueChange?: (value: string) => void
   disabled?: boolean
 }) {
   const field = useFieldContext<string>()
@@ -58,7 +60,9 @@ export function SearchSelect({
   const selectedOption = options.find((o) => o.value === field.state.value)
 
   const handleSelect = (value: string) => {
-    field.handleChange(value === field.state.value ? '' : value)
+    const next = value === field.state.value ? '' : value
+    field.handleChange(next)
+    onValueChange?.(next)
     setSearch('')
     setOpen(false)
   }
@@ -72,6 +76,7 @@ export function SearchSelect({
       : { value: trimmed.toLowerCase(), label: trimmed }
 
     field.handleChange(newOption.value)
+    onValueChange?.(newOption.value)
     setSearch('')
     setOpen(false)
   }

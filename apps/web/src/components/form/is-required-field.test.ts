@@ -81,7 +81,7 @@ describe('isRequiredField', () => {
     expect(isRequiredField(insertCoffeeSchema, 'name')).toBe(true)
     expect(isRequiredField(insertCoffeeSchema, 'roasterId')).toBe(true)
     expect(isRequiredField(insertCoffeeSchema, 'roastLevelId')).toBe(true)
-    expect(isRequiredField(insertCoffeeSchema, 'countryId')).toBe(false)
+    expect(isRequiredField(insertCoffeeSchema, 'origins')).toBe(false)
     expect(isRequiredField(insertCoffeeSchema, 'notes')).toBe(false)
   })
 

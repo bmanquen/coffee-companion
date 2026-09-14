@@ -6,7 +6,11 @@ import { CoffeeOriginFields } from './coffee-origin-fields'
 function Harness({ initialBlend = false }: { initialBlend?: boolean }) {
   const [isBlend, setIsBlend] = useState(initialBlend)
   return (
-    <CoffeeOriginFields isBlend={isBlend} onBlendChange={setIsBlend}>
+    <CoffeeOriginFields
+      isBlend={isBlend}
+      onBlendChange={setIsBlend}
+      onAddOrigin={() => undefined}
+    >
       <span>Country field</span>
     </CoffeeOriginFields>
   )
@@ -20,22 +24,25 @@ describe('CoffeeOriginFields', () => {
       true,
     )
     expect(screen.getByText('Country field')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Add country' })).toBeNull()
   })
 
-  it('hides origin fields when Blend is chosen', () => {
+  it('keeps origin fields visible when Blend is chosen', () => {
     render(<Harness />)
     fireEvent.click(screen.getByRole('radio', { name: 'Blend' }))
     expect(screen.getByRole('radio', { name: 'Blend' })).toHaveProperty(
       'checked',
       true,
     )
-    expect(screen.queryByText('Country field')).toBeNull()
+    expect(screen.getByText('Country field')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Add country' })).toBeTruthy()
   })
 
-  it('restores origin fields when returning to single origin', () => {
+  it('hides Add country when returning to single origin', () => {
     render(<Harness initialBlend />)
-    expect(screen.queryByText('Country field')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Add country' })).toBeTruthy()
     fireEvent.click(screen.getByRole('radio', { name: 'Single origin' }))
     expect(screen.getByText('Country field')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Add country' })).toBeNull()
   })
 })

@@ -48,8 +48,7 @@ function makeCoffeeRow(over: {
   notes?: string | null
   isBlend?: boolean
   roaster?: string | null
-  country?: string | null
-  region?: string | null
+  origins?: Array<{ country?: string | null; region?: string | null }>
   process?: string | null
   roastLevel?: string | null
   varieties?: Array<string>
@@ -69,8 +68,10 @@ function makeCoffeeRow(over: {
       isBlend: over.isBlend ?? false,
     }),
     roaster: over.roaster ? { name: over.roaster } : null,
-    country: over.country ? { name: over.country } : null,
-    region: over.region ? { name: over.region } : null,
+    origins: (over.origins ?? []).map((origin) => ({
+      country: origin.country ? { name: origin.country } : null,
+      region: origin.region ? { name: origin.region } : null,
+    })),
     process: over.process ? { name: over.process } : null,
     roastLevel: over.roastLevel ? { name: over.roastLevel } : null,
     varieties: (over.varieties ?? []).map((name) => ({ name })),
@@ -81,7 +82,9 @@ function makeCoffeeRow(over: {
 // The detail region for a row: its sibling sub-row's animating grid-rows wrap
 // (grid-rows-[1fr] open, grid-rows-[0fr] collapsed). Always in the DOM.
 const detailRegionFor = (name: string): HTMLElement => {
-  const dataRow = within(screen.getByRole('table')).getByText(name).closest('tr')!
+  const dataRow = within(screen.getByRole('table'))
+    .getByText(name)
+    .closest('tr')!
   return dataRow.nextElementSibling!.querySelector(
     '[class*="grid-rows-"]',
   ) as HTMLElement
@@ -104,8 +107,7 @@ describe('Coffees page', () => {
         id: 'cf1',
         name: 'Ethiopia Guji',
         roaster: 'Onyx',
-        country: 'Ethiopia',
-        region: 'Guji',
+        origins: [{ country: 'Ethiopia', region: 'Guji' }],
       }),
     ])
 
@@ -118,7 +120,7 @@ describe('Coffees page', () => {
     expect(table.getByText('Guji')).toBeTruthy()
   })
 
-  it('shows Blend in place of country for a blend coffee', () => {
+  it('shows each origin country and region for a blend coffee', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [
       makeCoffeeRow({
@@ -126,7 +128,10 @@ describe('Coffees page', () => {
         name: 'House Blend',
         roaster: 'Onyx',
         isBlend: true,
-        country: 'Ethiopia',
+        origins: [
+          { country: 'Ethiopia', region: 'Guji' },
+          { country: 'Colombia', region: 'Huila' },
+        ],
       }),
     ])
 
@@ -134,8 +139,8 @@ describe('Coffees page', () => {
 
     const table = within(screen.getByRole('table'))
     expect(table.getByText('House Blend')).toBeTruthy()
-    expect(table.getByText('Blend')).toBeTruthy()
-    expect(table.queryByText('Ethiopia')).toBeNull()
+    expect(table.getByText('Ethiopia, Colombia')).toBeTruthy()
+    expect(table.getByText('Guji, Huila')).toBeTruthy()
   })
 
   it('expands a desktop row on click to reveal the coffee detail', () => {
@@ -279,7 +284,9 @@ describe('Coffees page', () => {
 
     // Delete opens its confirmation dialog (fires) and still doesn't expand.
     fireEvent.click(table.getByRole('button', { name: 'Delete coffee' }))
-    expect(within(screen.getByRole('dialog')).getByText(/Ethiopia Guji/)).toBeTruthy()
+    expect(
+      within(screen.getByRole('dialog')).getByText(/Ethiopia Guji/),
+    ).toBeTruthy()
     expect(region.className).toContain('grid-rows-[0fr]')
   })
 })

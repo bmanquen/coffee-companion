@@ -13,7 +13,8 @@ type ColdBrewBrew = RouterOutputs['coldBrewBrew']['getAll'][number]
 type CoffeeOption = RouterOutputs['coffee']['getAll'][number]
 type MethodOption = RouterOutputs['aeropressMethod']['list'][number]
 type PouroverMethodOption = RouterOutputs['pouroverMethod']['list'][number]
-type FrenchpressMethodOption = RouterOutputs['frenchpressMethod']['list'][number]
+type FrenchpressMethodOption =
+  RouterOutputs['frenchpressMethod']['list'][number]
 type GrinderOption = RouterOutputs['grinder']['list'][number]
 type DeviceOption = RouterOutputs['brewingDevice']['list'][number]
 
@@ -78,8 +79,6 @@ export function makeRecentCoffee(
     name: 'Ethiopia Guji',
     roasterId: null,
     roastLevelId: null,
-    countryId: null,
-    regionId: null,
     processId: null,
     notes: null,
     isActive: false,
@@ -316,11 +315,12 @@ export function makeColdBrewBrew(
 }
 
 // The following back the SearchSelect option lists that the brew forms load.
-export function makeCoffee(overrides: Partial<CoffeeOption> = {}): CoffeeOption {
+export function makeCoffee(
+  overrides: Partial<CoffeeOption> = {},
+): CoffeeOption {
   return {
     ...makeRecentCoffee(),
-    country: null,
-    region: null,
+    origins: [],
     process: null,
     roaster: null,
     roastLevel: null,

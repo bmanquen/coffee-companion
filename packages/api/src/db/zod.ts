@@ -87,6 +87,10 @@ export type GreenCoffee = z.infer<typeof selectGreenCoffeeSchema>
 
 // Coffees. Roaster and roast level are nullable columns; drizzle-zod keeps
 // those optional unless we replace them after the insert schema is built.
+export const coffeeOriginInputSchema = z.object({
+  countryId: z.uuid(),
+  regionId: z.uuid().nullable().optional(),
+})
 export const insertCoffeeSchema = createInsertSchema(coffees, {
   name: (schema) => schema.min(1),
 })
@@ -95,10 +99,12 @@ export const insertCoffeeSchema = createInsertSchema(coffees, {
     roasterId: z.uuid('Select a roaster'),
     roastLevelId: z.uuid('Select a roast level'),
     isBlend: z.boolean().optional(),
+    origins: z.array(coffeeOriginInputSchema).optional(),
   })
 export const selectCoffeeSchema = createSelectSchema(coffees)
 export type InsertCoffee = z.infer<typeof insertCoffeeSchema>
 export type Coffee = z.infer<typeof selectCoffeeSchema>
+export type CoffeeOriginInput = z.infer<typeof coffeeOriginInputSchema>
 
 // Grinders
 export const insertGrinderSchema = createInsertSchema(grinders, {

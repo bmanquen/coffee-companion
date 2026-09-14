@@ -1,5 +1,3 @@
-import { insertCoffeeSchema } from '@coffee-companion/api/db/zod'
-import { useStore } from '@tanstack/react-form'
 import {
   useMutation,
   useQuery,
@@ -8,8 +6,13 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
-import type { InsertCoffee } from '@coffee-companion/api/db/zod'
-import { CoffeeOriginFields } from '@/components/coffees/coffee-origin-fields'
+import type { CoffeeFormValues } from '@/components/coffees/coffee-form'
+import { CoffeeOriginEditor } from '@/components/coffees/coffee-origin-editor'
+import {
+  coffeeFormSchema,
+  formOriginsFromCoffee,
+  originsForApi,
+} from '@/components/coffees/coffee-form'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -92,49 +95,30 @@ function EditCoffeeComponent() {
     }),
   )
 
-  const defaultCoffee = {
+  const defaultCoffee: CoffeeFormValues = {
     name: coffee.name,
     roasterId: coffee.roasterId ?? '',
     roastLevelId: coffee.roastLevelId ?? '',
-    countryId: coffee.countryId,
-    regionId: coffee.regionId,
     processId: coffee.processId,
     notes: coffee.notes,
     isActive: coffee.isActive,
     isBlend: coffee.isBlend,
-  } as unknown as InsertCoffee
+    origins: formOriginsFromCoffee(coffee.origins),
+  }
 
   const form = useAppForm({
     defaultValues: defaultCoffee,
     validators: {
-      onChange: insertCoffeeSchema,
+      onChange: coffeeFormSchema,
     },
     onSubmit: ({ value }) => {
-      updateCoffee.mutate({ ...value, id: coffeeId })
+      updateCoffee.mutate({
+        ...value,
+        id: coffeeId,
+        origins: originsForApi(value.origins),
+      })
     },
   })
-
-  const selectedCountryId = useStore(form.store, (s) => s.values.countryId)
-  const isBlend = useStore(form.store, (s) => s.values.isBlend)
-  const { data: regions } = useQuery(
-    trpc.region.getAll.queryOptions(selectedCountryId!, {
-      enabled: !!selectedCountryId,
-    }),
-  )
-  const createRegion = useMutation(
-    trpc.region.create.mutationOptions({
-      onSuccess: () => {
-        if (selectedCountryId) {
-          queryClient.invalidateQueries(
-            trpc.region.getAll.queryOptions(selectedCountryId),
-          )
-        }
-      },
-    }),
-  )
-  const region = useSearchSelectResource(regions ?? [], (name) =>
-    createRegion.mutateAsync({ name, countryId: selectedCountryId }),
-  )
 
   const { data: coffeeProcesses } = useQuery(
     trpc.coffeeProcess.getAll.queryOptions(),
@@ -170,35 +154,7 @@ function EditCoffeeComponent() {
             <field.SearchSelect label="Roast Level" {...roastLevel} />
           )}
         </form.AppField>
-        <form.AppField name="isBlend">
-          {(field) => (
-            <CoffeeOriginFields
-              isBlend={isBlend ?? false}
-              onBlendChange={(next) => {
-                field.handleChange(next)
-                if (next) {
-                  form.setFieldValue('countryId', null)
-                  form.setFieldValue('regionId', null)
-                }
-              }}
-            >
-              <form.AppField name="countryId">
-                {(countryField) => (
-                  <countryField.SearchSelect label="Country" {...country} />
-                )}
-              </form.AppField>
-              <form.AppField name="regionId">
-                {(regionField) => (
-                  <regionField.SearchSelect
-                    label="Region"
-                    disabled={!selectedCountryId}
-                    {...region}
-                  />
-                )}
-              </form.AppField>
-            </CoffeeOriginFields>
-          )}
-        </form.AppField>
+        <CoffeeOriginEditor form={form} countries={country} />
         <form.AppField name="processId">
           {(field) => <field.SearchSelect label="Process" {...coffeeProcess} />}
         </form.AppField>

@@ -46,13 +46,23 @@ test('create a blend coffee via the new-coffee form', async ({ page }) => {
   await pickLookups(page)
   await page.getByPlaceholder('Name').fill(name)
   await page.getByRole('radio', { name: 'Blend' }).click()
-  await expect(page.getByText('Select Country')).toHaveCount(0)
+  await pickOption(
+    page.getByText('Select Country').first(),
+    page.getByText('Ethiopia', { exact: true }),
+  )
+  await page.getByRole('button', { name: 'Add country' }).click()
+  await pickOption(
+    page.getByText('Select Country'),
+    page.getByText('Colombia', { exact: true }),
+  )
 
   await page.getByRole('button', { name: 'Add', exact: true }).click()
 
   await expect(page).toHaveURL(/\/coffees$/)
   await expect(page.getByText(name).first()).toBeVisible()
-  await expect(page.getByText('Blend').first()).toBeVisible()
+  await expect(
+    page.getByText(/Ethiopia.*Colombia|Colombia.*Ethiopia/).first(),
+  ).toBeVisible()
 })
 
 // Edits a coffee through the edit route. Creates its own coffee first (unique

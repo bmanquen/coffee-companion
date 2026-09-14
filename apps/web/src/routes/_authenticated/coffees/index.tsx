@@ -14,6 +14,7 @@ import { CoffeeIcon, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { CellContext } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
 import { SealedBrewNotice } from '@/components/brews/sealed-brew-notice'
+import { formatOriginNames } from '@/components/coffees/format-coffee-origins'
 import { CoffeeDetails } from '@/components/coffees/coffee-details'
 import { DataTable, expanderColumn } from '@/components/data-table'
 import { H1 } from '@/components/typography/h1'
@@ -59,8 +60,10 @@ type CoffeeRow = {
   isBlend: boolean
   roaster: { name: string } | null
   roastLevel: { name: string } | null
-  country: { name: string } | null
-  region: { name: string } | null
+  origins: Array<{
+    country: { name: string } | null
+    region: { name: string } | null
+  }>
   process: { name: string } | null
   varieties: Array<{ name: string }>
   dialedInShot: {
@@ -165,18 +168,16 @@ const columns = [
     cell: (info) => info.getValue() || '-',
     meta: { cardSummary: true },
   }),
-  columnHelper.accessor((row) => row.country?.name ?? '', {
+  columnHelper.accessor((row) => formatOriginNames(row.origins, 'country'), {
     id: 'country',
     header: 'Country',
-    cell: (info) =>
-      info.row.original.isBlend ? 'Blend' : info.getValue() || '-',
+    cell: (info) => info.getValue(),
     meta: { cardSummary: true },
   }),
-  columnHelper.accessor((row) => row.region?.name ?? '', {
+  columnHelper.accessor((row) => formatOriginNames(row.origins, 'region'), {
     id: 'region',
     header: 'Region',
-    cell: (info) =>
-      info.row.original.isBlend ? '-' : info.getValue() || '-',
+    cell: (info) => info.getValue(),
     meta: { cardSummary: true },
   }),
   columnHelper.display({

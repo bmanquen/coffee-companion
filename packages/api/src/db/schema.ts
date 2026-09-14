@@ -126,8 +126,6 @@ export const coffees = pgTable(
     name: text().notNull(),
     roasterId: uuid('roaster_id').references(() => roasters.id),
     roastLevelId: uuid('roast_level_id').references(() => roastLevels.id),
-    countryId: uuid('country_id').references(() => countries.id),
-    regionId: uuid('region_id').references(() => regions.id),
     processId: uuid('process_id').references(() => coffeeProcesses.id),
     notes: text(),
     isActive: boolean('is_active'),
@@ -138,7 +136,6 @@ export const coffees = pgTable(
     index('coffees_user_idx').on(table.userId),
     index('coffees_user_name_idx').on(table.name, table.userId),
     index('coffees_user_process_id_idx').on(table.processId, table.userId),
-    index('coffees_user_country_idx').on(table.countryId, table.userId),
     uniqueIndex('coffees_user_roaster_name_idx').on(
       table.userId,
       table.roasterId,
@@ -172,6 +169,25 @@ export const coffeesVarieties = pgTable(
   (table) => [
     primaryKey({
       columns: [table.coffeeId, table.varietyId],
+    }),
+  ],
+)
+
+export const coffeeOrigins = pgTable(
+  'coffee_origins',
+  {
+    coffeeId: uuid('coffee_id')
+      .references(() => coffees.id, { onDelete: 'cascade' })
+      .notNull(),
+    countryId: uuid('country_id')
+      .references(() => countries.id)
+      .notNull(),
+    regionId: uuid('region_id').references(() => regions.id),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.coffeeId, table.countryId],
     }),
   ],
 )
@@ -489,7 +505,7 @@ export const planInterests = pgTable(
 // Relations
 
 export const relations = defineRelations(
-  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, planGrants, planInterests, subscription },
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, coffeeOrigins, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, planGrants, planInterests, subscription },
   (r) => ({
     user: {
       sessions: r.many.session(),
@@ -543,14 +559,14 @@ export const relations = defineRelations(
       user: r.one.user({ from: r.countries.userId, to: r.user.id }),
       regions: r.many.regions(),
       greenCoffees: r.many.greenCoffees(),
-      coffees: r.many.coffees(),
+      coffeeOrigins: r.many.coffeeOrigins(),
     },
     regions: {
       user: r.one.user({ from: r.regions.userId, to: r.user.id }),
       country: r.one.countries({ from: r.regions.countryId, to: r.countries.id }),
       farms: r.many.farms(),
       greenCoffees: r.many.greenCoffees(),
-      coffees: r.many.coffees(),
+      coffeeOrigins: r.many.coffeeOrigins(),
     },
     farms: {
       user: r.one.user({ from: r.farms.userId, to: r.user.id }),
@@ -586,16 +602,31 @@ export const relations = defineRelations(
     coffees: {
       user: r.one.user({ from: r.coffees.userId, to: r.user.id }),
       roaster: r.one.roasters({ from: r.coffees.roasterId, to: r.roasters.id }),
-      country: r.one.countries({ from: r.coffees.countryId, to: r.countries.id }),
-      region: r.one.regions({ from: r.coffees.regionId, to: r.regions.id }),
       roastLevel: r.one.roastLevels({ from: r.coffees.roastLevelId, to: r.roastLevels.id }),
       process: r.one.coffeeProcesses({ from: r.coffees.processId, to: r.coffeeProcesses.id }),
+      origins: r.many.coffeeOrigins(),
       coffeesVarieties: r.many.coffeesVarieties(),
       espressoShots: r.many.espressoShots(),
       aeropressBrews: r.many.aeropressBrews(),
       pouroverBrews: r.many.pouroverBrews(),
       frenchpressBrews: r.many.frenchpressBrews(),
       coldBrewBrews: r.many.coldBrewBrews(),
+    },
+    coffeeOrigins: {
+      coffee: r.one.coffees({
+        from: r.coffeeOrigins.coffeeId,
+        to: r.coffees.id,
+        optional: false,
+      }),
+      country: r.one.countries({
+        from: r.coffeeOrigins.countryId,
+        to: r.countries.id,
+        optional: false,
+      }),
+      region: r.one.regions({
+        from: r.coffeeOrigins.regionId,
+        to: r.regions.id,
+      }),
     },
     coffeesVarieties: {
       coffee: r.one.coffees({ from: r.coffeesVarieties.coffeeId, to: r.coffees.id }),
