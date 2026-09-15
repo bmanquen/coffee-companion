@@ -39,11 +39,12 @@ export const CoffeeOriginEditor = withForm({
                 origins.filter((_, i) => i !== index),
               )
             }
-            CountryField={
+            renderCountry={(country) => (
               <form.AppField name={`origins[${index}].countryId`}>
                 {(countryField) => (
                   <countryField.SearchSelect
                     label="Country"
+                    disabled={country.disabled}
                     options={countries.options.filter(
                       (option) =>
                         option.value === origin.countryId ||
@@ -56,7 +57,7 @@ export const CoffeeOriginEditor = withForm({
                   />
                 )}
               </form.AppField>
-            }
+            )}
             renderRegion={(region) => (
               <form.AppField name={`origins[${index}].regionId`}>
                 {(regionField) => (
