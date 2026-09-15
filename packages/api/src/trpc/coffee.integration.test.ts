@@ -175,15 +175,18 @@ describe('coffee.create', () => {
       .insert(countries)
       .values({ name: uniq('Shared Land') })
       .returning()
+    let createdId: string | undefined
     try {
       const created = await createCoffee(uniq('Shared origin'), {
         origins: [{ countryId: shared.id }],
       })
+      createdId = created.id
       const found = await asA.coffee.getById(created.id)
       expect(found.origins).toEqual([
         expect.objectContaining({ countryId: shared.id, regionId: null }),
       ])
     } finally {
+      if (createdId) await asA.coffee.delete(createdId)
       await db.delete(countries).where(eq(countries.id, shared.id))
     }
   })
