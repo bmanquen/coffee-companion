@@ -47,7 +47,7 @@ export function SearchSelect({
   options: Array<SearchSelectOption>
   onAddItem?: (
     value: string,
-  ) => SearchSelectOption | Promise<SearchSelectOption>
+  ) => SearchSelectOption | null | Promise<SearchSelectOption | null>
   onValueChange?: (value: string) => void
   disabled?: boolean
 }) {
@@ -74,6 +74,8 @@ export function SearchSelect({
     const newOption = onAddItem
       ? await onAddItem(trimmed)
       : { value: trimmed.toLowerCase(), label: trimmed }
+
+    if (!newOption) return
 
     field.handleChange(newOption.value)
     onValueChange?.(newOption.value)

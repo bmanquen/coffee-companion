@@ -59,7 +59,12 @@ function Harness({
   onAddItem,
 }: {
   value?: string
-  onAddItem?: (value: string) => { value: string; label: string }
+  onAddItem?: (
+    value: string,
+  ) =>
+    | { value: string; label: string }
+    | null
+    | Promise<{ value: string; label: string } | null>
 }) {
   const form = useAppForm({ defaultValues: { roasterId: value ?? '' } })
   return (
@@ -113,6 +118,24 @@ describe('SearchSelect', () => {
       fireEvent.click(screen.getByRole('button', { name: /Add/ }))
     })
     expect(onAddItem).toHaveBeenCalledWith('Heart')
+  })
+
+  it('does not select when onAddItem returns null', async () => {
+    const onAddItem = vi.fn(async () => null)
+    render(<Harness onAddItem={onAddItem} />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Select Roaster'))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Heart' },
+      })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Add/ }))
+    })
+    expect(onAddItem).toHaveBeenCalledWith('Heart')
+    expect(screen.getByText('Select Roaster')).toBeTruthy()
   })
 
   it('marks a required select from the form schema', () => {
