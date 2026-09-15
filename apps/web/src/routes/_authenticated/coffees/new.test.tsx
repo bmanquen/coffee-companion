@@ -103,4 +103,47 @@ describe('NewCoffee', () => {
       fetchSpy.mockRestore()
     }
   })
+
+  it('submits a blend with origin countries', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => Promise.resolve(trpcSuccess([])))
+    try {
+      const { Wrapper } = seeded()
+      render(<NewCoffee />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByLabelText(/^Name/), {
+        target: { value: 'House Blend' },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Roaster' }), {
+        target: { value: ROASTER },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Roast Level' }), {
+        target: { value: ROAST_LEVEL },
+      })
+      expect(screen.getByRole('combobox', { name: 'Country' })).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Add country' }))
+      expect(screen.getAllByRole('combobox', { name: 'Country' })).toHaveLength(
+        2,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: (n) => n === 'Add' }))
+
+      await waitFor(() =>
+        expect(
+          fetchSpy.mock.calls.some(([url]) =>
+            String(url).includes('coffee.create'),
+          ),
+        ).toBe(true),
+      )
+      const [, init] = fetchSpy.mock.calls.find(([url]) =>
+        String(url).includes('coffee.create'),
+      )!
+      const body = String(init?.body ?? '')
+      expect(body).toContain('House Blend')
+      expect(body).not.toContain('isBlend')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })

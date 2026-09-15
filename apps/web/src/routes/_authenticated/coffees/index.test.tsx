@@ -47,8 +47,7 @@ function makeCoffeeRow(over: {
   name: string
   notes?: string | null
   roaster?: string | null
-  country?: string | null
-  region?: string | null
+  origins?: Array<{ country?: string | null; region?: string | null }>
   process?: string | null
   roastLevel?: string | null
   varieties?: Array<string>
@@ -61,10 +60,16 @@ function makeCoffeeRow(over: {
   } | null
 }): CoffeeGetAllRow {
   return {
-    ...makeCoffee({ id: over.id, name: over.name, notes: over.notes ?? null }),
+    ...makeCoffee({
+      id: over.id,
+      name: over.name,
+      notes: over.notes ?? null,
+    }),
     roaster: over.roaster ? { name: over.roaster } : null,
-    country: over.country ? { name: over.country } : null,
-    region: over.region ? { name: over.region } : null,
+    origins: (over.origins ?? []).map((origin) => ({
+      country: origin.country ? { name: origin.country } : null,
+      region: origin.region ? { name: origin.region } : null,
+    })),
     process: over.process ? { name: over.process } : null,
     roastLevel: over.roastLevel ? { name: over.roastLevel } : null,
     varieties: (over.varieties ?? []).map((name) => ({ name })),
@@ -98,8 +103,7 @@ describe('Coffees page', () => {
         id: 'cf1',
         name: 'Ethiopia Guji',
         roaster: 'Onyx',
-        country: 'Ethiopia',
-        region: 'Guji',
+        origins: [{ country: 'Ethiopia', region: 'Guji' }],
       }),
     ])
 
@@ -110,6 +114,28 @@ describe('Coffees page', () => {
     expect(table.getByText('Onyx')).toBeTruthy()
     expect(table.getByText('Ethiopia')).toBeTruthy()
     expect(table.getByText('Guji')).toBeTruthy()
+  })
+
+  it('shows each origin country and region for a blend coffee', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [
+      makeCoffeeRow({
+        id: 'cf1',
+        name: 'House Blend',
+        roaster: 'Onyx',
+        origins: [
+          { country: 'Ethiopia', region: 'Guji' },
+          { country: 'Colombia', region: 'Huila' },
+        ],
+      }),
+    ])
+
+    render(<Coffee />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('House Blend')).toBeTruthy()
+    expect(table.getByText('Ethiopia, Colombia')).toBeTruthy()
+    expect(table.getByText('Guji, Huila')).toBeTruthy()
   })
 
   it('expands a desktop row on click to reveal the coffee detail', () => {

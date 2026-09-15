@@ -5,6 +5,7 @@ import {
   aeropressMethods,
   brewingDeviceTypes,
   brewingDevices,
+  coffeeOrigins,
   coffeeProcesses,
   coffees,
   coffeesVarieties,
@@ -564,8 +565,6 @@ async function seed() {
         roasterId: roasterMap.get(roaster),
         roastLevelId: roastLevelMap.get(roastLevel),
         processId: processMap.get(coffeeProcess),
-        countryId: countryMap.get(country),
-        regionId: regionMap.get(region),
       })
       .onConflictDoNothing()
       .returning()
@@ -574,6 +573,15 @@ async function seed() {
     // be absent at runtime even though the type says otherwise.
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!insertedCoffee) continue
+
+    const countryId = countryMap.get(country)
+    if (countryId) {
+      await db.insert(coffeeOrigins).values({
+        coffeeId: insertedCoffee.id,
+        countryId,
+        regionId: regionMap.get(region) ?? null,
+      })
+    }
 
     await db.insert(espressoShots).values(
       shots.map((shot, index) => ({

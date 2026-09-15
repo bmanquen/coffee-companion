@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { brewingDeviceTypes } from '../db/schema'
+import { brewingDeviceTypes, countries } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import {
   UNKNOWN_UUID,
@@ -68,6 +68,7 @@ describe('coffee.getById', () => {
     const found = await asA.coffee.getById(created.id)
     expect(found.id).toBe(created.id)
     expect(found.userId).toBe(USER_A)
+    expect(found.origins).toEqual([])
   })
 
   it('throws NOT_FOUND for an unknown id', async () => {
@@ -80,6 +81,113 @@ describe('coffee.getById', () => {
 })
 
 describe('coffee.create', () => {
+  it('stores multiple origin countries on a blend, one region each', async () => {
+    const ethiopia = await asA.country.create({ name: uniq('Ethiopia') })
+    const colombia = await asA.country.create({ name: uniq('Colombia') })
+    const guji = await asA.region.create({
+      name: uniq('Guji'),
+      countryId: ethiopia.id,
+    })
+    const huila = await asA.region.create({
+      name: uniq('Huila'),
+      countryId: colombia.id,
+    })
+    const created = await createCoffee(uniq('House Blend'), {
+      origins: [
+        { countryId: ethiopia.id, regionId: guji.id },
+        { countryId: colombia.id, regionId: huila.id },
+      ],
+    })
+    const found = await asA.coffee.getById(created.id)
+    expect(found.origins).toHaveLength(2)
+    const byCountry = new Map(
+      found.origins.map((origin) => [origin.countryId, origin.regionId]),
+    )
+    expect(byCountry.get(ethiopia.id)).toBe(guji.id)
+    expect(byCountry.get(colombia.id)).toBe(huila.id)
+  })
+
+  it('stores a single origin country on a coffee that is not a blend', async () => {
+    const country = await asA.country.create({ name: uniq('Ethiopia') })
+    const created = await createCoffee(uniq('Ethiopia Guji'), {
+      origins: [{ countryId: country.id }],
+    })
+    const found = await asA.coffee.getById(created.id)
+    expect(found.origins).toEqual([
+      expect.objectContaining({ countryId: country.id, regionId: null }),
+    ])
+  })
+
+  it('rejects listing the same country twice', async () => {
+    const country = await asA.country.create({ name: uniq('Ethiopia') })
+    await expect(
+      createCoffee(uniq('Twice'), {
+        origins: [{ countryId: country.id }, { countryId: country.id }],
+      }),
+    ).rejects.toThrow(/country only once/i)
+  })
+
+  it('creates a coffee with no origin countries', async () => {
+    const created = await createCoffee(uniq('Ethiopia Guji'))
+    const found = await asA.coffee.getById(created.id)
+    expect(found.origins).toEqual([])
+  })
+
+  it('rejects another user’s private country', async () => {
+    const hidden = await asB.country.create({ name: uniq('Hidden Land') })
+    await expect(
+      createCoffee(uniq('Stolen origin'), {
+        origins: [{ countryId: hidden.id }],
+      }),
+    ).rejects.toThrow(/country not found/i)
+  })
+
+  it('rejects another user’s private region', async () => {
+    const country = await asA.country.create({ name: uniq('Ethiopia') })
+    const otherCountry = await asB.country.create({ name: uniq('Colombia') })
+    const hiddenRegion = await asB.region.create({
+      name: uniq('Secret'),
+      countryId: otherCountry.id,
+    })
+    await expect(
+      createCoffee(uniq('Stolen region'), {
+        origins: [{ countryId: country.id, regionId: hiddenRegion.id }],
+      }),
+    ).rejects.toThrow(/region not found/i)
+  })
+
+  it('rejects a region that belongs to a different country', async () => {
+    const ethiopia = await asA.country.create({ name: uniq('Ethiopia') })
+    const colombia = await asA.country.create({ name: uniq('Colombia') })
+    const huila = await asA.region.create({
+      name: uniq('Huila'),
+      countryId: colombia.id,
+    })
+    await expect(
+      createCoffee(uniq('Mismatched region'), {
+        origins: [{ countryId: ethiopia.id, regionId: huila.id }],
+      }),
+    ).rejects.toThrow(/belong to its origin country/i)
+  })
+
+  it('accepts a shared country', async () => {
+    const [shared] = await db
+      .insert(countries)
+      .values({ name: uniq('Shared Land') })
+      .returning()
+    try {
+      const created = await createCoffee(uniq('Shared origin'), {
+        origins: [{ countryId: shared.id }],
+      })
+      const found = await asA.coffee.getById(created.id)
+      expect(found.origins).toEqual([
+        expect.objectContaining({ countryId: shared.id, regionId: null }),
+      ])
+    } finally {
+      await db.delete(countries).where(eq(countries.id, shared.id))
+    }
+  })
+
   it('rejects a second coffee with the same roaster and name', async () => {
     const name = uniq('House Blend')
     const first = await createCoffee(name)
@@ -150,6 +258,45 @@ describe('coffee.update', () => {
     expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(
       new Date(updated.createdAt).getTime(),
     )
+  })
+
+  it('keeps stored origins when origins are omitted', async () => {
+    const ethiopia = await asA.country.create({ name: uniq('Ethiopia') })
+    const colombia = await asA.country.create({ name: uniq('Colombia') })
+    const created = await createCoffee(uniq('Stay Origins'), {
+      origins: [{ countryId: ethiopia.id }, { countryId: colombia.id }],
+    })
+
+    await asA.coffee.update({
+      id: created.id,
+      name: uniq('Renamed Origins'),
+      roasterId: created.roasterId!,
+      roastLevelId: created.roastLevelId!,
+    })
+    const found = await asA.coffee.getById(created.id)
+    expect(found.origins.map((origin) => origin.countryId).sort()).toEqual(
+      [ethiopia.id, colombia.id].sort(),
+    )
+  })
+
+  it('replaces origins when they are provided', async () => {
+    const ethiopia = await asA.country.create({ name: uniq('Ethiopia') })
+    const colombia = await asA.country.create({ name: uniq('Colombia') })
+    const created = await createCoffee(uniq('Swap Origins'), {
+      origins: [{ countryId: ethiopia.id }],
+    })
+
+    await asA.coffee.update({
+      id: created.id,
+      name: created.name,
+      roasterId: created.roasterId!,
+      roastLevelId: created.roastLevelId!,
+      origins: [{ countryId: colombia.id }],
+    })
+    const found = await asA.coffee.getById(created.id)
+    expect(found.origins).toEqual([
+      expect.objectContaining({ countryId: colombia.id, regionId: null }),
+    ])
   })
 
   it('rejects renaming onto another coffee of the same roaster', async () => {

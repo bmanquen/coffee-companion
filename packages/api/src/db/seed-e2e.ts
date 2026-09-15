@@ -12,6 +12,7 @@ import {
   brewingDeviceTypes,
   brewingDevices,
   coffees,
+  countries,
   espressoShots,
   grinders,
   planGrants,
@@ -122,6 +123,10 @@ async function seedGrantedUser() {
 
   await db.insert(roasters).values({ userId: E2E_USER_WITH_DATA, name: 'Sey' })
   await roastLevelId('Medium')
+  await db
+    .insert(countries)
+    .values([{ name: 'Ethiopia' }, { name: 'Colombia' }])
+    .onConflictDoNothing()
 
   // Brewed now, against a library brewed days ago, so this stays the most
   // recent Shot. The other `.data` specs read it as the log's first row, so

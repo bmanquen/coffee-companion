@@ -147,8 +147,6 @@ describe('SearchSelect', () => {
         name: 'Ethiopia',
         roasterId: '',
         roastLevelId: '',
-        countryId: null,
-        regionId: null,
         processId: null,
         notes: null,
         isActive: false,
@@ -158,10 +156,8 @@ describe('SearchSelect', () => {
         validators: { onChange: insertCoffeeSchema },
       })
       return (
-        <form.AppField name="countryId">
-          {(field) => (
-            <field.SearchSelect label="Country" options={options} />
-          )}
+        <form.AppField name="processId">
+          {(field) => <field.SearchSelect label="Process" options={options} />}
         </form.AppField>
       )
     }
@@ -169,7 +165,7 @@ describe('SearchSelect', () => {
     render(<OptionalHarness />)
     expect(
       screen
-        .getByRole('button', { name: 'Country' })
+        .getByRole('button', { name: 'Process' })
         .getAttribute('aria-required'),
     ).toBeNull()
     expect(screen.queryByText('*')).toBeNull()
