@@ -44,7 +44,7 @@ type CoffeeSeed = {
   createdAt: string
 }
 
-async function migrateLegacyCoffees(seeds: CoffeeSeed[]) {
+async function migrateLegacyCoffees(seeds: Array<CoffeeSeed>) {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
