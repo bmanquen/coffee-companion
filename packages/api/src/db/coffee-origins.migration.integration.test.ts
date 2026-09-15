@@ -14,7 +14,7 @@ const MIGRATION_SQL = readFileSync(
 
 const backfillOrigins = MIGRATION_SQL.split('--> statement-breakpoint')
   .map((statement) => statement.trim())
-  .find((statement) => statement.startsWith('INSERT INTO "coffee_origins"'))
+  .find((statement) => statement.includes('INSERT INTO "coffee_origins"'))
 
 if (!backfillOrigins) {
   throw new Error('expected the origins migration to backfill coffee_origins')
