@@ -122,8 +122,6 @@ describe('TextField', () => {
         name: 'Ethiopia',
         roasterId: '',
         roastLevelId: '',
-        countryId: null,
-        regionId: null,
         processId: null,
         notes: null,
         isActive: false,
