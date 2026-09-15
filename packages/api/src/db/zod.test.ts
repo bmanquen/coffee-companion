@@ -102,6 +102,20 @@ describe('insertCoffeeSchema', () => {
       }).success,
     ).toBe(false)
   })
+
+  it('accepts multiple origin countries', () => {
+    expect(
+      insertCoffeeSchema.safeParse({
+        name: 'House Blend',
+        roasterId: uuid,
+        roastLevelId: uuid,
+        origins: [
+          { countryId: uuid, regionId: uuid },
+          { countryId: '00000000-0000-4000-8000-000000000001' },
+        ],
+      }).success,
+    ).toBe(true)
+  })
 })
 
 describe('insertPouroverBrewSchema', () => {

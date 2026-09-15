@@ -59,7 +59,12 @@ function Harness({
   onAddItem,
 }: {
   value?: string
-  onAddItem?: (value: string) => { value: string; label: string }
+  onAddItem?: (
+    value: string,
+  ) =>
+    | { value: string; label: string }
+    | null
+    | Promise<{ value: string; label: string } | null>
 }) {
   const form = useAppForm({ defaultValues: { roasterId: value ?? '' } })
   return (
@@ -115,6 +120,24 @@ describe('SearchSelect', () => {
     expect(onAddItem).toHaveBeenCalledWith('Heart')
   })
 
+  it('does not select when onAddItem returns null', async () => {
+    const onAddItem = vi.fn(async () => null)
+    render(<Harness onAddItem={onAddItem} />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Select Roaster'))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Heart' },
+      })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Add/ }))
+    })
+    expect(onAddItem).toHaveBeenCalledWith('Heart')
+    expect(screen.getByText('Select Roaster')).toBeTruthy()
+  })
+
   it('marks a required select from the form schema', () => {
     function SchemaHarness() {
       const form = useAppForm({
@@ -147,8 +170,6 @@ describe('SearchSelect', () => {
         name: 'Ethiopia',
         roasterId: '',
         roastLevelId: '',
-        countryId: null,
-        regionId: null,
         processId: null,
         notes: null,
         isActive: false,
@@ -158,10 +179,8 @@ describe('SearchSelect', () => {
         validators: { onChange: insertCoffeeSchema },
       })
       return (
-        <form.AppField name="countryId">
-          {(field) => (
-            <field.SearchSelect label="Country" options={options} />
-          )}
+        <form.AppField name="processId">
+          {(field) => <field.SearchSelect label="Process" options={options} />}
         </form.AppField>
       )
     }
@@ -169,7 +188,7 @@ describe('SearchSelect', () => {
     render(<OptionalHarness />)
     expect(
       screen
-        .getByRole('button', { name: 'Country' })
+        .getByRole('button', { name: 'Process' })
         .getAttribute('aria-required'),
     ).toBeNull()
     expect(screen.queryByText('*')).toBeNull()
