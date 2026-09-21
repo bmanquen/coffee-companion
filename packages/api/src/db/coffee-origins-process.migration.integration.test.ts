@@ -19,13 +19,16 @@ const statements = MIGRATION_SQL.split('--> statement-breakpoint').map(
 const backfillProcess = statements.find((statement) =>
   statement.includes('SET "process_id" = c."process_id"'),
 )
+const refuseUnrecoverableProcess = statements.find((statement) =>
+  statement.includes('refuse_unrecoverable_process'),
+)
 const dropBagProcess = statements.find((statement) =>
   statement.includes('DROP COLUMN "process_id"'),
 )
 
-if (!backfillProcess || !dropBagProcess) {
+if (!backfillProcess || !refuseUnrecoverableProcess || !dropBagProcess) {
   throw new Error(
-    'expected the process-per-origin migration to backfill coffee_origins and drop coffees.process_id',
+    'expected the process-per-origin migration to backfill coffee_origins, refuse unrecoverable process, and drop coffees.process_id',
   )
 }
 
@@ -90,6 +93,7 @@ describe('coffee origins process backfill', () => {
       )
 
       await client.query(backfillProcess)
+      await client.query(refuseUnrecoverableProcess)
 
       const { rows } = await client.query<{
         coffee_id: string
@@ -121,7 +125,7 @@ describe('coffee origins process backfill', () => {
     })
   })
 
-  it('drops a bag-level process that has no origin row to land on', async () => {
+  it('refuses a bag-level process that has no origin row to land on', async () => {
     await withProcessTables(async (client) => {
       await client.query(
         `INSERT INTO coffees (id, process_id) VALUES ($1, $2)`,
@@ -129,20 +133,8 @@ describe('coffee origins process backfill', () => {
       )
 
       await client.query(backfillProcess)
-      await client.query('ALTER TABLE coffees DROP COLUMN process_id')
-
-      const { rows } = await client.query<{ coffee_id: string }>(
-        'SELECT coffee_id FROM coffee_origins',
-      )
-      expect(rows).toEqual([])
-
-      const columns = await client.query<{ column_name: string }>(
-        `SELECT column_name
-         FROM information_schema.columns
-         WHERE table_name = 'coffees' AND table_schema LIKE 'pg_temp%'`,
-      )
-      expect(columns.rows.map((row) => row.column_name)).not.toContain(
-        'process_id',
+      await expect(client.query(refuseUnrecoverableProcess)).rejects.toThrow(
+        /process and no origin/i,
       )
     })
   })
