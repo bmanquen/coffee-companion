@@ -180,7 +180,11 @@ export const coffeeOrigins = pgTable(
       .references(() => countries.id)
       .notNull(),
     regionId: uuid('region_id').references(() => regions.id),
-    processId: uuid('process_id').references(() => coffeeProcesses.id),
+    // SET NULL so a user delete can drop their process lookups without
+    // racing coffee_origins rows that still point at them.
+    processId: uuid('process_id').references(() => coffeeProcesses.id, {
+      onDelete: 'set null',
+    }),
     ...timestamps,
   },
   (table) => [

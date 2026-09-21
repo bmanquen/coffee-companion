@@ -7,4 +7,4 @@ FROM "coffees" AS c
 WHERE o."coffee_id" = c."id"
 	AND c."process_id" IS NOT NULL;--> statement-breakpoint
 ALTER TABLE "coffees" DROP COLUMN "process_id";--> statement-breakpoint
-ALTER TABLE "coffee_origins" ADD CONSTRAINT "coffee_origins_process_id_coffee_processes_id_fkey" FOREIGN KEY ("process_id") REFERENCES "coffee_processes"("id");
+ALTER TABLE "coffee_origins" ADD CONSTRAINT "coffee_origins_process_id_coffee_processes_id_fkey" FOREIGN KEY ("process_id") REFERENCES "coffee_processes"("id") ON DELETE SET NULL;
