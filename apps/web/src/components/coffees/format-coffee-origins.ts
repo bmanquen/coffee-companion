@@ -6,5 +6,7 @@ export function formatOriginNames(
   key: 'country' | 'region',
 ) {
   if (origins.length === 0) return '-'
-  return origins.map((origin) => origin[key]?.name || '-').join(', ')
+  const names = origins.map((origin) => origin[key]?.name || '-')
+  if (names.every((name) => name === '-')) return '-'
+  return names.join(', ')
 }

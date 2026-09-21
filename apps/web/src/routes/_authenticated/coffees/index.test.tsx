@@ -138,6 +138,24 @@ describe('Coffees page', () => {
     expect(table.getByText('Guji, Huila')).toBeTruthy()
   })
 
+  it('shows a single dash when a blend has countries but no regions', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [
+      makeCoffeeRow({
+        id: 'cf1',
+        name: 'House Blend',
+        roaster: 'Onyx',
+        origins: [{ country: 'Ethiopia' }, { country: 'Colombia' }],
+      }),
+    ])
+
+    render(<Coffee />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('Ethiopia, Colombia')).toBeTruthy()
+    expect(table.queryByText('-, -')).toBeNull()
+  })
+
   it('expands a desktop row on click to reveal the coffee detail', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [

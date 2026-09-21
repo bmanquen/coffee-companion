@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
 import { E2E_USER_FREE, E2E_USER_WITH_DATA } from '../lib/e2e-auth'
 import {
@@ -11,11 +11,13 @@ import {
   aeropressMethods,
   brewingDeviceTypes,
   brewingDevices,
+  coffeeOrigins,
   coffees,
   countries,
   espressoShots,
   grinders,
   planGrants,
+  regions,
   roastLevels,
   roasters,
   user,
@@ -55,6 +57,41 @@ async function deviceTypeId(name: string) {
   return created.id
 }
 
+async function countryIdNamed(name: string) {
+  const existing = await db
+    .select()
+    .from(countries)
+    .where(eq(countries.name, name))
+  if (existing[0]) return existing[0].id
+
+  const [created] = await db.insert(countries).values({ name }).returning()
+  return created.id
+}
+
+async function regionIdNamed(name: string, countryId: string) {
+  const existing = await db
+    .select()
+    .from(regions)
+    .where(and(eq(regions.name, name), eq(regions.countryId, countryId)))
+  if (existing[0]) return existing[0].id
+
+  const [created] = await db
+    .insert(regions)
+    .values({ name, countryId })
+    .returning()
+  return created.id
+}
+
+async function attachOrigin(
+  coffeeId: string,
+  country: string,
+  region: string,
+) {
+  const countryId = await countryIdNamed(country)
+  const regionId = await regionIdNamed(region, countryId)
+  await db.insert(coffeeOrigins).values({ coffeeId, countryId, regionId })
+}
+
 // Every Coffee in E2E_LIBRARY with one Espresso Shot, brewed a day apart in the
 // order listed, so the Shelf's five are the first five listed rather than
 // whatever order the inserts happen to land in.
@@ -68,6 +105,8 @@ async function seedLibrary(
       .insert(coffees)
       .values({ userId, name: entry.name })
       .returning()
+
+    await attachOrigin(coffee.id, entry.country, entry.region)
 
     await db.insert(espressoShots).values({
       userId,
@@ -135,6 +174,8 @@ async function seedGrantedUser() {
     .insert(coffees)
     .values({ userId: E2E_USER_WITH_DATA, name: 'Ethiopia Guji' })
     .returning()
+
+  await attachOrigin(coffee.id, 'Ethiopia', 'Guji')
 
   await db.insert(espressoShots).values({
     userId: E2E_USER_WITH_DATA,
