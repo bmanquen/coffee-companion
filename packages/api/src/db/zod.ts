@@ -90,6 +90,7 @@ export type GreenCoffee = z.infer<typeof selectGreenCoffeeSchema>
 export const coffeeOriginInputSchema = z.object({
   countryId: z.uuid(),
   regionId: z.uuid().nullable().optional(),
+  processId: z.uuid().nullable().optional(),
 })
 export const insertCoffeeSchema = createInsertSchema(coffees, {
   name: (schema) => schema.min(1),

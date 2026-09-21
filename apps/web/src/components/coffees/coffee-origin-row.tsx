@@ -11,11 +11,13 @@ export function CoffeeOriginRow({
   onRemove,
   renderCountry,
   renderRegion,
+  renderProcess,
 }: {
   countryId: string
   canRemove: boolean
   onRemove: () => void
   renderCountry: (country: { disabled: boolean }) => ReactNode
+  renderProcess: (process: { disabled: boolean }) => ReactNode
   renderRegion: (region: {
     options: Array<{ value: string; label: string }>
     onAddItem?: (
@@ -65,6 +67,7 @@ export function CoffeeOriginRow({
           : undefined,
         disabled: !countryId || pending,
       })}
+      {renderProcess({ disabled: pending })}
       {canRemove ? (
         <Button
           type="button"

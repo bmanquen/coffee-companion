@@ -47,8 +47,11 @@ function makeCoffeeRow(over: {
   name: string
   notes?: string | null
   roaster?: string | null
-  origins?: Array<{ country?: string | null; region?: string | null }>
-  process?: string | null
+  origins?: Array<{
+    country?: string | null
+    region?: string | null
+    process?: string | null
+  }>
   roastLevel?: string | null
   varieties?: Array<string>
   dialedInShot?: {
@@ -69,8 +72,8 @@ function makeCoffeeRow(over: {
     origins: (over.origins ?? []).map((origin) => ({
       country: origin.country ? { name: origin.country } : null,
       region: origin.region ? { name: origin.region } : null,
+      process: origin.process ? { name: origin.process } : null,
     })),
-    process: over.process ? { name: over.process } : null,
     roastLevel: over.roastLevel ? { name: over.roastLevel } : null,
     varieties: (over.varieties ?? []).map((name) => ({ name })),
     dialedInShot: over.dialedInShot ?? null,
@@ -138,6 +141,30 @@ describe('Coffees page', () => {
     expect(table.getByText('Guji, Huila')).toBeTruthy()
   })
 
+  it('shows each origin process for a blend coffee', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [
+      makeCoffeeRow({
+        id: 'cf1',
+        name: 'House Blend',
+        roaster: 'Onyx',
+        origins: [
+          { country: 'Brazil', process: 'Natural' },
+          { country: 'Guatemala', process: 'Washed' },
+        ],
+      }),
+    ])
+
+    render(<Coffee />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('Brazil, Guatemala')).toBeTruthy()
+    fireEvent.click(table.getByText('House Blend').closest('tr')!)
+    expect(
+      within(detailRegionFor('House Blend')).getByText('Natural, Washed'),
+    ).toBeTruthy()
+  })
+
   it('shows a single dash when a blend has countries but no regions', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [
@@ -162,7 +189,7 @@ describe('Coffees page', () => {
       makeCoffeeRow({
         id: 'cf1',
         name: 'Ethiopia Guji',
-        process: 'Washed',
+        origins: [{ process: 'Washed' }],
         roastLevel: 'Light',
         varieties: ['Heirloom'],
         notes: 'jammy and bright',

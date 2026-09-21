@@ -12,6 +12,7 @@ import {
   brewingDeviceTypes,
   brewingDevices,
   coffeeOrigins,
+  coffeeProcesses,
   coffees,
   countries,
   espressoShots,
@@ -82,14 +83,34 @@ async function regionIdNamed(name: string, countryId: string) {
   return created.id
 }
 
+async function processIdNamed(name: string) {
+  const existing = await db
+    .select()
+    .from(coffeeProcesses)
+    .where(eq(coffeeProcesses.name, name))
+  if (existing[0]) return existing[0].id
+
+  const [created] = await db
+    .insert(coffeeProcesses)
+    .values({ name })
+    .returning()
+  return created.id
+}
+
 async function attachOrigin(
   coffeeId: string,
   country: string,
   region: string,
+  process?: string,
 ) {
   const countryId = await countryIdNamed(country)
   const regionId = await regionIdNamed(region, countryId)
-  await db.insert(coffeeOrigins).values({ coffeeId, countryId, regionId })
+  await db.insert(coffeeOrigins).values({
+    coffeeId,
+    countryId,
+    regionId,
+    processId: process ? await processIdNamed(process) : null,
+  })
 }
 
 // Every Coffee in E2E_LIBRARY with one Espresso Shot, brewed a day apart in the
@@ -106,7 +127,7 @@ async function seedLibrary(
       .values({ userId, name: entry.name })
       .returning()
 
-    await attachOrigin(coffee.id, entry.country, entry.region)
+    await attachOrigin(coffee.id, entry.country, entry.region, entry.process)
 
     await db.insert(espressoShots).values({
       userId,
@@ -175,7 +196,7 @@ async function seedGrantedUser() {
     .values({ userId: E2E_USER_WITH_DATA, name: 'Ethiopia Guji' })
     .returning()
 
-  await attachOrigin(coffee.id, 'Ethiopia', 'Guji')
+  await attachOrigin(coffee.id, 'Ethiopia', 'Guji', 'Washed')
 
   await db.insert(espressoShots).values({
     userId: E2E_USER_WITH_DATA,

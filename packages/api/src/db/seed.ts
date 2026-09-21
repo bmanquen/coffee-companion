@@ -564,7 +564,6 @@ async function seed() {
         userId: SEED_USER_ID,
         roasterId: roasterMap.get(roaster),
         roastLevelId: roastLevelMap.get(roastLevel),
-        processId: processMap.get(coffeeProcess),
       })
       .onConflictDoNothing()
       .returning()
@@ -580,6 +579,7 @@ async function seed() {
         coffeeId: insertedCoffee.id,
         countryId,
         regionId: regionMap.get(region) ?? null,
+        processId: processMap.get(coffeeProcess) ?? null,
       })
     }
 

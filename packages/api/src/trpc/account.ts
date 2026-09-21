@@ -54,10 +54,9 @@ export const accountRouter = createTRPCRouter({
         where: { userId },
         orderBy: { updatedAt: 'desc' },
         with: {
-          process: true,
           roaster: true,
           roastLevel: true,
-          origins: { with: { country: true, region: true } },
+          origins: { with: { country: true, region: true, process: true } },
           coffeesVarieties: { with: { variety: true } },
         },
       }),

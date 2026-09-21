@@ -116,6 +116,32 @@ describe('insertCoffeeSchema', () => {
       }).success,
     ).toBe(true)
   })
+
+  it('accepts a process on each origin and ignores a bag-level process', () => {
+    const parsed = insertCoffeeSchema.safeParse({
+      name: 'House Blend',
+      roasterId: uuid,
+      roastLevelId: uuid,
+      processId: uuid,
+      origins: [
+        { countryId: uuid, processId: uuid },
+        {
+          countryId: '00000000-0000-4000-8000-000000000001',
+          processId: '00000000-0000-4000-8000-000000000002',
+        },
+      ],
+    })
+    expect(parsed.success).toBe(true)
+    if (!parsed.success) return
+    expect(parsed.data).not.toHaveProperty('processId')
+    expect(parsed.data.origins).toEqual([
+      expect.objectContaining({ countryId: uuid, processId: uuid }),
+      expect.objectContaining({
+        countryId: '00000000-0000-4000-8000-000000000001',
+        processId: '00000000-0000-4000-8000-000000000002',
+      }),
+    ])
+  })
 })
 
 describe('insertPouroverBrewSchema', () => {

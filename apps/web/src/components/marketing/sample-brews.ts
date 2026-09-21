@@ -46,7 +46,6 @@ const coffee = {
   name: 'Ethiopia Guji',
   roasterId: null,
   roastLevelId: null,
-  processId: null,
   notes: null,
   isActive: true,
   createdAt,

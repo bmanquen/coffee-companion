@@ -41,4 +41,22 @@ describe('formatOriginNames', () => {
       ),
     ).toBe('-')
   })
+
+  it('joins process names in origin order and collapses all-empty to a dash', () => {
+    expect(
+      formatOriginNames(
+        [
+          { process: { name: 'Natural' } },
+          { process: { name: 'Washed' } },
+        ],
+        'process',
+      ),
+    ).toBe('Natural, Washed')
+    expect(
+      formatOriginNames(
+        [{ process: null }, { process: null }],
+        'process',
+      ),
+    ).toBe('-')
+  })
 })

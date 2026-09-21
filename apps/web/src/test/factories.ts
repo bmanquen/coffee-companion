@@ -78,7 +78,6 @@ export function makeRecentCoffee(
     name: 'Ethiopia Guji',
     roasterId: null,
     roastLevelId: null,
-    processId: null,
     notes: null,
     isActive: false,
     createdAt,
@@ -317,7 +316,6 @@ export function makeCoffee(overrides: Partial<CoffeeOption> = {}): CoffeeOption 
   return {
     ...makeRecentCoffee(),
     origins: [],
-    process: null,
     roaster: null,
     roastLevel: null,
     varieties: [],

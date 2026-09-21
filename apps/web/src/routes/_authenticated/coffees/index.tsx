@@ -62,8 +62,8 @@ type CoffeeRow = {
   origins: Array<{
     country: { name: string } | null
     region: { name: string } | null
+    process: { name: string } | null
   }>
-  process: { name: string } | null
   varieties: Array<{ name: string }>
   dialedInShot: {
     sealed: boolean
@@ -251,7 +251,7 @@ export function Coffee() {
           table={table}
           renderSubComponent={(row) => (
             <CoffeeDetails
-              process={row.original.process?.name ?? null}
+              process={formatOriginNames(row.original.origins, 'process')}
               roastLevel={row.original.roastLevel?.name ?? null}
               varieties={row.original.varieties.map((v) => v.name)}
               dialedInEspresso={formatDialedInShot(row.original.dialedInShot)}
