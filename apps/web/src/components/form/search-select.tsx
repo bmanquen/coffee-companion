@@ -39,6 +39,7 @@ export function SearchSelect({
   onAddItem,
   onValueChange,
   disabled = false,
+  triggerClassName,
 }: {
   label: string
   showLabel?: boolean
@@ -50,6 +51,7 @@ export function SearchSelect({
   ) => SearchSelectOption | null | Promise<SearchSelectOption | null>
   onValueChange?: (value: string) => void
   disabled?: boolean
+  triggerClassName?: string
 }) {
   const field = useFieldContext<string>()
   const required = useFieldRequired()
@@ -115,6 +117,7 @@ export function SearchSelect({
                 'flex h-9 w-full items-center justify-between rounded-md border bg-transparent px-3 py-2 text-sm',
                 disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
                 selectedOption ? 'text-foreground' : 'text-muted-foreground/40',
+                triggerClassName,
               )}
               disabled={disabled}
               aria-required={required || undefined}

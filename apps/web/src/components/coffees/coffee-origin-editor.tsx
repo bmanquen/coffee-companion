@@ -47,6 +47,7 @@ export const CoffeeOriginEditor = withForm({
                   <countryField.SearchSelect
                     label="Country"
                     disabled={country.disabled}
+                    triggerClassName="bg-card"
                     options={countries.options.filter(
                       (option) =>
                         option.value === origin.countryId ||
@@ -66,6 +67,7 @@ export const CoffeeOriginEditor = withForm({
                   <regionField.SearchSelect
                     label="Region"
                     disabled={region.disabled}
+                    triggerClassName="bg-card"
                     options={region.options}
                     onAddItem={region.onAddItem}
                   />
@@ -78,6 +80,7 @@ export const CoffeeOriginEditor = withForm({
                   <processField.SearchSelect
                     label="Process"
                     disabled={process.disabled}
+                    triggerClassName="bg-card"
                     options={processes.options}
                     onAddItem={processes.onAddItem}
                   />
