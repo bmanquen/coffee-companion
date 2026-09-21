@@ -4714,7 +4714,7 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
+      "onDelete": "SET NULL",
       "name": "coffee_origins_process_id_coffee_processes_id_fkey",
       "entityType": "fks",
       "schema": "public",

@@ -104,12 +104,12 @@ describe('coffee origins process backfill', () => {
       expect(rows).toEqual([
         {
           coffee_id: COFFEE_WASHED,
-          country_id: COUNTRY_COLOMBIA,
+          country_id: COUNTRY_ETHIOPIA,
           process_id: PROCESS_WASHED,
         },
         {
           coffee_id: COFFEE_WASHED,
-          country_id: COUNTRY_ETHIOPIA,
+          country_id: COUNTRY_COLOMBIA,
           process_id: PROCESS_WASHED,
         },
         {
