@@ -49,14 +49,14 @@ test('create a blend coffee via the new-coffee form', async ({ page }) => {
     page.getByText('Select Country').first(),
     page.getByText('Ethiopia', { exact: true }),
   )
+  await pickOption(
+    page.getByText('Select Process'),
+    page.getByText('Washed', { exact: true }),
+  )
   await page.getByRole('button', { name: 'Add country' }).click()
   await pickOption(
     page.getByText('Select Country'),
     page.getByText('Colombia', { exact: true }),
-  )
-  await pickOption(
-    page.getByText('Select Process').first(),
-    page.getByText('Washed', { exact: true }),
   )
   await pickOption(
     page.getByText('Select Process'),
