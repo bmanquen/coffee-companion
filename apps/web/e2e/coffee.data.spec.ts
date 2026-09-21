@@ -45,21 +45,24 @@ test('create a blend coffee via the new-coffee form', async ({ page }) => {
 
   await pickLookups(page)
   await page.getByPlaceholder('Name').fill(name)
+  const origin1 = page.getByRole('group', { name: 'Origin 1' })
   await pickOption(
-    page.getByText('Select Country').first(),
+    origin1.getByText('Select Country'),
     page.getByText('Ethiopia', { exact: true }),
   )
   await pickOption(
-    page.getByText('Select Process'),
+    origin1.getByText('Select Process'),
     page.getByText('Washed', { exact: true }),
   )
   await page.getByRole('button', { name: 'Add origin' }).click()
+  const origin2 = page.getByRole('group', { name: 'Origin 2' })
+  await origin2.scrollIntoViewIfNeeded()
   await pickOption(
-    page.getByText('Select Country'),
+    origin2.getByText('Select Country'),
     page.getByText('Colombia', { exact: true }),
   )
   await pickOption(
-    page.getByText('Select Process'),
+    origin2.getByText('Select Process'),
     page.getByText('Natural', { exact: true }),
   )
 
