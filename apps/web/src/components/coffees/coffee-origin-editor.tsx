@@ -15,8 +15,9 @@ export const CoffeeOriginEditor = withForm({
   } as CoffeeFormValues,
   props: {
     countries: {} as ReturnType<typeof useSearchSelectResource>,
+    processes: {} as ReturnType<typeof useSearchSelectResource>,
   },
-  render: function Render({ form, countries }) {
+  render: function Render({ form, countries, processes }) {
     const origins = useStore(form.store, (s) => s.values.origins)
     const usedCountryIds = new Set(
       origins.map((origin) => origin.countryId).filter(Boolean),
@@ -66,6 +67,18 @@ export const CoffeeOriginEditor = withForm({
                     disabled={region.disabled}
                     options={region.options}
                     onAddItem={region.onAddItem}
+                  />
+                )}
+              </form.AppField>
+            )}
+            renderProcess={(process) => (
+              <form.AppField name={`origins[${index}].processId`}>
+                {(processField) => (
+                  <processField.SearchSelect
+                    label="Process"
+                    disabled={process.disabled}
+                    options={processes.options}
+                    onAddItem={processes.onAddItem}
                   />
                 )}
               </form.AppField>

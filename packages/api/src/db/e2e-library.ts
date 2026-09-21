@@ -7,37 +7,54 @@
 // relative to the Shelf without importing the seed.
 
 export const E2E_LIBRARY = [
-  { name: 'Kenya Nyeri', grindSetting: '21', country: 'Kenya', region: 'Nyeri' },
+  {
+    name: 'Kenya Nyeri',
+    grindSetting: '21',
+    country: 'Kenya',
+    region: 'Nyeri',
+    process: 'Washed',
+  },
   {
     name: 'Guatemala Huehuetenango',
     grindSetting: '22',
     country: 'Guatemala',
     region: 'Huehuetenango',
+    process: 'Washed',
   },
-  { name: 'Rwanda Kivu', grindSetting: '23', country: 'Rwanda', region: 'Kivu' },
+  {
+    name: 'Rwanda Kivu',
+    grindSetting: '23',
+    country: 'Rwanda',
+    region: 'Kivu',
+    process: 'Washed',
+  },
   {
     name: 'Peru Cajamarca',
     grindSetting: '24',
     country: 'Peru',
     region: 'Cajamarca',
+    process: 'Washed',
   },
   {
     name: 'Burundi Kayanza',
     grindSetting: '25',
     country: 'Burundi',
     region: 'Kayanza',
+    process: 'Washed',
   },
   {
     name: 'Sumatra Lintong',
     grindSetting: '26',
     country: 'Indonesia',
     region: 'Lintong',
+    process: 'Wet-Hulled',
   },
   {
     name: 'Brazil Cerrado',
     grindSetting: '27',
     country: 'Brazil',
     region: 'Cerrado',
+    process: 'Natural',
   },
 ]
 

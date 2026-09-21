@@ -126,7 +126,6 @@ export const coffees = pgTable(
     name: text().notNull(),
     roasterId: uuid('roaster_id').references(() => roasters.id),
     roastLevelId: uuid('roast_level_id').references(() => roastLevels.id),
-    processId: uuid('process_id').references(() => coffeeProcesses.id),
     notes: text(),
     isActive: boolean('is_active'),
     ...timestamps,
@@ -134,7 +133,6 @@ export const coffees = pgTable(
   (table) => [
     index('coffees_user_idx').on(table.userId),
     index('coffees_user_name_idx').on(table.name, table.userId),
-    index('coffees_user_process_id_idx').on(table.processId, table.userId),
     uniqueIndex('coffees_user_roaster_name_idx').on(
       table.userId,
       table.roasterId,
@@ -182,6 +180,7 @@ export const coffeeOrigins = pgTable(
       .references(() => countries.id)
       .notNull(),
     regionId: uuid('region_id').references(() => regions.id),
+    processId: uuid('process_id').references(() => coffeeProcesses.id),
     ...timestamps,
   },
   (table) => [
@@ -583,7 +582,7 @@ export const relations = defineRelations(
     coffeeProcesses: {
       user: r.one.user({ from: r.coffeeProcesses.userId, to: r.user.id }),
       greenCoffees: r.many.greenCoffees(),
-      coffees: r.many.coffees(),
+      coffeeOrigins: r.many.coffeeOrigins(),
     },
     varieties: {
       user: r.one.user({ from: r.varieties.userId, to: r.user.id }),
@@ -602,7 +601,6 @@ export const relations = defineRelations(
       user: r.one.user({ from: r.coffees.userId, to: r.user.id }),
       roaster: r.one.roasters({ from: r.coffees.roasterId, to: r.roasters.id }),
       roastLevel: r.one.roastLevels({ from: r.coffees.roastLevelId, to: r.roastLevels.id }),
-      process: r.one.coffeeProcesses({ from: r.coffees.processId, to: r.coffeeProcesses.id }),
       origins: r.many.coffeeOrigins(),
       coffeesVarieties: r.many.coffeesVarieties(),
       espressoShots: r.many.espressoShots(),
@@ -625,6 +623,10 @@ export const relations = defineRelations(
       region: r.one.regions({
         from: r.coffeeOrigins.regionId,
         to: r.regions.id,
+      }),
+      process: r.one.coffeeProcesses({
+        from: r.coffeeOrigins.processId,
+        to: r.coffeeProcesses.id,
       }),
     },
     coffeesVarieties: {

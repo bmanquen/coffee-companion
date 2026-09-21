@@ -1,10 +1,7 @@
-import {
-  insertCoffeeSchema,
-  insertEspressoShotSchema,
-} from '@coffee-companion/api/db/zod'
+import { insertEspressoShotSchema } from '@coffee-companion/api/db/zod'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { InsertCoffee } from '@coffee-companion/api/db/zod'
+import { z } from 'zod'
 import type { ReactNode } from 'react'
 import { useAppForm } from '@/hooks/form'
 
@@ -166,17 +163,10 @@ describe('SearchSelect', () => {
 
   it('leaves an optional select unmarked', () => {
     function OptionalHarness() {
-      const defaultCoffee = {
-        name: 'Ethiopia',
-        roasterId: '',
-        roastLevelId: '',
-        processId: null,
-        notes: null,
-        isActive: false,
-      } as InsertCoffee
+      const schema = z.object({ processId: z.string().nullable() })
       const form = useAppForm({
-        defaultValues: defaultCoffee,
-        validators: { onChange: insertCoffeeSchema },
+        defaultValues: { processId: null as string | null },
+        validators: { onChange: schema },
       })
       return (
         <form.AppField name="processId">

@@ -17,9 +17,18 @@ A roaster's product — a named offering, not a single bag. Buying the same offe
 twice is the same Coffee, so a Coffee is unique per user by roaster and name.
 A Coffee may be a single origin or a blend; that is a property of the offering,
 not a second kind of Coffee, and a blend still occupies that same uniqueness.
-Zero or one origin country is a single origin; more than one is a blend, each
-country with at most one region.
+Zero or one Origin is a single origin; more than one is a blend.
 _Avoid_: Bean, bag, lot
+
+**Origin**:
+A country on a Coffee, optionally with a region and a Process. A Coffee lists
+a country at most once.
+_Avoid_: Lot, bag, bean
+
+**Process**:
+How an Origin of a Coffee was processed after harvest (Washed, Natural, Honey).
+Optional; each Origin on a Coffee can have its own.
+_Avoid_: Method
 
 **Brewing Method**:
 A distinct way of brewing coffee (Espresso, Pour Over, French Press, AeroPress, Cold

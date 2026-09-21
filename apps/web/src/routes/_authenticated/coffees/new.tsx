@@ -90,7 +90,6 @@ function NewCoffeeComponent() {
     name: '',
     roasterId: '',
     roastLevelId: '',
-    processId: null,
     notes: null,
     isActive: false,
     origins: [{ ...emptyOrigin }],
@@ -143,10 +142,11 @@ function NewCoffeeComponent() {
             <field.SearchSelect label="Roast Level" {...roastLevel} />
           )}
         </form.AppField>
-        <CoffeeOriginEditor form={form} countries={country} />
-        <form.AppField name="processId">
-          {(field) => <field.SearchSelect label="Process" {...coffeeProcess} />}
-        </form.AppField>
+        <CoffeeOriginEditor
+          form={form}
+          countries={country}
+          processes={coffeeProcess}
+        />
         <form.AppField name="notes">
           {(field) => <field.TextArea label="Notes" placeholder="Notes..." />}
         </form.AppField>

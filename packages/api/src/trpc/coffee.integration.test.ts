@@ -81,6 +81,39 @@ describe('coffee.getById', () => {
 })
 
 describe('coffee.create', () => {
+  it('stores a different process on each origin of a blend', async () => {
+    const brazil = await asA.country.create({ name: uniq('Brazil') })
+    const guatemala = await asA.country.create({ name: uniq('Guatemala') })
+    const natural = await asA.coffeeProcess.create({ name: uniq('Natural') })
+    const washed = await asA.coffeeProcess.create({ name: uniq('Washed') })
+    const created = await createCoffee(uniq('House Blend'), {
+      origins: [
+        { countryId: brazil.id, processId: natural.id },
+        { countryId: guatemala.id, processId: washed.id },
+      ],
+    })
+    const found = await asA.coffee.getById(created.id)
+    expect(found).not.toHaveProperty('processId')
+    const byCountry = new Map(
+      found.origins.map((origin) => [origin.countryId, origin.processId]),
+    )
+    expect(byCountry.get(brazil.id)).toBe(natural.id)
+    expect(byCountry.get(guatemala.id)).toBe(washed.id)
+    expect(found.origins.map((origin) => origin.process?.name).sort()).toEqual(
+      [natural.name, washed.name].sort(),
+    )
+  })
+
+  it('rejects another user’s private process', async () => {
+    const country = await asA.country.create({ name: uniq('Brazil') })
+    const hidden = await asB.coffeeProcess.create({ name: uniq('Secret') })
+    await expect(
+      createCoffee(uniq('Stolen process'), {
+        origins: [{ countryId: country.id, processId: hidden.id }],
+      }),
+    ).rejects.toThrow(/process not found/i)
+  })
+
   it('stores multiple origin countries on a blend, one region each', async () => {
     const ethiopia = await asA.country.create({ name: uniq('Ethiopia') })
     const colombia = await asA.country.create({ name: uniq('Colombia') })
@@ -298,8 +331,39 @@ describe('coffee.update', () => {
     })
     const found = await asA.coffee.getById(created.id)
     expect(found.origins).toEqual([
-      expect.objectContaining({ countryId: colombia.id, regionId: null }),
+      expect.objectContaining({
+        countryId: colombia.id,
+        regionId: null,
+        processId: null,
+      }),
     ])
+  })
+
+  it('replaces origin processes when origins are provided', async () => {
+    const brazil = await asA.country.create({ name: uniq('Brazil') })
+    const guatemala = await asA.country.create({ name: uniq('Guatemala') })
+    const natural = await asA.coffeeProcess.create({ name: uniq('Natural') })
+    const washed = await asA.coffeeProcess.create({ name: uniq('Washed') })
+    const created = await createCoffee(uniq('Swap Processes'), {
+      origins: [{ countryId: brazil.id, processId: natural.id }],
+    })
+
+    await asA.coffee.update({
+      id: created.id,
+      name: created.name,
+      roasterId: created.roasterId!,
+      roastLevelId: created.roastLevelId!,
+      origins: [
+        { countryId: brazil.id, processId: washed.id },
+        { countryId: guatemala.id, processId: natural.id },
+      ],
+    })
+    const found = await asA.coffee.getById(created.id)
+    const byCountry = new Map(
+      found.origins.map((origin) => [origin.countryId, origin.processId]),
+    )
+    expect(byCountry.get(brazil.id)).toBe(washed.id)
+    expect(byCountry.get(guatemala.id)).toBe(natural.id)
   })
 
   it('rejects renaming onto another coffee of the same roaster', async () => {
@@ -408,6 +472,32 @@ describe('coffee.getAll', () => {
         region: expect.objectContaining({ name: guji.name }),
       }),
     ])
+  })
+
+  it('returns each origin process on a blend in the list', async () => {
+    const brazil = await asA.country.create({ name: uniq('Brazil') })
+    const guatemala = await asA.country.create({ name: uniq('Guatemala') })
+    const natural = await asA.coffeeProcess.create({ name: uniq('Natural') })
+    const washed = await asA.coffeeProcess.create({ name: uniq('Washed') })
+    const created = await createCoffee(uniq('Listed processes'), {
+      origins: [
+        { countryId: brazil.id, processId: natural.id },
+        { countryId: guatemala.id, processId: washed.id },
+      ],
+    })
+
+    const row = (await asA.coffee.getAll()).find(
+      (coffee) => coffee.id === created.id,
+    )
+    expect(row).not.toHaveProperty('process')
+    const byCountry = new Map(
+      (row?.origins ?? []).map((origin) => [
+        origin.countryId,
+        origin.process?.name,
+      ]),
+    )
+    expect(byCountry.get(brazil.id)).toBe(natural.name)
+    expect(byCountry.get(guatemala.id)).toBe(washed.name)
   })
 })
 

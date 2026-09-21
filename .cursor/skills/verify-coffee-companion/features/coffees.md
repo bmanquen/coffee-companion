@@ -5,7 +5,7 @@ Coffees is the user's library of roaster offerings. A user adds a Coffee, edits 
 ## Sub-features
 
 - `coffees-list` lists the seeded library on `/coffees`.
-- `coffees-create` saves a new Coffee from `/coffees/new`. Origin is one or more Country/Region pairs (one region per country). More than one country is a blend.
+- `coffees-create` saves a new Coffee from `/coffees/new`. Origin is one or more Country/Region/Process rows (one region and one process per country). More than one country is a blend.
 - `coffees-edit` renames a Coffee from that row's `Edit coffee` control, and can add or remove origin countries.
 - `coffees-delete` removes a Coffee after the confirm dialog.
 - `coffees-dial-in` shows Dialed-in espresso settings in the expanded row (or a Sealed notice on Free).

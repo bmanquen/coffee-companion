@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { pickOption } from './helpers'
+import { expandRow, pickOption } from './helpers'
 import type { Page } from '@playwright/test'
 
 // The seeded roaster and roast level, chosen before the name is typed. A
@@ -54,6 +54,14 @@ test('create a blend coffee via the new-coffee form', async ({ page }) => {
     page.getByText('Select Country'),
     page.getByText('Colombia', { exact: true }),
   )
+  await pickOption(
+    page.getByText('Select Process').first(),
+    page.getByText('Washed', { exact: true }),
+  )
+  await pickOption(
+    page.getByText('Select Process'),
+    page.getByText('Natural', { exact: true }),
+  )
 
   await page.getByRole('button', { name: 'Add', exact: true }).click()
 
@@ -62,6 +70,8 @@ test('create a blend coffee via the new-coffee form', async ({ page }) => {
   await expect(
     page.getByText(/Ethiopia.*Colombia|Colombia.*Ethiopia/).first(),
   ).toBeVisible()
+  const table = await expandRow(page, name)
+  await expect(table.getByText('Natural, Washed')).toBeVisible()
 })
 
 // Edits a coffee through the edit route. Creates its own coffee first (unique
