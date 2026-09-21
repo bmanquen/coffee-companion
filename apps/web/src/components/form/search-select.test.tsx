@@ -54,6 +54,7 @@ const options = [
 function Harness({
   value,
   onAddItem,
+  triggerClassName,
 }: {
   value?: string
   onAddItem?: (
@@ -62,6 +63,7 @@ function Harness({
     | { value: string; label: string }
     | null
     | Promise<{ value: string; label: string } | null>
+  triggerClassName?: string
 }) {
   const form = useAppForm({ defaultValues: { roasterId: value ?? '' } })
   return (
@@ -71,6 +73,7 @@ function Harness({
           label="Roaster"
           options={options}
           onAddItem={onAddItem}
+          triggerClassName={triggerClassName}
         />
       )}
     </form.AppField>
@@ -159,6 +162,16 @@ describe('SearchSelect', () => {
         .getAttribute('aria-required'),
     ).toBe('true')
     expect(screen.getByText('*').getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('paints the trigger with triggerClassName over the transparent default', () => {
+    render(<Harness triggerClassName="bg-card" />)
+    expect(screen.getByRole('button', { name: 'Roaster' }).className).toContain(
+      'bg-card',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Roaster' }).className,
+    ).not.toContain('bg-transparent')
   })
 
   it('leaves an optional select unmarked', () => {

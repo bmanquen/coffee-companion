@@ -53,7 +53,7 @@ export function CoffeeOriginRow({
   const pending = createRegion.isPending
 
   return (
-    <FieldSet className="gap-2 rounded-lg border border-border bg-muted/20 p-3 [&_[data-slot=field-content]_button]:!bg-background [&_[data-slot=field-content]_input]:!bg-background">
+    <FieldSet className="gap-2 rounded-lg border border-border bg-muted/20 p-3">
       <FieldLegend variant="label" className="mb-1">
         {label}
       </FieldLegend>
