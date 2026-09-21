@@ -29,4 +29,16 @@ describe('formatOriginNames', () => {
   it('returns a dash when a coffee has no origins', () => {
     expect(formatOriginNames([], 'country')).toBe('-')
   })
+
+  it('returns a single dash when every origin is missing that place', () => {
+    expect(
+      formatOriginNames(
+        [
+          { country: { name: 'Ethiopia' }, region: null },
+          { country: { name: 'Colombia' }, region: null },
+        ],
+        'region',
+      ),
+    ).toBe('-')
+  })
 })

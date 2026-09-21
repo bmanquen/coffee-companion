@@ -386,6 +386,29 @@ describe('coffee.getAll', () => {
     expect(all.every((c) => c.userId === USER_B)).toBe(true)
     expect(all.some((c) => c.id === coffeeAId)).toBe(false)
   })
+
+  it('returns nested origin countries and regions on the list', async () => {
+    const ethiopia = await asA.country.create({ name: uniq('Ethiopia') })
+    const guji = await asA.region.create({
+      name: uniq('Guji'),
+      countryId: ethiopia.id,
+    })
+    const created = await createCoffee(uniq('Listed origin'), {
+      origins: [{ countryId: ethiopia.id, regionId: guji.id }],
+    })
+
+    const row = (await asA.coffee.getAll()).find(
+      (coffee) => coffee.id === created.id,
+    )
+    expect(row?.origins).toEqual([
+      expect.objectContaining({
+        countryId: ethiopia.id,
+        regionId: guji.id,
+        country: expect.objectContaining({ name: ethiopia.name }),
+        region: expect.objectContaining({ name: guji.name }),
+      }),
+    ])
+  })
 })
 
 describe('coffee.getRecent', () => {

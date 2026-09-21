@@ -31,6 +31,13 @@ test('coffees page lists coffees', async ({ page }) => {
   // .first(): the coffees list renders both a desktop table row and a mobile
   // card, so the name appears twice in the DOM.
   await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()
+  // Country is its own cell — exact so "Ethiopia Guji" does not count.
+  await expect(
+    page.getByRole('cell', { name: 'Ethiopia', exact: true }).first(),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('cell', { name: 'Guji', exact: true }).first(),
+  ).toBeVisible()
 })
 
 test('equipment page lists grinders and brewing devices', async ({ page }) => {

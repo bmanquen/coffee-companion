@@ -7,13 +7,38 @@
 // relative to the Shelf without importing the seed.
 
 export const E2E_LIBRARY = [
-  { name: 'Kenya Nyeri', grindSetting: '21' },
-  { name: 'Guatemala Huehuetenango', grindSetting: '22' },
-  { name: 'Rwanda Kivu', grindSetting: '23' },
-  { name: 'Peru Cajamarca', grindSetting: '24' },
-  { name: 'Burundi Kayanza', grindSetting: '25' },
-  { name: 'Sumatra Lintong', grindSetting: '26' },
-  { name: 'Brazil Cerrado', grindSetting: '27' },
+  { name: 'Kenya Nyeri', grindSetting: '21', country: 'Kenya', region: 'Nyeri' },
+  {
+    name: 'Guatemala Huehuetenango',
+    grindSetting: '22',
+    country: 'Guatemala',
+    region: 'Huehuetenango',
+  },
+  { name: 'Rwanda Kivu', grindSetting: '23', country: 'Rwanda', region: 'Kivu' },
+  {
+    name: 'Peru Cajamarca',
+    grindSetting: '24',
+    country: 'Peru',
+    region: 'Cajamarca',
+  },
+  {
+    name: 'Burundi Kayanza',
+    grindSetting: '25',
+    country: 'Burundi',
+    region: 'Kayanza',
+  },
+  {
+    name: 'Sumatra Lintong',
+    grindSetting: '26',
+    country: 'Indonesia',
+    region: 'Lintong',
+  },
+  {
+    name: 'Brazil Cerrado',
+    grindSetting: '27',
+    country: 'Brazil',
+    region: 'Cerrado',
+  },
 ]
 
 // The most recently brewed Coffee, so it sits on the Shelf under either Plan.

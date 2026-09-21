@@ -26,7 +26,7 @@ Preconditions:
 - No leftover Coffee titled with the `E2E Coffee` / `E2E Edit` / `E2E Delete` prefixes from a broken earlier run (seed if unsure).
 - `helpers/control doctor` reports the expected URL and `coffee_companion_test`.
 
-- **List.** Run `helpers/control browser as data` and `helpers/control browser goto --path /coffees`. Heading `Coffees` is visible and `Ethiopia Guji` appears (use `.first()` — desktop row and mobile card both render the name).
+- **List.** Run `helpers/control browser as data` and `helpers/control browser goto --path /coffees`. Heading `Coffees` is visible and `Ethiopia Guji` appears (use `.first()` — desktop row and mobile card both render the name). Country `Ethiopia` and region `Guji` are visible as their own cells.
 - **Create.** Open `/coffees/new`. Run `helpers/control browser goto --path /coffees/new`, `helpers/control browser fill --placeholder Name --value "E2E Coffee <unique>"`. Click visible text `Select Roaster`, then `Sey` (exact). Click button `Add` (exact). The URL is `/coffees` and the new name is visible.
 - **Edit.** Create a uniquely named Coffee the same way. On its desktop row, click `Edit coffee`. Heading `Edit Coffee` appears. Fill placeholder `Name` with the updated title and click `Save`. The list shows the new name and not the exact old one.
 - **Delete.** Create a uniquely named Coffee. On its desktop row, click `Delete coffee`, then confirm with button `Delete` (exact). The name is gone.
