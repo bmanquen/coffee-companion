@@ -2,10 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
+import { FieldLegend, FieldSet } from '@/components/ui/field'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 
 export function CoffeeOriginRow({
+  label,
   countryId,
   canRemove,
   onRemove,
@@ -13,6 +15,7 @@ export function CoffeeOriginRow({
   renderRegion,
   renderProcess,
 }: {
+  label: string
   countryId: string
   canRemove: boolean
   onRemove: () => void
@@ -50,7 +53,8 @@ export function CoffeeOriginRow({
   const pending = createRegion.isPending
 
   return (
-    <div className="flex flex-col gap-2">
+    <FieldSet className="gap-2 rounded-lg border bg-card p-4">
+      <FieldLegend variant="label">{label}</FieldLegend>
       {renderCountry({ disabled: pending })}
       {renderRegion({
         options: region.options,
@@ -76,9 +80,9 @@ export function CoffeeOriginRow({
           disabled={pending}
           onClick={onRemove}
         >
-          Remove country
+          Remove origin
         </Button>
       ) : null}
-    </div>
+    </FieldSet>
   )
 }

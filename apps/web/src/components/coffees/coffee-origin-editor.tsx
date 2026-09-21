@@ -32,6 +32,7 @@ export const CoffeeOriginEditor = withForm({
         {origins.map((origin, index) => (
           <CoffeeOriginRow
             key={index}
+            label={`Origin ${index + 1}`}
             countryId={origin.countryId}
             canRemove={origins.length > 1}
             onRemove={() =>

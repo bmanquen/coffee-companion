@@ -78,6 +78,8 @@ describe('NewCoffee', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Roast Level' }), {
         target: { value: ROAST_LEVEL },
       })
+      expect(screen.getByRole('group', { name: 'Origin 1' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Remove origin' })).toBeNull()
 
       expect(mocks.track).not.toHaveBeenCalled()
       fireEvent.click(screen.getByRole('button', { name: 'Add' }))
@@ -121,8 +123,10 @@ describe('NewCoffee', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Roast Level' }), {
         target: { value: ROAST_LEVEL },
       })
+      expect(screen.getByRole('group', { name: 'Origin 1' })).toBeTruthy()
       expect(screen.getByRole('combobox', { name: 'Country' })).toBeTruthy()
-      fireEvent.click(screen.getByRole('button', { name: 'Add country' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Add origin' }))
+      expect(screen.getByRole('group', { name: 'Origin 2' })).toBeTruthy()
       expect(screen.getAllByRole('combobox', { name: 'Country' })).toHaveLength(
         2,
       )

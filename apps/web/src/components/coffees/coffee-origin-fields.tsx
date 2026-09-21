@@ -9,11 +9,11 @@ export function CoffeeOriginFields({
   children: ReactNode
 }) {
   return (
-    <>
+    <div className="flex flex-col gap-3">
       {children}
       <Button type="button" variant="outline" size="sm" onClick={onAddOrigin}>
-        Add country
+        Add origin
       </Button>
-    </>
+    </div>
   )
 }
