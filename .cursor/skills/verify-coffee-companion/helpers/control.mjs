@@ -500,6 +500,7 @@ async function cmdBrowser(argv) {
       name: flags.name,
       exact: Boolean(flags.exact),
       text: flags.text,
+      label: flags.label,
       first: Boolean(flags.first),
     })
     console.log(JSON.stringify(result, null, 2))
@@ -512,8 +513,10 @@ async function cmdBrowser(argv) {
       role: flags.role,
       name: flags.name,
       placeholder: flags.placeholder,
+      label: flags.label,
       value: flags.value,
       exact: Boolean(flags.exact),
+      first: Boolean(flags.first),
     })
     console.log(JSON.stringify(result, null, 2))
     return
@@ -531,9 +534,11 @@ async function cmdBrowser(argv) {
       role: flags.role,
       name: flags.name,
       text: flags.text,
+      label: flags.label,
       url: flags.url,
       count: flags.count !== undefined ? Number(flags.count) : undefined,
       exact: Boolean(flags.exact),
+      first: Boolean(flags.first),
     })
     console.log(JSON.stringify(result, null, 2))
     return
@@ -707,6 +712,13 @@ function locatorFrom(page, spec) {
     if (spec.first) locator = locator.first()
     return locator
   }
+  if (spec.label) {
+    let locator = page.getByLabel(coerceName(spec.label), {
+      exact: Boolean(spec.exact),
+    })
+    if (spec.first) locator = locator.first()
+    return locator
+  }
   if (spec.placeholder) {
     return page.getByPlaceholder(spec.placeholder, { exact: Boolean(spec.exact) })
   }
@@ -715,7 +727,7 @@ function locatorFrom(page, spec) {
     if (spec.first) locator = locator.first()
     return locator
   }
-  throw new Error('Need --role/--name, --placeholder, or --text')
+  throw new Error('Need --role/--name, --label, --placeholder, or --text')
 }
 
 function coerceName(value) {
@@ -824,6 +836,26 @@ async function runDaemon() {
       }
       case 'fill': {
         const target = locatorFrom(page, msg)
+        await target.waitFor({ state: 'visible', timeout: 15_000 })
+        // An unhydrated fill sets the DOM value and React never hears it
+        // (apps/web/e2e/helpers.ts waitForHydration). Wait for React's
+        // listener tag before typing.
+        const start = Date.now()
+        let hydrated = false
+        while (Date.now() - start < 15_000) {
+          hydrated = await target
+            .evaluate((el) =>
+              Object.keys(el).some((key) => key.startsWith('__reactProps$')),
+            )
+            .catch(() => false)
+          if (hydrated) break
+          await sleep(50)
+        }
+        if (!hydrated) {
+          throw new Error(
+            'React never tagged this node. If the page is interactive in a browser, the tag has been renamed.',
+          )
+        }
         await target.fill(String(msg.value ?? ''), { timeout: 15_000 })
         return { value: msg.value }
       }
@@ -849,7 +881,7 @@ async function runDaemon() {
           }
           return { count: n, url: page.url() }
         }
-        if (msg.role || msg.text || msg.placeholder) {
+        if (msg.role || msg.text || msg.placeholder || msg.label) {
           const target = locatorFrom(page, msg)
           await target.waitFor({ state: 'visible', timeout: 15_000 })
         }
@@ -892,15 +924,18 @@ function usage() {
   browser goto --path /
   browser click --role link --name Pricing
   browser fill --placeholder Name --value "Kenya Nyeri"
+  browser fill --label "Dose (g)" --value 18
   browser press --key Enter
   browser expect --role heading --name Dashboard
+  browser expect --text Standard --first
   browser screenshot --path artifacts/foo.png
   browser snapshot --aria --path artifacts/foo.aria.txt
   drive marketing        One-shot recipe for the mapped marketing feature
   cleanup                Stop pids this run started; keep artifacts/
 
-  Other mapped features (dashboard, coffees, brews, plans-and-shelf) have
-  recipes in features/*.md but no drive <name> stub yet — use browser commands.
+  Other mapped features (dashboard, coffees, brews, plans-and-shelf,
+  equipment, privacy) have recipes in features/*.md but no drive <name>
+  stub yet — use browser commands.
 
 `)
 }
