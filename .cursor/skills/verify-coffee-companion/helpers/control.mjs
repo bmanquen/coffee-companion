@@ -517,6 +517,7 @@ async function cmdBrowser(argv) {
       label: flags.label,
       value: flags.value,
       exact: Boolean(flags.exact),
+      row: flags.row,
       first: Boolean(flags.first),
     })
     console.log(JSON.stringify(result, null, 2))
@@ -941,6 +942,7 @@ function usage() {
   browser click --role link --name Pricing
   browser click --role button --name "Edit grinder" --row "<unique>"
   browser fill --placeholder Name --value "Kenya Nyeri"
+  browser fill --placeholder Name --value "Kenya Nyeri" --first
   browser fill --label "Dose (g)" --value 18
   browser press --key Enter
   browser expect --role heading --name Dashboard
@@ -957,36 +959,45 @@ function usage() {
 `)
 }
 
-const argv = process.argv.slice(2)
-if (argv[0] === '--daemon') {
-  await runDaemon()
-} else {
-  const [command, ...rest] = argv
-  switch (command) {
-    case 'launch':
-      await cmdLaunch()
-      break
-    case 'doctor':
-      await cmdDoctor()
-      break
-    case 'seed':
-      await cmdSeed()
-      break
-    case 'browser':
-      await cmdBrowser(rest)
-      break
-    case 'drive':
-      await cmdDrive(rest[0])
-      break
-    case 'cleanup':
-      cmdCleanup()
-      break
-    case '-h':
-    case '--help':
-    case undefined:
-      usage()
-      break
-    default:
-      die(`Unknown command "${command}"`)
+export { locatorFrom, coerceName }
+
+// Importing this file for locator tests must not run launch/doctor/cleanup.
+const invokedAsCli =
+  Boolean(process.argv[1]) &&
+  resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
+
+if (invokedAsCli) {
+  const argv = process.argv.slice(2)
+  if (argv[0] === '--daemon') {
+    await runDaemon()
+  } else {
+    const [command, ...rest] = argv
+    switch (command) {
+      case 'launch':
+        await cmdLaunch()
+        break
+      case 'doctor':
+        await cmdDoctor()
+        break
+      case 'seed':
+        await cmdSeed()
+        break
+      case 'browser':
+        await cmdBrowser(rest)
+        break
+      case 'drive':
+        await cmdDrive(rest[0])
+        break
+      case 'cleanup':
+        cmdCleanup()
+        break
+      case '-h':
+      case '--help':
+      case undefined:
+        usage()
+        break
+      default:
+        die(`Unknown command "${command}"`)
+    }
   }
 }
