@@ -88,7 +88,7 @@ Identities (the `e2e_auth` cookie; server must have `E2E_BYPASS_AUTH=true`):
 .cursor/skills/verify-coffee-companion/helpers/control browser snapshot --aria --path artifacts/<run>/page.aria.txt
 ```
 
-Regex names are `/pattern/i` strings. `--first` applies to `click`, `expect`, and `fill` — use it whenever desktop table and mobile card both render the same name. `--label` is `getByLabel` (the same handle `apps/web/e2e` uses for recipe fields). Number fields are `spinbutton`s; `--label "Dose (g)"` matches them without naming the role. Scope a click to the marketing header with `--` plus the daemon's `nav: Marketing` (the `drive marketing` recipe does this). For ad-hoc header clicks, prefer:
+Regex names are `/pattern/i` strings. `--first` applies to `click`, `expect`, and `fill` — use it whenever desktop table and mobile card both render the same name. `--label` is `getByLabel` (the same handle `apps/web/e2e` uses for recipe fields). Number fields are `spinbutton`s; `--label "Dose (g)"` matches them without naming the role. Scope a list-row action with `--row` and the unique name (`click --role button --name "Edit grinder" --row "<unique>"`) — never `--first` or list position when the list sorts by name. Scope a click to the marketing header with `--` plus the daemon's `nav: Marketing` (the `drive marketing` recipe does this). For ad-hoc header clicks, prefer:
 
 ```bash
 .cursor/skills/verify-coffee-companion/helpers/control browser click --role link --name Pricing
