@@ -29,7 +29,7 @@ Preconditions:
 - **Redirect from root.** Run `helpers/control browser goto --path /`. The URL ends with `/dashboard` and the heading is still `Dashboard`.
 - **Chrome.** `button[aria-label="Account menu"]` is attached. Run `helpers/control browser click --role button --name "Open menu"`. Link `Home` (exact) has `href` `/dashboard`. Links `Coffee`, `Brews`, and `Equipment` are visible.
 - **List methods.** Run `helpers/control browser goto --path /dashboard?method=espresso`. Click the picker trigger `Espresso` (exact). Options read AeroPress, Cold Brew, Espresso, French Press, Pour Over, in that order.
-- **Switch to AeroPress.** Choose option `/AeroPress/`. Text `Standard` is visible and link `/Log Brew/i` has `href` `/aeropress/new`.
+- **Switch to AeroPress.** Choose option `/AeroPress/`. Text `Standard` is visible (`expect --text Standard --first` — desktop table and mobile card both render it) and link `/Log Brew/i` has `href` `/aeropress/new`.
 - **Switch back to Espresso.** Click the `AeroPress` trigger, then option `/Espresso/`. Link `/Log Shot/i` has `href` `/espresso/new`.
 - **Deep link Cold Brew.** Run `helpers/control browser goto --path /dashboard?method=coldbrew`. Trigger `Cold Brew` is visible and `/Log Brew/i` has `href` `/cold-brew/new`.
 - **URL write.** From `?method=espresso`, choose Cold Brew. The URL matches `[?&]method=coldbrew`.
@@ -44,3 +44,4 @@ Preconditions:
 - `Open menu` is desktop-only (`hidden lg:inline-flex`). At a mobile viewport use `Primary` nav or `Account menu` instead.
 - The feed pages at five. Sealed Free brews are not on page one — that proof belongs in [Plans and Shelf](./plans-and-shelf.md).
 - Dashboard feeds are reference-only. Edit, delete, and Dialed-in toggles live on Brews.
+- `expect --text` without `--first` fails strict mode on names the table and the card stack both show (`Standard`, coffee names).

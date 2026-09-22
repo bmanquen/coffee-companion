@@ -41,4 +41,4 @@ Preconditions:
 - DataTable renders a desktop table and a mobile card stack. At 1280px the table is the one to assert; a loose `getByText('Ethiopia Guji')` matches both.
 - Default billing period is annual (`$44.99`). Assert `$4.99` only after pressing `Monthly`.
 - `Subscribe` on this instance does not open Stripe Checkout (no `STRIPE_SECRET_KEY`). Do not treat a missing redirect as a product bug here.
-- Canonical/social tags and `/sitemap.xml` are public too; they are not this feature's user path. Drive them only when the change is about those tags.
+- Canonical/social tags and `/sitemap.xml` are public too; they are not this feature's user path. Drive them only when the change is about those tags. `/privacy` is its own map entry — see [Privacy](./privacy.md).

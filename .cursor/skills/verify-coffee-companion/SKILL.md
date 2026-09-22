@@ -80,13 +80,15 @@ Identities (the `e2e_auth` cookie; server must have `E2E_BYPASS_AUTH=true`):
 .cursor/skills/verify-coffee-companion/helpers/control browser goto --path /
 .cursor/skills/verify-coffee-companion/helpers/control browser click --role link --name Pricing
 .cursor/skills/verify-coffee-companion/helpers/control browser fill --placeholder Name --value "Kenya Nyeri"
+.cursor/skills/verify-coffee-companion/helpers/control browser fill --label "Dose (g)" --value 18
 .cursor/skills/verify-coffee-companion/helpers/control browser press --key Enter
 .cursor/skills/verify-coffee-companion/helpers/control browser expect --role heading --name Dashboard
+.cursor/skills/verify-coffee-companion/helpers/control browser expect --text Standard --first
 .cursor/skills/verify-coffee-companion/helpers/control browser screenshot --path artifacts/<run>/page.png
 .cursor/skills/verify-coffee-companion/helpers/control browser snapshot --aria --path artifacts/<run>/page.aria.txt
 ```
 
-Regex names are `/pattern/i` strings. Scope a click to the marketing header with `--` plus the daemon's `nav: Marketing` (the `drive marketing` recipe does this). For ad-hoc header clicks, prefer:
+Regex names are `/pattern/i` strings. `--first` applies to `click`, `expect`, and `fill` — use it whenever desktop table and mobile card both render the same name. `--label` is `getByLabel` (the same handle `apps/web/e2e` uses for recipe fields). Number fields are `spinbutton`s; `--label "Dose (g)"` matches them without naming the role. Scope a click to the marketing header with `--` plus the daemon's `nav: Marketing` (the `drive marketing` recipe does this). For ad-hoc header clicks, prefer:
 
 ```bash
 .cursor/skills/verify-coffee-companion/helpers/control browser click --role link --name Pricing
@@ -105,10 +107,12 @@ Stable handles (use these, not CSS or coordinates):
 - Brews H1 `Brews`. Tabs: `Espresso`, `Pour Over`, `French Press`, `AeroPress`, `Cold Brew`.
 - Coffees H1 `Coffees`. Link/button `Add Coffee`. Row actions `Edit coffee`, `Delete coffee`. Confirm `Delete` (exact).
 - Equipment H1 `Equipment`. Tabs `Grinders` (default) and `Brewing Devices`. Actions `Edit grinder`, `Delete grinder`, `Edit brewing device`, `Delete brewing device`.
+- Privacy H1 `/what we collect/i`. Recipient H2s `Sentry`, `PostHog` (exact). Footer link `Privacy`.
+- Account: heading `Account`, button `Export data`, link `See plans`. Grant users have no `Manage subscription`.
 
-First click after a navigation can land before hydration (`apps/web/e2e/helpers.ts` `clickUntil`). The daemon retries clicks. When you write a one-off Playwright spec instead, use `clickUntil` from that file.
+First click after a navigation can land before hydration (`apps/web/e2e/helpers.ts` `clickUntil`). The daemon retries clicks and waits for React's listener tag before `fill`. When you write a one-off Playwright spec instead, use `clickUntil` / `waitForHydration` from that file.
 
-Only one one-shot recipe is wired: `drive marketing`. Dashboard, coffees, brews, and plans-and-shelf are mapped under `features/` and are driven with `browser as` / `goto` / `click` from those files — a missing `drive <name>` stub is not a skip and not a pass.
+Only one one-shot recipe is wired: `drive marketing`. Dashboard, coffees, brews, plans-and-shelf, equipment, and privacy are mapped under `features/` and are driven with `browser as` / `goto` / `click` from those files — a missing `drive <name>` stub is not a skip and not a pass.
 
 ```bash
 .cursor/skills/verify-coffee-companion/helpers/control drive marketing
@@ -161,7 +165,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | `helpers/control launch` | Postgres (test DB, loopback + `*_test`) → migrate → seed → always rebuild → `node .output/server/index.mjs` |
 | `helpers/control doctor` | Pid, port ownership, HTTP + `Coffee Companion` marker |
 | `helpers/control seed` | `helpers/seed.mjs` → `seedE2eUsers()` |
-| `helpers/control browser …` | Playwright daemon (see Drive) |
+| `helpers/control browser …` | Playwright daemon (see Drive). `fill --label` / `expect --first` are the form and list handles |
 | `helpers/control drive marketing` | The only wired one-shot recipe (public home + pricing). Other map entries use `browser` commands |
 | `helpers/control cleanup` | Stop recorded pids; keep artifacts |
 | `helpers/ensure-postgres.sh` | Create/start local `coffee_companion_test` (scaffolding) |

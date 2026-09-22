@@ -17,8 +17,8 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Prefer ARIA roles and accessible names over CSS selectors or DOM position.
 - Treat every command as literal. Keep quoted names and flags unchanged.
 - Run browser actions through `helpers/control browser`.
-- The desktop table and the mobile card stack both render the same Coffee/Brew names. Scope list assertions to `div.lg\\:block table` (or use `.first()`) so one row does not count as two.
-- After a `page.goto`-style navigation, the first click can land before hydration. The control daemon retries; a raw Playwright spec must use `clickUntil` from `apps/web/e2e/helpers.ts`.
+- The desktop table and the mobile card stack both render the same Coffee/Brew names. Scope list assertions with `helpers/control browser expect … --first` (or `div.lg\\:block table` / `.first()` in a raw spec) so one row does not count as two.
+- After a `page.goto`-style navigation, the first click can land before hydration. The control daemon retries clicks and waits for React's listener tag before `fill`; a raw Playwright spec must use `clickUntil` / `waitForHydration` from `apps/web/e2e/helpers.ts`.
 
 ## Proof and skip reporting
 
@@ -43,7 +43,9 @@ Keep implementation details out of the map. Name only user paths, stable handles
 ## Features
 
 - [Marketing site](./marketing.md) covers the public home pitch, the hero brew table, and pricing (plans, period toggle, FAQ). This is the only feature with a `helpers/control drive marketing` shortcut.
+- [Privacy](./privacy.md) covers the public privacy page reached from the marketing footer. Mapped; drive with `browser` commands — no `drive privacy` stub yet.
 - [Dashboard](./dashboard.md) covers the signed-in home, method picker, and per-method log links. Mapped; drive with `browser` commands — no `drive dashboard` stub yet.
 - [Coffees](./coffees.md) covers the Coffee list and create / edit / delete. Mapped; drive with `browser` commands — no `drive coffees` stub yet.
 - [Brews](./brews.md) covers the brew log tabs and logging an Espresso Shot or AeroPress brew. Mapped; drive with `browser` commands — no `drive brews` stub yet.
-- [Plans and Shelf](./plans-and-shelf.md) covers Pro vs Free reading, Sealed brews, and the account Plan. Mapped; drive with `browser` commands — no `drive plans-and-shelf` stub yet.
+- [Equipment](./equipment.md) covers Grinders and Brewing Devices, including Free's gear cap. Mapped; drive with `browser` commands — no `drive equipment` stub yet.
+- [Plans and Shelf](./plans-and-shelf.md) covers Pro vs Free reading, Sealed brews, the account Plan, and account export. Mapped; drive with `browser` commands — no `drive plans-and-shelf` stub yet.

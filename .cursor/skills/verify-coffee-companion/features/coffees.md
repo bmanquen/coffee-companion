@@ -26,17 +26,17 @@ Preconditions:
 - No leftover Coffee titled with the `E2E Coffee` / `E2E Edit` / `E2E Delete` prefixes from a broken earlier run (seed if unsure).
 - `helpers/control doctor` reports the expected URL and `coffee_companion_test`.
 
-- **List.** Run `helpers/control browser as data` and `helpers/control browser goto --path /coffees`. Heading `Coffees` is visible and `Ethiopia Guji` appears (use `.first()` — desktop row and mobile card both render the name). Country `Ethiopia` and region `Guji` are visible as their own cells.
-- **Create.** Open `/coffees/new`. Run `helpers/control browser goto --path /coffees/new`, `helpers/control browser fill --placeholder Name --value "E2E Coffee <unique>"`. Click visible text `Select Roaster`, then `Sey` (exact). Click button `Add` (exact). The URL is `/coffees` and the new name is visible.
-- **Edit.** Create a uniquely named Coffee the same way. On its desktop row, click `Edit coffee`. Heading `Edit Coffee` appears. Fill placeholder `Name` with the updated title and click `Save`. The list shows the new name and not the exact old one.
-- **Delete.** Create a uniquely named Coffee. On its desktop row, click `Delete coffee`, then confirm with button `Delete` (exact). The name is gone.
+- **List.** Run `helpers/control browser as data` and `helpers/control browser goto --path /coffees`. Heading `Coffees` is visible and `Ethiopia Guji` appears (`expect --text "Ethiopia Guji" --first` — desktop row and mobile card both render the name). Country `Ethiopia` and region `Guji` are visible as their own cells.
+- **Create.** Open `/coffees/new`. Run `helpers/control browser goto --path /coffees/new`. Click visible text `Select Roaster`, then `Sey` (exact). Click `Select Roast Level`, then `Medium` (exact). Fill placeholder `Name` with `"E2E Coffee <unique>"`. Click button `Add` (exact). The URL is `/coffees` and the new name is visible (`--first`).
+- **Edit.** Create a uniquely named Coffee the same way. It lands as the first row. Run `helpers/control browser click --role button --name "Edit coffee" --first`. Heading `Edit Coffee` appears. Fill placeholder `Name` with the updated title and click `Save`. The list shows the new name and not the exact old one.
+- **Delete.** Create a uniquely named Coffee. Run `helpers/control browser click --role button --name "Delete coffee" --first`, then confirm with button `Delete` (exact). The name is gone.
 - **Proof.** After create (before delete), run `helpers/control browser screenshot --path artifacts/<run>/coffees/list.png` and `helpers/control browser snapshot --aria --path artifacts/<run>/coffees/list.aria.txt` on `/coffees`. Both show heading `Coffees` and the unique name. Delete the unique Coffee before the next feature; keep the artifacts.
 
 ## Gotchas
 
-- SearchSelect's accessible name is not the visible `Select Roaster` label. Click the visible text, then the option.
-- `Add` (create) and `Save` (edit) are different buttons. `Delete coffee` opens the dialog; the dialog's confirm is exactly `Delete`.
+- SearchSelect's accessible name is not the visible `Select Roaster` label. Click the visible text, then the option. Roast Level is required — submitting without it stays on `/coffees/new` with `Select a roast level`. Pick the SearchSelects before filling `Name` so the first post-navigation action is a click (hydration).
+- `Add` (create) and `Save` (edit) are different buttons. `Delete coffee` opens the dialog; the dialog's confirm is exactly `Delete`. Row actions are not unique; after a create the new Coffee is first — use `--first`.
 - Name uniqueness is per user per roaster. Timestamp the name so a retry does not collide. A blend occupies that same uniqueness — it cannot share a roaster and name with another Coffee.
-- Expanding a row to read Dialed-in settings is a click on the name cell of the desktop table (`apps/web/e2e/helpers.ts` `expandRow`). On `data`, Sumatra Lintong's expander shows `18g → 36g`. On `free`, that same Coffee shows `This Brew is Sealed` — see [Plans and Shelf](./plans-and-shelf.md).
+- Expanding a row to read Dialed-in settings is a click on the name cell of the desktop table (`apps/web/e2e/helpers.ts` `expandRow`, or `click --role cell --name "Sumatra Lintong" --exact`). On `data`, Sumatra Lintong's expander shows `18g → 36g` (`expect --text "18g → 36g" --first`). On `free`, that same Coffee shows `This Brew is Sealed` — see [Plans and Shelf](./plans-and-shelf.md).
 - Do not edit or delete seeded Coffees (`Ethiopia Guji`, the E2E_LIBRARY names). Create your own, then remove them.
 - Roaster `Sey` exists only on `data`. Identity `empty` has no roaster to pick; type-create one or skip the roaster.
