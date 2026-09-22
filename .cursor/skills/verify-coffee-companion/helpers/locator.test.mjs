@@ -64,4 +64,18 @@ describe('locatorFrom', () => {
     locatorFrom(page, { placeholder: 'Name' })
     assert.deepEqual(trail, [['getByPlaceholder', 'Name', { exact: false }]])
   })
+
+  it('scopes an exact country/region cell and takes the first match', () => {
+    const { page, trail } = pageWithTrail()
+    locatorFrom(page, {
+      role: 'cell',
+      name: 'Ethiopia',
+      exact: true,
+      first: true,
+    })
+    assert.deepEqual(trail, [
+      ['getByRole', 'cell', { name: 'Ethiopia', exact: true }],
+      'first',
+    ])
+  })
 })
