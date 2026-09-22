@@ -501,6 +501,7 @@ async function cmdBrowser(argv) {
       exact: Boolean(flags.exact),
       text: flags.text,
       label: flags.label,
+      row: flags.row,
       first: Boolean(flags.first),
     })
     console.log(JSON.stringify(result, null, 2))
@@ -535,6 +536,7 @@ async function cmdBrowser(argv) {
       name: flags.name,
       text: flags.text,
       label: flags.label,
+      row: flags.row,
       url: flags.url,
       count: flags.count !== undefined ? Number(flags.count) : undefined,
       exact: Boolean(flags.exact),
@@ -704,6 +706,16 @@ function locatorFrom(page, spec) {
       .getByRole('navigation', { name: spec.nav })
       .getByRole(spec.role, { name: spec.name, exact: Boolean(spec.exact) })
   }
+  if (spec.row && spec.role) {
+    let locator = page
+      .getByRole('row', { name: coerceName(spec.row) })
+      .getByRole(spec.role, {
+        name: coerceName(spec.name),
+        exact: Boolean(spec.exact),
+      })
+    if (spec.first) locator = locator.first()
+    return locator
+  }
   if (spec.role) {
     let locator = page.getByRole(spec.role, {
       name: coerceName(spec.name),
@@ -720,7 +732,11 @@ function locatorFrom(page, spec) {
     return locator
   }
   if (spec.placeholder) {
-    return page.getByPlaceholder(spec.placeholder, { exact: Boolean(spec.exact) })
+    let locator = page.getByPlaceholder(spec.placeholder, {
+      exact: Boolean(spec.exact),
+    })
+    if (spec.first) locator = locator.first()
+    return locator
   }
   if (spec.text) {
     let locator = page.getByText(coerceName(spec.text), { exact: Boolean(spec.exact) })
@@ -923,6 +939,7 @@ function usage() {
   browser as <who>       public | data | empty | free
   browser goto --path /
   browser click --role link --name Pricing
+  browser click --role button --name "Edit grinder" --row "<unique>"
   browser fill --placeholder Name --value "Kenya Nyeri"
   browser fill --label "Dose (g)" --value 18
   browser press --key Enter
