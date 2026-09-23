@@ -79,6 +79,15 @@ describe('insertEspressoShotSchema', () => {
     expect(messages).not.toContain('Must be a number')
   })
 
+  it('names a null integer field', () => {
+    const parsed = insertEspressoShotSchema.safeParse({ ...valid, time: null })
+    expect(parsed.success).toBe(false)
+    if (parsed.success) return
+    expect(parsed.error.issues.map((issue) => issue.message)).toEqual([
+      'Enter a number',
+    ])
+  })
+
   it('uses one message for an invalid dose', () => {
     const parsed = insertEspressoShotSchema.safeParse({ ...valid, dose: 'abc' })
     expect(parsed.success).toBe(false)
