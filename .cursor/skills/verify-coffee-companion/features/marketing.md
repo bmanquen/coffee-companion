@@ -26,17 +26,18 @@ Preconditions:
 - `helpers/control doctor` reports the expected URL and `coffee_companion_test`.
 
 - **Open home.** Run `helpers/control browser as public` and `helpers/control browser goto --path /`. The heading reads `Dial it in once. Never guess again.` and a button matching `/save your first brew/i` is visible.
-- **Hero table.** The page `role=table` is visible, contains `Ethiopia Guji`, and exposes an accessible name `Dialed in`.
+- **Hero table.** The page `role=table` is visible and contains `Ethiopia Guji`. The Dialed-in crosshair inside that table is labeled `Dialed in` (`expect --label "Dialed in" --first` — desktop table and mobile card both render it).
 - **Header pricing.** Choose `Pricing` in the marketing header. Run `helpers/control browser click --role link --name Pricing`. The URL ends with `/pricing` and the heading matches `/keep your history/i`.
 - **Plans.** Every plan heading is visible. Run `helpers/control browser expect --role heading --name Free --exact`, then the same for `Pro` and `Pro+`.
-- **Period toggle.** Annual `$44.99` is visible first. Run `helpers/control browser click --role button --name Monthly --exact`. `$4.99` appears and `$44.99` is gone.
+- **Period toggle.** Annual `$44.99` is visible first. Run `helpers/control browser click --role button --name Monthly --exact`. Then `expect --text '$4.99'` (single quotes — the shell eats `$4` inside double quotes). `$44.99` is gone.
 - **FAQ.** Open `/pricing` and choose the question about old brews. Run `helpers/control browser goto --path /pricing` then `helpers/control browser click --role button --name "/what happens to my old Brews/i"`. Text matching `/your Shelf/i` and `/Nothing is ever deleted/i` is visible.
-- **Checkout return.** Run `helpers/control browser goto --path "/pricing?checkout=pro&period=monthly"`. `$4.99` is visible, the `Monthly` button has `aria-pressed=true`, the URL has dropped the query, and a `Subscribe` button remains (nothing is bought).
+- **Checkout return.** Run `helpers/control browser goto --path "/pricing?checkout=pro&period=monthly"`. `expect --text '$4.99'` (single quotes), the `Monthly` button has `aria-pressed=true`, the URL has dropped the query, and a `Subscribe` button remains (nothing is bought).
 - **Proof.** Capture home and pricing. Run `helpers/control drive marketing`, or `helpers/control browser screenshot --path artifacts/<run>/marketing/home.png` and `helpers/control browser snapshot --aria --path artifacts/<run>/marketing/home.aria.txt` on `/`, then the same pair on `/pricing`. Both screenshots show the marketing header `Coffee Companion`.
 
 ## Gotchas
 
-- Identity `data` or `free` on `/` redirects to `/dashboard`. Prove marketing as `public`.
+- Identity `data`, `free`, or `empty` on `/` redirects to `/dashboard`. Prove marketing as `public`.
+- Quote plan prices as `'$4.99'` / `'$44.99'`. Double quotes let the shell expand `$4` / `$44` and `expect --text "$4.99"` becomes `getByText('.99')`.
 - `Pricing` is in the header and the footer. Click the header (`navigation` named `Marketing`) or you may scroll the footer instead.
 - DataTable renders a desktop table and a mobile card stack. At 1280px the table is the one to assert; a loose `getByText('Ethiopia Guji')` matches both.
 - Default billing period is annual (`$44.99`). Assert `$4.99` only after pressing `Monthly`.

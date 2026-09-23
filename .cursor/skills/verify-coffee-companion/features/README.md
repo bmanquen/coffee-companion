@@ -46,6 +46,6 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Privacy](./privacy.md) covers the public privacy page reached from the marketing footer. Mapped; drive with `browser` commands — no `drive privacy` stub yet.
 - [Dashboard](./dashboard.md) covers the signed-in home, method picker, and per-method log links. Mapped; drive with `browser` commands — no `drive dashboard` stub yet.
 - [Coffees](./coffees.md) covers the Coffee list and create / edit / delete. Mapped; drive with `browser` commands — no `drive coffees` stub yet.
-- [Brews](./brews.md) covers the brew log tabs and logging an Espresso Shot or AeroPress brew. Mapped; drive with `browser` commands — no `drive brews` stub yet.
+- [Brews](./brews.md) covers the brew log tabs, logging an Espresso Shot or AeroPress brew, and edit / delete / Dialed-in on a readable row. Mapped; drive with `browser` commands — no `drive brews` stub yet.
 - [Equipment](./equipment.md) covers Grinders and Brewing Devices, including Free's gear cap. Mapped; drive with `browser` commands — no `drive equipment` stub yet.
 - [Plans and Shelf](./plans-and-shelf.md) covers Pro vs Free reading, Sealed brews, the account Plan, and account export. Mapped; drive with `browser` commands — no `drive plans-and-shelf` stub yet.
