@@ -33,7 +33,9 @@ What the API is handed, from `apps/web/src/instrument.server.ts`:
 - `setErrorCapture` / `reportError` — when a DSN is set, the instrument captures
   with Sentry
 - `setLogSink` / `log` — the same file writes through the pino instance
-- `requestField` — reads `x-request-id` off the headers the server already set
+
+The request id is not a vendor sink. The server writes `x-request-id` onto the
+request; `requestField` in the API package reads it back onto a log line.
 
 The setters live in the API package. The vendors live in the instrument files,
 and PostHog is injected at boot in `apps/web/src/analytics.client.ts`. Tests
@@ -78,19 +80,21 @@ not on the response.
 
 ## Privacy stance
 
-A user is an opaque account id — the better-auth user id — and nothing else. No
-name, email, avatar, IP, cookie, body, or Coffee reaches Sentry or PostHog.
+A user is an opaque account id — the better-auth user id — and nothing else we
+send. No name, email, avatar, cookie, body, or Coffee is attached by us.
 `sendDefaultPii` is off; `scrubSentryEvent` enforces the Sentry side; PostHog's
-facade and `before_send` hook enforce the other. There is no session-level
+facade and `before_send` hook enforce the other. PostHog still derives an
+approximate location from the IP at its end — 0009 already said so, and that is
+not ours to withhold short of turning the SDK off. There is no session-level
 replay and no autocapture. 0009, 0010, and 0012 are the detailed versions of
 those rules; this is the stack-level line a new vendor or a new field is
 measured against.
 
 What we rejected:
 
-- **A `web-vitals` package.** Sentry's browser tracing already reports LCP, CLS,
-  and INP. A second library would measure the same three numbers and imply a
-  pipeline that does not exist.
+- **A first-party `web-vitals` package.** Sentry's browser tracing already
+  reports LCP, CLS, and INP. Adding the library ourselves would measure the
+  same three numbers and imply a pipeline we do not run.
 - **Vendors inside the API package.** The seams exist so a test can run without
   a DSN and so SSR does not load Node Sentry.
 - **A log vendor, or shipping logs anywhere but stdout.** Railway reads stdout.
