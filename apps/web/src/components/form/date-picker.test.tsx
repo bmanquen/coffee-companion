@@ -72,6 +72,11 @@ describe('DatePicker', () => {
     expect(screen.getByText('January 15th, 2026')).toBeTruthy()
   })
 
+  it('associates the label with the trigger', () => {
+    render(<Harness />)
+    expect(screen.getByLabelText('Roast date')).toBeTruthy()
+  })
+
   it('keeps the label reachable when it is visually hidden', () => {
     render(<Harness showLabel={false} />)
 

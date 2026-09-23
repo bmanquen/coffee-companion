@@ -36,6 +36,7 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
         <Popover>
           <PopoverTrigger asChild>
             <Button
+              id={field.name}
               variant="outline"
               className={`flex justify-between ${!field.state.value ? 'text-muted-foreground/40' : ''}`}
               aria-invalid={error.invalid || undefined}

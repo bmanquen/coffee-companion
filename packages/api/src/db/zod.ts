@@ -313,7 +313,9 @@ export const insertColdBrewBrewSchema = createInsertSchema(coldBrewBrews, {
     dose: decimalString(),
     water: decimalString(),
     steepTime: requiredInt(),
-    brewEnvironment: z.enum(['Counter', 'Fridge']),
+    brewEnvironment: z.enum(['Counter', 'Fridge'], {
+      error: 'Select Counter or Fridge',
+    }),
     grindSetting: requiredGrindSetting(),
   })
 export const selectColdBrewBrewSchema = createSelectSchema(coldBrewBrews)
