@@ -128,6 +128,37 @@ describe('dialedInBrew.set / get', () => {
     expect(found?.sealed).toBe(false)
   })
 
+  it('keeps one mapping when two sets for the same pair race', async () => {
+    const first = await logShot(espressoDeviceAId, '2.1')
+    const second = await logShot(espressoDeviceAId, '2.2')
+
+    await Promise.all([
+      asA.dialedInBrew.set({
+        brewingMethod: 'espresso',
+        brewingDeviceId: espressoDeviceAId,
+        brewId: first.id,
+      }),
+      asA.dialedInBrew.set({
+        brewingMethod: 'espresso',
+        brewingDeviceId: espressoDeviceAId,
+        brewId: second.id,
+      }),
+    ])
+
+    const found = await asA.dialedInBrew.get({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+    })
+    expect([first.id, second.id]).toContain(found?.brewId)
+    expect(
+      (await asA.dialedInBrew.list()).filter(
+        (row) =>
+          row.brewingMethod === 'espresso' &&
+          row.brewingDeviceId === espressoDeviceAId,
+      ),
+    ).toHaveLength(1)
+  })
+
   it('replaces the pair’s Brew when a second one is set', async () => {
     const first = await logShot(espressoDeviceAId, '2.0')
     const second = await logShot(espressoDeviceAId, '2.5')
