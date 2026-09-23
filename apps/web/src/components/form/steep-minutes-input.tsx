@@ -1,6 +1,7 @@
 import { FormLabel } from './form-label'
+import { useFieldError } from './use-field-error'
 import { useFieldRequired } from './use-field-required'
-import { Field, FieldContent } from '@/components/ui/field'
+import { Field, FieldContent, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { fromSeconds, toSeconds } from '@/lib/duration'
 
@@ -23,9 +24,10 @@ export function SteepMinutesInput({
     onChange(seconds == null ? null : seconds / 60)
   }
   const required = useFieldRequired()
+  const error = useFieldError()
 
   return (
-    <Field>
+    <Field data-invalid={error.shown || undefined}>
       <FormLabel htmlFor="steepTimeHours" required={required}>
         Steep Time
       </FormLabel>
@@ -40,6 +42,8 @@ export function SteepMinutesInput({
             value={hours}
             onBlur={onBlur}
             onChange={(e) => setSteep(e.target.value, minutes)}
+            aria-invalid={error.invalid || undefined}
+            aria-describedby={error.describedBy}
             aria-required={required || undefined}
           />
           <Input
@@ -50,9 +54,14 @@ export function SteepMinutesInput({
             value={minutes}
             onBlur={onBlur}
             onChange={(e) => setSteep(hours, e.target.value)}
+            aria-invalid={error.invalid || undefined}
+            aria-describedby={error.describedBy}
             aria-required={required || undefined}
           />
         </div>
+        {error.shown && (
+          <FieldError id={error.errorId}>{error.messages.join(', ')}</FieldError>
+        )}
       </FieldContent>
     </Field>
   )

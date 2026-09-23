@@ -1,6 +1,7 @@
 import { Field, FieldContent, FieldDescription, FieldError } from '../ui/field'
 import { Textarea } from '../ui/textarea'
 import { FormLabel } from './form-label'
+import { useFieldError } from './use-field-error'
 import { useFieldRequired } from './use-field-required'
 import { useFieldContext } from '@/hooks/form-context'
 
@@ -19,9 +20,10 @@ export function TextArea({
 }: Props) {
   const field = useFieldContext<string | null>()
   const required = useFieldRequired()
+  const error = useFieldError()
 
   return (
-    <Field>
+    <Field data-invalid={error.shown || undefined}>
       <FormLabel
         htmlFor={field.name}
         required={required}
@@ -38,13 +40,13 @@ export function TextArea({
           onBlur={field.handleBlur}
           onChange={(e) => field.handleChange(e.target.value)}
           rows={10}
+          aria-invalid={error.invalid || undefined}
+          aria-describedby={error.describedBy}
           aria-required={required || undefined}
         />
         {description && <FieldDescription>{description}</FieldDescription>}
-        {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
-          <FieldError>
-            {field.state.meta.errors.map((e) => e.message).join(', ')}
-          </FieldError>
+        {error.shown && (
+          <FieldError id={error.errorId}>{error.messages.join(', ')}</FieldError>
         )}
       </FieldContent>
     </Field>

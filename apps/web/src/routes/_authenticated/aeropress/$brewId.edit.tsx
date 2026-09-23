@@ -9,6 +9,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import type { InsertAeropressBrew } from '@coffee-companion/api/db/zod'
 import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
+import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -16,6 +17,7 @@ import { useAppForm } from '@/hooks/form'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
+import { submitFormMutation } from '@/lib/form-error'
 
 export const Route = createFileRoute('/_authenticated/aeropress/$brewId/edit')({
   loader: async ({ context, params }) => {
@@ -103,8 +105,8 @@ function EditAeropressBrew() {
     validators: {
       onChange: insertAeropressBrewSchema as never,
     },
-    onSubmit: ({ value }) => {
-      updateBrew.mutate({ ...value, id: brewId })
+    onSubmit: async ({ value }) => {
+      await submitFormMutation(form, updateBrew.mutateAsync, { ...value, id: brewId })
     },
   })
 
@@ -175,6 +177,7 @@ function EditAeropressBrew() {
             <field.TextArea label="Notes" placeholder="Tasting notes..." />
           )}
         </form.AppField>
+        <MutationErrorNotices error={updateBrew.error} />
         <Button type="submit">
           Save
           <Check />

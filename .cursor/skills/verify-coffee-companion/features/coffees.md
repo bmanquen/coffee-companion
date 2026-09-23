@@ -34,7 +34,7 @@ Preconditions:
 
 ## Gotchas
 
-- SearchSelect's accessible name is not the visible `Select Roaster` label. Click the visible text, then the option. Roast Level is required — submitting without it stays on `/coffees/new` with `Select a roast level`. Pick the SearchSelects before filling `Name` so the first post-navigation action is a click (hydration).
+- SearchSelect's accessible name is not the visible `Select Roaster` label. Click the visible text, then the option. An empty submit stays on `/coffees/new` and shows `Enter a name`, `Select a roaster`, and `Select a roast level` next to those fields. Pick the SearchSelects before filling `Name` so the first post-navigation action is a click (hydration).
 - `Add` (create) and `Save` (edit) are different buttons. `Delete coffee` opens the dialog; the dialog's confirm is exactly `Delete`. Row actions are not unique; after a create the new Coffee is first — use `--first`.
 - Name uniqueness is per user per roaster. Timestamp the name so a retry does not collide. A blend occupies that same uniqueness — it cannot share a roaster and name with another Coffee.
 - Expanding a row to read Dialed-in settings is a click on the name cell of the desktop table (`apps/web/e2e/helpers.ts` `expandRow`, or `click --role cell --name "Sumatra Lintong" --exact`). On `data`, Sumatra Lintong's expander shows `18g → 36g` (`expect --text "18g → 36g" --first`). On `free`, that same Coffee shows `This Brew is Sealed` — see [Plans and Shelf](./plans-and-shelf.md).

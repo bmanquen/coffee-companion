@@ -7,14 +7,16 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertBrewingDevice } from '@coffee-companion/api/db/zod'
-import { PlanLimitNotice } from '@/components/plan-limit-notice'
+import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
-import { planLimitMessage } from '@/lib/plan-limit'
+import { submitFormMutation } from '@/lib/form-error'
+
+const deviceMutationFields = { CONFLICT: 'name' } as const
 
 export const Route = createFileRoute(
   '/_authenticated/equipment/brewing-devices/new',
@@ -57,8 +59,6 @@ function NewBrewingDevice() {
     }),
   )
 
-  const limitMessage = planLimitMessage(createDevice.error)
-
   const defaultDevice: InsertBrewingDevice = {
     name: '',
     brand: '',
@@ -70,8 +70,13 @@ function NewBrewingDevice() {
     validators: {
       onChange: insertBrewingDeviceSchema,
     },
-    onSubmit: ({ value }) => {
-      createDevice.mutate(value)
+    onSubmit: async ({ value }) => {
+      await submitFormMutation(
+        form,
+        createDevice.mutateAsync,
+        value,
+        deviceMutationFields,
+      )
     },
   })
 
@@ -98,7 +103,10 @@ function NewBrewingDevice() {
         <form.AppField name="typeId">
           {(field) => <field.SearchSelect label="Type" {...type} />}
         </form.AppField>
-        {limitMessage && <PlanLimitNotice message={limitMessage} />}
+        <MutationErrorNotices
+          error={createDevice.error}
+          fieldByCode={deviceMutationFields}
+        />
         <Button type="submit">
           Add
           <Plus />

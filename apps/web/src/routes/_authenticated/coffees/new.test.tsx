@@ -106,6 +106,27 @@ describe('NewCoffee', () => {
     }
   })
 
+  it('shows field errors when required fields are empty', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => Promise.resolve(trpcSuccess([])))
+    try {
+      const { Wrapper } = seeded()
+      render(<NewCoffee />, { wrapper: Wrapper })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      expect(await screen.findByText('Enter a name')).toBeTruthy()
+      expect(
+        fetchSpy.mock.calls.some(([url]) =>
+          String(url).includes('coffee.create'),
+        ),
+      ).toBe(false)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('submits a blend with origin countries', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')

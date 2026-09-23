@@ -1,6 +1,7 @@
 import { FormLabel } from './form-label'
+import { useFieldError } from './use-field-error'
 import { useFieldRequired } from './use-field-required'
-import { Field, FieldContent } from '@/components/ui/field'
+import { Field, FieldContent, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { fromSeconds, toSeconds } from '@/lib/duration'
 
@@ -33,9 +34,10 @@ export function MinutesSecondsInput({
   }
   const minutesId = `${label.replace(/\s+/g, '-').toLowerCase()}-minutes`
   const required = useFieldRequired()
+  const error = useFieldError()
 
   return (
-    <Field>
+    <Field data-invalid={error.shown || undefined}>
       <FormLabel htmlFor={minutesId} required={required}>
         {label}
       </FormLabel>
@@ -50,6 +52,8 @@ export function MinutesSecondsInput({
             value={minutes}
             onBlur={onBlur}
             onChange={(e) => setTime(e.target.value, seconds)}
+            aria-invalid={error.invalid || undefined}
+            aria-describedby={error.describedBy}
             aria-required={required || undefined}
           />
           <Input
@@ -60,9 +64,14 @@ export function MinutesSecondsInput({
             value={seconds}
             onBlur={onBlur}
             onChange={(e) => setTime(minutes, e.target.value)}
+            aria-invalid={error.invalid || undefined}
+            aria-describedby={error.describedBy}
             aria-required={required || undefined}
           />
         </div>
+        {error.shown && (
+          <FieldError id={error.errorId}>{error.messages.join(', ')}</FieldError>
+        )}
       </FieldContent>
     </Field>
   )

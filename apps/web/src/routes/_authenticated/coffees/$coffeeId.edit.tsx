@@ -10,15 +10,18 @@ import type { CoffeeFormValues } from '@/components/coffees/coffee-form'
 import { CoffeeOriginEditor } from '@/components/coffees/coffee-origin-editor'
 import {
   coffeeFormSchema,
+  coffeeMutationFields,
   formOriginsFromCoffee,
   originsForApi,
 } from '@/components/coffees/coffee-form'
+import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
+import { submitFormMutation } from '@/lib/form-error'
 
 export const Route = createFileRoute('/_authenticated/coffees/$coffeeId/edit')({
   loader: async ({ context, params }) => {
@@ -109,12 +112,17 @@ function EditCoffeeComponent() {
     validators: {
       onChange: coffeeFormSchema,
     },
-    onSubmit: ({ value }) => {
-      updateCoffee.mutate({
-        ...value,
-        id: coffeeId,
-        origins: originsForApi(value.origins),
-      })
+    onSubmit: async ({ value }) => {
+      await submitFormMutation(
+        form,
+        updateCoffee.mutateAsync,
+        {
+          ...value,
+          id: coffeeId,
+          origins: originsForApi(value.origins),
+        },
+        coffeeMutationFields,
+      )
     },
   })
 
@@ -160,6 +168,10 @@ function EditCoffeeComponent() {
         <form.AppField name="notes">
           {(field) => <field.TextArea label="Notes" placeholder="Notes..." />}
         </form.AppField>
+        <MutationErrorNotices
+          error={updateCoffee.error}
+          fieldByCode={coffeeMutationFields}
+        />
         <Button type="submit">
           Save
           <Check />

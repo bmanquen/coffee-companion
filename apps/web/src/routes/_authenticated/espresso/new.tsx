@@ -9,6 +9,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
+import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -17,6 +18,7 @@ import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
+import { submitFormMutation } from '@/lib/form-error'
 
 export const Route = createFileRoute('/_authenticated/espresso/new')({
   loader: async ({ context }) => {
@@ -83,8 +85,8 @@ function NewEspressoShot() {
     validators: {
       onChange: insertEspressoShotSchema as never,
     },
-    onSubmit: ({ value }) => {
-      createShot.mutate(value)
+    onSubmit: async ({ value }) => {
+      await submitFormMutation(form, createShot.mutateAsync, value)
     },
   })
 
@@ -166,6 +168,7 @@ function NewEspressoShot() {
             <field.TextArea label="Notes" placeholder="Tasting notes..." />
           )}
         </form.AppField>
+        <MutationErrorNotices error={createShot.error} />
         <Button type="submit">
           Log
           <Plus />
