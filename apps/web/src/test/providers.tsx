@@ -35,5 +35,7 @@ export function createTestProviders() {
       </TRPCProvider>
     </QueryClientProvider>
   )
+  // Brew logs read this on mount. Default is no device-scoped Dialed-in pairs.
+  queryClient.setQueryData(trpc.dialedInBrew.list.queryKey(), [])
   return { queryClient, trpc, Wrapper }
 }

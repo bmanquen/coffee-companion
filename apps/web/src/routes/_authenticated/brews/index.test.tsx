@@ -39,6 +39,10 @@ function seeded() {
     providers.trpc.aeropressBrew.getAll.queryKey(),
     [makeAeropressBrew()],
   )
+  providers.queryClient.setQueryData(
+    providers.trpc.dialedInBrew.list.queryKey(),
+    [],
+  )
   return providers
 }
 

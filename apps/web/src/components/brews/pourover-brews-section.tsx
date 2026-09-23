@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { PouroverBrewWithRelations } from '@/types'
 import {
+  deviceDialedInFor,
   renderBrewDetails,
   waterTempExtra,
 } from '@/components/brews/brew-details'
@@ -30,6 +31,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
+import { useDeviceDialedIn } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 import { formatBrewSeconds } from '@/lib/brew'
@@ -174,6 +176,7 @@ export function PouroverBrewsSection() {
   const { data: brews } = useSuspenseQuery(
     trpc.pouroverBrew.getAll.queryOptions(),
   )
+  const deviceDialedIn = useDeviceDialedIn('pourover')
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -255,6 +258,7 @@ export function PouroverBrewsSection() {
               renderBrewDetails(
                 row.original,
                 waterTempExtra(row.original.waterTemp),
+                deviceDialedInFor(row.original, deviceDialedIn),
               )
             }
             replaceRow={(row) =>
@@ -263,7 +267,12 @@ export function PouroverBrewsSection() {
             rowClassName={(row) =>
               row.original.sealed
                 ? sealedRowClass
-                : row.original.isDialedIn
+                : row.original.isDialedIn ||
+                    (row.original.brewingDeviceId != null &&
+                      deviceDialedIn.isDialedIn(
+                        row.original.id,
+                        row.original.brewingDeviceId,
+                      ))
                   ? 'bg-primary/10 hover:bg-primary/15'
                   : undefined
             }

@@ -3,8 +3,9 @@ import { aeropressBrewRouter } from './aeropressBrew'
 import { aeropressMethodRouter } from './aeropressMethod'
 import { brewingDeviceRouter } from './brewingDevice'
 import { brewingDeviceTypeRouter } from './brewingDeviceType'
-import { coffeeRouter } from './coffee'
 import { coffeeProcessRouter } from './coffeeProcess'
+import { coffeeRouter } from './coffee'
+import { dialedInBrewRouter } from './dialedInBrew'
 import { coldBrewBrewRouter } from './coldBrewBrew'
 import { countryRouter } from './country'
 import { espressoShotRouter } from './espressoShot'
@@ -28,6 +29,7 @@ export const trpcRouter = createTRPCRouter({
   region: regionRouter,
   coffeeProcess: coffeeProcessRouter,
   coffee: coffeeRouter,
+  dialedInBrew: dialedInBrewRouter,
   grinder: grinderRouter,
   brewingDeviceType: brewingDeviceTypeRouter,
   brewingDevice: brewingDeviceRouter,

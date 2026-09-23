@@ -9,6 +9,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertAeropressBrew } from '@coffee-companion/api/db/zod'
 import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
+import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -148,7 +149,13 @@ function NewAeropressBrew() {
         </form.AppField>
         <form.AppField name="brewingDeviceId">
           {(field) => (
-            <field.SearchSelect label="Brewing Device" {...brewingDevice} />
+            <>
+              <field.SearchSelect label="Brewing Device" {...brewingDevice} />
+              <DeviceDialedInReference
+                brewingMethod="aeropress"
+                brewingDeviceId={field.state.value}
+              />
+            </>
           )}
         </form.AppField>
         <form.AppField name="roastDate">

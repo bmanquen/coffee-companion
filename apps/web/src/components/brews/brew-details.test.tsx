@@ -22,6 +22,25 @@ describe('BrewDetails', () => {
     expect(screen.getByText('bright and clean')).toBeTruthy()
   })
 
+  it('renders the device Dialed-in toggle when wired', () => {
+    render(
+      <BrewDetails
+        grinder={grinder}
+        device={device}
+        notes={null}
+        deviceDialedIn={{
+          dialedIn: true,
+          deviceName: 'V60',
+          onToggle: () => {},
+        }}
+      />,
+    )
+    expect(
+      screen.getByRole('button', { name: 'Dialed in for V60 — clear' }),
+    ).toBeTruthy()
+    expect(screen.getByText('Dialed-in for device')).toBeTruthy()
+  })
+
   it('omits the extra slot and shows a dimmed placeholder for empty notes', () => {
     render(<BrewDetails grinder={grinder} device={device} notes={null} />)
     expect(screen.queryByText(/Water temp/)).toBeNull()
