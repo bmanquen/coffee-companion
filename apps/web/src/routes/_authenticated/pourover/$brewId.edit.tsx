@@ -186,7 +186,11 @@ function EditPouroverBrew() {
             <field.TextArea label="Notes" placeholder="Tasting notes..." />
           )}
         </form.AppField>
-        <MutationErrorNotices error={updateBrew.error} />
+        <MutationErrorNotices
+          error={updateBrew.error}
+          reset={updateBrew.reset}
+          form={form}
+        />
         <Button type="submit">
           Save
           <Check />

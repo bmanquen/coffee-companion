@@ -150,7 +150,11 @@ function EditEspressoShot() {
             <field.TextArea label="Notes" placeholder="Tasting notes..." />
           )}
         </form.AppField>
-        <MutationErrorNotices error={updateShot.error} />
+        <MutationErrorNotices
+          error={updateShot.error}
+          reset={updateShot.reset}
+          form={form}
+        />
         <Button type="submit">
           Save
           <Check />

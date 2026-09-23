@@ -116,6 +116,8 @@ function EditBrewingDevice() {
         </form.AppField>
         <MutationErrorNotices
           error={updateDevice.error}
+          reset={updateDevice.reset}
+          form={form}
           fieldByCode={deviceMutationFields}
         />
         <Button type="submit">
