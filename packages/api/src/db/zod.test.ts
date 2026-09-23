@@ -245,6 +245,18 @@ describe('insertColdBrewBrewSchema', () => {
       }).success,
     ).toBe(false)
   })
+
+  it('names an empty brew environment', () => {
+    const parsed = insertColdBrewBrewSchema.safeParse({
+      ...valid,
+      brewEnvironment: null,
+    })
+    expect(parsed.success).toBe(false)
+    if (parsed.success) return
+    expect(parsed.error.issues.map((issue) => issue.message)).toContain(
+      'Select Counter or Fridge',
+    )
+  })
 })
 
 describe('insertGrinderSchema', () => {
