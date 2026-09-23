@@ -31,6 +31,7 @@ export function DeviceDialedInReference({
       brewingDeviceId,
     }),
     enabled: Boolean(brewingDeviceId),
+    staleTime: Infinity,
   })
 
   if (!brewingDeviceId || !data) return null
