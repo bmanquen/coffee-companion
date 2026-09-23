@@ -201,7 +201,11 @@ function NewAeropressBrew() {
             <field.TextArea label="Notes" placeholder="Tasting notes..." />
           )}
         </form.AppField>
-        <MutationErrorNotices error={createBrew.error} />
+        <MutationErrorNotices
+          error={createBrew.error}
+          reset={createBrew.reset}
+          form={form}
+        />
         <Button type="submit">
           Log
           <Plus />

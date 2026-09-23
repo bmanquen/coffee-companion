@@ -73,6 +73,8 @@ function NewGrinder() {
         </form.AppField>
         <MutationErrorNotices
           error={createGrinder.error}
+          reset={createGrinder.reset}
+          form={form}
           fieldByCode={grinderMutationFields}
         />
         <Button type="submit">
