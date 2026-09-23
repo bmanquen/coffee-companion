@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { useTRPC } from '@/integrations/trpc/react'
 import type {
   BrewingMethod,
   DialedInBrewView,
 } from '@coffee-companion/api/lib/dialed-in-brew'
+import { useTRPC } from '@/integrations/trpc/react'
 
 function formatReference(view: DialedInBrewView) {
   if (view.sealed) return 'Sealed'

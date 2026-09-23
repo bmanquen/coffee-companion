@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useTRPC } from '@/integrations/trpc/react'
 import type { BrewingMethod } from '@coffee-companion/api/lib/dialed-in-brew'
+import { useTRPC } from '@/integrations/trpc/react'
 
 export function useDeviceDialedIn(brewingMethod: BrewingMethod) {
   const trpc = useTRPC()
