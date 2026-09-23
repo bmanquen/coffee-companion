@@ -3,6 +3,9 @@ import {
   applyMutationError,
   formLevelMessage,
   mapMutationError,
+  rememberSubmittedValues,
+  submitFormMutation,
+  submittedValuesKey,
 } from './form-error'
 
 const trpcError = (code: string, message: string) =>
@@ -92,5 +95,24 @@ describe('applyMutationError', () => {
       trpcError('FORBIDDEN', 'Free holds 1 grinder. Subscribe to add more.'),
     )
     expect(setErrorMap).not.toHaveBeenCalled()
+  })
+})
+
+describe('rememberSubmittedValues', () => {
+  it('records the values object that submit sent', () => {
+    const form = {}
+    rememberSubmittedValues(form, { name: 'Ethiopia' })
+    expect(submittedValuesKey(form)).toBe(JSON.stringify({ name: 'Ethiopia' }))
+  })
+
+  it('submitFormMutation records the form store, not the API payload', async () => {
+    const form = {
+      setErrorMap: vi.fn(),
+      store: { state: { values: { name: 'Ethiopia', origins: [{ countryId: '' }] } } },
+    }
+    await submitFormMutation(form, async () => {}, { name: 'Ethiopia', origins: [] })
+    expect(submittedValuesKey(form)).toBe(
+      JSON.stringify({ name: 'Ethiopia', origins: [{ countryId: '' }] }),
+    )
   })
 })

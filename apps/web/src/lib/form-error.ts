@@ -42,6 +42,21 @@ export function formLevelMessage(
 
 type FormLike = {
   setErrorMap: (errorMap: never) => void
+  store?: { state: { values: unknown } }
+}
+
+const submittedByForm = new WeakMap<object, string>()
+
+function encodeValues(value: unknown) {
+  return JSON.stringify(value)
+}
+
+export function rememberSubmittedValues(form: object, value: unknown) {
+  submittedByForm.set(form, encodeValues(value))
+}
+
+export function submittedValuesKey(form: object) {
+  return submittedByForm.get(form)
 }
 
 export function applyMutationError(
@@ -64,6 +79,7 @@ export async function submitFormMutation<T>(
   value: T,
   fieldByCode: Partial<Record<string, string>> = {},
 ) {
+  rememberSubmittedValues(form, form.store?.state.values ?? value)
   try {
     await mutate(value)
   } catch (error) {
