@@ -3,6 +3,7 @@ import { Crosshair } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { SealedBrewNotice } from '@/components/brews/sealed-brew-notice'
+import { sealedRowClass } from '@/components/brews/sealed-row'
 import { DetailList } from '@/components/detail-list'
 import { daysOffRoast as computeDaysOffRoast } from '@/lib/brew'
 
@@ -29,6 +30,18 @@ export function deviceDialedInFor(
     deviceName: brew.brewingDevice.name,
     onToggle: () => control.toggle(brew),
   }
+}
+
+export function brewLogRowClass(
+  sealed: boolean,
+  coffeeDialedIn: boolean,
+  deviceDialedIn: boolean,
+) {
+  if (sealed) return sealedRowClass
+  if (coffeeDialedIn || deviceDialedIn) {
+    return 'bg-primary/10 hover:bg-primary/15'
+  }
+  return undefined
 }
 
 // The expandable detail region shared by every brew surface — the dashboard

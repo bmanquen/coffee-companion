@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { PouroverBrewWithRelations } from '@/types'
 import {
+  brewLogRowClass,
   deviceDialedInFor,
   renderBrewDetails,
   waterTempExtra,
@@ -25,7 +26,7 @@ import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
-import { SealedRowNotice, sealedRowClass } from '@/components/brews/sealed-row'
+import { SealedRowNotice } from '@/components/brews/sealed-row'
 import { DataTable, expanderColumn } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -265,16 +266,15 @@ export function PouroverBrewsSection() {
               row.original.sealed ? <SealedRowNotice /> : null
             }
             rowClassName={(row) =>
-              row.original.sealed
-                ? sealedRowClass
-                : row.original.isDialedIn ||
-                    (row.original.brewingDeviceId != null &&
-                      deviceDialedIn.isDialedIn(
-                        row.original.id,
-                        row.original.brewingDeviceId,
-                      ))
-                  ? 'bg-primary/10 hover:bg-primary/15'
-                  : undefined
+              brewLogRowClass(
+                row.original.sealed,
+                row.original.isDialedIn,
+                row.original.brewingDeviceId != null &&
+                  deviceDialedIn.isDialedIn(
+                    row.original.id,
+                    row.original.brewingDeviceId,
+                  ),
+              )
             }
           />
         </>
