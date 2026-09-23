@@ -71,8 +71,21 @@ describe('insertEspressoShotSchema', () => {
     if (parsed.success) return
     const messages = parsed.error.issues.map((issue) => issue.message)
     expect(messages).toContain('Select a coffee')
-    expect(messages).toContain('Enter a number')
     expect(messages).toContain('Enter a grind setting')
+    expect(messages.filter((message) => message === 'Enter a number')).toEqual([
+      'Enter a number',
+      'Enter a number',
+    ])
+    expect(messages).not.toContain('Must be a number')
+  })
+
+  it('uses one message for an invalid dose', () => {
+    const parsed = insertEspressoShotSchema.safeParse({ ...valid, dose: 'abc' })
+    expect(parsed.success).toBe(false)
+    if (parsed.success) return
+    expect(parsed.error.issues.map((issue) => issue.message)).toEqual([
+      'Must be a number',
+    ])
   })
 
   it('rejects non-numeric dose strings', () => {
