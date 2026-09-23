@@ -46,6 +46,7 @@ type FormLike = {
 }
 
 const submittedByForm = new WeakMap<object, string>()
+const inflightByForm = new WeakSet<object>()
 
 function encodeValues(value: unknown) {
   return JSON.stringify(value)
@@ -79,10 +80,14 @@ export async function submitFormMutation<T>(
   value: T,
   fieldByCode: Partial<Record<string, string>> = {},
 ) {
+  if (inflightByForm.has(form)) return
+  inflightByForm.add(form)
   rememberSubmittedValues(form, form.store?.state.values ?? value)
   try {
     await mutate(value)
   } catch (error) {
     applyMutationError(form, error, fieldByCode)
+  } finally {
+    inflightByForm.delete(form)
   }
 }
