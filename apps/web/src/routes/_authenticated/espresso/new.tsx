@@ -173,7 +173,7 @@ function NewEspressoShot() {
           reset={createShot.reset}
           form={form}
         />
-        <Button type="submit">
+        <Button type="submit" disabled={createShot.isPending}>
           Log
           <Plus />
         </Button>

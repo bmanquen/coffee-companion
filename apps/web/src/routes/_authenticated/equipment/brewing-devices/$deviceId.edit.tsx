@@ -120,7 +120,7 @@ function EditBrewingDevice() {
           form={form}
           fieldByCode={deviceMutationFields}
         />
-        <Button type="submit">
+        <Button type="submit" disabled={updateDevice.isPending}>
           Save
           <Check />
         </Button>

@@ -206,7 +206,7 @@ function NewAeropressBrew() {
           reset={createBrew.reset}
           form={form}
         />
-        <Button type="submit">
+        <Button type="submit" disabled={createBrew.isPending}>
           Log
           <Plus />
         </Button>

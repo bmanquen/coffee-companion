@@ -92,7 +92,7 @@ function EditGrinder() {
           form={form}
           fieldByCode={grinderMutationFields}
         />
-        <Button type="submit">
+        <Button type="submit" disabled={updateGrinder.isPending}>
           Save
           <Check />
         </Button>

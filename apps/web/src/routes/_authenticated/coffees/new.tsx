@@ -164,7 +164,7 @@ function NewCoffeeComponent() {
           form={form}
           fieldByCode={coffeeMutationFields}
         />
-        <Button type="submit">
+        <Button type="submit" disabled={createCoffee.isPending}>
           Add
           <Plus />
         </Button>

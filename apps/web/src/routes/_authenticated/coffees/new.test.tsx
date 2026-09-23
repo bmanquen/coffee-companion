@@ -106,6 +106,48 @@ describe('NewCoffee', () => {
     }
   })
 
+  it('disables Add while create is pending', async () => {
+    let finishCreate: (value: Response) => void = () => {}
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input) => {
+        if (String(input).includes('coffee.create')) {
+          return new Promise((resolve) => {
+            finishCreate = resolve
+          })
+        }
+        return Promise.resolve(trpcSuccess([]))
+      })
+    try {
+      const { Wrapper } = seeded()
+      render(<NewCoffee />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByLabelText(/^Name/), {
+        target: { value: 'Ethiopia Guji' },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Roaster' }), {
+        target: { value: ROASTER },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Roast Level' }), {
+        target: { value: ROAST_LEVEL },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Add' })).toHaveProperty(
+          'disabled',
+          true,
+        ),
+      )
+      finishCreate(trpcSuccess([]))
+      await waitFor(() =>
+        expect(mocks.navigate).toHaveBeenCalledWith({ to: '/coffees' }),
+      )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('shows field errors when required fields are empty', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')

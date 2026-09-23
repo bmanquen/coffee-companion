@@ -182,7 +182,7 @@ function EditAeropressBrew() {
           reset={updateBrew.reset}
           form={form}
         />
-        <Button type="submit">
+        <Button type="submit" disabled={updateBrew.isPending}>
           Save
           <Check />
         </Button>

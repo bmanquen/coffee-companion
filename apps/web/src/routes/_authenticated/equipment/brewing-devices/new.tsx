@@ -109,7 +109,7 @@ function NewBrewingDevice() {
           form={form}
           fieldByCode={deviceMutationFields}
         />
-        <Button type="submit">
+        <Button type="submit" disabled={createDevice.isPending}>
           Add
           <Plus />
         </Button>

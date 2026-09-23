@@ -77,7 +77,7 @@ function NewGrinder() {
           form={form}
           fieldByCode={grinderMutationFields}
         />
-        <Button type="submit">
+        <Button type="submit" disabled={createGrinder.isPending}>
           Add
           <Plus />
         </Button>
