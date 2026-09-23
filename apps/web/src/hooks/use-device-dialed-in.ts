@@ -8,6 +8,8 @@ export function useDeviceDialedIn(brewingMethod: BrewingMethod) {
   const { data: mappings = [] } = useQuery({
     ...trpc.dialedInBrew.list.queryOptions(),
     placeholderData: [],
+    // Seeded caches (tests, the brews loader) stay put; set() invalidates.
+    staleTime: Infinity,
   })
   const setMapping = useMutation(
     trpc.dialedInBrew.set.mutationOptions({
