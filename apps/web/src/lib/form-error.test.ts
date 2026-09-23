@@ -115,4 +115,32 @@ describe('rememberSubmittedValues', () => {
       JSON.stringify({ name: 'Ethiopia', origins: [{ countryId: '' }] }),
     )
   })
+
+  it('ignores a second submit while the first is in flight', async () => {
+    let rejectFirst: (error: Error) => void = () => {}
+    const first = new Promise<never>((_resolve, reject) => {
+      rejectFirst = reject
+    })
+    const mutate = vi
+      .fn()
+      .mockImplementationOnce(() => first)
+      .mockImplementationOnce(() =>
+        Promise.reject(trpcError('NOT_FOUND', 'second')),
+      )
+    const form = {
+      setErrorMap: vi.fn(),
+      store: { state: { values: { name: 'Ethiopia' } } },
+    }
+
+    const pending = submitFormMutation(form, mutate, { name: 'Ethiopia' })
+    form.store.state.values = { name: 'Kenya Nyeri' }
+    await submitFormMutation(form, mutate, { name: 'Kenya Nyeri' })
+    expect(mutate).toHaveBeenCalledTimes(1)
+    expect(submittedValuesKey(form)).toBe(JSON.stringify({ name: 'Ethiopia' }))
+
+    rejectFirst(trpcError('NOT_FOUND', 'first'))
+    await pending
+    expect(submittedValuesKey(form)).toBe(JSON.stringify({ name: 'Ethiopia' }))
+    expect(form.setErrorMap).not.toHaveBeenCalled()
+  })
 })
