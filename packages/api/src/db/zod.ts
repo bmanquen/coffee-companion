@@ -155,9 +155,9 @@ const decimalString = () =>
 // duration inputs and tRPC callers send numbers. Null/blank still fail.
 const requiredInt = () =>
   z
-    .union([z.number(), z.string()])
+    .union([z.number(), z.string(), z.null()])
     .superRefine((value, ctx) => {
-      if (value === '') {
+      if (value === '' || value == null) {
         ctx.addIssue({ code: 'custom', message: 'Enter a number' })
         return
       }
