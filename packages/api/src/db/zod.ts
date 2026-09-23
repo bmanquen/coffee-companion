@@ -93,7 +93,7 @@ export const coffeeOriginInputSchema = z.object({
   processId: z.uuid().nullable().optional(),
 })
 export const insertCoffeeSchema = createInsertSchema(coffees, {
-  name: (schema) => schema.min(1),
+  name: (schema) => schema.min(1, 'Enter a name'),
 })
   .omit({ id: true, userId: true })
   .extend({
@@ -108,8 +108,8 @@ export type CoffeeOriginInput = z.infer<typeof coffeeOriginInputSchema>
 
 // Grinders
 export const insertGrinderSchema = createInsertSchema(grinders, {
-  name: (schema) => schema.min(1),
-  brand: (schema) => schema.min(1),
+  name: (schema) => schema.min(1, 'Enter a name'),
+  brand: (schema) => schema.min(1, 'Enter a brand'),
 }).omit({ id: true, userId: true })
 export const selectGrinderSchema = createSelectSchema(grinders)
 export type InsertGrinder = z.infer<typeof insertGrinderSchema>
@@ -131,8 +131,8 @@ export type BrewingDeviceType = z.infer<typeof selectBrewingDeviceTypeSchema>
 
 // Brewing Devices
 export const insertBrewingDeviceSchema = createInsertSchema(brewingDevices, {
-  name: (schema) => schema.min(1),
-  brand: (schema) => schema.min(1),
+  name: (schema) => schema.min(1, 'Enter a name'),
+  brand: (schema) => schema.min(1, 'Enter a brand'),
   typeId: () => z.uuid('Select a type'),
 }).omit({ id: true, userId: true })
 export const selectBrewingDeviceSchema = createSelectSchema(brewingDevices)
@@ -141,19 +141,25 @@ export type BrewingDevice = z.infer<typeof selectBrewingDeviceSchema>
 
 // Accepts an integer or decimal string, e.g. "16", "36.5", "2.5"
 const decimalString = () =>
-  z.string().regex(/^\d+(\.\d+)?$/, 'Must be a number')
+  z
+    .string()
+    .min(1, 'Enter a number')
+    .regex(/^\d+(\.\d+)?$/, 'Must be a number')
 
 // Recipe integers (seconds, minutes, °C). Text fields send numeric strings;
 // duration inputs and tRPC callers send numbers. Null/blank still fail.
 const requiredInt = () =>
   z
     .union([
-      z.number({ error: 'Required' }).int(),
-      z.string().regex(/^-?\d+$/, 'Must be a whole number'),
+      z.number({ error: 'Enter a number' }).int('Must be a whole number'),
+      z
+        .string()
+        .min(1, 'Enter a number')
+        .regex(/^-?\d+$/, 'Must be a whole number'),
     ])
     .transform((value) => (typeof value === 'string' ? Number(value) : value))
 
-const requiredGrindSetting = () => z.string().min(1)
+const requiredGrindSetting = () => z.string().min(1, 'Enter a grind setting')
 
 // Espresso Shots
 export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
