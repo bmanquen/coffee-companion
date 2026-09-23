@@ -155,7 +155,7 @@ function EditEspressoShot() {
           reset={updateShot.reset}
           form={form}
         />
-        <Button type="submit">
+        <Button type="submit" disabled={updateShot.isPending}>
           Save
           <Check />
         </Button>

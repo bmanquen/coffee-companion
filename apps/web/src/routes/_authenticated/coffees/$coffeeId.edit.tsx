@@ -174,7 +174,7 @@ function EditCoffeeComponent() {
           form={form}
           fieldByCode={coffeeMutationFields}
         />
-        <Button type="submit">
+        <Button type="submit" disabled={updateCoffee.isPending}>
           Save
           <Check />
         </Button>
