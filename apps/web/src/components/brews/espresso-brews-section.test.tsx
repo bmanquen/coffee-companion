@@ -321,15 +321,16 @@ describe('EspressoBrewsSection', () => {
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       const shot = makeRecentShot({ id: 's1' })
+      const brewingDeviceId = shot.brewingDeviceId ?? 'd1'
       queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [shot])
       queryClient.setQueryData(
         trpc.dialedInBrew.get.queryKey({
           brewingMethod: 'espresso',
-          brewingDeviceId: shot.brewingDeviceId!,
+          brewingDeviceId,
         }),
         {
           brewingMethod: 'espresso',
-          brewingDeviceId: shot.brewingDeviceId,
+          brewingDeviceId,
           brewId: shot.id,
           coffeeName: 'Ethiopia Guji',
           deviceName: 'Linea Mini',
@@ -358,7 +359,7 @@ describe('EspressoBrewsSection', () => {
           queryClient.getQueryState(
             trpc.dialedInBrew.get.queryKey({
               brewingMethod: 'espresso',
-              brewingDeviceId: shot.brewingDeviceId!,
+              brewingDeviceId,
             }),
           )?.isInvalidated,
         ).toBe(true)
