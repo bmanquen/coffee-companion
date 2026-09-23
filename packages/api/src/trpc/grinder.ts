@@ -5,7 +5,18 @@ import { db } from '../db'
 import { grinders } from '../db/schema'
 import { insertGrinderSchema } from '../db/zod'
 import { assertRoomForAnother } from '../lib/allowance'
+import { isPgUniqueViolation } from '../lib/pg-error'
 import { authedProcedure, createTRPCRouter } from './init'
+
+function rethrowUniqueGrinderConflict(err: unknown): never {
+  if (isPgUniqueViolation(err)) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'A grinder with this name already exists',
+    })
+  }
+  throw err
+}
 
 export const grinderRouter = createTRPCRouter({
   list: authedProcedure.query(async ({ ctx }) => {
@@ -33,31 +44,40 @@ export const grinderRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertRoomForAnother(ctx.plan, 'grinders', ctx.session.user.id)
 
-      const [grinder] = await db
-        .insert(grinders)
-        .values({ ...input, userId: ctx.session.user.id })
-        .returning()
-      return grinder
+      try {
+        const [grinder] = await db
+          .insert(grinders)
+          .values({ ...input, userId: ctx.session.user.id })
+          .returning()
+        return grinder
+      } catch (err) {
+        rethrowUniqueGrinderConflict(err)
+      }
     }),
 
   update: authedProcedure
     .input(insertGrinderSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
-      const updated = await db
-        .update(grinders)
-        .set(data)
-        .where(
-          and(eq(grinders.id, id), eq(grinders.userId, ctx.session.user.id)),
-        )
-        .returning()
-      if (updated.length === 0) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Grinder not found',
-        })
+      try {
+        const updated = await db
+          .update(grinders)
+          .set(data)
+          .where(
+            and(eq(grinders.id, id), eq(grinders.userId, ctx.session.user.id)),
+          )
+          .returning()
+        if (updated.length === 0) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Grinder not found',
+          })
+        }
+        return updated[0]
+      } catch (err) {
+        if (err instanceof TRPCError) throw err
+        rethrowUniqueGrinderConflict(err)
       }
-      return updated[0]
     }),
 
   delete: authedProcedure

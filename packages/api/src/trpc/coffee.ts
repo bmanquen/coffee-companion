@@ -11,6 +11,7 @@ import {
   regions,
 } from '../db/schema'
 import { insertCoffeeSchema } from '../db/zod'
+import { isPgUniqueViolation } from '../lib/pg-error'
 import { isSealed, sealNestedBrew, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 import type { CoffeeOriginInput, InsertCoffee } from '../db/zod'
@@ -32,22 +33,6 @@ function sortedOrigins<T extends { country?: { name: string } | null }>(
 function coffeeColumnValues(input: InsertCoffee) {
   const { origins: _origins, ...columns } = input
   return columns
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-const PG_UNIQUE_VIOLATION = '23505'
-
-function isPgUniqueViolation(err: unknown): boolean {
-  let current: unknown = err
-  for (let i = 0; i < 5; i++) {
-    if (!isRecord(current)) return false
-    if (current.code === PG_UNIQUE_VIOLATION) return true
-    current = current.cause
-  }
-  return false
 }
 
 function rethrowUniqueCoffeeConflict(err: unknown): never {

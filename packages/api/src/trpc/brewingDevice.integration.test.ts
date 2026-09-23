@@ -44,6 +44,19 @@ beforeAll(async () => {
   deviceAId = device.id
 })
 
+describe('brewingDevice uniqueness', () => {
+  it('returns CONFLICT when the same user reuses a name', async () => {
+    const name = uniq('Same device')
+    await asA.brewingDevice.create({ name, brand: 'Brand', typeId })
+    await expect(
+      asA.brewingDevice.create({ name, brand: 'Other', typeId }),
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: expect.stringMatching(/already exists/i),
+    })
+  })
+})
+
 describe('brewingDevice', () => {
   it('creates then lists, scoped to the user', async () => {
     const device = await asA.brewingDevice.create({

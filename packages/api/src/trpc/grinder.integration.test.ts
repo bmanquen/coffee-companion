@@ -147,6 +147,19 @@ describe('grinder.delete', () => {
   })
 })
 
+describe('grinder uniqueness', () => {
+  it('returns CONFLICT when the same user reuses a name', async () => {
+    const name = uniq('Same name')
+    await asA.grinder.create({ name, brand: 'Brand' })
+    await expect(
+      asA.grinder.create({ name, brand: 'Other' }),
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: expect.stringMatching(/already exists/i),
+    })
+  })
+})
+
 describe('grinder plan limits', () => {
   it('allows the first grinder on Free and refuses a second', async () => {
     const first = await asFree.grinder.create({

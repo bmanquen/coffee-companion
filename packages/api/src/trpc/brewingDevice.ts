@@ -5,7 +5,18 @@ import { db } from '../db'
 import { brewingDevices } from '../db/schema'
 import { insertBrewingDeviceSchema } from '../db/zod'
 import { assertRoomForAnother } from '../lib/allowance'
+import { isPgUniqueViolation } from '../lib/pg-error'
 import { authedProcedure, createTRPCRouter } from './init'
+
+function rethrowUniqueDeviceConflict(err: unknown): never {
+  if (isPgUniqueViolation(err)) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'A brewing device with this name already exists',
+    })
+  }
+  throw err
+}
 
 export const brewingDeviceRouter = createTRPCRouter({
   list: authedProcedure.query(async ({ ctx }) => {
@@ -38,34 +49,43 @@ export const brewingDeviceRouter = createTRPCRouter({
         ctx.session.user.id,
       )
 
-      const [device] = await db
-        .insert(brewingDevices)
-        .values({ ...input, userId: ctx.session.user.id })
-        .returning()
-      return device
+      try {
+        const [device] = await db
+          .insert(brewingDevices)
+          .values({ ...input, userId: ctx.session.user.id })
+          .returning()
+        return device
+      } catch (err) {
+        rethrowUniqueDeviceConflict(err)
+      }
     }),
 
   update: authedProcedure
     .input(insertBrewingDeviceSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
-      const updated = await db
-        .update(brewingDevices)
-        .set(data)
-        .where(
-          and(
-            eq(brewingDevices.id, id),
-            eq(brewingDevices.userId, ctx.session.user.id),
-          ),
-        )
-        .returning()
-      if (updated.length === 0) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Brewing device not found',
-        })
+      try {
+        const updated = await db
+          .update(brewingDevices)
+          .set(data)
+          .where(
+            and(
+              eq(brewingDevices.id, id),
+              eq(brewingDevices.userId, ctx.session.user.id),
+            ),
+          )
+          .returning()
+        if (updated.length === 0) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Brewing device not found',
+          })
+        }
+        return updated[0]
+      } catch (err) {
+        if (err instanceof TRPCError) throw err
+        rethrowUniqueDeviceConflict(err)
       }
-      return updated[0]
     }),
 
   delete: authedProcedure

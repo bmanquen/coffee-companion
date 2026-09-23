@@ -59,6 +59,22 @@ describe('insertEspressoShotSchema', () => {
     ).toBe(true)
   })
 
+  it('names empty recipe fields', () => {
+    const parsed = insertEspressoShotSchema.safeParse({
+      ...valid,
+      coffeeId: '',
+      dose: '',
+      grindSetting: '',
+      time: '',
+    })
+    expect(parsed.success).toBe(false)
+    if (parsed.success) return
+    const messages = parsed.error.issues.map((issue) => issue.message)
+    expect(messages).toContain('Select a coffee')
+    expect(messages).toContain('Enter a number')
+    expect(messages).toContain('Enter a grind setting')
+  })
+
   it('rejects non-numeric dose strings', () => {
     expect(
       insertEspressoShotSchema.safeParse({ ...valid, dose: 'abc' }).success,
@@ -77,6 +93,20 @@ describe('insertEspressoShotSchema', () => {
 })
 
 describe('insertCoffeeSchema', () => {
+  it('names empty required fields', () => {
+    const parsed = insertCoffeeSchema.safeParse({
+      name: '',
+      roasterId: '',
+      roastLevelId: '',
+    })
+    expect(parsed.success).toBe(false)
+    if (parsed.success) return
+    const messages = parsed.error.issues.map((issue) => issue.message)
+    expect(messages).toContain('Enter a name')
+    expect(messages).toContain('Select a roaster')
+    expect(messages).toContain('Select a roast level')
+  })
+
   it('requires name, roaster, and roast level', () => {
     expect(
       insertCoffeeSchema.safeParse({
