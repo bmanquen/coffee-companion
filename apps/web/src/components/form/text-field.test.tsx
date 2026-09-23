@@ -76,6 +76,93 @@ describe('TextField', () => {
       fireEvent.blur(input)
     })
     expect(screen.getByText('Name is required')).toBeTruthy()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(input.getAttribute('aria-describedby')).toBe('name-error')
+  })
+
+  it('shows a validation error on submit without the field being touched', async () => {
+    function SubmitHarness() {
+      const form = useAppForm({
+        defaultValues: { name: '' },
+        validators: {
+          onChange: z.object({ name: z.string().min(1, 'Name is required') }),
+        },
+      })
+      return (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            form.handleSubmit()
+          }}
+        >
+          <form.AppField name="name">
+            {(field) => <field.TextField label="Name" />}
+          </form.AppField>
+          <button type="submit">Add</button>
+        </form>
+      )
+    }
+
+    render(<SubmitHarness />)
+    expect(screen.queryByText('Name is required')).toBeNull()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    })
+    const input = screen.getByRole('textbox', { name: 'Name' })
+    expect(screen.getByText('Name is required')).toBeTruthy()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(input.getAttribute('aria-describedby')).toBe('name-error')
+    expect(document.getElementById('name-error')?.textContent).toBe(
+      'Name is required',
+    )
+  })
+
+  it('shows an onServer field error after submit', async () => {
+    let setErrorMap: ((errorMap: never) => void) | undefined
+    function ServerHarness() {
+      const form = useAppForm({
+        defaultValues: { name: 'Ethiopia' },
+        validators: {
+          onChange: z.object({ name: z.string().min(1) }),
+        },
+      })
+      setErrorMap = form.setErrorMap
+      return (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            form.handleSubmit()
+          }}
+        >
+          <form.AppField name="name">
+            {(field) => <field.TextField label="Name" />}
+          </form.AppField>
+          <button type="submit">Add</button>
+        </form>
+      )
+    }
+
+    render(<ServerHarness />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    })
+    await act(async () => {
+      setErrorMap?.({
+        onServer: {
+          fields: {
+            name: 'A coffee with this name already exists for this roaster',
+          },
+        },
+      } as never)
+    })
+    const input = screen.getByRole('textbox', { name: 'Name' })
+    expect(
+      screen.getByText(
+        'A coffee with this name already exists for this roaster',
+      ),
+    ).toBeTruthy()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(input.getAttribute('aria-describedby')).toBe('name-error')
   })
 
   it('renders a description when one is given', () => {

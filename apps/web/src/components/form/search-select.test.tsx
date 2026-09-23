@@ -138,6 +138,43 @@ describe('SearchSelect', () => {
     expect(screen.getByText('Select Roaster')).toBeTruthy()
   })
 
+  it('shows a validation error on submit without the field being touched', async () => {
+    function SubmitHarness() {
+      const form = useAppForm({
+        defaultValues: { roasterId: '' },
+        validators: {
+          onChange: z.object({
+            roasterId: z.string().uuid('Select a roaster'),
+          }),
+        },
+      })
+      return (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            form.handleSubmit()
+          }}
+        >
+          <form.AppField name="roasterId">
+            {(field) => (
+              <field.SearchSelect label="Roaster" options={options} />
+            )}
+          </form.AppField>
+          <button type="submit">Add</button>
+        </form>
+      )
+    }
+
+    render(<SubmitHarness />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    })
+    const trigger = screen.getByRole('button', { name: 'Roaster' })
+    expect(screen.getByText('Select a roaster')).toBeTruthy()
+    expect(trigger.getAttribute('aria-invalid')).toBe('true')
+    expect(trigger.getAttribute('aria-describedby')).toBe('roasterId-error')
+  })
+
   it('marks a required select from the form schema', () => {
     function SchemaHarness() {
       const form = useAppForm({

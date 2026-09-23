@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expandRow, pickOption } from './helpers'
+import { expandRow, pickOption, waitForHydration } from './helpers'
 import type { Page } from '@playwright/test'
 
 // The seeded roaster and roast level, chosen before the name is typed. A
@@ -22,6 +22,24 @@ async function pickLookups(page: Page) {
 // Exercises the form components in a real browser end-to-end: the TextField,
 // the SearchSelect dropdown (selecting a seeded roaster), and form submission
 // through the real create mutation. A unique name keeps retries conflict-free.
+test('empty coffee submit shows field errors and stays on the form', async ({
+  page,
+}) => {
+  await page.goto('/coffees/new')
+  const add = page.getByRole('button', { name: 'Add', exact: true })
+  await waitForHydration(add)
+  await add.click()
+
+  await expect(page).toHaveURL(/\/coffees\/new/)
+  await expect(page.getByText('Enter a name')).toBeVisible()
+  await expect(page.getByText('Select a roaster')).toBeVisible()
+  await expect(page.getByText('Select a roast level')).toBeVisible()
+  await expect(page.getByPlaceholder('Name')).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  )
+})
+
 test('create a coffee via the new-coffee form', async ({ page }) => {
   const name = `E2E Coffee ${Date.now()}`
 

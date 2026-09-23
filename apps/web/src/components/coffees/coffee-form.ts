@@ -15,6 +15,8 @@ export const coffeeFormSchema = insertCoffeeSchema.extend({
 
 export type CoffeeFormValues = z.input<typeof coffeeFormSchema>
 
+export const coffeeMutationFields = { CONFLICT: 'name' } as const
+
 export function originsForApi(
   origins: Array<{ countryId: string; regionId: string; processId: string }>,
 ) {

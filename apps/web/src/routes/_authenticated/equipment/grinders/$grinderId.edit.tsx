@@ -3,11 +3,15 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import type { InsertGrinder } from '@coffee-companion/api/db/zod'
+import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useTRPC } from '@/integrations/trpc/react'
+import { submitFormMutation } from '@/lib/form-error'
+
+const grinderMutationFields = { CONFLICT: 'name' } as const
 
 export const Route = createFileRoute(
   '/_authenticated/equipment/grinders/$grinderId/edit',
@@ -52,8 +56,13 @@ function EditGrinder() {
     validators: {
       onChange: insertGrinderSchema,
     },
-    onSubmit: ({ value }) => {
-      updateGrinder.mutate({ ...value, id: grinderId })
+    onSubmit: async ({ value }) => {
+      await submitFormMutation(
+        form,
+        updateGrinder.mutateAsync,
+        { ...value, id: grinderId },
+        grinderMutationFields,
+      )
     },
   })
 
@@ -77,6 +86,10 @@ function EditGrinder() {
             <field.TextField label="Brand" placeholder="brand" />
           )}
         </form.AppField>
+        <MutationErrorNotices
+          error={updateGrinder.error}
+          fieldByCode={grinderMutationFields}
+        />
         <Button type="submit">
           Save
           <Check />

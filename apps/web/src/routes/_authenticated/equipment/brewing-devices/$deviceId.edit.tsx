@@ -7,12 +7,16 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import type { InsertBrewingDevice } from '@coffee-companion/api/db/zod'
+import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
+import { submitFormMutation } from '@/lib/form-error'
+
+const deviceMutationFields = { CONFLICT: 'name' } as const
 
 export const Route = createFileRoute(
   '/_authenticated/equipment/brewing-devices/$deviceId/edit',
@@ -77,8 +81,13 @@ function EditBrewingDevice() {
     validators: {
       onChange: insertBrewingDeviceSchema,
     },
-    onSubmit: ({ value }) => {
-      updateDevice.mutate({ ...value, id: deviceId })
+    onSubmit: async ({ value }) => {
+      await submitFormMutation(
+        form,
+        updateDevice.mutateAsync,
+        { ...value, id: deviceId },
+        deviceMutationFields,
+      )
     },
   })
 
@@ -105,6 +114,10 @@ function EditBrewingDevice() {
         <form.AppField name="typeId">
           {(field) => <field.SearchSelect label="Type" {...type} />}
         </form.AppField>
+        <MutationErrorNotices
+          error={updateDevice.error}
+          fieldByCode={deviceMutationFields}
+        />
         <Button type="submit">
           Save
           <Check />

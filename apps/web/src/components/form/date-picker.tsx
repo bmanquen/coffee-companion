@@ -1,10 +1,11 @@
 import { format } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
 import { FormLabel } from './form-label'
+import { useFieldError } from './use-field-error'
 import { useFieldRequired } from './use-field-required'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
-import { Field, FieldContent } from '@/components/ui/field'
+import { Field, FieldContent, FieldError } from '@/components/ui/field'
 import {
   Popover,
   PopoverContent,
@@ -20,9 +21,10 @@ type DatePickerProps = {
 export function DatePicker({ label, showLabel = true }: DatePickerProps) {
   const field = useFieldContext<Date | undefined>()
   const required = useFieldRequired()
+  const error = useFieldError()
 
   return (
-    <Field>
+    <Field data-invalid={error.shown || undefined}>
       <FormLabel
         htmlFor={field.name}
         required={required}
@@ -36,6 +38,8 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
             <Button
               variant="outline"
               className={`flex justify-between ${!field.state.value ? 'text-muted-foreground/40' : ''}`}
+              aria-invalid={error.invalid || undefined}
+              aria-describedby={error.describedBy}
               aria-required={required || undefined}
             >
               {field.state.value ? (
@@ -56,6 +60,9 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
             />
           </PopoverContent>
         </Popover>
+        {error.shown && (
+          <FieldError id={error.errorId}>{error.messages.join(', ')}</FieldError>
+        )}
       </FieldContent>
     </Field>
   )

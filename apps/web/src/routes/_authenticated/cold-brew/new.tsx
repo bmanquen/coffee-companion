@@ -10,6 +10,7 @@ import { Plus } from 'lucide-react'
 import type { InsertColdBrewBrew } from '@coffee-companion/api/db/zod'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
 import { SteepMinutesInput } from '@/components/form/steep-minutes-input'
+import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -18,6 +19,7 @@ import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
+import { submitFormMutation } from '@/lib/form-error'
 
 export const Route = createFileRoute('/_authenticated/cold-brew/new')({
   loader: async ({ context }) => {
@@ -85,8 +87,8 @@ function NewColdBrewBrew() {
     validators: {
       onChange: insertColdBrewBrewSchema as never,
     },
-    onSubmit: ({ value }) => {
-      createBrew.mutate(value)
+    onSubmit: async ({ value }) => {
+      await submitFormMutation(form, createBrew.mutateAsync, value)
     },
   })
 
@@ -197,6 +199,7 @@ function NewColdBrewBrew() {
             <field.TextArea label="Notes" placeholder="Tasting notes..." />
           )}
         </form.AppField>
+        <MutationErrorNotices error={createBrew.error} />
         <Button type="submit">
           Log
           <Plus />

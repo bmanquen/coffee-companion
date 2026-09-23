@@ -1,6 +1,7 @@
 import { CheckIcon, ChevronDownIcon, PlusIcon } from 'lucide-react'
 import { useState } from 'react'
 import { FormLabel } from './form-label'
+import { useFieldError } from './use-field-error'
 import { useFieldRequired } from './use-field-required'
 import {
   Command,
@@ -55,6 +56,7 @@ export function SearchSelect({
 }) {
   const field = useFieldContext<string>()
   const required = useFieldRequired()
+  const error = useFieldError()
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const options = initialOptions
@@ -90,7 +92,7 @@ export function SearchSelect({
   )
 
   return (
-    <Field>
+    <Field data-invalid={error.shown || undefined}>
       <FormLabel
         htmlFor={field.name}
         required={required}
@@ -120,6 +122,8 @@ export function SearchSelect({
                 triggerClassName,
               )}
               disabled={disabled}
+              aria-invalid={error.invalid || undefined}
+              aria-describedby={error.describedBy}
               aria-required={required || undefined}
             >
               {selectedOption ? selectedOption.label : placeholder}
@@ -191,10 +195,8 @@ export function SearchSelect({
           </PopoverContent>
         </Popover>
         {description && <FieldDescription>{description}</FieldDescription>}
-        {field.state.meta.isTouched && field.state.meta.errors.length > 0 && (
-          <FieldError>
-            {field.state.meta.errors.map((e) => e.message).join(', ')}
-          </FieldError>
+        {error.shown && (
+          <FieldError id={error.errorId}>{error.messages.join(', ')}</FieldError>
         )}
       </FieldContent>
     </Field>
