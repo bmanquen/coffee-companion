@@ -63,11 +63,6 @@ pnpm test:e2e
 
 ## Observability
 
-The stack — Sentry, PostHog, and pino — the seam that keeps vendors out of the
-API package, the sample rates, the request id, and the privacy stance are
-recorded in
-`docs/adr/0014-observability-is-sentry-posthog-and-pino-at-a-seam.md`.
-
 ### Health check
 
 `GET /api/health` answers `200` with `{ "status": "ok", "db": "ok" }` while the
