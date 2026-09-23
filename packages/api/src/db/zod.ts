@@ -141,22 +141,34 @@ export type BrewingDevice = z.infer<typeof selectBrewingDeviceSchema>
 
 // Accepts an integer or decimal string, e.g. "16", "36.5", "2.5"
 const decimalString = () =>
-  z
-    .string()
-    .min(1, 'Enter a number')
-    .regex(/^\d+(\.\d+)?$/, 'Must be a number')
+  z.string().superRefine((value, ctx) => {
+    if (value.length === 0) {
+      ctx.addIssue({ code: 'custom', message: 'Enter a number' })
+      return
+    }
+    if (!/^\d+(\.\d+)?$/.test(value)) {
+      ctx.addIssue({ code: 'custom', message: 'Must be a number' })
+    }
+  })
 
 // Recipe integers (seconds, minutes, °C). Text fields send numeric strings;
 // duration inputs and tRPC callers send numbers. Null/blank still fail.
 const requiredInt = () =>
   z
-    .union([
-      z.number({ error: 'Enter a number' }).int('Must be a whole number'),
-      z
-        .string()
-        .min(1, 'Enter a number')
-        .regex(/^-?\d+$/, 'Must be a whole number'),
-    ])
+    .union([z.number(), z.string()])
+    .superRefine((value, ctx) => {
+      if (value === '') {
+        ctx.addIssue({ code: 'custom', message: 'Enter a number' })
+        return
+      }
+      if (typeof value === 'number' && !Number.isInteger(value)) {
+        ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
+        return
+      }
+      if (typeof value === 'string' && !/^-?\d+$/.test(value)) {
+        ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
+      }
+    })
     .transform((value) => (typeof value === 'string' ? Number(value) : value))
 
 const requiredGrindSetting = () => z.string().min(1, 'Enter a grind setting')
