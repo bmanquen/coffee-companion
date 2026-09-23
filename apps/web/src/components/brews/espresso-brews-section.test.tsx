@@ -317,17 +317,31 @@ describe('EspressoBrewsSection', () => {
   })
 
   it('deletes the shot when the confirmation dialog is confirmed', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
-      queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
-        makeRecentShot({ id: 's1' }),
-      ])
+      const shot = makeRecentShot({ id: 's1' })
+      queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [shot])
+      queryClient.setQueryData(
+        trpc.dialedInBrew.get.queryKey({
+          brewingMethod: 'espresso',
+          brewingDeviceId: shot.brewingDeviceId!,
+        }),
+        {
+          brewingMethod: 'espresso',
+          brewingDeviceId: shot.brewingDeviceId,
+          brewId: shot.id,
+          coffeeName: 'Ethiopia Guji',
+          deviceName: 'Linea Mini',
+          grindSetting: '4.5',
+          dose: '18',
+          outputGrams: '36',
+          outputLabel: 'Yield',
+          time: 28,
+          timeUnit: 's',
+          sealed: false,
+        },
+      )
 
       render(<EspressoBrewsSection />, { wrapper: Wrapper })
       const table = within(screen.getByRole('table'))
@@ -339,6 +353,20 @@ describe('EspressoBrewsSection', () => {
       const [url, init] = fetchSpy.mock.calls[0]
       expect(String(url)).toContain('espressoShot.delete')
       expect(String(init?.body ?? '')).toContain('s1')
+      await waitFor(() => {
+        expect(
+          queryClient.getQueryState(
+            trpc.dialedInBrew.get.queryKey({
+              brewingMethod: 'espresso',
+              brewingDeviceId: shot.brewingDeviceId!,
+            }),
+          )?.isInvalidated,
+        ).toBe(true)
+        expect(
+          queryClient.getQueryState(trpc.dialedInBrew.list.queryKey())
+            ?.isInvalidated,
+        ).toBe(true)
+      })
     } finally {
       fetchSpy.mockRestore()
     }

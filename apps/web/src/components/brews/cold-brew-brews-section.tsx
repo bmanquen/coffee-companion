@@ -32,7 +32,10 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
-import { useDeviceDialedIn } from '@/hooks/use-device-dialed-in'
+import {
+  invalidateDeviceDialedInQueries,
+  useDeviceDialedIn,
+} from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 import { formatSteepMinutes } from '@/lib/brew'
@@ -77,6 +80,7 @@ function ActionsCell({ row }: CellContext<Brew, unknown>) {
     trpc.coldBrewBrew.delete.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.coldBrewBrew.getAll.queryOptions())
+        invalidateDeviceDialedInQueries(queryClient, trpc)
       },
     }),
   )

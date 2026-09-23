@@ -288,21 +288,24 @@ export async function setDialedInBrew(
           eq(dialedInBrews.brewId, brewId),
         ),
       )
+    // Upsert the pair so two concurrent sets for the same method × device
+    // cannot both insert and collide on the unique pair index.
     await tx
-      .delete(dialedInBrews)
-      .where(
-        and(
-          eq(dialedInBrews.userId, userId),
-          eq(dialedInBrews.brewingMethod, pair.brewingMethod),
-          eq(dialedInBrews.brewingDeviceId, pair.brewingDeviceId),
-        ),
-      )
-    await tx.insert(dialedInBrews).values({
-      userId,
-      brewingMethod: pair.brewingMethod,
-      brewingDeviceId: pair.brewingDeviceId,
-      brewId,
-    })
+      .insert(dialedInBrews)
+      .values({
+        userId,
+        brewingMethod: pair.brewingMethod,
+        brewingDeviceId: pair.brewingDeviceId,
+        brewId,
+      })
+      .onConflictDoUpdate({
+        target: [
+          dialedInBrews.userId,
+          dialedInBrews.brewingMethod,
+          dialedInBrews.brewingDeviceId,
+        ],
+        set: { brewId },
+      })
   })
 
   return { ...pair, brewId }

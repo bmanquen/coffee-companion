@@ -30,7 +30,10 @@ import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { useDeviceDialedIn } from '@/hooks/use-device-dialed-in'
+import {
+  invalidateDeviceDialedInQueries,
+  useDeviceDialedIn,
+} from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 
@@ -93,6 +96,7 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
         queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
+        invalidateDeviceDialedInQueries(queryClient, trpc)
       },
     }),
   )

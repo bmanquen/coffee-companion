@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 import type { BrewingMethod } from '@coffee-companion/api/lib/dialed-in-brew'
 import { useTRPC } from '@/integrations/trpc/react'
+
+export function invalidateDeviceDialedInQueries(
+  queryClient: QueryClient,
+  trpc: ReturnType<typeof useTRPC>,
+) {
+  queryClient.invalidateQueries(trpc.dialedInBrew.list.queryOptions())
+  queryClient.invalidateQueries(trpc.dialedInBrew.get.queryFilter())
+}
 
 export function useDeviceDialedIn(brewingMethod: BrewingMethod) {
   const trpc = useTRPC()
@@ -14,8 +23,7 @@ export function useDeviceDialedIn(brewingMethod: BrewingMethod) {
   const setMapping = useMutation(
     trpc.dialedInBrew.set.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.dialedInBrew.list.queryOptions())
-        queryClient.invalidateQueries(trpc.dialedInBrew.get.queryFilter())
+        invalidateDeviceDialedInQueries(queryClient, trpc)
       },
     }),
   )
