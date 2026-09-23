@@ -469,6 +469,46 @@ export const coldBrewBrews = pgTable(
   ],
 )
 
+// The five Brewing Methods. Distinct from Method Variants (aeropress_methods
+// etc.): this is the method a Brew belongs to, used to key Dialed-in per
+// device. A Brewing Device can hold one Dialed-in Brew per method.
+export const brewingMethodEnum = pgEnum('brewing_method', [
+  'espresso',
+  'aeropress',
+  'pourover',
+  'frenchpress',
+  'coldBrew',
+])
+
+// One Dialed-in Brew per (user × Brewing Method × Brewing Device). Separate
+// from brewBase.isDialedIn, which is the Coffee-scoped reference (per coffee
+// per method variant). brew_id points at the method's brew table; a delete
+// trigger on each brew table clears the row so the pointer cannot dangle.
+export const dialedInBrews = pgTable(
+  'dialed_in_brews',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .references(() => user.id, { onDelete: 'cascade' })
+      .notNull(),
+    brewingMethod: brewingMethodEnum('brewing_method').notNull(),
+    brewingDeviceId: uuid('brewing_device_id')
+      .references(() => brewingDevices.id, { onDelete: 'cascade' })
+      .notNull(),
+    brewId: uuid('brew_id').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('dialed_in_brews_user_method_device_idx').on(
+      table.userId,
+      table.brewingMethod,
+      table.brewingDeviceId,
+    ),
+    uniqueIndex('dialed_in_brews_brew_idx').on(table.brewId),
+    index('dialed_in_brews_user_idx').on(table.userId),
+  ],
+)
+
 export const planIdEnum = pgEnum('plan_id', ['free', 'pro', 'proPlus'])
 
 export const planGrants = pgTable(
@@ -507,7 +547,7 @@ export const planInterests = pgTable(
 // Relations
 
 export const relations = defineRelations(
-  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, coffeeOrigins, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, planGrants, planInterests, subscription },
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, coffeeOrigins, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, dialedInBrews, planGrants, planInterests, subscription },
   (r) => ({
     user: {
       sessions: r.many.session(),
@@ -532,6 +572,7 @@ export const relations = defineRelations(
       frenchpressMethods: r.many.frenchpressMethods(),
       frenchpressBrews: r.many.frenchpressBrews(),
       coldBrewBrews: r.many.coldBrewBrews(),
+      dialedInBrews: r.many.dialedInBrews(),
       planGrants: r.many.planGrants(),
       planInterests: r.many.planInterests(),
       subscriptions: r.many.subscription(),
@@ -661,6 +702,19 @@ export const relations = defineRelations(
       pouroverBrews: r.many.pouroverBrews(),
       frenchpressBrews: r.many.frenchpressBrews(),
       coldBrewBrews: r.many.coldBrewBrews(),
+      dialedInBrews: r.many.dialedInBrews(),
+    },
+    dialedInBrews: {
+      user: r.one.user({
+        from: r.dialedInBrews.userId,
+        to: r.user.id,
+        optional: false,
+      }),
+      brewingDevice: r.one.brewingDevices({
+        from: r.dialedInBrews.brewingDeviceId,
+        to: r.brewingDevices.id,
+        optional: false,
+      }),
     },
     espressoShots: {
       user: r.one.user({ from: r.espressoShots.userId, to: r.user.id, optional: false }),

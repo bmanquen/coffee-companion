@@ -48,6 +48,7 @@ export const accountRouter = createTRPCRouter({
       pourover,
       frenchPress,
       coldBrew,
+      dialedIn,
     ] = await Promise.all([
       db.query.user.findFirst({ where: { id: userId } }),
       db.query.coffees.findMany({
@@ -85,6 +86,10 @@ export const accountRouter = createTRPCRouter({
         orderBy: { createdAt: 'desc' },
         with: brewWith(userId),
       }),
+      db.query.dialedInBrews.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
     ])
 
     return {
@@ -94,6 +99,7 @@ export const accountRouter = createTRPCRouter({
         varieties: coffeesVarieties.map((cv) => cv.variety),
       })),
       brews: { espresso, aeropress, pourover, frenchPress, coldBrew },
+      dialedInBrews: dialedIn,
     }
   }),
 })

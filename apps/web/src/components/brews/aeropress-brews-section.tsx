@@ -16,7 +16,10 @@ import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { AeropressBrewWithRelations } from '@/types'
-import { renderBrewDetails } from '@/components/brews/brew-details'
+import {
+  deviceDialedInFor,
+  renderBrewDetails,
+} from '@/components/brews/brew-details'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
@@ -27,6 +30,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
+import { useDeviceDialedIn } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 import { formatBrewSeconds } from '@/lib/brew'
@@ -172,6 +176,7 @@ export function AeropressBrewsSection() {
   const { data: brews } = useSuspenseQuery(
     trpc.aeropressBrew.getAll.queryOptions(),
   )
+  const deviceDialedIn = useDeviceDialedIn('aeropress')
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -249,14 +254,25 @@ export function AeropressBrewsSection() {
           </div>
           <DataTable
             table={table}
-            renderSubComponent={(row) => renderBrewDetails(row.original)}
+            renderSubComponent={(row) =>
+              renderBrewDetails(
+                row.original,
+                undefined,
+                deviceDialedInFor(row.original, deviceDialedIn),
+              )
+            }
             replaceRow={(row) =>
               row.original.sealed ? <SealedRowNotice /> : null
             }
             rowClassName={(row) =>
               row.original.sealed
                 ? sealedRowClass
-                : row.original.isDialedIn
+                : row.original.isDialedIn ||
+                    (row.original.brewingDeviceId != null &&
+                      deviceDialedIn.isDialedIn(
+                        row.original.id,
+                        row.original.brewingDeviceId,
+                      ))
                   ? 'bg-primary/10 hover:bg-primary/15'
                   : undefined
             }

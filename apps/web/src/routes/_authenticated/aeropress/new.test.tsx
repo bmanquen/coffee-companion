@@ -105,6 +105,13 @@ function seeded() {
       roastDate: '2026-05-01',
     }),
   ])
+  qc.setQueryData(
+    trpc.dialedInBrew.get.queryKey({
+      brewingMethod: 'aeropress',
+      brewingDeviceId: AERO_DEVICE,
+    }),
+    null,
+  )
   return providers
 }
 

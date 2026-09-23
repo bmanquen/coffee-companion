@@ -18,6 +18,7 @@ import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { ColdBrewBrewWithRelations } from '@/types'
 import {
   brewEnvironmentExtra,
+  deviceDialedInFor,
   renderBrewDetails,
 } from '@/components/brews/brew-details'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
@@ -30,6 +31,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
+import { useDeviceDialedIn } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 import { formatSteepMinutes } from '@/lib/brew'
@@ -165,6 +167,7 @@ export function ColdBrewBrewsSection() {
   const { data: brews } = useSuspenseQuery(
     trpc.coldBrewBrew.getAll.queryOptions(),
   )
+  const deviceDialedIn = useDeviceDialedIn('coldBrew')
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -246,6 +249,7 @@ export function ColdBrewBrewsSection() {
               renderBrewDetails(
                 row.original,
                 brewEnvironmentExtra(row.original.brewEnvironment),
+                deviceDialedInFor(row.original, deviceDialedIn),
               )
             }
             replaceRow={(row) =>
@@ -254,7 +258,12 @@ export function ColdBrewBrewsSection() {
             rowClassName={(row) =>
               row.original.sealed
                 ? sealedRowClass
-                : row.original.isDialedIn
+                : row.original.isDialedIn ||
+                    (row.original.brewingDeviceId != null &&
+                      deviceDialedIn.isDialedIn(
+                        row.original.id,
+                        row.original.brewingDeviceId,
+                      ))
                   ? 'bg-primary/10 hover:bg-primary/15'
                   : undefined
             }

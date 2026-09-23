@@ -116,6 +116,13 @@ function seeded() {
       roastDate: '2026-05-01',
     }),
   ])
+  qc.setQueryData(
+    trpc.dialedInBrew.get.queryKey({
+      brewingMethod: 'pourover',
+      brewingDeviceId: PO_DEVICE,
+    }),
+    null,
+  )
   return providers
 }
 

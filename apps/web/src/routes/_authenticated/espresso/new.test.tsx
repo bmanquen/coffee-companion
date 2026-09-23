@@ -93,6 +93,13 @@ function seeded() {
       roastDate: '2026-05-01',
     }),
   ])
+  qc.setQueryData(
+    trpc.dialedInBrew.get.queryKey({
+      brewingMethod: 'espresso',
+      brewingDeviceId: ESP_DEVICE,
+    }),
+    null,
+  )
   return providers
 }
 
@@ -112,6 +119,42 @@ describe('NewEspressoShot form', () => {
     expect(
       within(deviceSelect).queryByRole('option', { name: 'AeroPress Go' }),
     ).toBeNull()
+  })
+
+  it('surfaces the Dialed-in Brew for the prefilled device', () => {
+    const { queryClient, trpc, Wrapper } = seeded()
+    queryClient.setQueryData(
+      trpc.dialedInBrew.get.queryKey({
+        brewingMethod: 'espresso',
+        brewingDeviceId: ESP_DEVICE,
+      }),
+      {
+        brewingMethod: 'espresso',
+        brewingDeviceId: ESP_DEVICE,
+        brewId: 'shot-1',
+        coffeeName: 'Ethiopia Guji',
+        deviceName: 'Linea Mini',
+        grindSetting: '21',
+        dose: '18',
+        outputGrams: '36',
+        outputLabel: 'Yield',
+        time: 27,
+        timeUnit: 's',
+        sealed: false,
+      },
+    )
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+
+    expect(
+      screen.getByRole('status', { name: 'Dialed-in for Linea Mini' }),
+    ).toBeTruthy()
+    expect(
+      screen.getByText('Ethiopia Guji · Grind 21 · Dose 18g · Yield 36g · Time 27s'),
+    ).toBeTruthy()
   })
 
   it('prefills grinder and device from the coffee’s latest shot', () => {

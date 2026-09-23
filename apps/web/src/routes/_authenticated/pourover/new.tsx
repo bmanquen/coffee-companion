@@ -8,6 +8,7 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertPouroverBrew } from '@coffee-companion/api/db/zod'
+import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
 import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
@@ -149,7 +150,13 @@ function NewPouroverBrew() {
         </form.AppField>
         <form.AppField name="brewingDeviceId">
           {(field) => (
-            <field.SearchSelect label="Brewing Device" {...brewingDevice} />
+            <>
+              <field.SearchSelect label="Brewing Device" {...brewingDevice} />
+              <DeviceDialedInReference
+                brewingMethod="pourover"
+                brewingDeviceId={field.state.value}
+              />
+            </>
           )}
         </form.AppField>
         <form.AppField name="roastDate">
