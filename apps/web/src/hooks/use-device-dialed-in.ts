@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { QueryClient } from '@tanstack/react-query'
 import type { BrewingMethod } from '@coffee-companion/api/lib/dialed-in-brew'
+import type { QueryClient } from '@tanstack/react-query'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 
@@ -59,7 +59,9 @@ export function useDeviceDialedIn(brewingMethod: BrewingMethod) {
     trpc.dialedInBrew.set.mutationOptions({
       onSuccess: () => {
         invalidate()
-        track('brew_dialed_in', { method: brewingMethod })
+        track('brew_dialed_in', {
+          method: brewingMethod === 'coldBrew' ? 'coldbrew' : brewingMethod,
+        })
       },
     }),
   )

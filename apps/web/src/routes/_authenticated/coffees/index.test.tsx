@@ -250,7 +250,9 @@ describe('Coffees page', () => {
       render(<Coffee />, { wrapper: Wrapper })
 
       const detail = expandDetail('Colombia Huila')
-      expect(detail.getByText('-')).toBeTruthy()
+      expect(
+        within(detail.getByText('Dialed in').closest('div')!).getByText('-'),
+      ).toBeTruthy()
     })
   })
 

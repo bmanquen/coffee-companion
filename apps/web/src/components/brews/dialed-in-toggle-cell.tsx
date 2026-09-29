@@ -1,7 +1,7 @@
-import type { BrewingMethod } from '@coffee-companion/api/lib/dialed-in-brew'
 import { Crosshair } from 'lucide-react'
-import { useDeviceDialedIn } from '@/hooks/use-device-dialed-in'
+import type { BrewingMethod } from '@coffee-companion/api/lib/dialed-in-brew'
 import { Button } from '@/components/ui/button'
+import { useDeviceDialedIn } from '@/hooks/use-device-dialed-in'
 
 export function DialedInToggleCell({
   dialedIn,
