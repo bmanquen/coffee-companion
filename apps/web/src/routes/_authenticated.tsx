@@ -32,7 +32,7 @@ export const Route = createFileRoute('/_authenticated')({
 // shell so public routes never mount it — the root document is now bare, and
 // each layout brings its own <main>. The nav drawer's open state lives here
 // because it shifts the main column on desktop.
-function AuthenticatedLayout() {
+export function AuthenticatedLayout() {
   const [navOpen, setNavOpen] = useState(false)
   const trpc = useTRPC()
   // Not suspended on: a failing renewal is worth saying wherever the user is,
@@ -44,8 +44,10 @@ function AuthenticatedLayout() {
   // every navigation.
   const { id: userId } = identityFrom(session)
 
+  // Memory persistence starts anonymous on every load. Identify the account
+  // as soon as we have it; attach the plan when the query resolves.
   useEffect(() => {
-    if (planId) identifyUser({ id: userId }, { plan: planId })
+    identifyUser({ id: userId }, planId ? { plan: planId } : undefined)
   }, [userId, planId])
 
   useEffect(() => {

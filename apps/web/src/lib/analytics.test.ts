@@ -153,6 +153,15 @@ describe('the analytics facade', () => {
     expect(client.identify).toHaveBeenCalledWith('user_123', { plan: 'pro' })
   })
 
+  it('identifies by account id when the Plan is not yet known', () => {
+    const client = fake()
+    setAnalyticsClient(client)
+
+    identifyUser({ id: 'user_123' })
+
+    expect(client.identify).toHaveBeenCalledWith('user_123', undefined)
+  })
+
   it('forwards a reset', () => {
     const client = fake()
     setAnalyticsClient(client)
@@ -199,8 +208,8 @@ describe('analyticsOptions', () => {
 
   // The option above is the contract; this boots the installed posthog-js so a
   // SDK default that started writing again would fail here even if the option
-  // were still set.
-  it('writes nothing to cookies, localStorage, or sessionStorage when booted', () => {
+  // were still set. Flags/decide settle after init — assert only after that.
+  it('writes nothing to cookies, localStorage, or sessionStorage when booted', async () => {
     localStorage.clear()
     sessionStorage.clear()
     for (const cookie of document.cookie.split(';')) {
@@ -208,13 +217,21 @@ describe('analyticsOptions', () => {
       if (name) document.cookie = `${name}=;max-age=0;path=/`
     }
 
-    posthog.init('phc_device_storage_guard', {
-      ...analyticsOptions('http://127.0.0.1:9'),
-      disable_surveys: true,
+    const booted = new Promise<void>((resolve) => {
+      posthog.init('phc_device_storage_guard', {
+        ...analyticsOptions('http://127.0.0.1:9'),
+        disable_surveys: true,
+        loaded: () => resolve(),
+      })
     })
+    await booted
     posthog.register({ environment: 'test' })
     posthog.identify('user_123', { plan: 'pro' })
     posthog.capture('$pageview', { $pathname: '/', $current_url: '/' })
+
+    await Promise.resolve()
+    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
     const cookieNames = document.cookie
       .split(';')

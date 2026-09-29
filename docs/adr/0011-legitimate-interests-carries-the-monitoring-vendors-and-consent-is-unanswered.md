@@ -56,7 +56,8 @@ banner.**
 - **PostHog runs storage-free.** `persistence` is `'memory'` (posthog-js 1.428.11).
   Distinct id, session id, window id, flags, and super-properties stay in RAM for this
   page. A reload starts a new anonymous session; the authenticated layout identifies
-  the account id again on boot, so events still stitch to the person. Surveys and
+  the account id on boot even if the plan query is still pending or has failed, and
+  attaches the plan when it arrives, so events still stitch to the person. Surveys and
   recording were already off. Opt-out state is only written if we call `opt_out` /
   `opt_in` — we never do. The toolbar only writes if someone opens it.
 - **Sentry Replay runs storage-free.** `stickySession` is `false`, so the SDK never
