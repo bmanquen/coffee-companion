@@ -52,15 +52,18 @@ describe('PrivacyPage', () => {
     expect(replay.getByText(/every piece of text .* is masked/i)).toBeTruthy()
   })
 
-  // ADR 0011: no banner, because the only device write is the session the user
-  // asked for and the monitoring SDKs stay in memory.
-  it('says the device holds only the sign-in session', () => {
+  // ADR 0011: no banner. Strictly necessary writes are the session and the
+  // one-shot router reload after a deploy; the monitoring SDKs stay in memory.
+  it('says the device holds only strictly necessary writes', () => {
     render(<PrivacyPage />)
 
     const storage = within(
       screen.getByRole('region', { name: 'Cookies and device storage' }),
     )
     expect(storage.getByText(/sign-in session you asked for/i)).toBeTruthy()
+    expect(
+      storage.getByText(/fails to load after we ship a new version/i),
+    ).toBeTruthy()
     expect(storage.getByText(/posthog and sentry/i)).toBeTruthy()
     expect(storage.getByText(/no consent banner/i)).toBeTruthy()
   })
