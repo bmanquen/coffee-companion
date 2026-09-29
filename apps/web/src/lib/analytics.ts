@@ -122,7 +122,7 @@ export function identityFrom(session: { user: { id: string } }): Identity {
   return { id: session.user.id }
 }
 
-export function identifyUser(identity: Identity, properties: { plan: PlanId }) {
+export function identifyUser(identity: Identity, properties?: { plan: PlanId }) {
   active()?.identify(identity.id, properties)
 }
 
