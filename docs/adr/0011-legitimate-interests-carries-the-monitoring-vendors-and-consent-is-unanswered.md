@@ -81,8 +81,7 @@ What we rejected:
   grows past the 0009 allow-list, this line is the first thing that stops being true.
 - **A consent banner for device storage.** The first draft of this ADR left ePrivacy
   unanswered and said a banner was the mechanism if the answer was yes. The answer is
-  no: turn the writes off instead of asking permission to keep them. Issue #124 still
-  holds the DPA / transfer check.
+  no: turn the writes off instead of asking permission to keep them.
 - **Writing the basis onto the page only.** A claim that lives in JSX gets edited by
   whoever is adjusting the copy. It is recorded here so that changing it is a decision.
 
@@ -108,9 +107,10 @@ Consequences to understand before changing anything here:
   updating these figures
   ([Sentry retention](https://docs.sentry.io/security-legal-pii/security/data-retention-periods/),
   [PostHog persons](https://posthog.com/docs/data/persons)).
-- **The Sentry DPA has not been checked.** Sentry is US-based, so international transfer
-  terms apply and someone has to confirm the DPA is executed on our account. Nothing in
-  the repo can establish that.
+- **The Sentry DPA was accepted in the Sentry org settings (Sep 2026).** EU/UK
+  transfers to the US rely on the EU-U.S. Data Privacy Framework (plus the UK and
+  Swiss extensions), with the 2021 EU Standard Contractual Clauses and UK addendum
+  as the fallback ([Sentry DPA, Schedule 3](https://sentry.io/legal/dpa/)).
 - **Naming the user in Sentry reopened the balancing test, and it was reopened
   deliberately.** This ADR was first written against a Sentry that named nobody.
   [ADR 0012](0012-sentry-names-the-user-by-account-id.md) added the account id and
