@@ -10,6 +10,7 @@ import {
   coffees,
   coffeesVarieties,
   countries,
+  dialedInBrews,
   espressoShots,
   farms,
   frenchpressBrews,
@@ -24,7 +25,6 @@ import {
   roasters,
   user,
   varieties,
-  dialedInBrews,
 } from './schema'
 import { db } from './index'
 
@@ -612,7 +612,7 @@ async function seed() {
         })),
       )
       .returning()
-    const dialedShot = insertedShots[dialedInShotIndex]
+    const dialedShot = insertedShots.at(dialedInShotIndex)
     if (dialedShot) {
       await markDialedIn(
         insertedCoffee.id,

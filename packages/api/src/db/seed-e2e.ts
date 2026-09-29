@@ -15,6 +15,7 @@ import {
   coffeeProcesses,
   coffees,
   countries,
+  dialedInBrews,
   espressoShots,
   grinders,
   planGrants,
@@ -22,7 +23,6 @@ import {
   roastLevels,
   roasters,
   user,
-  dialedInBrews,
 } from './schema'
 import { db } from './index'
 

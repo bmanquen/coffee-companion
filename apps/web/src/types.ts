@@ -27,6 +27,8 @@ export interface EspressoShotWithRelations
   grinderId: string | null
   brewingDeviceId: string | null
   sealed: boolean
+  // Membership, stamped at read time — not a column on the brew.
+  isDialedIn: boolean
 }
 
 // An aeropress brew with its coffee, grinder, brewing device, and method
@@ -42,6 +44,7 @@ export interface AeropressBrewWithRelations
   methodId: string | null
   method: AeropressMethod | null
   sealed: boolean
+  isDialedIn: boolean
 }
 
 // A pour over brew with its coffee, grinder, brewing device, and method
@@ -57,6 +60,7 @@ export interface PouroverBrewWithRelations
   methodId: string | null
   method: PouroverMethod | null
   sealed: boolean
+  isDialedIn: boolean
 }
 
 // A french press brew with its coffee, grinder, brewing device, and method
@@ -72,6 +76,7 @@ export interface FrenchpressBrewWithRelations
   methodId: string | null
   method: FrenchpressMethod | null
   sealed: boolean
+  isDialedIn: boolean
 }
 
 // A cold brew with its coffee, grinder, and brewing device relations joined in —
@@ -85,4 +90,6 @@ export interface ColdBrewBrewWithRelations
   grinderId: string | null
   brewingDeviceId: string | null
   sealed: boolean
+  // Membership, stamped at read time — not a column on the brew.
+  isDialedIn: boolean
 }

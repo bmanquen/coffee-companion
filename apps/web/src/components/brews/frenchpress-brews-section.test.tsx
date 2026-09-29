@@ -279,7 +279,7 @@ describe('FrenchpressBrewsSection', () => {
     render(<FrenchpressBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // const dialed = table.getByRole('button', {
+    const dialed = table.getByRole('button', {
       name: 'Dialed in Ethiopia Guji — clear',
     })
     expect(dialed.getAttribute('aria-pressed')).toBe('true')

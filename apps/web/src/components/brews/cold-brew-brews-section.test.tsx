@@ -252,7 +252,7 @@ describe('ColdBrewBrewsSection', () => {
       expect(body).toContain('cb1')
       await waitFor(() =>
         expect(mocks.track).toHaveBeenCalledWith('brew_dialed_in', {
-          method: 'coldBrew',
+          method: 'coldbrew',
         }),
       )
     } finally {
