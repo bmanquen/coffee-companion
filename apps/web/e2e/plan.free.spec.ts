@@ -87,7 +87,7 @@ test('an off-Shelf coffee still reads as Dialed-in when its Brew is Sealed', asy
 
   const table = await expandRow(page, OFF_SHELF_DIALED_IN_COFFEE.name)
 
-  await expect(table.getByText('Yes')).toBeVisible()
+  await expect(table.locator('.opacity-100').getByText('Yes')).toBeVisible()
 })
 
 test('an off-Shelf coffee is still loggable, and the new brew reads straight away', async ({

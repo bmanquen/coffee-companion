@@ -179,9 +179,9 @@ export function Coffee() {
     data: coffees as Array<CoffeeRow>,
     columns,
     // Both layouts collapse to the identity summary; expansion (accordion)
-    // reveals process, roast level, varieties, the dialed-in recipe and notes
-    // via CoffeeDetails — a card detail region on mobile, a desktop sub-row
-    // (see ADR-0003).
+    // reveals process, roast level, varieties, whether the coffee has a
+    // Dialed-in Brew, and notes via CoffeeDetails — a card detail region on
+    // mobile, a desktop sub-row (see ADR-0003).
     state: { expanded: expansion.expanded },
     onExpandedChange: expansion.onExpandedChange,
     getCoreRowModel: getCoreRowModel(),
