@@ -78,4 +78,18 @@ describe('locatorFrom', () => {
       'first',
     ])
   })
+
+  it('scopes a Pricing click to the Marketing nav', () => {
+    const { page, trail } = pageWithTrail()
+    locatorFrom(page, {
+      role: 'link',
+      name: 'Pricing',
+      nav: 'Marketing',
+    })
+    assert.deepEqual(trail, [
+      ['getByRole', 'navigation', { name: 'Marketing' }],
+      ['getByRole', 'link', { name: 'Pricing', exact: false }],
+    ])
+    assert.ok(!trail.includes('first'))
+  })
 })

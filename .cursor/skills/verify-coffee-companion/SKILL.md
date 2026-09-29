@@ -78,7 +78,7 @@ Identities (the `e2e_auth` cookie; server must have `E2E_BYPASS_AUTH=true`):
 ```bash
 .cursor/skills/verify-coffee-companion/helpers/control browser as public
 .cursor/skills/verify-coffee-companion/helpers/control browser goto --path /
-.cursor/skills/verify-coffee-companion/helpers/control browser click --role link --name Pricing
+.cursor/skills/verify-coffee-companion/helpers/control browser click --role link --name Pricing --nav Marketing
 .cursor/skills/verify-coffee-companion/helpers/control browser fill --placeholder Name --value "Kenya Nyeri"
 .cursor/skills/verify-coffee-companion/helpers/control browser fill --label "Dose (g)" --value 18
 .cursor/skills/verify-coffee-companion/helpers/control browser press --key Enter
@@ -88,13 +88,13 @@ Identities (the `e2e_auth` cookie; server must have `E2E_BYPASS_AUTH=true`):
 .cursor/skills/verify-coffee-companion/helpers/control browser snapshot --aria --path artifacts/<run>/page.aria.txt
 ```
 
-Regex names are `/pattern/i` strings. `--first` applies to `click`, `expect`, and `fill` (including `--placeholder`) — use it whenever desktop table and mobile card both render the same name. `--label` is `getByLabel` (the same handle `apps/web/e2e` uses for recipe fields). Number fields are `spinbutton`s; `--label "Dose (g)"` matches them without naming the role. Scope a list-row action with `--row` and the unique name (`click --role button --name "Edit grinder" --row "<unique>"`) — never `--first` or list position when the list sorts by name. Scope a click to the marketing header with `--` plus the daemon's `nav: Marketing` (the `drive marketing` recipe does this). For ad-hoc header clicks, prefer:
+Regex names are `/pattern/i` strings. `--first` applies to `click`, `expect`, and `fill` (including `--placeholder`) — use it whenever desktop table and mobile card both render the same name. `--label` is `getByLabel` (the same handle `apps/web/e2e` uses for recipe fields). Number fields are `spinbutton`s; `--label "Dose (g)"` matches them without naming the role. Scope a list-row action with `--row` and the unique name (`click --role button --name "Edit grinder" --row "<unique>"`) — never `--first` or list position when the list sorts by name. Scope a marketing-header click with `--nav Marketing` (the `drive marketing` recipe does this):
 
 ```bash
-.cursor/skills/verify-coffee-companion/helpers/control browser click --role link --name Pricing
+.cursor/skills/verify-coffee-companion/helpers/control browser click --role link --name Pricing --nav Marketing
 ```
 
-Pricing also appears in the footer; if both match, click the header one by going through the mapped marketing recipe.
+An unscoped `Pricing` click fails strict mode: the header, the home body `See pricing`, and the footer all match. `--count` waits until the locator reaches that count (same 15s window as a visible expect) — use it after a delete rather than sampling the DOM once.
 
 Stable handles (use these, not CSS or coordinates):
 
@@ -165,7 +165,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | `helpers/control launch` | Postgres (test DB, loopback + `*_test`) → migrate → seed → always rebuild → `node .output/server/index.mjs` |
 | `helpers/control doctor` | Pid, port ownership, HTTP + `Coffee Companion` marker |
 | `helpers/control seed` | `helpers/seed.mjs` → `seedE2eUsers()` |
-| `helpers/control browser …` | Playwright daemon (see Drive). `fill --label` / `expect --first` are the form and list handles |
+| `helpers/control browser …` | Playwright daemon (see Drive). `fill --label` / `expect --first` / `click --nav Marketing` are the form, list, and header handles |
 | `helpers/control drive marketing` | The only wired one-shot recipe (public home + pricing). Other map entries use `browser` commands |
 | `helpers/control cleanup` | Stop recorded pids; keep artifacts |
 | `helpers/ensure-postgres.sh` | Create/start local `coffee_companion_test` (scaffolding) |

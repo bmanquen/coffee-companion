@@ -502,6 +502,7 @@ async function cmdBrowser(argv) {
       text: flags.text,
       label: flags.label,
       row: flags.row,
+      nav: flags.nav,
       first: Boolean(flags.first),
     })
     console.log(JSON.stringify(result, null, 2))
@@ -890,11 +891,16 @@ async function runDaemon() {
             await sleep(100)
           }
         }
-        if (msg.count !== undefined && (msg.role || msg.text)) {
+        if (msg.count !== undefined && (msg.role || msg.text || msg.label)) {
           const target = locatorFrom(page, msg)
-          const n = await target.count()
-          if (n !== msg.count) {
-            throw new Error(`expected count ${msg.count}, got ${n}`)
+          const start = Date.now()
+          let n = await target.count()
+          while (n !== msg.count) {
+            if (Date.now() - start > 15_000) {
+              throw new Error(`expected count ${msg.count}, got ${n}`)
+            }
+            await sleep(100)
+            n = await target.count()
           }
           return { count: n, url: page.url() }
         }
@@ -939,7 +945,7 @@ function usage() {
   seed                   Reseed the e2e bypass users (data + free)
   browser as <who>       public | data | empty | free
   browser goto --path /
-  browser click --role link --name Pricing
+  browser click --role link --name Pricing --nav Marketing
   browser click --role button --name "Edit grinder" --row "<unique>"
   browser fill --placeholder Name --value "Kenya Nyeri"
   browser fill --placeholder Name --value "Kenya Nyeri" --first
