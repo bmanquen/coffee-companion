@@ -50,5 +50,5 @@ test('an off-Shelf coffee still reads as Dialed-in', async ({
 
   const table = await expandRow(page, OFF_SHELF_DIALED_IN_COFFEE.name)
 
-  await expect(table.getByText('Yes')).toBeVisible()
+  await expect(table.locator('.opacity-100').getByText('Yes')).toBeVisible()
 })
