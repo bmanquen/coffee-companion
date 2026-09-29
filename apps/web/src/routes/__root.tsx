@@ -1,13 +1,10 @@
-import { TanStackDevtools } from '@tanstack/react-devtools'
+import { Suspense, lazy } from 'react'
 import {
   HeadContent,
   Scripts,
   createRootRouteWithContext,
 } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { Toaster } from 'sonner'
-
-import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import appCss from '../styles.css?url'
 
@@ -63,6 +60,14 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   shellComponent: RootDocument,
 })
 
+const Devtools = import.meta.env.DEV
+  ? lazy(() =>
+      import('../integrations/devtools').then((module) => ({
+        default: module.Devtools,
+      })),
+    )
+  : () => null
+
 // The bare document. Navigation chrome deliberately lives in the authenticated
 // layout, not here, so public routes render without furniture meant for users
 // who are already signed in. Each layout supplies its own <main>.
@@ -75,18 +80,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         {children}
         <Toaster position="bottom-center" richColors />
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-            TanStackQueryDevtools,
-          ]}
-        />
+        {import.meta.env.DEV ? (
+          <Suspense>
+            <Devtools />
+          </Suspense>
+        ) : null}
         <Scripts />
       </body>
     </html>

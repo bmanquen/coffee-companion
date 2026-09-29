@@ -43,11 +43,14 @@ ePrivacy Directive are separate questions. The second one is now answered: **we 
 no non-essential information on the device, so Article 5(3) never asks for a consent
 banner.**
 
-- **The only first-party storage is the sign-in session.** better-auth's session cookie
-  (`better-auth.session_token`) exists because the user pressed Sign in. That is
-  strictly necessary for the service they asked for. During Google sign-in the library
-  also sets a short-lived OAuth state cookie so the callback can finish; that is the
-  same request.
+- **The first-party storage that is strictly necessary.** better-auth's session cookie
+  (`better-auth.session_token`) exists because the user pressed Sign in. During Google
+  sign-in the library also sets a short-lived OAuth state cookie so the callback can
+  finish; that is the same request. TanStack Router may write one
+  `tanstack_router_reload:<module>` key to sessionStorage if a lazy chunk 404s after
+  a deploy — it reloads once so the user gets the page they asked for, and it does
+  not loop. We do not write that key ourselves. It is strictly necessary for the
+  page they requested.
 - **PostHog runs storage-free.** `persistence` is `'memory'` (posthog-js 1.428.11).
   Distinct id, session id, window id, flags, and super-properties stay in RAM for this
   page. A reload starts a new anonymous session; the authenticated layout identifies
@@ -83,9 +86,10 @@ Consequences to understand before changing anything here:
 
 - **Adding a cookie, a localStorage key, or any other device write reopens ePrivacy.**
   Theme prefs, a flags cache, a sticky replay session, PostHog persistence that is not
-  `'memory'`, or an offline Sentry transport would all need a new decision — and likely
-  a banner. The options tests in `analytics.test.ts` and `sentry.test.ts` fail if the
-  two vendor levers move.
+  `'memory'`, an offline Sentry transport, or shipping TanStack Devtools in the
+  production bundle would all need a new decision — and likely a banner. The options
+  tests in `analytics.test.ts` and `sentry.test.ts` fail if the two vendor levers
+  move. Devtools render only when `import.meta.env.DEV` is true.
 - **Legitimate interests still carries a right to object.** Storage-free is not a
   mechanism to object with. The page has nowhere to object today; that remains open
   and is not solved here.
