@@ -4,7 +4,7 @@
 const SENTRY_RETENTION =
   'Sentry keeps errors, traces and replays for up to 90 days, then deletes them.'
 const POSTHOG_RETENTION =
-  'PostHog keeps events for a year, then deletes them. Person profiles are kept until they are deleted.'
+  'PostHog keeps events for a year, then deletes them. Person profiles have no expiry. They stay until they are deleted through PostHog\'s person API, which we do not call yet, so a request to delete your account does not delete the profile.'
 
 const CONTRACT_BASIS =
   'Performing the contract you asked us for. Without this the feature you pressed cannot happen at all.'

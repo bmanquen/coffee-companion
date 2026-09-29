@@ -107,10 +107,12 @@ Consequences to understand before changing anything here:
   updating these figures
   ([Sentry retention](https://docs.sentry.io/security-legal-pii/security/data-retention-periods/),
   [PostHog persons](https://posthog.com/docs/data/persons)).
-- **The Sentry DPA was accepted in the Sentry org settings (Sep 2026).** EU/UK
-  transfers to the US rely on the EU-U.S. Data Privacy Framework (plus the UK and
-  Swiss extensions), with the 2021 EU Standard Contractual Clauses and UK addendum
-  as the fallback ([Sentry DPA, Schedule 3](https://sentry.io/legal/dpa/)).
+- **The Sentry DPA was accepted in the Sentry org settings (Sep 28, 2026).**
+  Issue [#124](https://github.com/bmanquen/coffee-companion/issues/124) records
+  the acceptance; the org's audit log is the source. EU/UK transfers to the US
+  rely on the EU-U.S. Data Privacy Framework (plus the UK and Swiss extensions),
+  with the 2021 EU Standard Contractual Clauses and UK addendum as the fallback
+  ([Sentry DPA, Schedule 3](https://sentry.io/legal/dpa/)).
 - **Naming the user in Sentry reopened the balancing test, and it was reopened
   deliberately.** This ADR was first written against a Sentry that named nobody.
   [ADR 0012](0012-sentry-names-the-user-by-account-id.md) added the account id and
