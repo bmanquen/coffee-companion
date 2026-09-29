@@ -43,14 +43,16 @@ ePrivacy Directive are separate questions. The second one is now answered: **we 
 no non-essential information on the device, so Article 5(3) never asks for a consent
 banner.**
 
-- **The first-party storage that is strictly necessary.** better-auth's session cookie
-  (`better-auth.session_token`) exists because the user pressed Sign in. During Google
-  sign-in the library also sets a short-lived OAuth state cookie so the callback can
-  finish; that is the same request. TanStack Router may write one
-  `tanstack_router_reload:<module>` key to sessionStorage if a lazy chunk 404s after
-  a deploy — it reloads once so the user gets the page they asked for, and it does
-  not loop. We do not write that key ourselves. It is strictly necessary for the
-  page they requested.
+- **The first-party storage that is strictly necessary.** The exemption is
+  [Article 29 Working Party Opinion 04/2012 (WP194)](https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2012/wp194_en.pdf):
+  storage that is strictly necessary for a service the user explicitly requested.
+  better-auth's session cookie (`better-auth.session_token`) exists because the user
+  pressed Sign in. During Google sign-in the library also sets a short-lived OAuth
+  state cookie so the callback can finish; that is the same request. TanStack Router
+  may write one `tanstack_router_reload:<module>` key to sessionStorage if a lazy
+  chunk 404s after a deploy — it reloads once so the user gets the page they asked
+  for, and it does not loop. We do not write that key ourselves. It is strictly
+  necessary for the page they requested.
 - **PostHog runs storage-free.** `persistence` is `'memory'` (posthog-js 1.428.11).
   Distinct id, session id, window id, flags, and super-properties stay in RAM for this
   page. A reload starts a new anonymous session; the authenticated layout identifies
@@ -63,10 +65,11 @@ banner.**
   (the SDK default). We do not install the offline transport, which would have used
   IndexedDB.
 
-Planet49 (C-673/17) and EDPB Guidelines 2/2023 on the technical scope of Article 5(3)
-put cookies, localStorage, sessionStorage, IndexedDB, and the rest of device storage
-in the same bucket. We stay out of that bucket except for the session. A banner would
-be the answer if we started writing anything else.
+Planet49 (C-673/17) and EDPB Guidelines 2/2023 — the primary source for the
+technical scope of Article 5(3) — put cookies, localStorage, sessionStorage,
+IndexedDB, and the rest of device storage in the same bucket. We stay out of that
+bucket except for the session. A banner would be the answer if we started writing
+anything else.
 
 What we rejected:
 
