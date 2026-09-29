@@ -15,37 +15,48 @@ function formatReference(view: DialedInBrewView) {
   return parts.join(' · ')
 }
 
-// Shown on a method's log form once a brewing device is chosen. Looks up the
-// Dialed-in Brew for this method × device only — another pair is never reused.
+// Shown on a method's log form once a coffee and brewing device are chosen.
+// Looks up membership for this coffee × method × device only — another set is
+// never reused.
 export function DeviceDialedInReference({
+  coffeeId,
   brewingMethod,
   brewingDeviceId,
 }: {
+  coffeeId: string
   brewingMethod: BrewingMethod
   brewingDeviceId: string
 }) {
   const trpc = useTRPC()
+  const enabled = Boolean(coffeeId && brewingDeviceId)
   const { data } = useQuery({
     ...trpc.dialedInBrew.get.queryOptions({
+      coffeeId,
       brewingMethod,
       brewingDeviceId,
     }),
-    enabled: Boolean(brewingDeviceId),
+    enabled,
     staleTime: Infinity,
   })
 
-  if (!brewingDeviceId || !data) return null
+  if (!enabled || !data || data.length === 0) return null
+
+  const deviceName = data[0].deviceName
 
   return (
     <div
       role="status"
-      aria-label={`Dialed-in for ${data.deviceName}`}
+      aria-label={`Dialed-in for ${deviceName}`}
       className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm"
     >
       <p className="font-medium text-foreground">
-        Dialed-in for {data.deviceName}
+        Dialed-in for {deviceName}
       </p>
-      <p className="text-muted-foreground">{formatReference(data)}</p>
+      {data.map((view) => (
+        <p key={view.brewId} className="text-muted-foreground">
+          {formatReference(view)}
+        </p>
+      ))}
     </div>
   )
 }

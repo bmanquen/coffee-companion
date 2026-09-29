@@ -19,12 +19,11 @@ import type { ColdBrewBrewWithRelations } from '@/types'
 import {
   brewEnvironmentExtra,
   brewLogRowClass,
-  deviceDialedInFor,
   renderBrewDetails,
 } from '@/components/brews/brew-details'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
-import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
+import { BrewDialedInCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { SealedRowNotice } from '@/components/brews/sealed-row'
 import { DataTable, expanderColumn } from '@/components/data-table'
@@ -32,45 +31,14 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
-import {
-  invalidateDeviceDialedInQueries,
-  useDeviceDialedIn,
-} from '@/hooks/use-device-dialed-in'
+import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
-import { track } from '@/lib/analytics'
 import { formatSteepMinutes } from '@/lib/brew'
 
 type Brew = ColdBrewBrewWithRelations
 
 function DialedInCell({ row }: CellContext<Brew, unknown>) {
-  const trpc = useTRPC()
-  const queryClient = useQueryClient()
-  const setDialedIn = useMutation(
-    trpc.coldBrewBrew.setDialedIn.mutationOptions({
-      onSuccess: (_data, variables) => {
-        queryClient.invalidateQueries(trpc.coldBrewBrew.getAll.queryOptions())
-        if (variables.brewId) track('brew_dialed_in', { method: 'coldbrew' })
-      },
-    }),
-  )
-
-  const brew = row.original
-  const dialedIn = brew.isDialedIn
-
-  return (
-    <DialedInToggleCell
-      dialedIn={dialedIn}
-      onLabel={`Dialed in ${brew.coffee.name} — clear`}
-      offLabel={`Mark ${brew.coffee.name} as dialed in`}
-      // Cold brew is methodless, so dialing in is scoped to the coffee alone.
-      onToggle={() =>
-        setDialedIn.mutate({
-          coffeeId: brew.coffeeId,
-          brewId: dialedIn ? null : brew.id,
-        })
-      }
-    />
-  )
+  return <BrewDialedInCell brewingMethod="coldBrew" brew={row.original} />
 }
 
 function ActionsCell({ row }: CellContext<Brew, unknown>) {
@@ -172,7 +140,6 @@ export function ColdBrewBrewsSection() {
   const { data: brews } = useSuspenseQuery(
     trpc.coldBrewBrew.getAll.queryOptions(),
   )
-  const deviceDialedIn = useDeviceDialedIn('coldBrew')
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -254,22 +221,13 @@ export function ColdBrewBrewsSection() {
               renderBrewDetails(
                 row.original,
                 brewEnvironmentExtra(row.original.brewEnvironment),
-                deviceDialedInFor(row.original, deviceDialedIn),
               )
             }
             replaceRow={(row) =>
               row.original.sealed ? <SealedRowNotice /> : null
             }
             rowClassName={(row) =>
-              brewLogRowClass(
-                row.original.sealed,
-                row.original.isDialedIn,
-                row.original.brewingDeviceId != null &&
-                  deviceDialedIn.isDialedIn(
-                    row.original.id,
-                    row.original.brewingDeviceId,
-                  ),
-              )
+              brewLogRowClass(row.original.sealed, row.original.isDialedIn)
             }
           />
         </>

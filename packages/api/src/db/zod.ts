@@ -182,7 +182,6 @@ export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
   .omit({
     id: true,
     userId: true,
-    isDialedIn: true,
   })
   .extend({
     dose: decimalString(),
@@ -213,7 +212,6 @@ export const insertAeropressBrewSchema = createInsertSchema(aeropressBrews, {
   .omit({
     id: true,
     userId: true,
-    isDialedIn: true,
   })
   .extend({
     dose: decimalString(),
@@ -244,7 +242,6 @@ export const insertPouroverBrewSchema = createInsertSchema(pouroverBrews, {
   .omit({
     id: true,
     userId: true,
-    isDialedIn: true,
   })
   .extend({
     dose: decimalString(),
@@ -282,7 +279,6 @@ export const insertFrenchpressBrewSchema = createInsertSchema(frenchpressBrews, 
   .omit({
     id: true,
     userId: true,
-    isDialedIn: true,
   })
   .extend({
     dose: decimalString(),
@@ -307,7 +303,6 @@ export const insertColdBrewBrewSchema = createInsertSchema(coldBrewBrews, {
   .omit({
     id: true,
     userId: true,
-    isDialedIn: true,
   })
   .extend({
     dose: decimalString(),

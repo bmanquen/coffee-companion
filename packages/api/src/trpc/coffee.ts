@@ -7,12 +7,12 @@ import {
   coffeeProcesses,
   coffees,
   countries,
-  espressoShots,
   regions,
 } from '../db/schema'
 import { insertCoffeeSchema } from '../db/zod'
+import { coffeeIdsWithDialedIn } from '../lib/dialed-in-brew'
 import { isPgUniqueViolation } from '../lib/pg-error'
-import { isSealed, sealNestedBrew, stampFallenBrews } from '../lib/shelf'
+import { stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 import type { CoffeeOriginInput, InsertCoffee } from '../db/zod'
 
@@ -147,7 +147,7 @@ async function replaceOrigins(
 
 export const coffeeRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
-    const [rows, shelf] = await Promise.all([
+    const [rows, dialedInCoffeeIds] = await Promise.all([
       db.query.coffees.findMany({
         where: { userId: ctx.session.user.id },
         orderBy: { updatedAt: 'desc' },
@@ -157,23 +157,16 @@ export const coffeeRouter = createTRPCRouter({
           origins: { with: originWithPlace },
           // Varieties are a many-to-many via the join table; flatten below.
           coffeesVarieties: { with: { variety: true } },
-          // The coffee's dialed-in espresso shot, if one is set.
-          espressoShots: { where: { isDialedIn: true }, limit: 1 },
         },
       }),
-      ctx.shelf(),
+      coffeeIdsWithDialedIn(ctx.session.user.id),
     ])
-    return rows.map(
-      ({ espressoShots: dialedIn, coffeesVarieties, origins, ...coffee }) => ({
-        ...coffee,
-        origins: sortedOrigins(origins),
-        varieties: coffeesVarieties.map((cv) => cv.variety),
-        // Blanked rather than dropped, like every Brew feed: a Sealed dial-in
-        // is still the coffee's reference shot, and the list is where a user
-        // notices it has gone.
-        dialedInShot: sealNestedBrew(dialedIn.at(0) ?? null, shelf),
-      }),
-    )
+    return rows.map(({ coffeesVarieties, origins, ...coffee }) => ({
+      ...coffee,
+      origins: sortedOrigins(origins),
+      varieties: coffeesVarieties.map((cv) => cv.variety),
+      isDialedIn: dialedInCoffeeIds.has(coffee.id),
+    }))
   }),
 
   getById: authedProcedure.input(z.uuid()).query(async ({ ctx, input }) => {
@@ -284,51 +277,5 @@ export const coffeeRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
       }
       return deleted[0]
-    }),
-
-  setDialedIn: authedProcedure
-    .input(z.object({ coffeeId: z.string(), shotId: z.string().nullable() }))
-    .mutation(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id
-
-      // A Sealed Brew cannot become the reference to reproduce: its settings
-      // are not readable, so it would arrive as a Sealed row nobody can act on.
-      if (input.shotId) {
-        const target = await db.query.espressoShots.findFirst({
-          where: { id: input.shotId, userId },
-        })
-        if (target && isSealed(target, await ctx.shelf())) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'This Brew is Sealed. Subscribe to dial it in again.',
-          })
-        }
-      }
-      await db.transaction(async (tx) => {
-        // Clear the coffee's current dialed-in espresso shot, if any. The
-        // partial unique index allows only one dialed-in shot per coffee, so
-        // this must run before flagging a new one.
-        await tx
-          .update(espressoShots)
-          .set({ isDialedIn: false })
-          .where(
-            and(
-              eq(espressoShots.coffeeId, input.coffeeId),
-              eq(espressoShots.userId, userId),
-              eq(espressoShots.isDialedIn, true),
-            ),
-          )
-        if (input.shotId) {
-          await tx
-            .update(espressoShots)
-            .set({ isDialedIn: true })
-            .where(
-              and(
-                eq(espressoShots.id, input.shotId),
-                eq(espressoShots.userId, userId),
-              ),
-            )
-        }
-      })
     }),
 })

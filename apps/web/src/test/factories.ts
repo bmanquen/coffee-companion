@@ -319,7 +319,7 @@ export function makeCoffee(overrides: Partial<CoffeeOption> = {}): CoffeeOption 
     roaster: null,
     roastLevel: null,
     varieties: [],
-    dialedInShot: null,
+    isDialedIn: false,
     ...overrides,
   }
 }

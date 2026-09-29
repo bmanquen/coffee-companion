@@ -291,7 +291,6 @@ const brewBase = {
     .notNull(),
   grindSetting: text('grind_setting'),
   notes: text(),
-  isDialedIn: boolean('is_dialed_in').notNull().default(false),
   // Timezone-aware for the same reason plan_grants.expires_at is: the app
   // writes it and compares it against now().
   sealedAt: timestamp('sealed_at', { withTimezone: true }),
@@ -309,10 +308,6 @@ export const espressoShots = pgTable(
   (table) => [
     index('espresso_shots_user_idx').on(table.userId),
     index('espresso_shots_user_coffee_idx').on(table.userId, table.coffeeId),
-    // At most one dialed-in espresso shot per coffee.
-    uniqueIndex('espresso_shots_dialed_in_idx')
-      .on(table.coffeeId)
-      .where(sql`is_dialed_in`),
   ],
 )
 
@@ -348,12 +343,6 @@ export const aeropressBrews = pgTable(
   (table) => [
     index('aeropress_brews_user_idx').on(table.userId),
     index('aeropress_brews_user_coffee_idx').on(table.userId, table.coffeeId),
-    // At most one dialed-in aeropress brew per coffee *per method* — so a coffee
-    // can have both a dialed-in Standard and a dialed-in Inverted brew.
-    // Independent of the dialed-in espresso shot as well.
-    uniqueIndex('aeropress_brews_dialed_in_idx')
-      .on(table.coffeeId, table.methodId)
-      .where(sql`is_dialed_in`),
   ],
 )
 
@@ -390,11 +379,6 @@ export const pouroverBrews = pgTable(
   (table) => [
     index('pourover_brews_user_idx').on(table.userId),
     index('pourover_brews_user_coffee_idx').on(table.userId, table.coffeeId),
-    // At most one dialed-in pour over brew per coffee *per method*, independent
-    // of the dialed-in espresso shot and aeropress brews.
-    uniqueIndex('pourover_brews_dialed_in_idx')
-      .on(table.coffeeId, table.methodId)
-      .where(sql`is_dialed_in`),
   ],
 )
 
@@ -427,9 +411,6 @@ export const frenchpressBrews = pgTable(
   (table) => [
     index('frenchpress_brews_user_idx').on(table.userId),
     index('frenchpress_brews_user_coffee_idx').on(table.userId, table.coffeeId),
-    uniqueIndex('frenchpress_brews_dialed_in_idx')
-      .on(table.coffeeId, table.methodId)
-      .where(sql`is_dialed_in`),
   ],
 )
 
@@ -460,18 +441,12 @@ export const coldBrewBrews = pgTable(
   (table) => [
     index('cold_brew_brews_user_idx').on(table.userId),
     index('cold_brew_brews_user_coffee_idx').on(table.userId, table.coffeeId),
-    // At most one dialed-in cold brew per coffee. Cold brew is methodless, so
-    // this is scoped to the coffee alone (not coffee+method), independent of
-    // every other method's dialed-in brew.
-    uniqueIndex('cold_brew_brews_dialed_in_idx')
-      .on(table.coffeeId)
-      .where(sql`is_dialed_in`),
   ],
 )
 
 // The five Brewing Methods. Distinct from Method Variants (aeropress_methods
-// etc.): this is the method a Brew belongs to, used to key Dialed-in per
-// device. A Brewing Device can hold one Dialed-in Brew per method.
+// etc.): this is the method a Brew belongs to, used to key Dialed-in membership
+// with Coffee and Brewing Device.
 export const brewingMethodEnum = pgEnum('brewing_method', [
   'espresso',
   'aeropress',
@@ -480,16 +455,20 @@ export const brewingMethodEnum = pgEnum('brewing_method', [
   'coldBrew',
 ])
 
-// One Dialed-in Brew per (user × Brewing Method × Brewing Device). Separate
-// from brewBase.isDialedIn, which is the Coffee-scoped reference (per coffee
-// per method variant). brew_id points at the method's brew table; a delete
-// trigger on each brew table clears the row so the pointer cannot dangle.
+// Membership of a Brew in the Dialed-in set for (Coffee × Brewing Method ×
+// Brewing Device). Unique on brew_id — a brew is in at most one set — but not
+// unique on the set key, so many brews can belong to the same coffee × method
+// × device. brew_id points at the method's brew table; a delete trigger on
+// each brew table removes only that brew from the set.
 export const dialedInBrews = pgTable(
   'dialed_in_brews',
   {
     id: uuid().primaryKey().defaultRandom(),
     userId: text('user_id')
       .references(() => user.id, { onDelete: 'cascade' })
+      .notNull(),
+    coffeeId: uuid('coffee_id')
+      .references(() => coffees.id, { onDelete: 'cascade' })
       .notNull(),
     brewingMethod: brewingMethodEnum('brewing_method').notNull(),
     brewingDeviceId: uuid('brewing_device_id')
@@ -499,13 +478,14 @@ export const dialedInBrews = pgTable(
     ...timestamps,
   },
   (table) => [
-    uniqueIndex('dialed_in_brews_user_method_device_idx').on(
+    uniqueIndex('dialed_in_brews_brew_idx').on(table.brewId),
+    index('dialed_in_brews_user_idx').on(table.userId),
+    index('dialed_in_brews_set_idx').on(
       table.userId,
+      table.coffeeId,
       table.brewingMethod,
       table.brewingDeviceId,
     ),
-    uniqueIndex('dialed_in_brews_brew_idx').on(table.brewId),
-    index('dialed_in_brews_user_idx').on(table.userId),
   ],
 )
 
@@ -653,6 +633,7 @@ export const relations = defineRelations(
       pouroverBrews: r.many.pouroverBrews(),
       frenchpressBrews: r.many.frenchpressBrews(),
       coldBrewBrews: r.many.coldBrewBrews(),
+      dialedInBrews: r.many.dialedInBrews(),
     },
     coffeeOrigins: {
       coffee: r.one.coffees({
@@ -708,6 +689,11 @@ export const relations = defineRelations(
       user: r.one.user({
         from: r.dialedInBrews.userId,
         to: r.user.id,
+        optional: false,
+      }),
+      coffee: r.one.coffees({
+        from: r.dialedInBrews.coffeeId,
+        to: r.coffees.id,
         optional: false,
       }),
       brewingDevice: r.one.brewingDevices({

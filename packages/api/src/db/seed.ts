@@ -24,6 +24,7 @@ import {
   roasters,
   user,
   varieties,
+  dialedInBrews,
 } from './schema'
 import { db } from './index'
 
@@ -346,6 +347,21 @@ const TEST_USER_ID = 'test-user-seed-id'
 const SEED_USER_ID = process.env.SEED_USER_ID ?? TEST_USER_ID
 const usingExistingUser = process.env.SEED_USER_ID != null
 
+async function markDialedIn(
+  coffeeId: string,
+  brewingMethod: 'espresso' | 'aeropress' | 'pourover' | 'frenchpress',
+  brewingDeviceId: string,
+  brewId: string,
+) {
+  await db.insert(dialedInBrews).values({
+    userId: SEED_USER_ID,
+    coffeeId,
+    brewingMethod,
+    brewingDeviceId,
+    brewId,
+  })
+}
+
 async function seed() {
   console.log(`Seeding database for user "${SEED_USER_ID}"...`)
 
@@ -583,76 +599,110 @@ async function seed() {
       })
     }
 
-    await db.insert(espressoShots).values(
-      shots.map((shot, index) => ({
-        ...shot,
-        userId: SEED_USER_ID,
-        coffeeId: insertedCoffee.id,
-        grinderId,
+    const insertedShots = await db
+      .insert(espressoShots)
+      .values(
+        shots.map((shot) => ({
+          ...shot,
+          userId: SEED_USER_ID,
+          coffeeId: insertedCoffee.id,
+          grinderId,
+          brewingDeviceId,
+          roastDate,
+        })),
+      )
+      .returning()
+    const dialedShot = insertedShots[dialedInShotIndex]
+    if (dialedShot) {
+      await markDialedIn(
+        insertedCoffee.id,
+        'espresso',
         brewingDeviceId,
-        roastDate,
-        // One dialed-in shot per coffee (enforced by a partial unique index).
-        isDialedIn: index === dialedInShotIndex,
-      })),
-    )
+        dialedShot.id,
+      )
+    }
 
-    // Give the first few coffees a dialed-in Standard AeroPress brew so the
+    // Give the first few coffees a Dialed-in Standard AeroPress brew so the
     // aeropress views have data to show out of the box.
     if (coffeeIndex < 3) {
-      await db.insert(aeropressBrews).values({
-        userId: SEED_USER_ID,
-        coffeeId: insertedCoffee.id,
-        grinderId,
-        brewingDeviceId: aeropressDeviceId,
-        methodId: standardMethodId,
-        roastDate,
-        dose: '15.0',
-        water: '220',
-        steepTime: 90,
-        grindSetting: '18',
-        notes: 'Bright and clean, medium grind',
-        isDialedIn: true,
-      })
+      const [aeropress] = await db
+        .insert(aeropressBrews)
+        .values({
+          userId: SEED_USER_ID,
+          coffeeId: insertedCoffee.id,
+          grinderId,
+          brewingDeviceId: aeropressDeviceId,
+          methodId: standardMethodId,
+          roastDate,
+          dose: '15.0',
+          water: '220',
+          steepTime: 90,
+          grindSetting: '18',
+          notes: 'Bright and clean, medium grind',
+        })
+        .returning()
+      await markDialedIn(
+        insertedCoffee.id,
+        'aeropress',
+        aeropressDeviceId,
+        aeropress.id,
+      )
     }
 
-    // Likewise seed a dialed-in Standard pour over brew so the pour over views
+    // Likewise seed a Dialed-in Standard pour over brew so the pour over views
     // have data out of the box.
     if (coffeeIndex < 3) {
-      await db.insert(pouroverBrews).values({
-        userId: SEED_USER_ID,
-        coffeeId: insertedCoffee.id,
-        grinderId,
-        brewingDeviceId: pouroverDeviceId,
-        methodId: pouroverStandardMethodId,
-        roastDate,
-        dose: '18.0',
-        water: '300',
-        brewTime: 165,
-        waterTemp: 94,
-        grindSetting: '22',
-        notes: 'Even drawdown, sweet and floral',
-        isDialedIn: true,
-      })
+      const [pourover] = await db
+        .insert(pouroverBrews)
+        .values({
+          userId: SEED_USER_ID,
+          coffeeId: insertedCoffee.id,
+          grinderId,
+          brewingDeviceId: pouroverDeviceId,
+          methodId: pouroverStandardMethodId,
+          roastDate,
+          dose: '18.0',
+          water: '300',
+          brewTime: 165,
+          waterTemp: 94,
+          grindSetting: '22',
+          notes: 'Even drawdown, sweet and floral',
+        })
+        .returning()
+      await markDialedIn(
+        insertedCoffee.id,
+        'pourover',
+        pouroverDeviceId,
+        pourover.id,
+      )
     }
 
-    // Likewise seed a dialed-in Standard french press brew so the french press
+    // Likewise seed a Dialed-in Standard french press brew so the french press
     // views have data out of the box.
     if (coffeeIndex < 3) {
-      await db.insert(frenchpressBrews).values({
-        userId: SEED_USER_ID,
-        coffeeId: insertedCoffee.id,
-        grinderId,
-        brewingDeviceId: frenchpressDeviceId,
-        methodId: frenchpressStandardMethodId,
-        roastDate,
-        dose: '30.0',
-        water: '500',
-        steepTime: 240,
-        waterTemp: 95,
-        grindSetting: '30',
-        notes: 'Coarse grind, full body, break the crust at 4:00',
-        isDialedIn: true,
-      })
+      const [frenchpress] = await db
+        .insert(frenchpressBrews)
+        .values({
+          userId: SEED_USER_ID,
+          coffeeId: insertedCoffee.id,
+          grinderId,
+          brewingDeviceId: frenchpressDeviceId,
+          methodId: frenchpressStandardMethodId,
+          roastDate,
+          dose: '30.0',
+          water: '500',
+          steepTime: 240,
+          waterTemp: 95,
+          grindSetting: '30',
+          notes: 'Coarse grind, full body, break the crust at 4:00',
+        })
+        .returning()
+      await markDialedIn(
+        insertedCoffee.id,
+        'frenchpress',
+        frenchpressDeviceId,
+        frenchpress.id,
+      )
     }
 
     for (const varietyName of coffeeVarieties) {

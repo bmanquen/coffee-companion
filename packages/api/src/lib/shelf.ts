@@ -130,19 +130,15 @@ export function isSealed(brew: SealableBrew, shelf: Shelf): boolean {
   return brew.sealedAt !== null || !shelf.has(brew.coffeeId)
 }
 
-// What a user can still identify: which Brew, on which Coffee, whether it is
-// that Coffee's reference, and when. Everything else is the past they have not
-// paid to read, so it comes back null and the type says so.
-//
-// isDialedIn is here because a Sealed dial-in is still shown as the Coffee's
-// reference Brew — blanking the flag would have the dial-in feed return rows
-// denying they are dial-ins. It reports a Brew's standing, never its settings.
+// What a user can still identify: which Brew, on which Coffee, and when.
+// Everything else is the past they have not paid to read, so it comes back
+// null and the type says so. Dialed-in membership is stamped after sealing
+// from the membership table, not stored on the brew.
 type ReadableWhenSealed =
   | 'id'
   | 'userId'
   | 'coffeeId'
   | 'coffee'
-  | 'isDialedIn'
   | 'sealedAt'
   | 'createdAt'
   | 'updatedAt'
@@ -166,7 +162,6 @@ const readableFields: Record<ReadableWhenSealed, true> = {
   userId: true,
   coffeeId: true,
   coffee: true,
-  isDialedIn: true,
   sealedAt: true,
   createdAt: true,
   updatedAt: true,
@@ -175,8 +170,8 @@ const readableFields: Record<ReadableWhenSealed, true> = {
 const readableWhenSealed = new Set<string>(Object.keys(readableFields))
 
 // Blanks a Sealed Brew rather than dropping it, so the feed still shows that it
-// exists and which Coffee it belongs to. That holds for the dial-ins too: a
-// Sealed dial-in is still the Coffee's reference Brew, it just cannot be read.
+// exists and which Coffee it belongs to. Membership still counts: a Sealed
+// Dialed-in Brew stays in the set, it just cannot be read.
 function withSealing<T extends SealableBrew>(
   brew: T,
   shelf: Shelf,
@@ -233,9 +228,9 @@ export async function sealBrew<T extends SealableBrew>(
   return withSealing(brew, resolved)
 }
 
-// A Brew carried on some other row — the coffee list's dialed-in shot. Takes
-// the Shelf already resolved, since the caller resolved it to map the rows it
-// hangs off, and passes null through for a row that has no Brew at all.
+// A Brew carried on some other row. Takes the Shelf already resolved, since
+// the caller resolved it to map the rows it hangs off, and passes null through
+// for a row that has no Brew at all.
 export function sealNestedBrew<T extends SealableBrew>(
   brew: T | null,
   shelf: Shelf,

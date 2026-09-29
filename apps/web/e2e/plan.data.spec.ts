@@ -43,12 +43,12 @@ test('no brew reads as Sealed on any feed', async ({ page }) => {
   }
 })
 
-test('the Dialed-in settings of an off-Shelf coffee are readable', async ({
+test('an off-Shelf coffee still reads as Dialed-in', async ({
   page,
 }) => {
   await page.goto('/coffees')
 
   const table = await expandRow(page, OFF_SHELF_DIALED_IN_COFFEE.name)
 
-  await expect(table.getByText('18g → 36g')).toBeVisible()
+  await expect(table.getByText('Yes')).toBeVisible()
 })

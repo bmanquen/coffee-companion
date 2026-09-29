@@ -25,9 +25,6 @@ export const Route = createFileRoute('/_authenticated/brews/')({
     context.queryClient.ensureQueryData(
       context.trpc.coldBrewBrew.getAll.queryOptions(),
     )
-    context.queryClient.ensureQueryData(
-      context.trpc.dialedInBrew.list.queryOptions(),
-    )
   },
   component: BrewsIndex,
 })

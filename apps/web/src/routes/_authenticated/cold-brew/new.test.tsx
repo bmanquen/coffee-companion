@@ -112,10 +112,11 @@ function seeded() {
   ])
   qc.setQueryData(
     trpc.dialedInBrew.get.queryKey({
+      coffeeId: COFFEE,
       brewingMethod: 'coldBrew',
       brewingDeviceId: CB_DEVICE,
     }),
-    null,
+    [],
   )
   return providers
 }

@@ -18,13 +18,12 @@ import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { FrenchpressBrewWithRelations } from '@/types'
 import {
   brewLogRowClass,
-  deviceDialedInFor,
   renderBrewDetails,
   waterTempExtra,
 } from '@/components/brews/brew-details'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
-import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
+import { BrewDialedInCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { SealedRowNotice } from '@/components/brews/sealed-row'
 import { DataTable, expanderColumn } from '@/components/data-table'
@@ -32,12 +31,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
-import {
-  invalidateDeviceDialedInQueries,
-  useDeviceDialedIn,
-} from '@/hooks/use-device-dialed-in'
+import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
-import { track } from '@/lib/analytics'
 import { formatBrewSeconds } from '@/lib/brew'
 
 type Brew = FrenchpressBrewWithRelations
@@ -45,44 +40,7 @@ type Brew = FrenchpressBrewWithRelations
 const columnHelper = createColumnHelper<Brew>()
 
 function DialedInCell({ row }: CellContext<Brew, unknown>) {
-  const trpc = useTRPC()
-  const queryClient = useQueryClient()
-  const setDialedIn = useMutation(
-    trpc.frenchpressBrew.setDialedIn.mutationOptions({
-      onSuccess: (_data, variables) => {
-        queryClient.invalidateQueries(
-          trpc.frenchpressBrew.getAll.queryOptions(),
-        )
-        if (variables.brewId) track('brew_dialed_in', { method: 'frenchpress' })
-      },
-    }),
-  )
-
-  const brew = row.original
-  const dialedIn = brew.isDialedIn
-
-  // A Sealed Brew has no Brewing Method to dial in against, and its settings
-  // are not readable.
-  // Destructured so the narrowing survives into the onToggle closure below.
-  const { method, methodId } = brew
-  if (brew.sealed || !method || !methodId) return null
-
-  return (
-    <DialedInToggleCell
-      dialedIn={dialedIn}
-      onLabel={`Dialed in ${brew.coffee.name} for ${method.name} — clear`}
-      offLabel={`Mark ${brew.coffee.name} as dialed in for ${method.name}`}
-      // Dialing in is scoped per method: this only replaces the coffee's
-      // dialed-in brew for *this* brew's method.
-      onToggle={() =>
-        setDialedIn.mutate({
-          coffeeId: brew.coffeeId,
-          methodId,
-          brewId: dialedIn ? null : brew.id,
-        })
-      }
-    />
-  )
+  return <BrewDialedInCell brewingMethod="frenchpress" brew={row.original} />
 }
 
 function ActionsCell({ row }: CellContext<Brew, unknown>) {
@@ -185,7 +143,6 @@ export function FrenchpressBrewsSection() {
   const { data: brews } = useSuspenseQuery(
     trpc.frenchpressBrew.getAll.queryOptions(),
   )
-  const deviceDialedIn = useDeviceDialedIn('frenchpress')
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -267,22 +224,13 @@ export function FrenchpressBrewsSection() {
               renderBrewDetails(
                 row.original,
                 waterTempExtra(row.original.waterTemp),
-                deviceDialedInFor(row.original, deviceDialedIn),
               )
             }
             replaceRow={(row) =>
               row.original.sealed ? <SealedRowNotice /> : null
             }
             rowClassName={(row) =>
-              brewLogRowClass(
-                row.original.sealed,
-                row.original.isDialedIn,
-                row.original.brewingDeviceId != null &&
-                  deviceDialedIn.isDialedIn(
-                    row.original.id,
-                    row.original.brewingDeviceId,
-                  ),
-              )
+              brewLogRowClass(row.original.sealed, row.original.isDialedIn)
             }
           />
         </>

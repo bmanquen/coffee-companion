@@ -1,15 +1,17 @@
 import { z } from 'zod'
 import {
   brewingMethods,
-  getDialedInBrew,
+  getDialedInBrews,
   listDialedInBrews,
   setDialedInBrew,
+  unsetDialedInBrew,
 } from '../lib/dialed-in-brew'
 import { authedProcedure, createTRPCRouter } from './init'
 
 const brewingMethodSchema = z.enum(brewingMethods)
 
-const pairInput = z.object({
+const setKey = z.object({
+  coffeeId: z.uuid(),
   brewingMethod: brewingMethodSchema,
   brewingDeviceId: z.uuid(),
 })
@@ -19,22 +21,34 @@ export const dialedInBrewRouter = createTRPCRouter({
     listDialedInBrews(ctx.session.user.id),
   ),
 
-  get: authedProcedure.input(pairInput).query(async ({ ctx, input }) =>
-    getDialedInBrew(ctx.session.user.id, input, await ctx.shelf()),
+  get: authedProcedure.input(setKey).query(async ({ ctx, input }) =>
+    getDialedInBrews(ctx.session.user.id, input, await ctx.shelf()),
   ),
 
-  // Set or clear (brewId null) the Dialed-in Brew for a method × device pair.
-  // At most one mapping per pair; setting replaces. The brew must belong to
-  // this user, this method, and this device.
+  // Add this brew to its coffee × method × device set. Idempotent: marking a
+  // brew that is already a member leaves the rest of the set untouched.
   set: authedProcedure
-    .input(pairInput.extend({ brewId: z.uuid().nullable() }))
-    .mutation(async ({ ctx, input }) => {
-      const { brewId, ...pair } = input
-      return setDialedInBrew(
+    .input(
+      z.object({
+        brewingMethod: brewingMethodSchema,
+        brewingDeviceId: z.uuid(),
+        brewId: z.uuid(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setDialedInBrew(
         ctx.session.user.id,
-        pair,
-        brewId,
+        input.brewingMethod,
+        input.brewingDeviceId,
+        input.brewId,
         await ctx.shelf(),
-      )
+      ),
+    ),
+
+  // Remove only this brew from its set. Other members stay marked.
+  unset: authedProcedure
+    .input(z.object({ brewId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await unsetDialedInBrew(ctx.session.user.id, input.brewId)
     }),
 })

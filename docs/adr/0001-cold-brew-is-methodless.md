@@ -9,9 +9,9 @@ Consequences that diverge from the templated per-method pattern:
 
 - **No `cold_brew_methods` table and no method router.** Cold Brew ships with only a
   brew router.
-- **No `methodId` on `cold_brew_brews`.** Dialed-in uniqueness is per coffee (`unique
-  where is_dialed_in` on `coffeeId` alone), not per coffee *per method*. `setDialedIn`
-  takes `coffeeId` + `brewId`, no `methodId`.
+- **No `methodId` on `cold_brew_brews`.** Dialed-in membership is still keyed by
+  Brewing Method (`coldBrew`), Coffee, and Brewing Device — the method is the
+  table, not a Method Variant.
 - **UI has no method picker** on the cold brew new/edit forms.
 
 We chose an honest model over template symmetry. A future reader will notice Cold Brew

@@ -277,13 +277,12 @@ describe('PouroverBrewsSection', () => {
     render(<PouroverBrewsSection />, { wrapper: Wrapper })
 
     const table = within(screen.getByRole('table'))
-    // Labels are scoped per method so the toggle reads clearly for each row.
-    const dialed = table.getByRole('button', {
-      name: 'Dialed in Ethiopia Guji for Standard — clear',
+    // const dialed = table.getByRole('button', {
+      name: 'Dialed in Ethiopia Guji — clear',
     })
     expect(dialed.getAttribute('aria-pressed')).toBe('true')
     const notDialed = table.getByRole('button', {
-      name: 'Mark Colombia Huila as dialed in for Standard',
+      name: 'Mark Colombia Huila as dialed in',
     })
     expect(notDialed.getAttribute('aria-pressed')).toBe('false')
   })
@@ -310,7 +309,7 @@ describe('PouroverBrewsSection', () => {
     expect(dialog.getByRole('button', { name: 'Delete' })).toBeTruthy()
   })
 
-  it('fires setDialedIn with the coffee, method, and brew when toggled on', async () => {
+  it('fires dialedInBrew.set when toggled on', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(trpcSuccess())
@@ -330,17 +329,15 @@ describe('PouroverBrewsSection', () => {
       const table = within(screen.getByRole('table'))
       fireEvent.click(
         table.getByRole('button', {
-          name: 'Mark Ethiopia Guji as dialed in for Standard',
+          name: 'Mark Ethiopia Guji as dialed in',
         }),
       )
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
       const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('pouroverBrew.setDialedIn')
+      expect(String(url)).toContain('dialedInBrew.set')
       const body = String(init?.body ?? '')
       expect(body).toContain('p1')
-      expect(body).toContain('c1')
-      expect(body).toContain('m1')
       await waitFor(() =>
         expect(mocks.track).toHaveBeenCalledWith('brew_dialed_in', {
           method: 'pourover',
@@ -351,7 +348,7 @@ describe('PouroverBrewsSection', () => {
     }
   })
 
-  it('clears the dialed-in brew (null brewId) when toggled off', async () => {
+  it('fires dialedInBrew.unset when toggled off', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(trpcSuccess())
@@ -371,18 +368,15 @@ describe('PouroverBrewsSection', () => {
       const table = within(screen.getByRole('table'))
       fireEvent.click(
         table.getByRole('button', {
-          name: 'Dialed in Ethiopia Guji for Standard — clear',
+          name: 'Dialed in Ethiopia Guji — clear',
         }),
       )
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
       const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('pouroverBrew.setDialedIn')
+      expect(String(url)).toContain('dialedInBrew.unset')
       const body = String(init?.body ?? '')
-      // Clearing scopes to coffee + method but sends no brew id.
-      expect(body).toContain('c1')
-      expect(body).toContain('m1')
-      expect(body).not.toContain('p1')
+      expect(body).toContain('p1')
       await waitFor(() => expect(queryClient.isMutating()).toBe(0))
       expect(mocks.track).not.toHaveBeenCalled()
     } finally {
@@ -523,7 +517,7 @@ describe('PouroverBrewsSection', () => {
       // control cells, whose clicks are stopped from bubbling to the row toggle.
       fireEvent.click(
         table.getByRole('button', {
-          name: 'Mark Ethiopia Guji as dialed in for Standard',
+          name: 'Mark Ethiopia Guji as dialed in',
         }),
       )
       expect(region.className).toContain('grid-rows-[0fr]')

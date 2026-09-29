@@ -271,14 +271,16 @@ describe('espressoShot.delete', () => {
       time: 30,
       grindSetting: '1.5',
     })
-    await asA.coffee.setDialedIn({ coffeeId: coffee.id, shotId: shot.id })
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceId,
+      brewId: shot.id,
+    })
 
     await asA.espressoShot.delete(shot.id)
 
-    // Deleting the shot removes the only dialed-in shot, so the coffee is left
-    // with none.
     const coffees = await asA.coffee.getAll()
-    expect(coffees.find((c) => c.id === coffee.id)?.dialedInShot).toBeNull()
+    expect(coffees.find((c) => c.id === coffee.id)?.isDialedIn).toBe(false)
   })
 
   it('throws NOT_FOUND for an unknown id', async () => {
@@ -356,7 +358,11 @@ describe('espressoShot.getDialedIn', () => {
       time: 30,
       grindSetting: '1.5',
     })
-    await asA.coffee.setDialedIn({ coffeeId: coffee.id, shotId: dialedShot.id })
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceId,
+      brewId: dialedShot.id,
+    })
 
     const dialedIn = await asA.espressoShot.getDialedIn()
 
@@ -390,7 +396,11 @@ describe('espressoShot.getDialedIn', () => {
         time: 30,
         grindSetting: '1.5',
       })
-      await asA.coffee.setDialedIn({ coffeeId: c.id, shotId: s.id })
+      await asA.dialedInBrew.set({
+        brewingMethod: 'espresso',
+        brewingDeviceId: espressoDeviceId,
+        brewId: s.id,
+      })
     }
     const all = await asA.espressoShot.getDialedIn()
     expect(all.length).toBeGreaterThanOrEqual(2)

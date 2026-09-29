@@ -95,10 +95,11 @@ function seeded() {
   ])
   qc.setQueryData(
     trpc.dialedInBrew.get.queryKey({
+      coffeeId: COFFEE,
       brewingMethod: 'espresso',
       brewingDeviceId: ESP_DEVICE,
     }),
-    null,
+    [],
   )
   return providers
 }
@@ -125,23 +126,27 @@ describe('NewEspressoShot form', () => {
     const { queryClient, trpc, Wrapper } = seeded()
     queryClient.setQueryData(
       trpc.dialedInBrew.get.queryKey({
+        coffeeId: COFFEE,
         brewingMethod: 'espresso',
         brewingDeviceId: ESP_DEVICE,
       }),
-      {
-        brewingMethod: 'espresso',
-        brewingDeviceId: ESP_DEVICE,
-        brewId: 'shot-1',
-        coffeeName: 'Ethiopia Guji',
-        deviceName: 'Linea Mini',
-        grindSetting: '21',
-        dose: '18',
-        outputGrams: '36',
-        outputLabel: 'Yield',
-        time: 27,
-        timeUnit: 's',
-        sealed: false,
-      },
+      [
+        {
+          coffeeId: COFFEE,
+          brewingMethod: 'espresso',
+          brewingDeviceId: ESP_DEVICE,
+          brewId: 'shot-1',
+          coffeeName: 'Ethiopia Guji',
+          deviceName: 'Linea Mini',
+          grindSetting: '21',
+          dose: '18',
+          outputGrams: '36',
+          outputLabel: 'Yield',
+          time: 27,
+          timeUnit: 's',
+          sealed: false,
+        },
+      ],
     )
     render(<NewEspressoShot />, { wrapper: Wrapper })
 

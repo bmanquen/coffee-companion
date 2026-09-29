@@ -83,9 +83,10 @@ beforeAll(async () => {
 
   // Dial in the shot that will later Seal. It has to happen now: once Sealed, a
   // Brew can no longer be made the reference to reproduce.
-  await asUser.coffee.setDialedIn({
-    coffeeId: coffees[1].id,
-    shotId: coffees[1].shotId,
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'espresso',
+    brewingDeviceId: deviceId,
+    brewId: coffees[1].shotId,
   })
 })
 
@@ -220,14 +221,11 @@ describe('Sealing and the Plan', () => {
 })
 
 describe('every espresso read path', () => {
-  it('withholds a Sealed dial-in from the coffee list too', async () => {
+  it('still reports a coffee as Dialed-in when its membership is Sealed', async () => {
     const list = await asUser.coffee.getAll()
     const sealedCoffee = list.find((coffee) => coffee.id === coffees[1].id)
 
-    // Reported, not omitted: a coffee whose dial-in is Sealed must not read as
-    // one that was never dialed in.
-    expect(sealedCoffee?.dialedInShot?.sealed).toBe(true)
-    expect(sealedCoffee?.dialedInShot?.dose).toBe(null)
+    expect(sealedCoffee?.isDialedIn).toBe(true)
   })
 
   it('withholds a Sealed shot fetched on its own', async () => {

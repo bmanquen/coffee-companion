@@ -250,146 +250,35 @@ describe('pouroverBrew.getAll / getRecent', () => {
   })
 })
 
-describe('pouroverBrew.setDialedIn / getDialedIn', () => {
-  it('dials in one brew per method for the same coffee, independently', async () => {
-    const coffee = await createCoffee(uniq('Two Methods'))
+describe('pouroverBrew.getDialedIn', () => {
+  async function mark(brewId: string) {
+    await asA.dialedInBrew.set({
+      brewingMethod: 'pourover',
+      brewingDeviceId: pouroverDeviceId,
+      brewId,
+    })
+  }
 
-    const standardBrew = await asA.pouroverBrew.create({
+  it('returns every Dialed-in pour over brew for the user', async () => {
+    const coffee = await createCoffee(uniq('Two Members'))
+    const first = await asA.pouroverBrew.create({
       ...baseBrew(),
       coffeeId: coffee.id,
       methodId: standardMethodId,
     })
-    const pulseBrew = await asA.pouroverBrew.create({
+    const second = await asA.pouroverBrew.create({
       ...baseBrew(),
       coffeeId: coffee.id,
       methodId: pulseMethodId,
     })
+    await mark(first.id)
+    await mark(second.id)
 
-    await asA.pouroverBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-      brewId: standardBrew.id,
-    })
-    await asA.pouroverBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: pulseMethodId,
-      brewId: pulseBrew.id,
-    })
-
-    // Both methods can be dialed in for the same coffee at once.
     const dialedIn = await asA.pouroverBrew.getDialedIn()
     const ids = dialedIn.map((b) => b.id)
-    expect(ids).toContain(standardBrew.id)
-    expect(ids).toContain(pulseBrew.id)
+    expect(ids).toContain(first.id)
+    expect(ids).toContain(second.id)
     expect(dialedIn.every((b) => b.isDialedIn)).toBe(true)
-  })
-
-  it('replacing a method’s dialed-in brew leaves the other method untouched', async () => {
-    const coffee = await createCoffee(uniq('Replace Standard'))
-    const firstStandard = await asA.pouroverBrew.create({
-      ...baseBrew(),
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-    })
-    const pulse = await asA.pouroverBrew.create({
-      ...baseBrew(),
-      coffeeId: coffee.id,
-      methodId: pulseMethodId,
-    })
-    await asA.pouroverBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-      brewId: firstStandard.id,
-    })
-    await asA.pouroverBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: pulseMethodId,
-      brewId: pulse.id,
-    })
-
-    // Dial in a *second* Standard brew — the first Standard clears, Pulse stays.
-    const secondStandard = await asA.pouroverBrew.create({
-      ...baseBrew(),
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-    })
-    await asA.pouroverBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-      brewId: secondStandard.id,
-    })
-
-    expect((await asA.pouroverBrew.getById(firstStandard.id)).isDialedIn).toBe(
-      false,
-    )
-    expect((await asA.pouroverBrew.getById(secondStandard.id)).isDialedIn).toBe(
-      true,
-    )
-    // The Pulse dialed-in brew is unaffected by changes to Standard.
-    expect((await asA.pouroverBrew.getById(pulse.id)).isDialedIn).toBe(true)
-  })
-
-  it('clears a method’s dialed-in brew with a null brewId', async () => {
-    const coffee = await createCoffee(uniq('Clear Dialed'))
-    const brew = await asA.pouroverBrew.create({
-      ...baseBrew(),
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-    })
-    await asA.pouroverBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-      brewId: brew.id,
-    })
-    await asA.pouroverBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-      brewId: null,
-    })
-    expect((await asA.pouroverBrew.getById(brew.id)).isDialedIn).toBe(false)
-  })
-
-  it('rejects dialing in a brew from a different coffee without disturbing state', async () => {
-    const coffeeX = await createCoffee(uniq('Guard X'))
-    const coffeeY = await createCoffee(uniq('Guard Y'))
-    const xDialed = await asA.pouroverBrew.create({
-      ...baseBrew(),
-      coffeeId: coffeeX.id,
-      methodId: standardMethodId,
-    })
-    const yDialed = await asA.pouroverBrew.create({
-      ...baseBrew(),
-      coffeeId: coffeeY.id,
-      methodId: standardMethodId,
-    })
-    const yOther = await asA.pouroverBrew.create({
-      ...baseBrew(),
-      coffeeId: coffeeY.id,
-      methodId: standardMethodId,
-    })
-    await asA.pouroverBrew.setDialedIn({
-      coffeeId: coffeeX.id,
-      methodId: standardMethodId,
-      brewId: xDialed.id,
-    })
-    await asA.pouroverBrew.setDialedIn({
-      coffeeId: coffeeY.id,
-      methodId: standardMethodId,
-      brewId: yDialed.id,
-    })
-    // Dialing coffeeY's *other* brew in under coffeeX would set a second
-    // dialed-in brew for coffeeY (tripping the unique index) and wrongly clear
-    // coffeeX's. Now it's a clean NOT_FOUND with the transaction rolled back.
-    await expect(
-      asA.pouroverBrew.setDialedIn({
-        coffeeId: coffeeX.id,
-        methodId: standardMethodId,
-        brewId: yOther.id,
-      }),
-    ).rejects.toThrow(/not found/i)
-    expect((await asA.pouroverBrew.getById(xDialed.id)).isDialedIn).toBe(true)
-    expect((await asA.pouroverBrew.getById(yDialed.id)).isDialedIn).toBe(true)
-    expect((await asA.pouroverBrew.getById(yOther.id)).isDialedIn).toBe(false)
   })
 
   it('does not return another user’s dialed-in brews', async () => {
