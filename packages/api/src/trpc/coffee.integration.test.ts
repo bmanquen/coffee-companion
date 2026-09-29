@@ -18,9 +18,9 @@ const asB = callerFor(USER_B)
 const uniq = uniqFor(USER_A)
 const createCoffee = createCoffeeFor(asA, uniq)
 
-// An espresso device + grinder are needed to create the reference shot that
-// coffee.setDialedIn points at. Device types are globally unique, so reuse an
-// existing "Espresso" row or create one and remember to drop it.
+// An espresso device + grinder are needed to mark a Dialed-in shot so
+// coffee.getAll can derive isDialedIn. Device types are globally unique, so
+// reuse an existing "Espresso" row or create one and remember to drop it.
 let espressoDeviceId: string
 let grinderId: string
 let createdDeviceTypeId: string | null = null
@@ -515,8 +515,8 @@ describe('coffee.getRecent', () => {
   })
 })
 
-describe('coffee.setDialedIn', () => {
-  it('sets and clears the dialed-in shot', async () => {
+describe('coffee.getAll dialed-in', () => {
+  it('is true when the coffee has a Dialed-in Brew, and false after unmarking', async () => {
     const coffee = await createCoffee(uniq('Dial-in'))
     const shot = await asA.espressoShot.create({
       coffeeId: coffee.id,
@@ -528,25 +528,16 @@ describe('coffee.setDialedIn', () => {
       grindSetting: '1.5',
     })
 
-    await asA.coffee.setDialedIn({ coffeeId: coffee.id, shotId: shot.id })
-    const afterSet = await asA.coffee.getAll()
-    expect(afterSet.find((c) => c.id === coffee.id)?.dialedInShot?.id).toBe(
-      shot.id,
-    )
-
-    await asA.coffee.setDialedIn({ coffeeId: coffee.id, shotId: null })
-    const afterClear = await asA.coffee.getAll()
-    expect(
-      afterClear.find((c) => c.id === coffee.id)?.dialedInShot,
-    ).toBeNull()
-  })
-
-  it('will not dial in a coffee owned by another user', async () => {
-    // coffeeAId belongs to USER_A; as USER_B the scoped update matches nothing.
-    const result = await asB.coffee.setDialedIn({
-      coffeeId: coffeeAId,
-      shotId: null,
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceId,
+      brewId: shot.id,
     })
-    expect(result).toBeUndefined()
+    const afterSet = await asA.coffee.getAll()
+    expect(afterSet.find((c) => c.id === coffee.id)?.isDialedIn).toBe(true)
+
+    await asA.dialedInBrew.unset({ brewId: shot.id })
+    const afterClear = await asA.coffee.getAll()
+    expect(afterClear.find((c) => c.id === coffee.id)?.isDialedIn).toBe(false)
   })
 })

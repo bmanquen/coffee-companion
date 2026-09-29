@@ -17,12 +17,11 @@ import { useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import {
   brewLogRowClass,
-  deviceDialedInFor,
   renderBrewDetails,
 } from '@/components/brews/brew-details'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
-import { DialedInToggleCell } from '@/components/brews/dialed-in-toggle-cell'
+import { BrewDialedInCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { SealedRowNotice } from '@/components/brews/sealed-row'
 import { DataTable, expanderColumn } from '@/components/data-table'
@@ -30,12 +29,8 @@ import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import {
-  invalidateDeviceDialedInQueries,
-  useDeviceDialedIn,
-} from '@/hooks/use-device-dialed-in'
+import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
-import { track } from '@/lib/analytics'
 
 type Shot = {
   id: string
@@ -58,34 +53,7 @@ type Shot = {
 const columnHelper = createColumnHelper<Shot>()
 
 function DialedInCell({ row }: CellContext<Shot, unknown>) {
-  const trpc = useTRPC()
-  const queryClient = useQueryClient()
-  const setDialedIn = useMutation(
-    trpc.coffee.setDialedIn.mutationOptions({
-      onSuccess: (_data, variables) => {
-        queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
-        queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
-        if (variables.shotId) track('brew_dialed_in', { method: 'espresso' })
-      },
-    }),
-  )
-
-  const shot = row.original
-  const dialedIn = shot.isDialedIn
-
-  return (
-    <DialedInToggleCell
-      dialedIn={dialedIn}
-      onLabel={`Dialed in ${shot.coffee.name} — clear`}
-      offLabel={`Mark ${shot.coffee.name} as dialed in`}
-      onToggle={() =>
-        setDialedIn.mutate({
-          coffeeId: shot.coffeeId,
-          shotId: dialedIn ? null : shot.id,
-        })
-      }
-    />
-  )
+  return <BrewDialedInCell brewingMethod="espresso" brew={row.original} />
 }
 
 function ActionsCell({ row }: CellContext<Shot, unknown>) {
@@ -184,7 +152,6 @@ export function EspressoBrewsSection() {
   const { data: shots } = useSuspenseQuery(
     trpc.espressoShot.getAll.queryOptions(),
   )
-  const deviceDialedIn = useDeviceDialedIn('espresso')
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -263,26 +230,12 @@ export function EspressoBrewsSection() {
           </div>
           <DataTable
             table={table}
-            renderSubComponent={(row) =>
-              renderBrewDetails(
-                row.original,
-                undefined,
-                deviceDialedInFor(row.original, deviceDialedIn),
-              )
-            }
+            renderSubComponent={(row) => renderBrewDetails(row.original)}
             replaceRow={(row) =>
               row.original.sealed ? <SealedRowNotice /> : null
             }
             rowClassName={(row) =>
-              brewLogRowClass(
-                row.original.sealed,
-                row.original.isDialedIn,
-                row.original.brewingDeviceId != null &&
-                  deviceDialedIn.isDialedIn(
-                    row.original.id,
-                    row.original.brewingDeviceId,
-                  ),
-              )
+              brewLogRowClass(row.original.sealed, row.original.isDialedIn)
             }
           />
         </>

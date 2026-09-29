@@ -153,10 +153,15 @@ function NewAeropressBrew() {
           {(field) => (
             <>
               <field.SearchSelect label="Brewing Device" {...brewingDevice} />
-              <DeviceDialedInReference
-                brewingMethod="aeropress"
-                brewingDeviceId={field.state.value}
-              />
+              <form.Subscribe selector={(state) => state.values.coffeeId}>
+                {(coffeeId) => (
+                  <DeviceDialedInReference
+                    coffeeId={coffeeId}
+                    brewingMethod="aeropress"
+                    brewingDeviceId={field.state.value}
+                  />
+                )}
+              </form.Subscribe>
             </>
           )}
         </form.AppField>

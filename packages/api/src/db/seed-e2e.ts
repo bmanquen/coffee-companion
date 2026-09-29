@@ -22,6 +22,7 @@ import {
   roastLevels,
   roasters,
   user,
+  dialedInBrews,
 } from './schema'
 import { db } from './index'
 
@@ -129,18 +130,29 @@ async function seedLibrary(
 
     await attachOrigin(coffee.id, entry.country, entry.region, entry.process)
 
-    await db.insert(espressoShots).values({
-      userId,
-      coffeeId: coffee.id,
-      grinderId,
-      brewingDeviceId,
-      dose: '18',
-      yield: '36',
-      time: 30,
-      grindSetting: entry.grindSetting,
-      isDialedIn: entry.name === OFF_SHELF_DIALED_IN_COFFEE.name,
-      createdAt: daysAgo(index + 1),
-    })
+    const [shot] = await db
+      .insert(espressoShots)
+      .values({
+        userId,
+        coffeeId: coffee.id,
+        grinderId,
+        brewingDeviceId,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: entry.grindSetting,
+        createdAt: daysAgo(index + 1),
+      })
+      .returning()
+    if (entry.name === OFF_SHELF_DIALED_IN_COFFEE.name) {
+      await db.insert(dialedInBrews).values({
+        userId,
+        coffeeId: coffee.id,
+        brewingMethod: 'espresso',
+        brewingDeviceId,
+        brewId: shot.id,
+      })
+    }
   }
 }
 
@@ -233,17 +245,26 @@ async function seedGrantedUser() {
       await db.insert(aeropressMethods).values({ name: 'Standard' }).returning()
     )[0].id
 
-  await db.insert(aeropressBrews).values({
+  const [aeropressBrew] = await db
+    .insert(aeropressBrews)
+    .values({
+      userId: E2E_USER_WITH_DATA,
+      coffeeId: coffee.id,
+      grinderId: grinder.id,
+      brewingDeviceId: aeropressDevice.id,
+      methodId,
+      dose: '15',
+      water: '220',
+      steepTime: 90,
+      grindSetting: '18',
+    })
+    .returning()
+  await db.insert(dialedInBrews).values({
     userId: E2E_USER_WITH_DATA,
     coffeeId: coffee.id,
-    grinderId: grinder.id,
+    brewingMethod: 'aeropress',
     brewingDeviceId: aeropressDevice.id,
-    methodId,
-    dose: '15',
-    water: '220',
-    steepTime: 90,
-    grindSetting: '18',
-    isDialedIn: true,
+    brewId: aeropressBrew.id,
   })
 }
 

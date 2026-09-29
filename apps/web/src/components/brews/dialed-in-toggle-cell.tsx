@@ -1,12 +1,8 @@
+import type { BrewingMethod } from '@coffee-companion/api/lib/dialed-in-brew'
 import { Crosshair } from 'lucide-react'
+import { useDeviceDialedIn } from '@/hooks/use-device-dialed-in'
 import { Button } from '@/components/ui/button'
 
-// The dialed-in crosshair toggle shared by every /brews section's dialed-in
-// column. Visual only — each section wires its own `setDialedIn` mutation into
-// `onToggle`, since the payload differs per method (espresso uses `shotId` on
-// `coffee.setDialedIn`; the method-based brews add `methodId`; cold brew is
-// methodless). The aria-labels also differ (the method-based ones name the
-// method), so they're passed in.
 export function DialedInToggleCell({
   dialedIn,
   onToggle,
@@ -29,5 +25,31 @@ export function DialedInToggleCell({
     >
       <Crosshair className="h-4 w-4" />
     </Button>
+  )
+}
+
+export function BrewDialedInCell({
+  brewingMethod,
+  brew,
+}: {
+  brewingMethod: BrewingMethod
+  brew: {
+    id: string
+    brewingDeviceId: string | null
+    isDialedIn: boolean
+    sealed: boolean
+    coffee: { name: string }
+  }
+}) {
+  const { toggle } = useDeviceDialedIn(brewingMethod)
+  if (brew.sealed) return null
+
+  return (
+    <DialedInToggleCell
+      dialedIn={brew.isDialedIn}
+      onLabel={`Dialed in ${brew.coffee.name} — clear`}
+      offLabel={`Mark ${brew.coffee.name} as dialed in`}
+      onToggle={() => toggle(brew)}
+    />
   )
 }

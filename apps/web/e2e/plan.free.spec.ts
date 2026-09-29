@@ -80,18 +80,14 @@ test('a coffee on the Shelf stays fully readable', async ({ page }) => {
   await expect(readable.getByText(/^Sealed/)).toHaveCount(0)
 })
 
-test('the Dialed-in settings of an off-Shelf coffee are Sealed too', async ({
+test('an off-Shelf coffee still reads as Dialed-in when its Brew is Sealed', async ({
   page,
 }) => {
   await page.goto('/coffees')
 
   const table = await expandRow(page, OFF_SHELF_DIALED_IN_COFFEE.name)
 
-  await expect(table.getByText(/This Brew is Sealed/)).toBeVisible()
-  await expect(table.getByRole('link', { name: 'See plans' })).toHaveAttribute(
-    'href',
-    '/pricing',
-  )
+  await expect(table.getByText('Yes')).toBeVisible()
 })
 
 test('an off-Shelf coffee is still loggable, and the new brew reads straight away', async ({

@@ -4,8 +4,10 @@ import { DeviceDialedInReference } from './device-dialed-in-reference'
 import { createTestProviders } from '@/test/providers'
 
 const DEVICE = '00000000-0000-4000-8000-000000000005'
+const COFFEE = '00000000-0000-4000-8000-000000000001'
 
 const view = {
+  coffeeId: COFFEE,
   brewingMethod: 'espresso' as const,
   brewingDeviceId: DEVICE,
   brewId: 'shot-1',
@@ -21,18 +23,20 @@ const view = {
 }
 
 describe('DeviceDialedInReference', () => {
-  it('renders nothing when this method × device has no Dialed-in Brew', () => {
+  it('renders nothing when this coffee × method × device has no Dialed-in Brew', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(
       trpc.dialedInBrew.get.queryKey({
+        coffeeId: COFFEE,
         brewingMethod: 'espresso',
         brewingDeviceId: DEVICE,
       }),
-      null,
+      [],
     )
 
     render(
       <DeviceDialedInReference
+        coffeeId={COFFEE}
         brewingMethod="espresso"
         brewingDeviceId={DEVICE}
       />,
@@ -41,18 +45,20 @@ describe('DeviceDialedInReference', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  it('surfaces the Dialed-in Brew for the given method × device', () => {
+  it('surfaces the Dialed-in set for the given coffee × method × device', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(
       trpc.dialedInBrew.get.queryKey({
+        coffeeId: COFFEE,
         brewingMethod: 'espresso',
         brewingDeviceId: DEVICE,
       }),
-      view,
+      [view],
     )
 
     render(
       <DeviceDialedInReference
+        coffeeId={COFFEE}
         brewingMethod="espresso"
         brewingDeviceId={DEVICE}
       />,
@@ -68,10 +74,45 @@ describe('DeviceDialedInReference', () => {
     ).toBeTruthy()
   })
 
-  it('does not query another pair when the device is empty', () => {
+  it('lists every member of the set', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(
+      trpc.dialedInBrew.get.queryKey({
+        coffeeId: COFFEE,
+        brewingMethod: 'espresso',
+        brewingDeviceId: DEVICE,
+      }),
+      [
+        view,
+        { ...view, brewId: 'shot-2', grindSetting: '22' },
+      ],
+    )
+
+    render(
+      <DeviceDialedInReference
+        coffeeId={COFFEE}
+        brewingMethod="espresso"
+        brewingDeviceId={DEVICE}
+      />,
+      { wrapper: Wrapper },
+    )
+
+    expect(
+      screen.getByText('Ethiopia Guji · Grind 21 · Dose 18g · Yield 36g · Time 27s'),
+    ).toBeTruthy()
+    expect(
+      screen.getByText('Ethiopia Guji · Grind 22 · Dose 18g · Yield 36g · Time 27s'),
+    ).toBeTruthy()
+  })
+
+  it('does not query when the coffee or device is empty', () => {
     const { Wrapper } = createTestProviders()
     render(
-      <DeviceDialedInReference brewingMethod="espresso" brewingDeviceId="" />,
+      <DeviceDialedInReference
+        coffeeId=""
+        brewingMethod="espresso"
+        brewingDeviceId={DEVICE}
+      />,
       { wrapper: Wrapper },
     )
     expect(screen.queryByRole('status')).toBeNull()

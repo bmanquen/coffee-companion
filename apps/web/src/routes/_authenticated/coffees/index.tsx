@@ -12,8 +12,6 @@ import {
 } from '@tanstack/react-table'
 import { CoffeeIcon, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { CellContext } from '@tanstack/react-table'
-import type { ReactNode } from 'react'
-import { SealedBrewNotice } from '@/components/brews/sealed-brew-notice'
 import { formatOriginNames } from '@/components/coffees/format-coffee-origins'
 import { CoffeeDetails } from '@/components/coffees/coffee-details'
 import { DataTable, expanderColumn } from '@/components/data-table'
@@ -65,29 +63,10 @@ type CoffeeRow = {
     process: { name: string } | null
   }>
   varieties: Array<{ name: string }>
-  dialedInShot: {
-    sealed: boolean
-    dose: string | null
-    yield: string | null
-    time: number | null
-    grindSetting: string | null
-  } | null
+  isDialedIn: boolean
 }
 
 const columnHelper = createColumnHelper<CoffeeRow>()
-
-// The dialed-in espresso recipe, compacted to a single line (or a dash). A
-// Sealed shot is still the coffee's reference — the settings just are not
-// readable — so it says so rather than passing for a coffee with no dial-in.
-function formatDialedInShot(shot: CoffeeRow['dialedInShot']): ReactNode {
-  if (!shot) return '-'
-  if (shot.sealed) return <SealedBrewNotice />
-  const parts: Array<string> = []
-  if (shot.dose && shot.yield) parts.push(`${shot.dose}g → ${shot.yield}g`)
-  if (shot.time) parts.push(`${shot.time}s`)
-  if (shot.grindSetting) parts.push(`Grind ${shot.grindSetting}`)
-  return parts.length > 0 ? parts.join(' · ') : '-'
-}
 
 function CoffeeActionsCell({ row }: CellContext<CoffeeRow, unknown>) {
   const trpc = useTRPC()
@@ -254,7 +233,7 @@ export function Coffee() {
               process={formatOriginNames(row.original.origins, 'process')}
               roastLevel={row.original.roastLevel?.name ?? null}
               varieties={row.original.varieties.map((v) => v.name)}
-              dialedInEspresso={formatDialedInShot(row.original.dialedInShot)}
+              dialedIn={row.original.isDialedIn ? 'Yes' : '-'}
               notes={row.original.notes}
             />
           )}

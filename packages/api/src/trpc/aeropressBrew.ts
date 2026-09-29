@@ -6,12 +6,12 @@ import { aeropressBrews } from '../db/schema'
 import { insertAeropressBrewSchema } from '../db/zod'
 import { AEROPRESS_DEVICE_TYPE, isAeropressDevice } from '../lib/aeropress'
 import {
-  isSealed,
-  sealBrew,
-  sealBrewPage,
-  sealBrews,
-  stampFallenBrews,
-} from '../lib/shelf'
+  brewIdsForMethod,
+  sealBrewPageWithDialedIn,
+  sealBrewWithDialedIn,
+  sealBrewsWithDialedIn,
+} from '../lib/dialed-in-brew'
+import { isSealed, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 const withRelations = {
@@ -57,7 +57,7 @@ async function assertAeropressMethod(methodId: string, userId: string) {
 
 export const aeropressBrewRouter = createTRPCRouter({
   getAll: authedProcedure.query(({ ctx }) =>
-    sealBrews(ctx.shelf, () =>
+    sealBrewsWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
       db.query.aeropressBrews.findMany({
         where: { userId: ctx.session.user.id },
         orderBy: { createdAt: 'desc' },
@@ -71,7 +71,7 @@ export const aeropressBrewRouter = createTRPCRouter({
       z.object({ limit: z.number().min(1).max(50), offset: z.number().min(0) }),
     )
     .query(({ ctx, input }) =>
-      sealBrewPage(ctx.shelf, async () => {
+      sealBrewPageWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {
         const [items, [{ total }]] = await Promise.all([
           db.query.aeropressBrews.findMany({
             where: { userId: ctx.session.user.id },
@@ -89,23 +89,26 @@ export const aeropressBrewRouter = createTRPCRouter({
       }),
     ),
 
-  // Brews that are the dialed-in reference for their coffee+method, most recent
-  // first. An optional limit caps the result; omitting it returns all of them.
+  // Brews in the Dialed-in set, most recent first. An optional limit caps the
+  // result; omitting it returns all of them. A Sealed member is blanked, not
+  // dropped.
   getDialedIn: authedProcedure
     .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
-    .query(({ ctx, input }) =>
-      sealBrews(ctx.shelf, () =>
+    .query(async ({ ctx, input }) => {
+      const ids = await brewIdsForMethod(ctx.session.user.id, 'aeropress')
+      if (ids.length === 0) return []
+      return sealBrewsWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
         db.query.aeropressBrews.findMany({
-          where: { userId: ctx.session.user.id, isDialedIn: true },
+          where: { userId: ctx.session.user.id, id: { in: ids } },
           orderBy: { createdAt: 'desc' },
           with: withRelations,
           limit: input?.limit,
         }),
-      ),
-    ),
+      )
+    }),
 
   getById: authedProcedure.input(z.uuid()).query(({ ctx, input }) =>
-    sealBrew(ctx.shelf, async () => {
+    sealBrewWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {
       const brew = await db.query.aeropressBrews.findFirst({
         where: { id: input, userId: ctx.session.user.id },
       })
@@ -183,76 +186,4 @@ export const aeropressBrewRouter = createTRPCRouter({
     }
     return deleted[0]
   }),
-
-  // Set (or clear, with brewId null) the dialed-in aeropress brew for a coffee
-  // *within a single method*. A coffee can hold one dialed-in brew per method
-  // (and one dialed-in espresso shot) at the same time, so the clear is scoped
-  // to coffeeId + methodId — never touching the other method's dialed-in brew.
-  setDialedIn: authedProcedure
-    .input(
-      z.object({
-        coffeeId: z.uuid(),
-        methodId: z.uuid(),
-        brewId: z.uuid().nullable(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id
-
-      // A Sealed Brew cannot become the reference to reproduce: its settings
-      // are not readable, so it would arrive as a Sealed row nobody can act on.
-      if (input.brewId) {
-        const target = await db.query.aeropressBrews.findFirst({
-          where: { id: input.brewId, userId },
-        })
-        if (target && isSealed(target, await ctx.shelf())) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'This Brew is Sealed. Subscribe to dial it in again.',
-          })
-        }
-      }
-      await db.transaction(async (tx) => {
-        // Clear the coffee's current dialed-in brew for this method, if any. The
-        // partial unique index allows only one per (coffee, method), so this
-        // must run before flagging a new one.
-        await tx
-          .update(aeropressBrews)
-          .set({ isDialedIn: false })
-          .where(
-            and(
-              eq(aeropressBrews.coffeeId, input.coffeeId),
-              eq(aeropressBrews.methodId, input.methodId),
-              eq(aeropressBrews.userId, userId),
-              eq(aeropressBrews.isDialedIn, true),
-            ),
-          )
-        if (input.brewId) {
-          // Constrain the set to the same coffee + method: a brewId belonging to
-          // a different coffee must not be flagged here, or the real coffee's
-          // existing dialed-in brew would be left untouched and trip the
-          // per-(coffee, method) unique index with a raw DB error. On a mismatch
-          // no row updates; throw so the transaction rolls back the clear above
-          // and the caller gets a clean NOT_FOUND.
-          const updated = await tx
-            .update(aeropressBrews)
-            .set({ isDialedIn: true })
-            .where(
-              and(
-                eq(aeropressBrews.id, input.brewId),
-                eq(aeropressBrews.userId, userId),
-                eq(aeropressBrews.coffeeId, input.coffeeId),
-                eq(aeropressBrews.methodId, input.methodId),
-              ),
-            )
-            .returning()
-          if (updated.length === 0) {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'Brew not found for this coffee and method',
-            })
-          }
-        }
-      })
-    }),
 })

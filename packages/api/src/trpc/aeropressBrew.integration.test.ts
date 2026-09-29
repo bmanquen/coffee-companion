@@ -245,146 +245,35 @@ describe('aeropressBrew.getAll / getRecent', () => {
   })
 })
 
-describe('aeropressBrew.setDialedIn / getDialedIn', () => {
-  it('dials in one brew per method for the same coffee, independently', async () => {
-    const coffee = await createCoffee(uniq('Two Methods'))
+describe('aeropressBrew.getDialedIn', () => {
+  async function mark(brewId: string) {
+    await asA.dialedInBrew.set({
+      brewingMethod: 'aeropress',
+      brewingDeviceId: aeropressDeviceId,
+      brewId,
+    })
+  }
 
-    const standardBrew = await asA.aeropressBrew.create({
+  it('returns every Dialed-in aeropress brew for the user', async () => {
+    const coffee = await createCoffee(uniq('Two Members'))
+    const first = await asA.aeropressBrew.create({
       ...baseBrew(),
       coffeeId: coffee.id,
       methodId: standardMethodId,
     })
-    const invertedBrew = await asA.aeropressBrew.create({
+    const second = await asA.aeropressBrew.create({
       ...baseBrew(),
       coffeeId: coffee.id,
       methodId: invertedMethodId,
     })
+    await mark(first.id)
+    await mark(second.id)
 
-    await asA.aeropressBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-      brewId: standardBrew.id,
-    })
-    await asA.aeropressBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: invertedMethodId,
-      brewId: invertedBrew.id,
-    })
-
-    // Both methods can be dialed in for the same coffee at once.
     const dialedIn = await asA.aeropressBrew.getDialedIn()
     const ids = dialedIn.map((b) => b.id)
-    expect(ids).toContain(standardBrew.id)
-    expect(ids).toContain(invertedBrew.id)
+    expect(ids).toContain(first.id)
+    expect(ids).toContain(second.id)
     expect(dialedIn.every((b) => b.isDialedIn)).toBe(true)
-  })
-
-  it('replacing a method’s dialed-in brew leaves the other method untouched', async () => {
-    const coffee = await createCoffee(uniq('Replace Standard'))
-    const firstStandard = await asA.aeropressBrew.create({
-      ...baseBrew(),
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-    })
-    const inverted = await asA.aeropressBrew.create({
-      ...baseBrew(),
-      coffeeId: coffee.id,
-      methodId: invertedMethodId,
-    })
-    await asA.aeropressBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-      brewId: firstStandard.id,
-    })
-    await asA.aeropressBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: invertedMethodId,
-      brewId: inverted.id,
-    })
-
-    // Dial in a *second* Standard brew — the first Standard clears, Inverted stays.
-    const secondStandard = await asA.aeropressBrew.create({
-      ...baseBrew(),
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-    })
-    await asA.aeropressBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-      brewId: secondStandard.id,
-    })
-
-    expect((await asA.aeropressBrew.getById(firstStandard.id)).isDialedIn).toBe(
-      false,
-    )
-    expect((await asA.aeropressBrew.getById(secondStandard.id)).isDialedIn).toBe(
-      true,
-    )
-    // The Inverted dialed-in brew is unaffected by changes to Standard.
-    expect((await asA.aeropressBrew.getById(inverted.id)).isDialedIn).toBe(true)
-  })
-
-  it('clears a method’s dialed-in brew with a null brewId', async () => {
-    const coffee = await createCoffee(uniq('Clear Dialed'))
-    const brew = await asA.aeropressBrew.create({
-      ...baseBrew(),
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-    })
-    await asA.aeropressBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-      brewId: brew.id,
-    })
-    await asA.aeropressBrew.setDialedIn({
-      coffeeId: coffee.id,
-      methodId: standardMethodId,
-      brewId: null,
-    })
-    expect((await asA.aeropressBrew.getById(brew.id)).isDialedIn).toBe(false)
-  })
-
-  it('rejects dialing in a brew from a different coffee without disturbing state', async () => {
-    const coffeeX = await createCoffee(uniq('Guard X'))
-    const coffeeY = await createCoffee(uniq('Guard Y'))
-    const xDialed = await asA.aeropressBrew.create({
-      ...baseBrew(),
-      coffeeId: coffeeX.id,
-      methodId: standardMethodId,
-    })
-    const yDialed = await asA.aeropressBrew.create({
-      ...baseBrew(),
-      coffeeId: coffeeY.id,
-      methodId: standardMethodId,
-    })
-    const yOther = await asA.aeropressBrew.create({
-      ...baseBrew(),
-      coffeeId: coffeeY.id,
-      methodId: standardMethodId,
-    })
-    await asA.aeropressBrew.setDialedIn({
-      coffeeId: coffeeX.id,
-      methodId: standardMethodId,
-      brewId: xDialed.id,
-    })
-    await asA.aeropressBrew.setDialedIn({
-      coffeeId: coffeeY.id,
-      methodId: standardMethodId,
-      brewId: yDialed.id,
-    })
-    // Dialing coffeeY's *other* brew in under coffeeX would set a second
-    // dialed-in brew for coffeeY (tripping the unique index) and wrongly clear
-    // coffeeX's. Now it's a clean NOT_FOUND with the transaction rolled back.
-    await expect(
-      asA.aeropressBrew.setDialedIn({
-        coffeeId: coffeeX.id,
-        methodId: standardMethodId,
-        brewId: yOther.id,
-      }),
-    ).rejects.toThrow(/not found/i)
-    expect((await asA.aeropressBrew.getById(xDialed.id)).isDialedIn).toBe(true)
-    expect((await asA.aeropressBrew.getById(yDialed.id)).isDialedIn).toBe(true)
-    expect((await asA.aeropressBrew.getById(yOther.id)).isDialedIn).toBe(false)
   })
 
   it('does not return another user’s dialed-in brews', async () => {

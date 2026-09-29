@@ -245,7 +245,7 @@ describe('EspressoBrewsSection', () => {
     expect(dialog.getByRole('button', { name: 'Delete' })).toBeTruthy()
   })
 
-  it('fires coffee.setDialedIn with the coffee and shot when toggled on', async () => {
+  it('fires dialedInBrew.set when toggled on', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(trpcSuccess())
@@ -268,10 +268,10 @@ describe('EspressoBrewsSection', () => {
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
       const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('coffee.setDialedIn')
+      expect(String(url)).toContain('dialedInBrew.set')
       const body = String(init?.body ?? '')
-      expect(body).toContain('c1')
       expect(body).toContain('s1')
+      expect(body).toContain('espresso')
       await waitFor(() =>
         expect(mocks.track).toHaveBeenCalledWith('brew_dialed_in', {
           method: 'espresso',
@@ -281,7 +281,7 @@ describe('EspressoBrewsSection', () => {
       fetchSpy.mockRestore()
     }
   })
-  it('clears the dialed-in shot (null shotId) when toggled off', async () => {
+  it('fires dialedInBrew.unset when toggled off', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(trpcSuccess())
@@ -304,11 +304,9 @@ describe('EspressoBrewsSection', () => {
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
       const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('coffee.setDialedIn')
+      expect(String(url)).toContain('dialedInBrew.unset')
       const body = String(init?.body ?? '')
-      // Clearing scopes to the coffee but sends no shot id.
-      expect(body).toContain('c1')
-      expect(body).not.toContain('s1')
+      expect(body).toContain('s1')
       await waitFor(() => expect(queryClient.isMutating()).toBe(0))
       expect(mocks.track).not.toHaveBeenCalled()
     } finally {
@@ -321,28 +319,8 @@ describe('EspressoBrewsSection', () => {
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       const shot = makeRecentShot({ id: 's1' })
-      const brewingDeviceId = shot.brewingDeviceId ?? 'd1'
       queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [shot])
-      queryClient.setQueryData(
-        trpc.dialedInBrew.get.queryKey({
-          brewingMethod: 'espresso',
-          brewingDeviceId,
-        }),
-        {
-          brewingMethod: 'espresso',
-          brewingDeviceId,
-          brewId: shot.id,
-          coffeeName: 'Ethiopia Guji',
-          deviceName: 'Linea Mini',
-          grindSetting: '4.5',
-          dose: '18',
-          outputGrams: '36',
-          outputLabel: 'Yield',
-          time: 28,
-          timeUnit: 's',
-          sealed: false,
-        },
-      )
+      queryClient.setQueryData(trpc.dialedInBrew.list.queryKey(), [])
 
       render(<EspressoBrewsSection />, { wrapper: Wrapper })
       const table = within(screen.getByRole('table'))
@@ -355,14 +333,6 @@ describe('EspressoBrewsSection', () => {
       expect(String(url)).toContain('espressoShot.delete')
       expect(String(init?.body ?? '')).toContain('s1')
       await waitFor(() => {
-        expect(
-          queryClient.getQueryState(
-            trpc.dialedInBrew.get.queryKey({
-              brewingMethod: 'espresso',
-              brewingDeviceId,
-            }),
-          )?.isInvalidated,
-        ).toBe(true)
         expect(
           queryClient.getQueryState(trpc.dialedInBrew.list.queryKey())
             ?.isInvalidated,

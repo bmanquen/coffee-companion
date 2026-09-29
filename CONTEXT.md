@@ -47,9 +47,11 @@ Cold Brew has none and is modelled without a variant lookup (see ADR-0001).
 _Avoid_: Style, mode
 
 **Dialed-in**:
-The reference Brew to reproduce. A Coffee holds at most one per method variant
-(Cold Brew: at most one per Coffee). Separately, a user holds at most one per
-Brewing Method per Brewing Device — that pair's baseline, independent of Coffee.
+A Brew marked as a reference to reproduce, for a Coffee, a Brewing Method, and a
+Brewing Device. Many Brews can be Dialed-in for the same Coffee, method, and
+device at once; marking one does not replace the others. A Coffee is Dialed-in
+when it has at least one such Brew.
+_Avoid_: Favorite, saved recipe
 
 ## Plans
 

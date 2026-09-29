@@ -152,30 +152,32 @@ beforeAll(async () => {
     })
   ).id
 
-  // Dial each one in. isDialedIn is not settable on create — it has its own
-  // mutation per method — and setting it matters here: an undialed fixture
-  // would make the dial-in assertions below pass for the wrong reason.
-  await asUser.coffee.setDialedIn({
-    coffeeId: fallen.id,
-    shotId: sealedBrewIds.espressoShot,
+  // Dial each one in. Membership is not settable on create — it has its own
+  // mutation — and setting it matters here: an unmarked fixture would make the
+  // dial-in assertions below pass for the wrong reason.
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'espresso',
+    brewingDeviceId: espressoDevice,
+    brewId: sealedBrewIds.espressoShot,
   })
-  await asUser.aeropressBrew.setDialedIn({
-    coffeeId: fallen.id,
-    methodId: aeroMethod.id,
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'aeropress',
+    brewingDeviceId: aeropressDevice,
     brewId: sealedBrewIds.aeropressBrew,
   })
-  await asUser.pouroverBrew.setDialedIn({
-    coffeeId: fallen.id,
-    methodId: pourMethod.id,
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'pourover',
+    brewingDeviceId: pouroverDevice,
     brewId: sealedBrewIds.pouroverBrew,
   })
-  await asUser.frenchpressBrew.setDialedIn({
-    coffeeId: fallen.id,
-    methodId: frenchMethod.id,
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'frenchpress',
+    brewingDeviceId: frenchpressDevice,
     brewId: sealedBrewIds.frenchpressBrew,
   })
-  await asUser.coldBrewBrew.setDialedIn({
-    coffeeId: fallen.id,
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'coldBrew',
+    brewingDeviceId: coldBrewDevice,
     brewId: sealedBrewIds.coldBrewBrew,
   })
 
@@ -254,27 +256,29 @@ beforeAll(async () => {
     })
   ).id
 
-  await asUser.coffee.setDialedIn({
-    coffeeId: kept.id,
-    shotId: readableBrewIds.espressoShot,
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'espresso',
+    brewingDeviceId: espressoDevice,
+    brewId: readableBrewIds.espressoShot,
   })
-  await asUser.aeropressBrew.setDialedIn({
-    coffeeId: kept.id,
-    methodId: aeroMethod.id,
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'aeropress',
+    brewingDeviceId: aeropressDevice,
     brewId: readableBrewIds.aeropressBrew,
   })
-  await asUser.pouroverBrew.setDialedIn({
-    coffeeId: kept.id,
-    methodId: pourMethod.id,
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'pourover',
+    brewingDeviceId: pouroverDevice,
     brewId: readableBrewIds.pouroverBrew,
   })
-  await asUser.frenchpressBrew.setDialedIn({
-    coffeeId: kept.id,
-    methodId: frenchMethod.id,
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'frenchpress',
+    brewingDeviceId: frenchpressDevice,
     brewId: readableBrewIds.frenchpressBrew,
   })
-  await asUser.coldBrewBrew.setDialedIn({
-    coffeeId: kept.id,
+  await asUser.dialedInBrew.set({
+    brewingMethod: 'coldBrew',
+    brewingDeviceId: coldBrewDevice,
     brewId: readableBrewIds.coldBrewBrew,
   })
 
@@ -340,15 +344,11 @@ describe('the enumeration itself', () => {
   const paths = Object.keys(trpcRouter._def.procedures)
 
   it('covers every router that owns Brews', () => {
-    // A Brew router is one that can dial a Brew in. Espresso's dial-in lives on
-    // the coffee router, so it is named directly.
     const owners = new Set(
       paths
-        .filter((path) => path.endsWith('.setDialedIn'))
+        .filter((path) => path.endsWith('.getDialedIn'))
         .map((path) => path.split('.')[0]),
     )
-    owners.delete('coffee')
-    owners.add('espressoShot')
 
     expect([...owners].sort()).toEqual([...methods].sort())
   })

@@ -224,7 +224,7 @@ describe('ColdBrewBrewsSection', () => {
     expect(otherRow.className).not.toContain('bg-primary')
   })
 
-  it('fires setDialedIn with the coffee and brew (no method) when toggled on', async () => {
+  it('fires dialedInBrew.set when toggled on', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(trpcSuccess())
@@ -247,13 +247,12 @@ describe('ColdBrewBrewsSection', () => {
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
       const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('coldBrewBrew.setDialedIn')
+      expect(String(url)).toContain('dialedInBrew.set')
       const body = String(init?.body ?? '')
       expect(body).toContain('cb1')
-      expect(body).toContain('c1')
       await waitFor(() =>
         expect(mocks.track).toHaveBeenCalledWith('brew_dialed_in', {
-          method: 'coldbrew',
+          method: 'coldBrew',
         }),
       )
     } finally {
@@ -261,7 +260,7 @@ describe('ColdBrewBrewsSection', () => {
     }
   })
 
-  it('clears the dialed-in brew (null brewId) when toggled off', async () => {
+  it('fires dialedInBrew.unset when toggled off', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(trpcSuccess())
@@ -286,11 +285,9 @@ describe('ColdBrewBrewsSection', () => {
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
       const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('coldBrewBrew.setDialedIn')
+      expect(String(url)).toContain('dialedInBrew.unset')
       const body = String(init?.body ?? '')
-      // Clearing scopes to the coffee but sends no brew id.
-      expect(body).toContain('c1')
-      expect(body).not.toContain('cb1')
+      expect(body).toContain('cb1')
       await waitFor(() => expect(queryClient.isMutating()).toBe(0))
       expect(mocks.track).not.toHaveBeenCalled()
     } finally {
