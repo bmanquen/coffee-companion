@@ -4,6 +4,11 @@ import type { BillingPeriod, PlanId } from './plans'
 
 const DEFAULT_HOST = 'https://us.i.posthog.com'
 
+// posthog-js 1.428.11: 'localStorage+cookie' | 'localStorage' | 'cookie' |
+// 'sessionStorage' | 'memory'. Memory is the only one that never writes the
+// device (ADR 0011).
+const POSTHOG_PERSISTENCE_MEMORY = 'memory' satisfies PostHogConfig['persistence']
+
 function trim(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
   return trimmed || undefined
@@ -134,6 +139,7 @@ export function analyticsOptions(host: string) {
     disable_session_recording: true,
     disable_surveys: true,
     person_profiles: 'identified_only',
+    persistence: POSTHOG_PERSISTENCE_MEMORY,
     before_send: scrubAnalyticsEvent,
   } satisfies Partial<PostHogConfig>
 }

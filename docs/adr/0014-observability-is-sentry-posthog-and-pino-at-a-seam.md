@@ -90,6 +90,13 @@ replay and no autocapture. 0009, 0010, and 0012 are the detailed versions of
 those rules; this is the stack-level line a new vendor or a new field is
 measured against.
 
+Device storage is the ePrivacy half of
+[ADR 0011](0011-legitimate-interests-carries-the-monitoring-vendors-and-consent-is-unanswered.md):
+PostHog's person and session live in memory (`persistence: 'memory'`), and Sentry
+Replay does not persist (`stickySession: false`). An error still uploads a replay;
+a reload starts a new PostHog session and the authenticated layout identifies the
+account again.
+
 What we rejected:
 
 - **A first-party `web-vitals` package.** Sentry's browser tracing already

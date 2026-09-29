@@ -32,6 +32,24 @@ export function PrivacyPage() {
         <RecipientSection key={recipient.slug} recipient={recipient} />
       ))}
 
+      <Section id="device-storage" title="Cookies and device storage">
+        <p className="text-muted-foreground">
+          The only thing we write on your device is the{' '}
+          <strong className="font-medium text-foreground">
+            sign-in session you asked for
+          </strong>
+          — the cookie that keeps you signed in after you press the button.
+          PostHog and Sentry keep their state in memory for the current page
+          and forget it when you reload. There is{' '}
+          <strong className="font-medium text-foreground">
+            no consent banner
+          </strong>
+          , because nothing else is stored: the session is strictly necessary
+          for the service you pressed, and the two monitoring tools never write
+          to the browser at all.
+        </p>
+      </Section>
+
       <Section id="session-replay" title="Session replay">
         <p className="text-muted-foreground">
           Sentry can record what happened in the browser just before a crash, so

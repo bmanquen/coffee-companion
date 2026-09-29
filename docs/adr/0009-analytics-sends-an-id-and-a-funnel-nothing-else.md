@@ -43,10 +43,11 @@ What we rejected:
 - **Server-side capture or a proxy.** The API package never imports PostHog. Every event
   is fired from the component that owns the action, after the mutation resolves where
   there is one, so a failed save is not a funnel step.
-- **A consent banner.** Deferred, not refused. With recording and autocapture off the
-  payload is a random id, route patterns, and six events. If the app ever serves traffic
-  under a consent regime, the answer is to gate the boot behind consent, not to change
-  what is sent.
+- **A consent banner.** Refused, not deferred.
+  [ADR 0011](0011-legitimate-interests-carries-the-monitoring-vendors-and-consent-is-unanswered.md)
+  answers ePrivacy by writing no non-essential device storage (`persistence: 'memory'`),
+  not by gating the boot. If the payload grows past this allow-list, that decision is
+  the first thing that stops being true.
 
 Consequences to understand before changing anything here:
 
