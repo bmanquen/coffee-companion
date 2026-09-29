@@ -82,7 +82,7 @@ What we rejected:
 - **A consent banner for device storage.** The first draft of this ADR left ePrivacy
   unanswered and said a banner was the mechanism if the answer was yes. The answer is
   no: turn the writes off instead of asking permission to keep them. Issue #124 still
-  holds the DPA / transfer check and the unstated retention figures.
+  holds the DPA / transfer check.
 - **Writing the basis onto the page only.** A claim that lives in JSX gets edited by
   whoever is adjusting the copy. It is recorded here so that changing it is a decision.
 
@@ -98,13 +98,16 @@ Consequences to understand before changing anything here:
   mechanism to object with. The page has nowhere to object today; that remains open
   and is not solved here.
 - **The page's retention figures are our dashboard settings, and go stale silently.**
-  Sentry keeps errors for 90 days; PostHog keeps events for a year. They live as two
+  Sentry keeps errors, traces and replays for up to 90 days; PostHog keeps events
+  for a year and person profiles until they are deleted. They live as two
   constants at the top of `apps/web/src/lib/privacy.ts`. Nothing in the repo can notice
   when someone changes a retention setting in a vendor dashboard, so changing one there
   without changing the constant here makes the one sentence on the page that is actively
-  false rather than merely incomplete. Two figures are still unstated: Sentry's retention
-  for traces and replays, and how long a PostHog person profile survives its events.
-  Both are named in #124.
+  false rather than merely incomplete. Moving to Sentry's Business plan (which keeps
+  sampled traces up to 13 months) or a paid PostHog plan (events kept 7 years) means
+  updating these figures
+  ([Sentry retention](https://docs.sentry.io/security-legal-pii/security/data-retention-periods/),
+  [PostHog persons](https://posthog.com/docs/data/persons)).
 - **The Sentry DPA has not been checked.** Sentry is US-based, so international transfer
   terms apply and someone has to confirm the DPA is executed on our account. Nothing in
   the repo can establish that.
