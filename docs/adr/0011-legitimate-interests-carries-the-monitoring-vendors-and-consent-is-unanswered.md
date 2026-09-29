@@ -98,8 +98,10 @@ Consequences to understand before changing anything here:
   and is not solved here.
 - **The page's retention figures are our dashboard settings, and go stale silently.**
   Sentry keeps errors, traces and replays for up to 90 days; PostHog keeps events
-  for a year and person profiles until they are deleted. They live as two
-  constants at the top of `apps/web/src/lib/privacy.ts`. Nothing in the repo can notice
+  for a year. Person profiles have no expiry and stay until someone deletes them
+  through PostHog's person API; this app does not call that API yet, so a manual
+  account-deletion request does not delete the profile. That work is #125. The
+  figures live as two constants at the top of `apps/web/src/lib/privacy.ts`. Nothing in the repo can notice
   when someone changes a retention setting in a vendor dashboard, so changing one there
   without changing the constant here makes the one sentence on the page that is actively
   false rather than merely incomplete. Moving to Sentry's Business plan (which keeps
