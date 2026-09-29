@@ -23,6 +23,10 @@ What is recorded, and what leaves the browser:
   `maskAllText`, `maskAllInputs`, and `blockAllMedia` are all on. A replay is boxes and
   interactions — the shape of what happened, none of its content. A Coffee name, a
   roaster, a tasting note, and an email address are all rectangles.
+- **The buffer is not written to the device.** `stickySession` is `false`, so the
+  recorder never stores `sentryReplaySession`.
+  [ADR 0011](0011-legitimate-interests-carries-the-monitoring-vendors-and-consent-is-unanswered.md)
+  is why: error-triggered upload still happens; the session does not survive a reload.
 - **Masking is the whole defence.** A replay does not pass through `beforeSend`; that hook
   sees errors and transactions, not recordings. `scrubSentryEvent` cleans the error a
   replay is attached to, and it cleans nothing inside the replay itself. Whatever the

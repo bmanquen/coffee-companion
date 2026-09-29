@@ -1,4 +1,4 @@
-# Legitimate interests carries the monitoring vendors, and consent is unanswered
+# Legitimate interests carries the monitoring vendors, and the device stores only the session you asked for
 
 [ADR 0009](0009-analytics-sends-an-id-and-a-funnel-nothing-else.md) fixed what PostHog
 may receive and [ADR 0010](0010-a-replay-is-attached-to-an-error-never-to-a-session.md)
@@ -38,6 +38,33 @@ app sent data to two companies. It sends to five. A page that undercounts its re
 is worse than no page, so the count is asserted in `privacy.test.ts` rather than left to
 prose.
 
+Lawful basis under the GDPR and consent for storing information on a device under the
+ePrivacy Directive are separate questions. The second one is now answered: **we write
+no non-essential information on the device, so Article 5(3) never asks for a consent
+banner.**
+
+- **The only first-party storage is the sign-in session.** better-auth's session cookie
+  (`better-auth.session_token`) exists because the user pressed Sign in. That is
+  strictly necessary for the service they asked for. During Google sign-in the library
+  also sets a short-lived OAuth state cookie so the callback can finish; that is the
+  same request.
+- **PostHog runs storage-free.** `persistence` is `'memory'` (posthog-js 1.428.11).
+  Distinct id, session id, window id, flags, and super-properties stay in RAM for this
+  page. A reload starts a new anonymous session; the authenticated layout identifies
+  the account id again on boot, so events still stitch to the person. Surveys and
+  recording were already off. Opt-out state is only written if we call `opt_out` /
+  `opt_in` — we never do. The toolbar only writes if someone opens it.
+- **Sentry Replay runs storage-free.** `stickySession` is `false`, so the SDK never
+  writes `sentryReplaySession`. The buffer 0010 describes stays in memory; an error
+  still uploads the replay. Browser tracing keeps the previous-trace link in memory
+  (the SDK default). We do not install the offline transport, which would have used
+  IndexedDB.
+
+Planet49 (C-673/17) and EDPB Guidelines 2/2023 on the technical scope of Article 5(3)
+put cookies, localStorage, sessionStorage, IndexedDB, and the rest of device storage
+in the same bucket. We stay out of that bucket except for the session. A banner would
+be the answer if we started writing anything else.
+
 What we rejected:
 
 - **Consent as the basis for analytics.** The stricter reading treats product analytics
@@ -45,22 +72,23 @@ What we rejected:
   front of a random id and six counted events while the thing that actually records
   behaviour — the replay — would ride through on a different basis. If analytics ever
   grows past the 0009 allow-list, this line is the first thing that stops being true.
+- **A consent banner for device storage.** The first draft of this ADR left ePrivacy
+  unanswered and said a banner was the mechanism if the answer was yes. The answer is
+  no: turn the writes off instead of asking permission to keep them. Issue #124 still
+  holds the DPA / transfer check and the unstated retention figures.
 - **Writing the basis onto the page only.** A claim that lives in JSX gets edited by
   whoever is adjusting the copy. It is recorded here so that changing it is a decision.
 
 Consequences to understand before changing anything here:
 
-- **This ADR does not answer the ePrivacy question, and must not be read as if it did.**
-  Lawful basis under the GDPR and consent for storing information on a device under the
-  ePrivacy Directive are separate questions with separate answers. The Sentry SDK writes
-  a `sentryReplaySession` key to browser storage the moment the recorder starts, and
-  whether error diagnostics is "strictly necessary" enough to do that without consent has
-  not been put to anyone qualified. Issue #124 carries that question and the banner that
-  a "yes" would require. Until it closes, `/privacy` describes what happens and claims no
-  exemption.
-- **Legitimate interests carries a right to object.** Whoever answers #124 owns this too;
-  the page has nowhere to object today because there is no mechanism to object with, and
-  a banner is the mechanism.
+- **Adding a cookie, a localStorage key, or any other device write reopens ePrivacy.**
+  Theme prefs, a flags cache, a sticky replay session, PostHog persistence that is not
+  `'memory'`, or an offline Sentry transport would all need a new decision — and likely
+  a banner. The options tests in `analytics.test.ts` and `sentry.test.ts` fail if the
+  two vendor levers move.
+- **Legitimate interests still carries a right to object.** Storage-free is not a
+  mechanism to object with. The page has nowhere to object today; that remains open
+  and is not solved here.
 - **The page's retention figures are our dashboard settings, and go stale silently.**
   Sentry keeps errors for 90 days; PostHog keeps events for a year. They live as two
   constants at the top of `apps/web/src/lib/privacy.ts`. Nothing in the repo can notice
@@ -72,10 +100,9 @@ Consequences to understand before changing anything here:
 - **The Sentry DPA has not been checked.** Sentry is US-based, so international transfer
   terms apply and someone has to confirm the DPA is executed on our account. Nothing in
   the repo can establish that.
-- **Naming the user in Sentry reopened this, and it was reopened deliberately.** This ADR
-  was first written against a Sentry that named nobody.
+- **Naming the user in Sentry reopened the balancing test, and it was reopened
+  deliberately.** This ADR was first written against a Sentry that named nobody.
   [ADR 0012](0012-sentry-names-the-user-by-account-id.md) added the account id and
   reweighed the balancing test there: the interest is unchanged, the payload grows by one
   opaque id, and the replay 0010 describes now belongs to an identifiable account. The
-  basis holds, but it is a closer call than the first draft of this ADR was making, and
-  whoever answers #124 is weighing a vendor that can tell two users apart.
+  basis holds, but it is a closer call than the first draft of this ADR was making.

@@ -52,6 +52,19 @@ describe('PrivacyPage', () => {
     expect(replay.getByText(/every piece of text .* is masked/i)).toBeTruthy()
   })
 
+  // ADR 0011: no banner, because the only device write is the session the user
+  // asked for and the monitoring SDKs stay in memory.
+  it('says the device holds only the sign-in session', () => {
+    render(<PrivacyPage />)
+
+    const storage = within(
+      screen.getByRole('region', { name: 'Cookies and device storage' }),
+    )
+    expect(storage.getByText(/sign-in session you asked for/i)).toBeTruthy()
+    expect(storage.getByText(/posthog and sentry/i)).toBeTruthy()
+    expect(storage.getByText(/no consent banner/i)).toBeTruthy()
+  })
+
   // A privacy page may only promise a right the app can actually honour. There
   // is no deletion path yet, so the page has to say so rather than imply one.
   it('promises no deletion button while none exists', () => {

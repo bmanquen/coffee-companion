@@ -1,3 +1,4 @@
+import posthog from 'posthog-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   analyticsClientKey,
@@ -185,6 +186,51 @@ describe('analyticsOptions', () => {
       disable_surveys: true,
       person_profiles: 'identified_only',
     })
+  })
+
+  // ADR 0011: memory persistence is the lever that keeps PostHog off the
+  // device. A default of localStorage+cookie (or any other store) writes
+  // cookies and web storage the moment the SDK boots.
+  it('keeps the person in memory, not on the device', () => {
+    expect(analyticsOptions('https://us.i.posthog.com').persistence).toBe(
+      'memory',
+    )
+  })
+
+  // The option above is the contract; this boots the installed posthog-js so a
+  // SDK default that started writing again would fail here even if the option
+  // were still set.
+  it('writes nothing to cookies, localStorage, or sessionStorage when booted', () => {
+    localStorage.clear()
+    sessionStorage.clear()
+    for (const cookie of document.cookie.split(';')) {
+      const name = cookie.split('=')[0]?.trim()
+      if (name) document.cookie = `${name}=;max-age=0;path=/`
+    }
+
+    posthog.init('phc_device_storage_guard', {
+      ...analyticsOptions('http://127.0.0.1:9'),
+      disable_surveys: true,
+    })
+    posthog.register({ environment: 'test' })
+    posthog.identify('user_123', { plan: 'pro' })
+    posthog.capture('$pageview', { $pathname: '/', $current_url: '/' })
+
+    const cookieNames = document.cookie
+      .split(';')
+      .map((part) => part.split('=')[0]?.trim())
+      .filter(Boolean)
+    expect(cookieNames.filter((name) => name.startsWith('ph_'))).toEqual([])
+    expect(
+      Object.keys(localStorage).filter((key) => key.includes('posthog') || key.startsWith('ph_')),
+    ).toEqual([])
+    expect(
+      Object.keys(sessionStorage).filter(
+        (key) => key.includes('posthog') || key.startsWith('ph_'),
+      ),
+    ).toEqual([])
+
+    posthog.reset()
   })
 })
 

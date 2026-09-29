@@ -109,6 +109,9 @@ export function sentryBrowserOptions(dsn: string) {
       maskAllText: true,
       maskAllInputs: true,
       blockAllMedia: true,
+      // Default true writes sentryReplaySession to sessionStorage. Buffer-mode
+      // error replays still upload; they just do not survive a reload (ADR 0011).
+      stickySession: false,
     },
   }
 }

@@ -188,7 +188,14 @@ describe('sentryBrowserOptions', () => {
       maskAllText: true,
       maskAllInputs: true,
       blockAllMedia: true,
+      stickySession: false,
     })
+  })
+
+  // Default true writes sentryReplaySession to sessionStorage as soon as the
+  // recorder starts (ADR 0011). Buffer-mode error replays do not need that key.
+  it('does not persist the replay session on the device', () => {
+    expect(sentryBrowserOptions(DSN).replay.stickySession).toBe(false)
   })
 
   it('carries the common options', () => {
