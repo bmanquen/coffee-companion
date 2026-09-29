@@ -1,8 +1,10 @@
-// Confirmed against our own dashboard settings (issue #122), not vendor plan
-// defaults. A figure here that drifts from the dashboard is the one sentence on
-// the page that is actively false rather than merely incomplete.
-const SENTRY_RETENTION = 'Sentry keeps errors for 90 days, then deletes them.'
-const POSTHOG_RETENTION = 'PostHog keeps events for a year, then deletes them.'
+// Developer keeps 30 days; Team keeps 90. "up to 90 days" stays true on both.
+// A figure here that drifts from the plan is the one sentence on the page that
+// is actively false rather than merely incomplete.
+const SENTRY_RETENTION =
+  'Sentry keeps errors, traces and replays for up to 90 days, then deletes them.'
+const POSTHOG_RETENTION =
+  'PostHog keeps events for a year, then deletes them. Person profiles are kept until they are deleted.'
 
 const CONTRACT_BASIS =
   'Performing the contract you asked us for. Without this the feature you pressed cannot happen at all.'
