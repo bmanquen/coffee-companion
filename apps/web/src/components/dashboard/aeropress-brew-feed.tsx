@@ -5,7 +5,7 @@ import {
   dialedInCoffeeColumn,
   renderBrewDetails,
 } from '@/components/brews/brew-details'
-import { BrewWeight } from '@/components/brews/brew-weight'
+import { ratioColumn } from '@/components/brews/brew-ratio'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
@@ -36,11 +36,10 @@ const columns = [
   }),
   columnHelper.accessor('water', {
     header: 'Water',
-    cell: (info) => (
-      <BrewWeight grams={info.getValue()} dose={info.row.original.dose} />
-    ),
+    cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
+  ratioColumn((row: AeropressBrewWithRelations) => row.water),
   columnHelper.accessor('steepTime', {
     header: 'Steep',
     cell: (info) => formatBrewSeconds(info.getValue()),

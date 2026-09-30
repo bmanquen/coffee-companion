@@ -74,6 +74,7 @@ describe('EspressoBrewsSection', () => {
     expect(table.getByText('36g')).toBeTruthy()
     expect(table.getByText('1:2')).toBeTruthy()
     expect(table.queryByText('Ratio')).toBeNull()
+    expect(within(table.getByText('36g').closest('td')!).queryByText('1:2')).toBeNull()
   })
 
   it('filters shots by the free-text filter', () => {
@@ -127,7 +128,7 @@ describe('EspressoBrewsSection', () => {
     expect(table.getByText('4.5')).toBeTruthy() // grind setting
   })
 
-  it('shows the computed ratio in the card summary beside the weights', () => {
+  it('shows the computed ratio as its own card-summary field', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
       makeRecentShot({ id: 's1', dose: '18', yield: '36' }),
@@ -138,7 +139,8 @@ describe('EspressoBrewsSection', () => {
     const cards = container.querySelector<HTMLElement>('.lg\\:hidden')!
     const yieldStat = within(cards).getByText('Yield').closest('div')!
     expect(within(yieldStat).getByText('36g')).toBeTruthy()
-    expect(within(yieldStat).getByText('1:2')).toBeTruthy()
+    expect(within(yieldStat).queryByText('1:2')).toBeNull()
+    expect(within(cards).getByText('1:2')).toBeTruthy()
   })
 
   it('shows no ratio when dose is missing', () => {

@@ -80,6 +80,9 @@ describe('ColdBrewBrewsSection', () => {
     expect(table.getByText('50g')).toBeTruthy() // dose
     expect(table.getByText('500g')).toBeTruthy() // water
     expect(table.getByText('1:10')).toBeTruthy()
+    expect(
+      within(table.getByText('500g').closest('td')!).queryByText('1:10'),
+    ).toBeNull()
     // 1080 minutes -> 18 hours, formatted as "18h".
     expect(table.getByText('18h')).toBeTruthy()
     expect(table.getByText('coarse')).toBeTruthy() // grind setting
