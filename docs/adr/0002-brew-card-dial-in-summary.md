@@ -6,7 +6,7 @@ the levers you actually turn when reproducing a brew, in a single uniform shape 
 five methods —
 
 ```
-⌖ Coffee (+ variant)   Grind 12 · Dose 18g · Yield 38g · 1:2.11 · Time 27s
+⌖ Coffee (+ variant)   Grind 12 · Dose 18g · Yield 38g · Ratio 1:2.11 · Time 27s
 ```
 
 Two choices here will look wrong to a future reader unless they read this, so please don't
@@ -29,9 +29,10 @@ Two choices here will look wrong to a future reader unless they read this, so pl
   weights, then dropped the number outright as redundant with the real numbers — the
   `brew-ratio` helper went with it. We put a computed 1:x back: espresso is yield / dose;
   Pour Over, French Press, AeroPress, and Cold Brew are water / dose. The first put-back
-  sat inside the yield/water cell; it now stands as its own unlabeled field, because 1:x
-  identifies itself (same idea as the method-variant) and the grams stay exactly as
-  entered. Missing either weight, or a zero dose, shows no ratio. Nothing is stored.
+  sat inside the yield/water cell; it then stood as its own unlabeled field. It now
+  reads as a **Ratio** column, labelled the same way Dose and Water are, on the brew
+  tables, the dashboard feeds, and the card summary. The grams stay exactly as entered.
+  Missing either weight, or a zero dose, shows no ratio. Nothing is stored.
 
 Related presentation decisions from the same redesign (not domain-surprising, recorded here
 for context, not as commitments): grinder sits in the expander despite grind-setting being

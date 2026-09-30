@@ -97,6 +97,7 @@ describe('AeropressBrewsSection', () => {
     expect(table.getByText('15g')).toBeTruthy() // dose
     expect(table.getByText('220g')).toBeTruthy() // water
     expect(table.getByText('1:14.67')).toBeTruthy()
+    expect(table.getByText('Ratio')).toBeTruthy()
     expect(
       within(table.getByText('220g').closest('td')!).queryByText('1:14.67'),
     ).toBeNull()
