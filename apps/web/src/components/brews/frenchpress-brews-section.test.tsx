@@ -98,6 +98,7 @@ describe('FrenchpressBrewsSection', () => {
     expect(table.getByText('30g')).toBeTruthy() // dose
     expect(table.getByText('500g')).toBeTruthy() // water
     expect(table.getByText('1:16.67')).toBeTruthy()
+    expect(table.getByText('Ratio')).toBeTruthy()
     expect(
       within(table.getByText('500g').closest('td')!).queryByText('1:16.67'),
     ).toBeNull()

@@ -114,6 +114,7 @@ describe('MarketingHome', () => {
     expect(table.getAllByText('Ethiopia Guji').length).toBeGreaterThan(0)
     expect(table.getByText('Grind')).toBeTruthy()
     expect(table.getByText('Yield')).toBeTruthy()
+    expect(table.getByText('Ratio')).toBeTruthy()
     expect(table.getByLabelText('Dialed in')).toBeTruthy()
   })
 })

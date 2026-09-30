@@ -7,10 +7,10 @@ export function ratioColumn<T extends { dose: string | null }>(
 ) {
   return createColumnHelper<T>().display({
     id: 'ratio',
-    header: '',
+    header: 'Ratio',
     cell: (info) =>
       formatBrewRatio(info.row.original.dose, output(info.row.original)),
     enableSorting: false,
-    meta: { cardSummary: true },
+    meta: { cardSummary: true, cardSummaryLabel: true },
   })
 }

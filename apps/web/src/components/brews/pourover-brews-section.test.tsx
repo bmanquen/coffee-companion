@@ -98,6 +98,7 @@ describe('PouroverBrewsSection', () => {
     expect(table.getByText('18g')).toBeTruthy() // dose
     expect(table.getByText('300g')).toBeTruthy() // water
     expect(table.getByText('1:16.67')).toBeTruthy()
+    expect(table.getByText('Ratio')).toBeTruthy()
     expect(
       within(table.getByText('300g').closest('td')!).queryByText('1:16.67'),
     ).toBeNull()

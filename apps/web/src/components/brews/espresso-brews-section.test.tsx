@@ -73,7 +73,7 @@ describe('EspressoBrewsSection', () => {
     expect(table.getByText('18g')).toBeTruthy()
     expect(table.getByText('36g')).toBeTruthy()
     expect(table.getByText('1:2')).toBeTruthy()
-    expect(table.queryByText('Ratio')).toBeNull()
+    expect(table.getByText('Ratio')).toBeTruthy()
     expect(within(table.getByText('36g').closest('td')!).queryByText('1:2')).toBeNull()
   })
 
@@ -124,6 +124,7 @@ describe('EspressoBrewsSection', () => {
     expect(table.getByText('18g')).toBeTruthy() // dose
     expect(table.getByText('36g')).toBeTruthy() // yield
     expect(table.getByText('1:2')).toBeTruthy()
+    expect(table.getByText('Ratio')).toBeTruthy()
     expect(table.getByText('28s')).toBeTruthy() // time
     expect(table.getByText('4.5')).toBeTruthy() // grind setting
   })
@@ -140,7 +141,8 @@ describe('EspressoBrewsSection', () => {
     const yieldStat = within(cards).getByText('Yield').closest('div')!
     expect(within(yieldStat).getByText('36g')).toBeTruthy()
     expect(within(yieldStat).queryByText('1:2')).toBeNull()
-    expect(within(cards).getByText('1:2')).toBeTruthy()
+    const ratioStat = within(cards).getByText('Ratio').closest('div')!
+    expect(within(ratioStat).getByText('1:2')).toBeTruthy()
   })
 
   it('shows no ratio when dose is missing', () => {

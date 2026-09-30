@@ -80,6 +80,7 @@ describe('ColdBrewBrewsSection', () => {
     expect(table.getByText('50g')).toBeTruthy() // dose
     expect(table.getByText('500g')).toBeTruthy() // water
     expect(table.getByText('1:10')).toBeTruthy()
+    expect(table.getByText('Ratio')).toBeTruthy()
     expect(
       within(table.getByText('500g').closest('td')!).queryByText('1:10'),
     ).toBeNull()
