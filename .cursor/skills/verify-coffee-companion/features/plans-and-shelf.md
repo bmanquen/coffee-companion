@@ -1,12 +1,13 @@
 # Plans and Shelf
 
-A Plan decides how much of the user's own past is readable. Free's Shelf is the five most-recently-brewed Coffees; the rest Seal. Pro (including a Grant) reads the whole library. Logging is never limited. The account page shows the Plan a Grant confers and exports the library — including Sealed Brews — as JSON.
+A Plan decides how much of the user's own past is readable. Free's Shelf is the five most-recently-brewed Coffees; the rest Seal. Pro (including a Grant) reads the whole library. Logging is never limited. The account page shows the Plan a Grant confers, exports the library — including Sealed Brews — as JSON, and deletes the account behind a confirmation.
 
 ## Sub-features
 
 - `plans-pricing` is the public catalogue of Free, Pro, and Pro+ (see [Marketing site](./marketing.md)).
 - `plans-account` shows the Plan a Grant confers on `/account`, with `See plans` and no `Manage subscription`.
 - `account-export` offers `Export data` on `/account` (a JSON download of Coffees and Brews, including Sealed ones).
+- `account-delete` offers `Delete account` on `/account`, behind a confirmation that names the library, a live Subscription, and the PostHog profile, and puts `Export data` in the dialog. Do not confirm it against a seeded identity — that user is shared.
 - `shelf-pro` reads grind settings for every Coffee in the seeded library, including the two that would fall off Free.
 - `shelf-free-sealed` marks off-Shelf brews `Sealed`, hides their settings, and links `Unlock` to `/pricing`.
 - `shelf-free-on` keeps an on-Shelf Coffee fully readable.
@@ -27,7 +28,7 @@ Preconditions:
 - The shared library is the seeded E2E_LIBRARY. Off-Shelf (Free): Sumatra Lintong (dialed-in) and Brazil Cerrado. On-Shelf: Kenya Nyeri (most recent of the seven).
 - `helpers/control doctor` reports the expected URL and `coffee_companion_test`.
 
-- **Granted account.** Run `helpers/control browser as data` and `helpers/control browser goto --path /account`. Heading `Account` and exact text `Pro` are visible. Button `Manage subscription` has count `0`. Link `See plans` has `href` `/pricing`. Button `Export data` is visible.
+- **Granted account.** Run `helpers/control browser as data` and `helpers/control browser goto --path /account`. Heading `Account` and exact text `Pro` are visible. Button `Manage subscription` has count `0`. Link `See plans` has `href` `/pricing`. Button `Export data` is visible. Button `Delete account` is visible. Click `Delete account`. The dialog names Coffees, Brews, a Subscription, and PostHog, and contains button `Export data`. Do not press the dialog's `Delete account`.
 - **Granted library.** Run `helpers/control browser goto --path /brews`. For each of Kenya Nyeri / Guatemala Huehuetenango / Rwanda Kivu / Peru Cajamarca / Burundi Kayanza / Sumatra Lintong / Brazil Cerrado, the row contains that coffee's grind setting (`21`–`27`). No `Sealed` text on `/dashboard`, `/brews`, or `/coffees`.
 - **Granted dial-in.** On `/coffees`, expand Sumatra Lintong's desktop name cell (`click --role cell --name "Sumatra Lintong" --exact`). `Yes` is visible (`expect --text Yes --first`).
 - **Free sealed brew.** Run `helpers/control browser as free` and `helpers/control browser goto --path /brews`. Sumatra Lintong's row shows `/^Sealed/` (`expect --text "/^Sealed/" --first`), link `Unlock` has `href` `/pricing` (`expect --role link --name Unlock --first`), and grind `26` is absent.
@@ -47,3 +48,4 @@ Preconditions:
 - Row matchers use the accessible name of the whole row (cells joined). A Coffee's name survives Sealing, so `row` + coffee name still addresses a Sealed row.
 - `expect --text Sealed` without `--first` fails strict mode (desktop table + mobile card, and two off-Shelf Coffees).
 - `Export data` starts a JSON download (`coffee-companion-export.json`). The control CLI does not assert file contents; visibility of the button plus the click is the user path. Equipment gear caps live in [Equipment](./equipment.md).
+- Do not confirm `Delete account` against `data`, `free`, or `empty`. Those identities are shared. Open the dialog, read the copy, close it.

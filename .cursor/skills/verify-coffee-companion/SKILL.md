@@ -108,7 +108,7 @@ Stable handles (use these, not CSS or coordinates):
 - Coffees H1 `Coffees`. Link/button `Add Coffee`. Row actions `Edit coffee`, `Delete coffee`. Confirm `Delete` (exact).
 - Equipment H1 `Equipment`. Tabs `Grinders` (default) and `Brewing Devices`. Actions `Edit grinder`, `Delete grinder`, `Edit brewing device`, `Delete brewing device`.
 - Privacy H1 `/what we collect/i`. Recipient H2s `Sentry`, `PostHog`, `Google`, `Stripe`, `Resend` (exact). Footer link `Privacy` in `navigation` named `Footer`.
-- Account: heading `Account`, button `Export data`, link `See plans`. Grant users have no `Manage subscription`.
+- Account: heading `Account`, button `Export data`, button `Delete account`, link `See plans`. Grant users have no `Manage subscription`. Do not confirm account deletion against a seeded identity.
 
 First click after a navigation can land before hydration (`apps/web/e2e/helpers.ts` `clickUntil`). The daemon retries clicks and waits for React's listener tag before `fill`. When you write a one-off Playwright spec instead, use `clickUntil` / `waitForHydration` from that file.
 

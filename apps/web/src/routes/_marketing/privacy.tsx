@@ -42,8 +42,8 @@ export function PrivacyPage() {
           — the cookie that keeps you signed in after you press the button —
           and, only if a page fails to load after we ship a new version, one
           short-lived key so the router can reload once and show you that page.
-          PostHog and Sentry keep their state in memory for the current page
-          and forget it when you reload. There is{' '}
+          PostHog and Sentry keep their state in memory for the current page and
+          forget it when you reload. There is{' '}
           <strong className="font-medium text-foreground">
             no consent banner
           </strong>
@@ -81,9 +81,11 @@ export function PrivacyPage() {
       <Section id="your-data" title="Your own data">
         <p className="text-muted-foreground">
           Everything the app holds about you can be exported from your account
-          page, on any plan and whatever a plan hides from view. There is no
-          button that deletes your account yet — until there is, write to us and
-          we will do it by hand.
+          page, on any plan and whatever a plan hides from view. You can delete
+          the account from that same page. The export is the last chance to take
+          a copy — deletion cannot be undone. Deleting cancels a live
+          Subscription first, removes what we store, and deletes the PostHog
+          person for the account.
         </p>
       </Section>
     </div>

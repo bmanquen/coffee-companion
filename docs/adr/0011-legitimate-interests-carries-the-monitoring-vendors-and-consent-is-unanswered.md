@@ -98,15 +98,16 @@ Consequences to understand before changing anything here:
   and is not solved here.
 - **The page's retention figures are our dashboard settings, and go stale silently.**
   Sentry keeps errors, traces and replays for up to 90 days; PostHog keeps events
-  for a year. Person profiles have no expiry and stay until someone deletes them
-  through PostHog's person API; this app does not call that API yet, so a manual
-  account-deletion request does not delete the profile. That work is #125. The
-  figures live as two constants at the top of `apps/web/src/lib/privacy.ts`. Nothing in the repo can notice
-  when someone changes a retention setting in a vendor dashboard, so changing one there
-  without changing the constant here makes the one sentence on the page that is actively
-  false rather than merely incomplete. Moving to Sentry's Business plan (which keeps
-  sampled traces up to 13 months) or a paid PostHog plan (events kept 7 years) means
-  updating these figures
+  for a year. Person profiles have no expiry of their own; deleting the account
+  deletes the person
+  ([ADR 0015](0015-account-deletion-cancels-stripe-immediately-then-erases.md)).
+  The figures live as two constants at the top of `apps/web/src/lib/privacy.ts`.
+  Nothing in the repo can notice when someone changes a retention setting in a
+  vendor dashboard, so changing one there without changing the constant here
+  makes the one sentence on the page that is actively false rather than merely
+  incomplete. Moving to Sentry's Business plan (which keeps sampled traces up to
+  13 months) or a paid PostHog plan (events kept 7 years) means updating these
+  figures
   ([Sentry retention](https://docs.sentry.io/security-legal-pii/security/data-retention-periods/),
   [PostHog persons](https://posthog.com/docs/data/persons)).
 - **The Sentry DPA was accepted in the Sentry org settings (Sep 28, 2026).**

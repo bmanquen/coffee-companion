@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/tanstackstart-react'
 import pino from 'pino'
 import { setLogSink } from '@coffee-companion/api/lib/log'
 import { setErrorCapture } from '@coffee-companion/api/lib/report-error'
+import { setPersonErasure } from '@coffee-companion/api/lib/erase-person'
 import {
   isAbortEvent,
   scrubSentryEvent,
@@ -10,6 +11,7 @@ import {
   sentryServerOptions,
   trimSetting,
 } from './lib/sentry'
+import { deletePostHogPerson, posthogPersonConfig } from './lib/posthog-person'
 
 const dsn = sentryServerDsn()
 if (sentryEnabled(dsn)) {
@@ -36,3 +38,8 @@ export const logger = pino({
 setLogSink((level, message, fields) => {
   logger[level](fields, message)
 })
+
+// Validates a half-configured key at boot, the way billing does. Missing both
+// is the local/CI no-op; erasePerson then does nothing.
+posthogPersonConfig()
+setPersonErasure(deletePostHogPerson)

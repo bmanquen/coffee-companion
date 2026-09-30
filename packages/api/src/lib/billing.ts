@@ -169,6 +169,25 @@ export async function hasLiveSubscription(
   return data.some((current) => paidStatuses.includes(current.status))
 }
 
+// Immediate cancel, not at period end: account deletion leaves nobody to
+// keep serving through the paid period (ADR-0015). Throws when the provider
+// cannot be reached, which is the caller's cue to stop and leave the account.
+export async function cancelBilledSubscriptions(
+  customerId: string,
+): Promise<void> {
+  const config = billingConfig()
+  if (!config) return
+
+  const { data } = await config.client.subscriptions.list({
+    customer: customerId,
+    limit: 100,
+  })
+  const live = data.filter((current) => paidStatuses.includes(current.status))
+  for (const current of live) {
+    await config.client.subscriptions.cancel(current.id)
+  }
+}
+
 // Makes Stripe the merchant of record for this purchase, so it calculates,
 // collects and remits the buyer's sales tax, VAT or GST (ADR-0006).
 export function managedPaymentsParams(): Stripe.Checkout.SessionCreateParams {

@@ -1,4 +1,9 @@
+import { TRPCError } from '@trpc/server'
 import { db } from '../db'
+import {
+  SubscriptionCancelFailed,
+  deleteAccount,
+} from '../lib/delete-account'
 import { authedProcedure, createTRPCRouter } from './init'
 
 // Creates accept any coffeeId/grinderId; only include nested rows this user owns.
@@ -101,5 +106,23 @@ export const accountRouter = createTRPCRouter({
       brews: { espresso, aeropress, pourover, frenchPress, coldBrew },
       dialedInBrews: dialedIn,
     }
+  }),
+
+  // better-auth's deleteUser wants a password or a deletion-verification
+  // email; this app has Google sign-in and an in-app confirmation, and the
+  // Stripe-first / PostHog / verification work is ours (ADR-0015).
+  delete: authedProcedure.mutation(async ({ ctx }) => {
+    try {
+      await deleteAccount(ctx.session.user.id)
+    } catch (error) {
+      if (error instanceof SubscriptionCancelFailed) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: error.message,
+        })
+      }
+      throw error
+    }
+    return { ok: true }
   }),
 })

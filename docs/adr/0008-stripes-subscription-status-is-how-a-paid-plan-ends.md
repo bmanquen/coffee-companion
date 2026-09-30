@@ -75,3 +75,7 @@ Consequences to understand before changing anything here:
 - **Reopening this is cheap.** An ending Stripe's `status` does not carry is the condition
   to revisit at. Because Sealing is a read-path decision, changing the rule needs no
   backfill and no migration — only the list above.
+- **Deleting the account is a different ending, and cancels immediately.** Voluntary
+  cancellation still Seals at period end. Account deletion has nobody left to serve,
+  so a live Subscription is cancelled at Stripe first and the account is removed only
+  if that succeeds. [ADR-0015](0015-account-deletion-cancels-stripe-immediately-then-erases.md).
