@@ -13,7 +13,10 @@ export function BrewWeight({
     <>
       <span>{grams ? `${grams}g` : '-'}</span>
       {ratio ? (
-        <span className="ml-1 text-muted-foreground">{ratio}</span>
+        <>
+          {' '}
+          <span className="text-muted-foreground">{ratio}</span>
+        </>
       ) : null}
     </>
   )
