@@ -3,7 +3,10 @@ import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes, dialedInBrews } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
-import { dropStaleMembership } from '../lib/dialed-in-brew'
+import {
+  dropStaleMembership,
+  writeDialedInMembership,
+} from '../lib/dialed-in-brew'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import {
   UNKNOWN_UUID,
@@ -386,6 +389,142 @@ describe('dialedInBrew.set / get / unset', () => {
     expect(
       (await asA.dialedInBrew.list()).some((row) => row.brewId === first.id),
     ).toBe(false)
+  })
+
+  it('concurrent edits onto the same triple replace instead of failing', async () => {
+    const coffeeA = (await createCoffee(uniq('Race Edit A'))).id
+    const coffeeB = (await createCoffee(uniq('Race Edit B'))).id
+    const coffeeC = (await createCoffee(uniq('Race Edit C'))).id
+    const shotA = await logShot(espressoDeviceAId, '9.8', coffeeA)
+    const shotB = await logShot(espressoDeviceAId, '9.9', coffeeB)
+
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: shotA.id,
+    })
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: shotB.id,
+    })
+
+    const payload = {
+      grinderId,
+      brewingDeviceId: espressoDeviceAId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+    }
+    const results = await Promise.allSettled([
+      asA.espressoShot.update({
+        ...payload,
+        id: shotA.id,
+        coffeeId: coffeeC,
+        grindSetting: '9.8',
+      }),
+      asA.espressoShot.update({
+        ...payload,
+        id: shotB.id,
+        coffeeId: coffeeC,
+        grindSetting: '9.9',
+      }),
+    ])
+    expect(results.map((result) => result.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+    ])
+
+    const destination = await asA.dialedInBrew.get(
+      espressoKey(espressoDeviceAId, coffeeC),
+    )
+    expect(destination).toHaveLength(1)
+    expect([shotA.id, shotB.id]).toContain(destination[0]?.brewId)
+    expect(
+      await asA.dialedInBrew.get(espressoKey(espressoDeviceAId, coffeeA)),
+    ).toEqual([])
+    expect(
+      await asA.dialedInBrew.get(espressoKey(espressoDeviceAId, coffeeB)),
+    ).toEqual([])
+  })
+
+  it('marking still succeeds if the brew’s membership has already moved', async () => {
+    const coffeeA = (await createCoffee(uniq('Stale Mark From'))).id
+    const coffeeB = (await createCoffee(uniq('Stale Mark To'))).id
+    const shot = await logShot(espressoDeviceAId, '10.1', coffeeA)
+
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: shot.id,
+    })
+    await asA.espressoShot.update({
+      id: shot.id,
+      coffeeId: coffeeB,
+      grinderId,
+      brewingDeviceId: espressoDeviceAId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '10.1',
+    })
+
+    await writeDialedInMembership({
+      userId: USER_A,
+      coffeeId: coffeeA,
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: shot.id,
+    })
+
+    const listed = await asA.dialedInBrew.list()
+    const memberships = listed.filter((row) => row.brewId === shot.id)
+    expect(memberships).toHaveLength(1)
+    expect(memberships[0]?.coffeeId).toBe(coffeeB)
+  })
+
+  it('marking still succeeds if the brew is moved during the mark', async () => {
+    const coffeeA = (await createCoffee(uniq('Live Mark From'))).id
+    const coffeeB = (await createCoffee(uniq('Live Mark To'))).id
+    const shot = await logShot(espressoDeviceAId, '10.2', coffeeA)
+
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: shot.id,
+    })
+
+    const results = await Promise.allSettled([
+      asA.dialedInBrew.set({
+        brewingMethod: 'espresso',
+        brewingDeviceId: espressoDeviceAId,
+        brewId: shot.id,
+      }),
+      asA.espressoShot.update({
+        id: shot.id,
+        coffeeId: coffeeB,
+        grinderId,
+        brewingDeviceId: espressoDeviceAId,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: '10.2',
+      }),
+    ])
+    expect(results.map((result) => result.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+    ])
+
+    expect(
+      (await asA.dialedInBrew.list()).filter((row) => row.brewId === shot.id),
+    ).toHaveLength(1)
+    expect(
+      idsOf(await asA.dialedInBrew.get(espressoKey(espressoDeviceAId, coffeeB))),
+    ).toEqual([shot.id])
+    expect(
+      await asA.dialedInBrew.get(espressoKey(espressoDeviceAId, coffeeA)),
+    ).toEqual([])
   })
 
   it('editing a marked brew onto an occupied triple replaces it', async () => {
