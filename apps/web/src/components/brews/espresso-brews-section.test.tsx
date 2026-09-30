@@ -72,6 +72,8 @@ describe('EspressoBrewsSection', () => {
     expect(table.getByText('Ethiopia Guji')).toBeTruthy()
     expect(table.getByText('18g')).toBeTruthy()
     expect(table.getByText('36g')).toBeTruthy()
+    expect(table.getByText('1:2')).toBeTruthy()
+    expect(table.queryByText('Ratio')).toBeNull()
   })
 
   it('filters shots by the free-text filter', () => {
@@ -120,8 +122,49 @@ describe('EspressoBrewsSection', () => {
     const table = within(screen.getByRole('table'))
     expect(table.getByText('18g')).toBeTruthy() // dose
     expect(table.getByText('36g')).toBeTruthy() // yield
+    expect(table.getByText('1:2')).toBeTruthy()
     expect(table.getByText('28s')).toBeTruthy() // time
     expect(table.getByText('4.5')).toBeTruthy() // grind setting
+  })
+
+  it('shows the computed ratio in the card summary beside the weights', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+      makeRecentShot({ id: 's1', dose: '18', yield: '36' }),
+    ])
+
+    const { container } = render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+    const cards = container.querySelector<HTMLElement>('.lg\\:hidden')!
+    const yieldStat = within(cards).getByText('Yield').closest('div')!
+    expect(within(yieldStat).getByText('36g')).toBeTruthy()
+    expect(within(yieldStat).getByText('1:2')).toBeTruthy()
+  })
+
+  it('shows no ratio when dose is missing', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+      makeRecentShot({ id: 's1', dose: null, yield: '36' }),
+    ])
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('36g')).toBeTruthy()
+    expect(table.queryByText(/^1:/)).toBeNull()
+  })
+
+  it('shows no ratio when yield is missing', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+      makeRecentShot({ id: 's1', dose: '18', yield: null }),
+    ])
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('18g')).toBeTruthy()
+    expect(table.queryByText(/^1:/)).toBeNull()
   })
 
   it('falls back to a dash for missing recipe values', () => {

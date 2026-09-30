@@ -49,3 +49,24 @@ export function formatSteepMinutes(minutes: number | null): string {
 export function formatBrewSeconds(seconds: number | null): string {
   return formatApplicableParts(seconds, ['hours', 'minutes', 'seconds'], '0s')
 }
+
+function parseWeight(value: string | number | null | undefined): number | null {
+  if (value == null) return null
+  if (typeof value === 'string' && value.trim() === '') return null
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+// 1:x from output / dose (espresso yield, or water on the other methods).
+// Null when either weight is missing or dose is zero — derived, never stored.
+export function formatBrewRatio(
+  dose: string | number | null | undefined,
+  output: string | number | null | undefined,
+): string | null {
+  const d = parseWeight(dose)
+  const o = parseWeight(output)
+  if (d == null || o == null || d === 0) return null
+  const ratio = o / d
+  if (!Number.isFinite(ratio)) return null
+  return `1:${Number(ratio.toFixed(2))}`
+}
