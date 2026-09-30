@@ -260,15 +260,16 @@ describe('pouroverBrew.getDialedIn', () => {
   }
 
   it('returns every Dialed-in pour over brew for the user', async () => {
-    const coffee = await createCoffee(uniq('Two Members'))
+    const coffeeA = await createCoffee(uniq('Dialed A'))
+    const coffeeB = await createCoffee(uniq('Dialed B'))
     const first = await asA.pouroverBrew.create({
       ...baseBrew(),
-      coffeeId: coffee.id,
+      coffeeId: coffeeA.id,
       methodId: standardMethodId,
     })
     const second = await asA.pouroverBrew.create({
       ...baseBrew(),
-      coffeeId: coffee.id,
+      coffeeId: coffeeB.id,
       methodId: pulseMethodId,
     })
     await mark(first.id)
