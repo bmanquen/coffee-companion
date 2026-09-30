@@ -10,7 +10,7 @@ import { authedProcedure, createTRPCRouter } from './init'
 
 const brewingMethodSchema = z.enum(brewingMethods)
 
-const setKey = z.object({
+const tripleKey = z.object({
   coffeeId: z.uuid(),
   brewingMethod: brewingMethodSchema,
   brewingDeviceId: z.uuid(),
@@ -21,12 +21,12 @@ export const dialedInBrewRouter = createTRPCRouter({
     listDialedInBrews(ctx.session.user.id),
   ),
 
-  get: authedProcedure.input(setKey).query(async ({ ctx, input }) =>
+  get: authedProcedure.input(tripleKey).query(async ({ ctx, input }) =>
     getDialedInBrews(ctx.session.user.id, input, await ctx.shelf()),
   ),
 
-  // Add this brew to its coffee × method × device set. Idempotent: marking a
-  // brew that is already a member leaves the rest of the set untouched.
+  // Make this brew the Dialed-in brew for its coffee × method × device.
+  // A second mark for the same triple replaces the current one.
   set: authedProcedure
     .input(
       z.object({
@@ -45,7 +45,7 @@ export const dialedInBrewRouter = createTRPCRouter({
       ),
     ),
 
-  // Remove only this brew from its set. Other members stay marked.
+  // Clear this brew if it is the current Dialed-in brew. Other triples stay.
   unset: authedProcedure
     .input(z.object({ brewId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {

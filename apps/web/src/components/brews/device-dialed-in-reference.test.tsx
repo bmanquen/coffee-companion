@@ -45,7 +45,7 @@ describe('DeviceDialedInReference', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  it('surfaces the Dialed-in set for the given coffee × method × device', () => {
+  it('surfaces the Dialed-in brew for the given coffee × method × device', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(
       trpc.dialedInBrew.get.queryKey({
@@ -71,37 +71,6 @@ describe('DeviceDialedInReference', () => {
     expect(screen.getByText('Dialed-in for Linea Mini')).toBeTruthy()
     expect(
       screen.getByText('Ethiopia Guji · Grind 21 · Dose 18g · Yield 36g · Time 27s'),
-    ).toBeTruthy()
-  })
-
-  it('lists every member of the set', () => {
-    const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(
-      trpc.dialedInBrew.get.queryKey({
-        coffeeId: COFFEE,
-        brewingMethod: 'espresso',
-        brewingDeviceId: DEVICE,
-      }),
-      [
-        view,
-        { ...view, brewId: 'shot-2', grindSetting: '22' },
-      ],
-    )
-
-    render(
-      <DeviceDialedInReference
-        coffeeId={COFFEE}
-        brewingMethod="espresso"
-        brewingDeviceId={DEVICE}
-      />,
-      { wrapper: Wrapper },
-    )
-
-    expect(
-      screen.getByText('Ethiopia Guji · Grind 21 · Dose 18g · Yield 36g · Time 27s'),
-    ).toBeTruthy()
-    expect(
-      screen.getByText('Ethiopia Guji · Grind 22 · Dose 18g · Yield 36g · Time 27s'),
     ).toBeTruthy()
   })
 

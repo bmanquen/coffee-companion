@@ -4,7 +4,7 @@ import type { Locator, Page } from '@playwright/test'
 
 // Dialed-in membership: set / clear from the brew log row, then look up by
 // coffee × method × device on the log form. Another method must not reuse
-// the espresso set.
+// the espresso brew.
 
 async function ethiopiaGujiRow(page: Page): Promise<Locator> {
   const table = desktopTable(page)

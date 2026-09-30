@@ -455,11 +455,10 @@ export const brewingMethodEnum = pgEnum('brewing_method', [
   'coldBrew',
 ])
 
-// Membership of a Brew in the Dialed-in set for (Coffee × Brewing Method ×
-// Brewing Device). Unique on brew_id — a brew is in at most one set — but not
-// unique on the set key, so many brews can belong to the same coffee × method
-// × device. brew_id points at the method's brew table; a delete trigger on
-// each brew table removes only that brew from the set.
+// One Dialed-in Brew per (user × Coffee × Brewing Method × Brewing Device).
+// Unique on brew_id so a brew occupies at most one triple. brew_id points at
+// the method's brew table; a delete trigger on each brew table removes only
+// that brew's membership.
 export const dialedInBrews = pgTable(
   'dialed_in_brews',
   {
@@ -480,7 +479,7 @@ export const dialedInBrews = pgTable(
   (table) => [
     uniqueIndex('dialed_in_brews_brew_idx').on(table.brewId),
     index('dialed_in_brews_user_idx').on(table.userId),
-    index('dialed_in_brews_set_idx').on(
+    uniqueIndex('dialed_in_brews_triple_idx').on(
       table.userId,
       table.coffeeId,
       table.brewingMethod,

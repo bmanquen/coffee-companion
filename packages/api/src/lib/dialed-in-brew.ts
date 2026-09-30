@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import { db } from '../db'
 import { dialedInBrews } from '../db/schema'
@@ -17,13 +17,13 @@ export const brewingMethods = [
 
 export type BrewingMethod = (typeof brewingMethods)[number]
 
-export type DialedInSetKey = {
+export type DialedInKey = {
   coffeeId: string
   brewingMethod: BrewingMethod
   brewingDeviceId: string
 }
 
-export type DialedInMapping = DialedInSetKey & { brewId: string }
+export type DialedInMapping = DialedInKey & { brewId: string }
 
 export type DialedInBrewView = DialedInMapping & {
   coffeeName: string
@@ -244,7 +244,7 @@ export function withDialedInFlag<T extends { id: string }>(
 export async function dropStaleMembership(
   userId: string,
   brewId: string,
-  key: DialedInSetKey,
+  key: DialedInKey,
 ) {
   await db
     .delete(dialedInBrews)
@@ -261,7 +261,7 @@ export async function dropStaleMembership(
 
 export async function getDialedInBrews(
   userId: string,
-  key: DialedInSetKey,
+  key: DialedInKey,
   shelf: Shelf,
 ): Promise<Array<DialedInBrewView>> {
   const rows = await db.query.dialedInBrews.findMany({
@@ -366,7 +366,18 @@ export async function setDialedInBrew(
       brewingDeviceId,
       brewId,
     })
-    .onConflictDoNothing({ target: dialedInBrews.brewId })
+    .onConflictDoUpdate({
+      target: [
+        dialedInBrews.userId,
+        dialedInBrews.coffeeId,
+        dialedInBrews.brewingMethod,
+        dialedInBrews.brewingDeviceId,
+      ],
+      set: {
+        brewId,
+        updatedAt: sql`now()`,
+      },
+    })
 
   return {
     coffeeId: brew.coffeeId,
