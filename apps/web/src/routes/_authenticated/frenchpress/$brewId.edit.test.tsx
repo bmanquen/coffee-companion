@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Route } from './$brewId.edit'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 import {
   makeBrewingDevice,
   makeCoffee,
@@ -186,6 +187,31 @@ describe('EditFrenchpressBrew form', () => {
       expect(body).toContain('31')
       // 4 minutes + the loaded 30 seconds → 270 whole seconds.
       expect(body).toMatch(/"steepTime":270/)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('invalidates dialed-in set lookups after save', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(trpcSuccess())
+    try {
+      const { queryClient, trpc, Wrapper } = seeded()
+      const setKey = {
+        coffeeId: COFFEE,
+        brewingMethod: 'frenchpress' as const,
+        brewingDeviceId: FP_DEVICE,
+      }
+      queryClient.setQueryData(trpc.dialedInBrew.get.queryKey(setKey), [])
+
+      render(<EditFrenchpressBrew />, { wrapper: Wrapper })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await waitFor(() => {
+        expect(
+          queryClient.getQueryState(trpc.dialedInBrew.get.queryKey(setKey))
+            ?.isInvalidated,
+        ).toBe(true)
+      })
     } finally {
       fetchSpy.mockRestore()
     }

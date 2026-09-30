@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
+import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { submitFormMutation } from '@/lib/form-error'
 
@@ -63,6 +64,7 @@ function EditEspressoShot() {
         queryClient.invalidateQueries(
           trpc.espressoShot.getById.queryOptions(shotId),
         )
+        invalidateDeviceDialedInQueries(queryClient, trpc)
         navigate({ to: '/brews' })
       },
     }),

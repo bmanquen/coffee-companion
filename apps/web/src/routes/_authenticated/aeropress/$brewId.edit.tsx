@@ -16,6 +16,7 @@ import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
+import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { submitFormMutation } from '@/lib/form-error'
 
@@ -81,6 +82,7 @@ function EditAeropressBrew() {
         queryClient.invalidateQueries(
           trpc.aeropressBrew.getById.queryOptions(brewId),
         )
+        invalidateDeviceDialedInQueries(queryClient, trpc)
         navigate({ to: '/brews' })
       },
     }),

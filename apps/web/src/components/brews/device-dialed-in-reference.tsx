@@ -36,6 +36,7 @@ export function DeviceDialedInReference({
       brewingDeviceId,
     }),
     enabled,
+    // Mark, unmark, delete, and brew edit invalidate this query.
     staleTime: Infinity,
   })
 
