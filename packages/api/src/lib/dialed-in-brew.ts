@@ -1,9 +1,21 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import { db } from '../db'
-import { dialedInBrews } from '../db/schema'
+import {
+  aeropressBrews,
+  coldBrewBrews,
+  dialedInBrews,
+  espressoShots,
+  frenchpressBrews,
+  pouroverBrews,
+} from '../db/schema'
+import { isPgUniqueViolation } from './pg-error'
 import { isSealed, sealBrew, sealBrewPage, sealBrews } from './shelf'
 import type { SealableBrew, Shelf } from './shelf'
+
+type BrewTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+const MEMBERSHIP_WRITE_ATTEMPTS = 3
 
 // The Brewing Method a Dialed-in membership is keyed by — the five methods, not
 // a Method Variant (Standard / Inverted / …).
@@ -322,6 +334,98 @@ export async function getDialedInBrews(
   return views
 }
 
+const brewTablesByMethod = {
+  espresso: espressoShots,
+  aeropress: aeropressBrews,
+  pourover: pouroverBrews,
+  frenchpress: frenchpressBrews,
+  coldBrew: coldBrewBrews,
+} as const
+
+async function lockBrew(
+  tx: BrewTx,
+  brewingMethod: BrewingMethod,
+  brewId: string,
+  userId: string,
+) {
+  const table = brewTablesByMethod[brewingMethod]
+  const rows = await tx.execute<{
+    coffee_id: string
+    brewing_device_id: string
+    sealed_at: Date | null
+  }>(sql`
+    select ${table.coffeeId} as coffee_id,
+      ${table.brewingDeviceId} as brewing_device_id,
+      ${table.sealedAt} as sealed_at
+    from ${table}
+    where ${eq(table.id, brewId)} and ${eq(table.userId, userId)}
+    for update
+  `)
+  if (rows.rows.length === 0) return null
+  const row = rows.rows[0]
+  return {
+    coffeeId: row.coffee_id,
+    brewingDeviceId: row.brewing_device_id,
+    sealedAt: row.sealed_at,
+  }
+}
+
+async function writeMembership(
+  executor: BrewTx | typeof db,
+  values: {
+    userId: string
+    coffeeId: string
+    brewingMethod: BrewingMethod
+    brewingDeviceId: string
+    brewId: string
+  },
+) {
+  await executor
+    .insert(dialedInBrews)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [
+        dialedInBrews.userId,
+        dialedInBrews.coffeeId,
+        dialedInBrews.brewingMethod,
+        dialedInBrews.brewingDeviceId,
+      ],
+      set: {
+        brewId: values.brewId,
+        updatedAt: sql`now()`,
+      },
+    })
+}
+
+// Triple upsert only handles one unique index. If brew_id already has a row
+// (the edit trigger moved it), reload the brew and write its current triple.
+export async function writeDialedInMembership(values: {
+  userId: string
+  coffeeId: string
+  brewingMethod: BrewingMethod
+  brewingDeviceId: string
+  brewId: string
+}) {
+  try {
+    await writeMembership(db, values)
+  } catch (err) {
+    if (!isPgUniqueViolation(err)) throw err
+    const brew = await loadBrew(
+      values.brewingMethod,
+      values.brewId,
+      values.userId,
+    )
+    if (!brew) throw err
+    await writeMembership(db, {
+      userId: values.userId,
+      coffeeId: brew.coffeeId,
+      brewingMethod: values.brewingMethod,
+      brewingDeviceId: brew.brewingDeviceId,
+      brewId: values.brewId,
+    })
+  }
+}
+
 export async function setDialedInBrew(
   userId: string,
   brewingMethod: BrewingMethod,
@@ -337,54 +441,54 @@ export async function setDialedInBrew(
     })
   }
 
-  const brew = await loadBrew(brewingMethod, brewId, userId)
-  if (!brew) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Brew not found for this method',
-    })
-  }
-  if (brew.brewingDeviceId !== brewingDeviceId) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Brew was not logged on this brewing device',
-    })
-  }
-  if (isSealed(brew, shelf)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'This Brew is Sealed. Subscribe to dial it in again.',
-    })
-  }
+  // Hold the brew row so an overlapping edit cannot move it between the
+  // read and the membership write. Retry if a unique index still collides.
+  let lastErr: unknown
+  for (let attempt = 0; attempt < MEMBERSHIP_WRITE_ATTEMPTS; attempt++) {
+    try {
+      return await db.transaction(async (tx) => {
+        const brew = await lockBrew(tx, brewingMethod, brewId, userId)
+        if (!brew) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Brew not found for this method',
+          })
+        }
+        if (brew.brewingDeviceId !== brewingDeviceId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Brew was not logged on this brewing device',
+          })
+        }
+        if (isSealed(brew, shelf)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'This Brew is Sealed. Subscribe to dial it in again.',
+          })
+        }
 
-  await db
-    .insert(dialedInBrews)
-    .values({
-      userId,
-      coffeeId: brew.coffeeId,
-      brewingMethod,
-      brewingDeviceId,
-      brewId,
-    })
-    .onConflictDoUpdate({
-      target: [
-        dialedInBrews.userId,
-        dialedInBrews.coffeeId,
-        dialedInBrews.brewingMethod,
-        dialedInBrews.brewingDeviceId,
-      ],
-      set: {
-        brewId,
-        updatedAt: sql`now()`,
-      },
-    })
+        await writeMembership(tx, {
+          userId,
+          coffeeId: brew.coffeeId,
+          brewingMethod,
+          brewingDeviceId,
+          brewId,
+        })
 
-  return {
-    coffeeId: brew.coffeeId,
-    brewingMethod,
-    brewingDeviceId,
-    brewId,
+        return {
+          coffeeId: brew.coffeeId,
+          brewingMethod,
+          brewingDeviceId,
+          brewId,
+        }
+      })
+    } catch (err) {
+      lastErr = err
+      if (err instanceof TRPCError) throw err
+      if (!isPgUniqueViolation(err)) throw err
+    }
   }
+  throw lastErr
 }
 
 export async function unsetDialedInBrew(
