@@ -63,10 +63,13 @@ describe('recipients', () => {
     }
   })
 
-  it('says deleting the account deletes the PostHog person', () => {
+  it('does not promise a PostHog person delete that a missing key would skip', () => {
     const posthog = recipients.find(
       (recipient) => recipient.slug === 'posthog',
     )!
-    expect(posthog.retention).toMatch(/deleting your account deletes it/i)
+    expect(posthog.retention).toMatch(
+      /asks PostHog to delete it when that call is configured/i,
+    )
+    expect(posthog.retention).toMatch(/otherwise the profile stays/i)
   })
 })

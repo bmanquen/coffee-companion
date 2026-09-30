@@ -78,6 +78,13 @@ describe('PrivacyPage', () => {
       own.getByText(/delete the account from that same page/i),
     ).toBeTruthy()
     expect(own.getByText(/export is the last chance/i)).toBeTruthy()
+    expect(
+      own.getByText(
+        /ask PostHog to delete the person .* when that call is configured/i,
+      ),
+    ).toBeTruthy()
+    expect(own.getByText(/if it is not, the profile stays/i)).toBeTruthy()
+    expect(own.queryByText(/deletes the PostHog person/i)).toBeNull()
     expect(own.queryByText(/no button that deletes your account/i)).toBeNull()
     expect(own.queryByText(/write to us/i)).toBeNull()
   })

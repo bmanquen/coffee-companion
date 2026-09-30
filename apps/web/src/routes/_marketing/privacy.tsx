@@ -84,8 +84,9 @@ export function PrivacyPage() {
           page, on any plan and whatever a plan hides from view. You can delete
           the account from that same page. The export is the last chance to take
           a copy — deletion cannot be undone. Deleting cancels a live
-          Subscription first, removes what we store, and deletes the PostHog
-          person for the account.
+          Subscription first and removes what we store. We ask PostHog to delete
+          the person for the account when that call is configured; if it is not,
+          the profile stays.
         </p>
       </Section>
     </div>

@@ -7,7 +7,7 @@ The public privacy page names every company Coffee Companion sends data to, what
 - `privacy-open` renders at `/privacy` with heading `What we collect, and who we send it to`.
 - `privacy-footer` reaches it from the marketing footer `Privacy` link.
 - `privacy-recipients` lists Sentry, PostHog, Google, Stripe, and Resend, each with a policy link.
-- `privacy-own-data` states that everything the app holds can be exported from the account page on any plan (including what a plan hides from view), and that the account can be deleted from that same page after exporting.
+- `privacy-own-data` states that everything the app holds can be exported from the account page on any plan (including what a plan hides from view), and that the account can be deleted from that same page after exporting. It does not promise a PostHog person delete when that call is not configured.
 
 ## How to get to it (user POV)
 
