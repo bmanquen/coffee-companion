@@ -99,7 +99,7 @@ An unscoped `Pricing` click fails strict mode: the header, the home body `See pr
 Stable handles (use these, not CSS or coordinates):
 
 - Marketing header: `navigation` named `Marketing`; links `Pricing`, brand `Coffee Companion`; button `Sign in`.
-- Home CTA: button `/save your first brew/i`.
+- Home CTA: button `/save your first brew/i` (use `--first` — hero and closing section both render it).
 - Home hero table: `role=table`, `getByLabel('Dialed in')` (use `--first` — desktop table and mobile card both render it), text `Ethiopia Guji`.
 - Pricing H1: `/keep your history/i`. Plan H2s: `Free`, `Pro`, `Pro+` (exact). Period toggle: button `Monthly` / default annual `$44.99`. Quote CLI price expects as `'$4.99'` — double quotes let the shell eat `$4`.
 - Signed-in chrome: button `Open menu` (desktop sheet); `navigation` named `Primary` (mobile bottom nav). Links `Home` (`/dashboard`), `Coffee`, `Brews`, `Equipment`. Button `Account menu`. Button `Sign Out`.

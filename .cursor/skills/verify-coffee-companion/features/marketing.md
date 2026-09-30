@@ -25,7 +25,7 @@ Preconditions:
 - Identity is `public`.
 - `helpers/control doctor` reports the expected URL and `coffee_companion_test`.
 
-- **Open home.** Run `helpers/control browser as public` and `helpers/control browser goto --path /`. The heading reads `Dial it in once. Never guess again.` and a button matching `/save your first brew/i` is visible.
+- **Open home.** Run `helpers/control browser as public` and `helpers/control browser goto --path /`. The heading reads `Dial it in once. Never guess again.` and a button matching `/save your first brew/i` is visible (`expect --role button --name "/save your first brew/i" --first` — the hero and the closing "Stop learning the same coffee twice" section both render that CTA).
 - **Hero table.** The page `role=table` is visible and contains `Ethiopia Guji`. The Dialed-in crosshair inside that table is labeled `Dialed in` (`expect --label "Dialed in" --first` — desktop table and mobile card both render it).
 - **Header pricing.** Choose `Pricing` in the marketing header. Run `helpers/control browser click --role link --name Pricing --nav Marketing`. The URL ends with `/pricing` and the heading matches `/keep your history/i`. An unscoped `Pricing` click matches the header, the home `See pricing` body link, and the footer.
 - **Plans.** Every plan heading is visible. Run `helpers/control browser expect --role heading --name Free --exact`, then the same for `Pro` and `Pro+`.
@@ -39,6 +39,7 @@ Preconditions:
 - Identity `data`, `free`, or `empty` on `/` redirects to `/dashboard`. Prove marketing as `public`.
 - Quote plan prices as `'$4.99'` / `'$44.99'`. Double quotes let the shell expand `$4` / `$44` and `expect --text "$4.99"` becomes `getByText('.99')`.
 - `Pricing` is in the header, the home body (`See pricing`), and the footer. Click the header with `--nav Marketing` (or `drive marketing`) — an unscoped `Pricing` click fails strict mode.
+- The home CTA `/save your first brew/i` appears twice (hero and closing section). `expect` without `--first` fails strict mode. `drive marketing` already uses `--first`.
 - DataTable renders a desktop table and a mobile card stack. At 1280px the table is the one to assert; a loose `getByText('Ethiopia Guji')` matches both.
 - Default billing period is annual (`$44.99`). Assert `$4.99` only after pressing `Monthly`.
 - `Subscribe` on this instance does not open Stripe Checkout (no `STRIPE_SECRET_KEY`). Do not treat a missing redirect as a product bug here.
