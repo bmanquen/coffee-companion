@@ -68,14 +68,17 @@ describe('PrivacyPage', () => {
     expect(storage.getByText(/no consent banner/i)).toBeTruthy()
   })
 
-  // A privacy page may only promise a right the app can actually honour. There
-  // is no deletion path yet, so the page has to say so rather than imply one.
-  it('promises no deletion button while none exists', () => {
+  // A privacy page may only promise a right the app can actually honour.
+  it('describes the account-page path to export and delete', () => {
     render(<PrivacyPage />)
 
     const own = within(screen.getByRole('region', { name: 'Your own data' }))
     expect(own.getByText(/exported from your account page/i)).toBeTruthy()
-    expect(own.getByText(/no button that deletes your account/i)).toBeTruthy()
-    expect(screen.queryByText(/deleting your account deletes it/i)).toBeNull()
+    expect(
+      own.getByText(/delete the account from that same page/i),
+    ).toBeTruthy()
+    expect(own.getByText(/export is the last chance/i)).toBeTruthy()
+    expect(own.queryByText(/no button that deletes your account/i)).toBeNull()
+    expect(own.queryByText(/write to us/i)).toBeNull()
   })
 })

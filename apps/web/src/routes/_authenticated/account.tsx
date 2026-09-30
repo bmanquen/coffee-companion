@@ -1,5 +1,10 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { planName } from '@coffee-companion/api/lib/plan'
@@ -16,7 +21,17 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { authClient } from '@/lib/auth-client'
+import { useSignOut } from '@/hooks/use-sign-out'
 import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute('/_authenticated/account')({
@@ -43,7 +58,10 @@ function AccountContainer() {
   const { session } = Route.useRouteContext()
   const trpc = useTRPC()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const signOut = useSignOut()
   const { data: current } = useSuspenseQuery(trpc.plan.current.queryOptions())
+  const deleteAccount = useMutation(trpc.account.delete.mutationOptions())
 
   const onExport = async () => {
     const data = await queryClient.fetchQuery(
@@ -52,12 +70,22 @@ function AccountContainer() {
     downloadJson('coffee-companion-export.json', data)
   }
 
+  const onDelete = async () => {
+    await deleteAccount.mutateAsync()
+    try {
+      await signOut()
+    } catch {
+      navigate({ to: '/' })
+    }
+  }
+
   return (
     <AccountScreen
       user={session.user}
       plan={current.plan}
       subscription={current.subscription}
       onExport={onExport}
+      onDelete={onDelete}
     />
   )
 }
@@ -67,12 +95,17 @@ export function AccountScreen({
   plan,
   subscription,
   onExport,
+  onDelete,
 }: {
   user: { name: string; email: string }
   plan: PlanId
   subscription: CurrentSubscription | null
   onExport: () => Promise<void>
+  onDelete: () => Promise<void>
 }) {
+  const [confirming, setConfirming] = useState(false)
+  const [pending, setPending] = useState(false)
+
   const manage = async () => {
     const { error } = await authClient.subscription.billingPortal({
       returnUrl: '/account',
@@ -91,6 +124,20 @@ export function AccountScreen({
       toast.error('We could not export your data', {
         description: 'Please try again.',
       })
+    }
+  }
+
+  const confirmDelete = async () => {
+    setPending(true)
+    try {
+      await onDelete()
+      setConfirming(false)
+    } catch {
+      toast.error('We could not delete your account', {
+        description: 'Please try again.',
+      })
+    } finally {
+      setPending(false)
     }
   }
 
@@ -146,6 +193,59 @@ export function AccountScreen({
           <Button variant="outline" onClick={exportData}>
             Export data
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Delete account</CardTitle>
+          <CardDescription>
+            This cannot be undone. Export a copy first — that is the last chance
+            to read what we hold.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Dialog open={confirming} onOpenChange={setConfirming}>
+            <DialogTrigger asChild>
+              <Button variant="destructive">Delete account</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete account</DialogTitle>
+                <DialogDescription>
+                  This cannot be undone. Export a copy first if you still want
+                  one. Deleting removes:
+                </DialogDescription>
+              </DialogHeader>
+              <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                <li>Your account and sign-in sessions</li>
+                <li>
+                  Your Coffees, Brews, Grinders, Brewing Devices, and the rest
+                  of the library
+                </li>
+                <li>
+                  A live Subscription, cancelled now so nothing keeps billing
+                </li>
+                <li>The analytics profile PostHog holds for this account</li>
+              </ul>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  disabled={pending}
+                  onClick={exportData}
+                >
+                  Export data
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={pending}
+                  onClick={confirmDelete}
+                >
+                  Delete account
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
     </div>

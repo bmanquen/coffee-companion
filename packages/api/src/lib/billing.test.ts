@@ -1,14 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { billingConfig, hasLiveSubscription } from './billing'
+import {
+  billingConfig,
+  cancelBilledSubscriptions,
+  hasLiveSubscription,
+} from './billing'
 
 const retrieve = vi.fn()
 const list = vi.fn()
+const cancel = vi.fn()
 const reportError = vi.hoisted(() => vi.fn())
 
 vi.mock('stripe', () => ({
   default: class {
     prices = { retrieve }
-    subscriptions = { list }
+    subscriptions = { list, cancel }
   },
 }))
 
@@ -238,5 +243,88 @@ describe('hasLiveSubscription', () => {
     list.mockRejectedValue(new Error('unreachable'))
 
     await expect(hasLiveSubscription('cus_123')).rejects.toThrow('unreachable')
+  })
+})
+
+describe('cancelBilledSubscriptions', () => {
+  beforeEach(() => {
+    list.mockReset()
+    cancel.mockReset()
+  })
+
+  it('does nothing when billing is switched off', async () => {
+    await cancelBilledSubscriptions('cus_123')
+
+    expect(list).not.toHaveBeenCalled()
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('cancels each Subscription that is still being paid for', async () => {
+    configure()
+    list.mockResolvedValue({
+      data: [
+        { id: 'sub_live', status: 'active' },
+        { id: 'sub_ended', status: 'canceled' },
+        { id: 'sub_retry', status: 'past_due' },
+      ],
+    })
+    cancel.mockResolvedValue({})
+
+    await cancelBilledSubscriptions('cus_123')
+
+    expect(list).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: 'cus_123' }),
+    )
+    expect(cancel).toHaveBeenCalledTimes(2)
+    expect(cancel).toHaveBeenCalledWith('sub_live')
+    expect(cancel).toHaveBeenCalledWith('sub_retry')
+  })
+
+  it('cancels a Subscription whose trial has not ended', async () => {
+    configure()
+    list.mockResolvedValue({
+      data: [{ id: 'sub_trial', status: 'trialing' }],
+    })
+    cancel.mockResolvedValue({})
+
+    await cancelBilledSubscriptions('cus_123')
+
+    expect(cancel).toHaveBeenCalledWith('sub_trial')
+  })
+
+  it('leaves Subscriptions that ended or never started', async () => {
+    configure()
+    list.mockResolvedValue({
+      data: [
+        { id: 'sub_canceled', status: 'canceled' },
+        { id: 'sub_incomplete', status: 'incomplete' },
+      ],
+    })
+
+    await cancelBilledSubscriptions('cus_123')
+
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('stops when a cancel fails, so the account is not deleted behind it', async () => {
+    configure()
+    list.mockResolvedValue({
+      data: [{ id: 'sub_live', status: 'active' }],
+    })
+    cancel.mockRejectedValue(new Error('unreachable'))
+
+    await expect(cancelBilledSubscriptions('cus_123')).rejects.toThrow(
+      'unreachable',
+    )
+  })
+
+  it('refuses when the provider cannot be reached to list', async () => {
+    configure()
+    list.mockRejectedValue(new Error('unreachable'))
+
+    await expect(cancelBilledSubscriptions('cus_123')).rejects.toThrow(
+      'unreachable',
+    )
+    expect(cancel).not.toHaveBeenCalled()
   })
 })

@@ -43,9 +43,9 @@ describe('recipients', () => {
     expect(
       sentry.receives.filter((item) => /id for your account/i.test(item)),
     ).toHaveLength(1)
-    expect(
-      sentry.neverReceives.some((item) => /your name/i.test(item)),
-    ).toBe(true)
+    expect(sentry.neverReceives.some((item) => /your name/i.test(item))).toBe(
+      true,
+    )
   })
 
   // ADR 0009 and ADR 0012 both turn on the monitoring vendors never being told
@@ -61,5 +61,12 @@ describe('recipients', () => {
         expect(item).not.toMatch(/\bemail\b|\bname of\b/i)
       }
     }
+  })
+
+  it('says deleting the account deletes the PostHog person', () => {
+    const posthog = recipients.find(
+      (recipient) => recipient.slug === 'posthog',
+    )!
+    expect(posthog.retention).toMatch(/deleting your account deletes it/i)
   })
 })

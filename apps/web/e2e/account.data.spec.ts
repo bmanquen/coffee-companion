@@ -28,6 +28,30 @@ test('offers an export of account data', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Export data' })).toBeVisible()
 })
 
+test('offers deletion behind a confirmation that names what is about to go', async ({
+  page,
+}) => {
+  await page.goto('/account')
+
+  await clickUntil(
+    page.getByRole('button', { name: 'Delete account' }),
+    page.getByRole('dialog'),
+  )
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText(/Coffees/)).toBeVisible()
+  await expect(dialog.getByText(/Brews/)).toBeVisible()
+  await expect(dialog.getByText(/Subscription/)).toBeVisible()
+  await expect(dialog.getByText(/PostHog/)).toBeVisible()
+  await expect(
+    dialog.getByRole('button', { name: 'Export data' }),
+  ).toBeVisible()
+  // Do not confirm: this identity is shared with the rest of the suite.
+  await expect(
+    dialog.getByRole('button', { name: 'Delete account' }),
+  ).toBeVisible()
+})
+
 test('is reachable from the account menu', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/dashboard')

@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountScreen } from './account'
 import type * as ReactRouter from '@tanstack/react-router'
@@ -47,6 +53,7 @@ function renderAccount(
       plan="pro"
       subscription={null}
       onExport={vi.fn()}
+      onDelete={vi.fn()}
       {...props}
     />,
   )
@@ -149,6 +156,87 @@ describe('AccountScreen', () => {
     await waitFor(() =>
       expect(mocks.toastError).toHaveBeenCalledWith(
         'We could not export your data',
+        expect.objectContaining({ description: 'Please try again.' }),
+      ),
+    )
+  })
+
+  it('offers deletion behind a confirmation that names what is about to go', () => {
+    renderAccount()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.textContent).toMatch(/Coffees/)
+    expect(dialog.textContent).toMatch(/Brews/)
+    expect(dialog.textContent).toMatch(/Subscription/)
+    expect(dialog.textContent).toMatch(/PostHog/)
+    expect(dialog.textContent).toMatch(/cannot be undone/i)
+  })
+
+  it('puts the export in front of the irreversible step', () => {
+    renderAccount()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByRole('button', { name: 'Export data' })).toBeTruthy()
+    expect(dialog.getByRole('button', { name: 'Delete account' })).toBeTruthy()
+  })
+
+  it('does not delete until the confirmation is confirmed', async () => {
+    const onDelete = vi.fn()
+    renderAccount({ onDelete })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+    expect(onDelete).not.toHaveBeenCalled()
+  })
+
+  it('deletes when the confirmation is confirmed', async () => {
+    const onDelete = vi.fn().mockResolvedValue(undefined)
+    renderAccount({ onDelete })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Delete account',
+      }),
+    )
+
+    await waitFor(() => expect(onDelete).toHaveBeenCalled())
+  })
+
+  it('exports from the confirmation without deleting', async () => {
+    const onExport = vi.fn().mockResolvedValue(undefined)
+    const onDelete = vi.fn()
+    renderAccount({ onExport, onDelete })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Export data',
+      }),
+    )
+
+    await waitFor(() => expect(onExport).toHaveBeenCalled())
+    expect(onDelete).not.toHaveBeenCalled()
+  })
+
+  it('says so when the account could not be deleted', async () => {
+    const onDelete = vi.fn().mockRejectedValue(new Error('unavailable'))
+    renderAccount({ onDelete })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Delete account',
+      }),
+    )
+
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        'We could not delete your account',
         expect.objectContaining({ description: 'Please try again.' }),
       ),
     )
