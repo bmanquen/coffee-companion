@@ -151,7 +151,7 @@ describe('EditColdBrewBrew form', () => {
     }
   })
 
-  it('invalidates dialed-in set lookups after save', async () => {
+  it('invalidates dialed-in lookups after save', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = seeded()

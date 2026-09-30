@@ -48,9 +48,9 @@ _Avoid_: Style, mode
 
 **Dialed-in**:
 A Brew marked as a reference to reproduce, for a Coffee, a Brewing Method, and a
-Brewing Device. Many Brews can be Dialed-in for the same Coffee, method, and
-device at once; marking one does not replace the others. A Coffee is Dialed-in
-when it has at least one such Brew.
+Brewing Device. There is exactly one such Brew per Coffee, method, and device;
+marking another replaces it. A Coffee is Dialed-in when it has at least one such
+Brew.
 _Avoid_: Favorite, saved recipe
 
 ## Plans

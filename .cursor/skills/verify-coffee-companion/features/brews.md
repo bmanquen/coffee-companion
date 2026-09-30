@@ -13,8 +13,8 @@ Brews is the log of every Shot and Brew, tabbed by brewing method. A user reads 
 - `brews-delete-espresso` removes that Shot after the confirm dialog.
 - `brews-dialed-in` shows the crosshair toggle (`Mark {coffee} as dialed in` / `Dialed in {coffee} — clear`). The seeded espresso Dialed-in is Sumatra Lintong.
 - `brews-device-dialed-in` sets Dialed-in on the Ethiopia Guji espresso row
-  crosshair, sees that set on `/espresso/new` after choosing Ethiopia Guji, and
-  confirms `/aeropress/new` does not reuse the Linea Mini set.
+  crosshair, sees that brew on `/espresso/new` after choosing Ethiopia Guji, and
+  confirms `/aeropress/new` does not reuse the Linea Mini brew.
 
 ## How to get to it (user POV)
 
@@ -49,7 +49,7 @@ Preconditions:
 - SearchSelect: clicking the already-selected option clears the field. If the value is already right, leave it.
 - Espresso submit is `Log`, not `Save`. Edit routes use `Save`. After a log, `--first` on `Edit shot` / `Delete shot` hits the new row (most recent). Do not edit or delete seeded rows — log your own, then remove it.
 - Ethiopia Guji's seeded espresso Shot is not Dialed-in and has no grind. The AeroPress `Standard` brew is Dialed-in. The seeded espresso Dialed-in is Sumatra Lintong (`Dialed in Sumatra Lintong — clear`).
-- There is one Dialed-in control: the row crosshair. Marking a brew adds it to the coffee × method × device set; unmarking removes only that brew.
+- There is one Dialed-in control: the row crosshair. Marking a brew makes it the Dialed-in brew for that coffee × method × device; marking another for the same triple replaces it.
 - Dose, yield, time, and grind are required. They have labels, not the old `18.0` / `36.0` placeholders. Number fields are spinbuttons; `fill --label "Dose (g)"` is the handle (same as e2e `getByLabel`).
 - Pour Over, French Press, and Cold Brew have `/…/new` forms too; this map's live recipe starts with Espresso and AeroPress because those are what the seed fills. Drive the others when the change is about those methods.
 - Identity `free` Seals off-Shelf rows on this page. Do not treat missing grind settings on Sumatra Lintong / Brazil Cerrado as a logging bug — see [Plans and Shelf](./plans-and-shelf.md).

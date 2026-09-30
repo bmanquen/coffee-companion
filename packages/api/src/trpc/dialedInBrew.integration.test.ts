@@ -126,7 +126,7 @@ function idsOf(views: Array<{ brewId: string }>) {
 }
 
 describe('dialedInBrew.set / get / unset', () => {
-  it('marks a brew and returns it in the coffee × method × device set', async () => {
+  it('marks a brew and returns it for that coffee × method × device', async () => {
     const shot = await logShot(espressoDeviceAId, '1.5')
 
     await asA.dialedInBrew.set({
@@ -148,7 +148,7 @@ describe('dialedInBrew.set / get / unset', () => {
     expect(found[0]?.sealed).toBe(false)
   })
 
-  it('keeps both brews when two are marked in the same set', async () => {
+  it('replaces the current brew when a second is marked for the same triple', async () => {
     const first = await logShot(espressoDeviceAId, '2.0')
     const second = await logShot(espressoDeviceAId, '2.5')
 
@@ -164,31 +164,35 @@ describe('dialedInBrew.set / get / unset', () => {
     })
 
     const found = await asA.dialedInBrew.get(espressoKey(espressoDeviceAId))
-    expect(idsOf(found)).toEqual([first.id, second.id].sort())
-    expect((await asA.espressoShot.getById(first.id)).isDialedIn).toBe(true)
-    expect((await asA.espressoShot.getById(second.id)).isDialedIn).toBe(true)
-  })
-
-  it('unmarks one brew and leaves the rest of the set', async () => {
-    const first = await logShot(espressoDeviceAId, '3.0')
-    const second = await logShot(espressoDeviceAId, '3.5')
-
-    await asA.dialedInBrew.set({
-      brewingMethod: 'espresso',
-      brewingDeviceId: espressoDeviceAId,
-      brewId: first.id,
-    })
-    await asA.dialedInBrew.set({
-      brewingMethod: 'espresso',
-      brewingDeviceId: espressoDeviceAId,
-      brewId: second.id,
-    })
-    await asA.dialedInBrew.unset({ brewId: first.id })
-
-    const found = await asA.dialedInBrew.get(espressoKey(espressoDeviceAId))
     expect(idsOf(found)).toEqual([second.id])
     expect((await asA.espressoShot.getById(first.id)).isDialedIn).toBe(false)
     expect((await asA.espressoShot.getById(second.id)).isDialedIn).toBe(true)
+  })
+
+  it('unmarking one triple does not clear another', async () => {
+    const onA = await logShot(espressoDeviceAId, '3.0')
+    const onB = await logShot(espressoDeviceBId, '3.5')
+
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: onA.id,
+    })
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceBId,
+      brewId: onB.id,
+    })
+    await asA.dialedInBrew.unset({ brewId: onA.id })
+
+    expect(idsOf(await asA.dialedInBrew.get(espressoKey(espressoDeviceAId)))).toEqual(
+      [],
+    )
+    expect(idsOf(await asA.dialedInBrew.get(espressoKey(espressoDeviceBId)))).toEqual(
+      [onB.id],
+    )
+    expect((await asA.espressoShot.getById(onA.id)).isDialedIn).toBe(false)
+    expect((await asA.espressoShot.getById(onB.id)).isDialedIn).toBe(true)
   })
 
   it('keeps a second mark of the same brew as a no-op', async () => {
@@ -209,7 +213,7 @@ describe('dialedInBrew.set / get / unset', () => {
     expect(found.filter((row) => row.brewId === shot.id)).toHaveLength(1)
   })
 
-  it('keeps two coffees on the same method and device in their own sets', async () => {
+  it('leaves a different coffee’s triple alone', async () => {
     const coffeeX = (await createCoffee(uniq('Coffee X'))).id
     const coffeeY = (await createCoffee(uniq('Coffee Y'))).id
     const shotX = await logShot(espressoDeviceAId, '4.0', coffeeX)
@@ -232,7 +236,7 @@ describe('dialedInBrew.set / get / unset', () => {
     expect(idsOf(forY)).toEqual([shotY.id])
   })
 
-  it('does not show another coffee’s set when the coffee changes', async () => {
+  it('does not show another coffee’s brew when the coffee changes', async () => {
     const coffeeX = (await createCoffee(uniq('Lookup X'))).id
     const coffeeY = (await createCoffee(uniq('Lookup Y'))).id
     const shotX = await logShot(espressoDeviceAId, '4.6', coffeeX)
@@ -248,7 +252,7 @@ describe('dialedInBrew.set / get / unset', () => {
     ).toEqual([])
   })
 
-  it('does not reuse another device’s set', async () => {
+  it('does not reuse another device’s brew', async () => {
     const shotA = await logShot(espressoDeviceAId, '5.0')
     const shotB = await logShot(espressoDeviceBId, '5.5')
 
@@ -271,7 +275,7 @@ describe('dialedInBrew.set / get / unset', () => {
     )
   })
 
-  it('does not reuse another method’s set', async () => {
+  it('does not reuse another method’s brew', async () => {
     const shot = await logShot(espressoDeviceAId, '6.0')
     const aeropress = await logAeropress('18')
 
@@ -348,7 +352,7 @@ describe('dialedInBrew.set / get / unset', () => {
     ).rejects.toThrow(/not found/i)
   })
 
-  it('does not return another user’s set', async () => {
+  it('does not return another user’s brew', async () => {
     const shot = await logShot(espressoDeviceAId, '8.5')
     await asA.dialedInBrew.set({
       brewingMethod: 'espresso',
@@ -359,9 +363,9 @@ describe('dialedInBrew.set / get / unset', () => {
     expect(await asB.dialedInBrew.get(espressoKey(espressoDeviceAId))).toEqual([])
   })
 
-  it('removes only the deleted brew from the set', async () => {
+  it('deleting the current brew leaves none for that triple', async () => {
     const first = await logShot(espressoDeviceAId, '9.0')
-    const second = await logShot(espressoDeviceAId, '9.5')
+    const second = await logShot(espressoDeviceBId, '9.5')
     await asA.dialedInBrew.set({
       brewingMethod: 'espresso',
       brewingDeviceId: espressoDeviceAId,
@@ -369,20 +373,60 @@ describe('dialedInBrew.set / get / unset', () => {
     })
     await asA.dialedInBrew.set({
       brewingMethod: 'espresso',
-      brewingDeviceId: espressoDeviceAId,
+      brewingDeviceId: espressoDeviceBId,
       brewId: second.id,
     })
 
     await asA.espressoShot.delete(first.id)
 
-    const found = await asA.dialedInBrew.get(espressoKey(espressoDeviceAId))
-    expect(idsOf(found)).toEqual([second.id])
+    expect(await asA.dialedInBrew.get(espressoKey(espressoDeviceAId))).toEqual([])
+    expect(idsOf(await asA.dialedInBrew.get(espressoKey(espressoDeviceBId)))).toEqual(
+      [second.id],
+    )
     expect(
       (await asA.dialedInBrew.list()).some((row) => row.brewId === first.id),
     ).toBe(false)
   })
 
-  it('does not unmark a brew that has already moved to another set', async () => {
+  it('editing a marked brew onto an occupied triple replaces it', async () => {
+    const coffeeA = (await createCoffee(uniq('Edit From'))).id
+    const coffeeB = (await createCoffee(uniq('Edit To'))).id
+    const moving = await logShot(espressoDeviceAId, '9.6', coffeeA)
+    const occupying = await logShot(espressoDeviceAId, '9.7', coffeeB)
+
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: moving.id,
+    })
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: occupying.id,
+    })
+
+    await asA.espressoShot.update({
+      id: moving.id,
+      coffeeId: coffeeB,
+      grinderId,
+      brewingDeviceId: espressoDeviceAId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '9.6',
+    })
+
+    expect(
+      await asA.dialedInBrew.get(espressoKey(espressoDeviceAId, coffeeA)),
+    ).toEqual([])
+    expect(
+      idsOf(await asA.dialedInBrew.get(espressoKey(espressoDeviceAId, coffeeB))),
+    ).toEqual([moving.id])
+    expect((await asA.espressoShot.getById(occupying.id)).isDialedIn).toBe(false)
+    expect((await asA.espressoShot.getById(moving.id)).isDialedIn).toBe(true)
+  })
+
+  it('does not unmark a brew that has already moved to another triple', async () => {
     const coffeeA = (await createCoffee(uniq('Race From'))).id
     const coffeeB = (await createCoffee(uniq('Race To'))).id
     const shot = await logShot(espressoDeviceAId, '13.0', coffeeA)
@@ -495,7 +539,7 @@ describe('coffee.getAll dialed-in', () => {
   it('is true exactly when the coffee has at least one membership', async () => {
     const coffee = await createCoffee(uniq('Card Flag'))
     const first = await logShot(espressoDeviceAId, '12.0', coffee.id)
-    const second = await logShot(espressoDeviceAId, '12.5', coffee.id)
+    const second = await logShot(espressoDeviceBId, '12.5', coffee.id)
 
     const before = await asA.coffee.getAll()
     expect(before.find((row) => row.id === coffee.id)?.isDialedIn).toBe(false)
@@ -507,7 +551,7 @@ describe('coffee.getAll dialed-in', () => {
     })
     await asA.dialedInBrew.set({
       brewingMethod: 'espresso',
-      brewingDeviceId: espressoDeviceAId,
+      brewingDeviceId: espressoDeviceBId,
       brewId: second.id,
     })
     expect(

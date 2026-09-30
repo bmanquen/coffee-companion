@@ -75,10 +75,10 @@ export const espressoShotRouter = createTRPCRouter({
       }),
     ),
 
-  // Shots in the Dialed-in set, most recent first. An optional limit caps the
-  // result; omitting it returns every member. A Sealed one is blanked like any
-  // other Brew rather than dropped: it is still a member, and the user is owed
-  // the sight of what subscribing would reopen.
+  // Dialed-in shots, most recent first. An optional limit caps the result;
+  // omitting it returns every one. A Sealed one is blanked like any other Brew
+  // rather than dropped: it is still Dialed-in, and the user is owed the sight
+  // of what subscribing would reopen.
   getDialedIn: authedProcedure
     .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
     .query(async ({ ctx, input }) => {

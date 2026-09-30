@@ -89,9 +89,8 @@ export const pouroverBrewRouter = createTRPCRouter({
       }),
     ),
 
-  // Brews in the Dialed-in set, most recent first. An optional limit caps the
-  // result; omitting it returns all of them. A Sealed member is blanked, not
-  // dropped.
+  // Dialed-in brews, most recent first. An optional limit caps the result;
+  // omitting it returns every one. A Sealed one is blanked, not dropped.
   getDialedIn: authedProcedure
     .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
     .query(async ({ ctx, input }) => {

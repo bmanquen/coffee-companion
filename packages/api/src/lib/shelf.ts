@@ -171,7 +171,7 @@ const readableWhenSealed = new Set<string>(Object.keys(readableFields))
 
 // Blanks a Sealed Brew rather than dropping it, so the feed still shows that it
 // exists and which Coffee it belongs to. Membership still counts: a Sealed
-// Dialed-in Brew stays in the set, it just cannot be read.
+// Dialed-in Brew stays marked, it just cannot be read.
 function withSealing<T extends SealableBrew>(
   brew: T,
   shelf: Shelf,
