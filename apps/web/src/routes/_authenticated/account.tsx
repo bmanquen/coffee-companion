@@ -226,7 +226,6 @@ export function AccountScreen({
                 <li>
                   A live Subscription, cancelled now so nothing keeps billing
                 </li>
-                <li>The analytics profile PostHog holds for this account</li>
               </ul>
               <DialogFooter>
                 <Button

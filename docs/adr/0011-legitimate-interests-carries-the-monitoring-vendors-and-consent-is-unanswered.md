@@ -98,8 +98,8 @@ Consequences to understand before changing anything here:
   and is not solved here.
 - **The page's retention figures are our dashboard settings, and go stale silently.**
   Sentry keeps errors, traces and replays for up to 90 days; PostHog keeps events
-  for a year. Person profiles have no expiry of their own; deleting the account
-  deletes the person
+  for a year. Person profiles have no expiry of their own; account deletion asks
+  PostHog to delete the person when that call is configured
   ([ADR 0015](0015-account-deletion-cancels-stripe-immediately-then-erases.md)).
   The figures live as two constants at the top of `apps/web/src/lib/privacy.ts`.
   Nothing in the repo can notice when someone changes a retention setting in a

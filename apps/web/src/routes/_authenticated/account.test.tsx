@@ -170,7 +170,7 @@ describe('AccountScreen', () => {
     expect(dialog.textContent).toMatch(/Coffees/)
     expect(dialog.textContent).toMatch(/Brews/)
     expect(dialog.textContent).toMatch(/Subscription/)
-    expect(dialog.textContent).toMatch(/PostHog/)
+    expect(dialog.textContent).not.toMatch(/PostHog/)
     expect(dialog.textContent).toMatch(/cannot be undone/i)
   })
 

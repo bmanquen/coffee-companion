@@ -5,6 +5,7 @@ export type PersonErasureConfig = {
 }
 
 const DEFAULT_HOST = 'https://us.i.posthog.com'
+const HTTP_NOT_FOUND = 404
 
 function trim(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
@@ -52,6 +53,7 @@ export async function deletePostHogPerson(
     },
   )
 
-  if (response.ok || response.status === 404) return
+  // Already gone is erased — the person is not there to delete.
+  if (response.ok || response.status === HTTP_NOT_FOUND) return
   throw new Error(`PostHog person delete failed (${response.status})`)
 }

@@ -143,7 +143,7 @@ VITE_POSTHOG_KEY=
 VITE_POSTHOG_HOST=
 ```
 
-Deleting an account also deletes that PostHog person. That call uses a personal
+Deleting an account asks PostHog to delete that person. That call uses a personal
 API key and the project id, not the capture key. Missing them is a no-op, the
 same as a missing capture key. The host defaults to PostHog US:
 
