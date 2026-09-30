@@ -13,7 +13,7 @@ function formatReference(view: DialedInBrewView) {
   if (view.dose) parts.push(`Dose ${view.dose}g`)
   if (view.outputGrams) parts.push(`${view.outputLabel} ${view.outputGrams}g`)
   const ratio = formatBrewRatio(view.dose, view.outputGrams)
-  if (ratio) parts.push(ratio)
+  if (ratio) parts.push(`Ratio ${ratio}`)
   if (view.time != null) parts.push(`Time ${view.time}${view.timeUnit}`)
   return parts.join(' · ')
 }

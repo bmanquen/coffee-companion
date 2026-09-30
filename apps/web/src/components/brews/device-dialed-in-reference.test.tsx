@@ -71,7 +71,7 @@ describe('DeviceDialedInReference', () => {
     expect(screen.getByText('Dialed-in for Linea Mini')).toBeTruthy()
     expect(
       screen.getByText(
-        'Ethiopia Guji · Grind 21 · Dose 18g · Yield 36g · 1:2 · Time 27s',
+        'Ethiopia Guji · Grind 21 · Dose 18g · Yield 36g · Ratio 1:2 · Time 27s',
       ),
     ).toBeTruthy()
   })

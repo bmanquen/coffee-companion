@@ -31,8 +31,10 @@ Two choices here will look wrong to a future reader unless they read this, so pl
   Pour Over, French Press, AeroPress, and Cold Brew are water / dose. The first put-back
   sat inside the yield/water cell; it then stood as its own unlabeled field. It now
   reads as a **Ratio** column, labelled the same way Dose and Water are, on the brew
-  tables, the dashboard feeds, and the card summary. The grams stay exactly as entered.
-  Missing either weight, or a zero dose, shows no ratio. Nothing is stored.
+  tables, the dashboard feeds, the card summary, and the device Dialed-in compact
+  line. The grams stay exactly as entered. Missing either weight, or a zero dose,
+  shows no ratio — the card omits that slot rather than leaving a blank. Nothing
+  is stored.
 
 Related presentation decisions from the same redesign (not domain-surprising, recorded here
 for context, not as commitments): grinder sits in the expander despite grind-setting being

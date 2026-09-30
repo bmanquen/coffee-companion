@@ -5,12 +5,14 @@ import { formatBrewRatio } from '@/lib/brew'
 export function ratioColumn<T extends { dose: string | null }>(
   output: (row: T) => string | null,
 ) {
-  return createColumnHelper<T>().display({
-    id: 'ratio',
-    header: 'Ratio',
-    cell: (info) =>
-      formatBrewRatio(info.row.original.dose, output(info.row.original)),
-    enableSorting: false,
-    meta: { cardSummary: true, cardSummaryLabel: true },
-  })
+  return createColumnHelper<T>().accessor(
+    (row) => formatBrewRatio(row.dose, output(row)),
+    {
+      id: 'ratio',
+      header: 'Ratio',
+      cell: (info) => info.getValue(),
+      enableSorting: false,
+      meta: { cardSummary: true, cardSummaryLabel: true, cardSkipEmpty: true },
+    },
+  )
 }

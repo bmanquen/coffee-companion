@@ -158,6 +158,20 @@ describe('EspressoBrewsSection', () => {
     expect(table.queryByText(/^1:/)).toBeNull()
   })
 
+  it('does not leave an empty ratio slot on the card when there is no ratio', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+      makeRecentShot({ id: 's1', dose: null, yield: '36' }),
+    ])
+
+    const { container } = render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+    const cards = container.querySelector<HTMLElement>('.lg\\:hidden')!
+    expect(within(cards).queryByText('Ratio')).toBeNull()
+    const yieldStat = within(cards).getByText('Yield').closest('div')!
+    expect(within(yieldStat).getByText('36g')).toBeTruthy()
+  })
+
   it('shows no ratio when yield is missing', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
