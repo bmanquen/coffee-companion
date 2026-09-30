@@ -95,4 +95,9 @@ describe('formatBrewRatio', () => {
     expect(formatBrewRatio('0', '36')).toBeNull()
     expect(formatBrewRatio(0, 36)).toBeNull()
   })
+
+  it('does not round a tiny positive output to 1:0', () => {
+    expect(formatBrewRatio('18', '0.05')).toBe('1:0.003')
+    expect(formatBrewRatio('18', '0.05')).not.toBe('1:0')
+  })
 })

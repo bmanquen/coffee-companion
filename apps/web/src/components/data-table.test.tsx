@@ -257,6 +257,61 @@ describe('DataTable', () => {
     const detailRegion = (card: HTMLElement) =>
       card.querySelector<HTMLElement>('[class*="grid-rows-"]')
 
+    it('omits a summary cell whose renderer returns nothing', () => {
+      type BrewWithRatio = BrewLike & { ratio: string | null }
+      const helper = createColumnHelper<BrewWithRatio>()
+      const columnsWithRatio = [
+        helper.accessor('name', {
+          header: 'Coffee',
+          meta: { cardTitle: true },
+        }),
+        helper.accessor('grind', {
+          header: 'Grind',
+          meta: { cardSummary: true, cardSummaryLabel: true },
+        }),
+        helper.accessor('ratio', {
+          header: 'Ratio',
+          cell: (info) => info.getValue(),
+          meta: {
+            cardSummary: true,
+            cardSummaryLabel: true,
+            cardSkipEmpty: true,
+          },
+        }),
+      ] as Array<ColumnDef<BrewWithRatio, string | null>>
+
+      function RatioHarness({ data }: { data: Array<BrewWithRatio> }) {
+        const expansion = useAccordionExpansion()
+        const table = useReactTable({
+          data,
+          columns: columnsWithRatio,
+          state: { expanded: expansion.expanded },
+          onExpandedChange: expansion.onExpandedChange,
+          getCoreRowModel: getCoreRowModel(),
+          getExpandedRowModel: getExpandedRowModel(),
+          getRowCanExpand: () => true,
+        })
+        return <DataTable table={table} />
+      }
+
+      const { container } = render(
+        <RatioHarness
+          data={[
+            {
+              name: 'Ethiopia Guji',
+              grind: '12',
+              grinder: 'Niche',
+              ratio: null,
+            },
+          ]}
+        />,
+      )
+      const [card] = cards(container)
+      expect(within(card).getByText('Grind')).toBeTruthy()
+      expect(within(card).getByText('12')).toBeTruthy()
+      expect(within(card).queryByText('Ratio')).toBeNull()
+    })
+
     it('shows summary cells up front and keeps detail cells in the collapsed region', () => {
       const { container } = render(
         <ExpandableHarness

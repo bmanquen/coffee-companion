@@ -49,6 +49,9 @@ declare module '@tanstack/react-table' {
     cardFullWidth?: boolean
     // Omit this column from the card layout entirely.
     cardHidden?: boolean
+    // Skip this summary cell on the card when its value is empty. Used for
+    // derived fields (Ratio) that are absent, not a dash.
+    cardSkipEmpty?: boolean
   }
 }
 
@@ -89,6 +92,10 @@ const controlColumnClass = 'w-px whitespace-nowrap'
 function cardLabel<T>(column: Column<T, unknown>): string {
   const header = column.columnDef.header
   return typeof header === 'string' ? header : column.id
+}
+
+function hasSummaryValue(value: unknown): boolean {
+  return value != null && value !== false && value !== ''
 }
 
 // A stack of label/value rows for a card's expanded detail region — one field
@@ -140,9 +147,12 @@ function DataCard<T>({
   const titleCells = cells.filter(
     (cell) => cell.column.columnDef.meta?.cardTitle,
   )
-  const summaryCells = cells.filter(
-    (cell) => cell.column.columnDef.meta?.cardSummary,
-  )
+  const summaryCells = cells.filter((cell) => {
+    const meta = cell.column.columnDef.meta
+    if (!meta?.cardSummary) return false
+    if (meta.cardSkipEmpty && !hasSummaryValue(cell.getValue())) return false
+    return true
+  })
   const actionCells = cells.filter(
     (cell) => cell.column.columnDef.meta?.cardHideLabel,
   )
