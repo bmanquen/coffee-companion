@@ -98,6 +98,9 @@ describe('FrenchpressBrewsSection', () => {
     expect(table.getByText('30g')).toBeTruthy() // dose
     expect(table.getByText('500g')).toBeTruthy() // water
     expect(table.getByText('1:16.67')).toBeTruthy()
+    expect(
+      within(table.getByText('500g').closest('td')!).queryByText('1:16.67'),
+    ).toBeNull()
     expect(table.getByText('4m')).toBeTruthy() // steep time
     expect(table.getByText('30')).toBeTruthy() // grind setting
     // Water temp is no longer a summary column — it lives in the expander

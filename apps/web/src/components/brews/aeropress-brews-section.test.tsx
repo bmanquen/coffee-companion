@@ -97,6 +97,9 @@ describe('AeropressBrewsSection', () => {
     expect(table.getByText('15g')).toBeTruthy() // dose
     expect(table.getByText('220g')).toBeTruthy() // water
     expect(table.getByText('1:14.67')).toBeTruthy()
+    expect(
+      within(table.getByText('220g').closest('td')!).queryByText('1:14.67'),
+    ).toBeNull()
     expect(table.getByText('1m 30s')).toBeTruthy() // steep
     expect(table.getByText('18')).toBeTruthy() // grind setting
   })

@@ -21,7 +21,7 @@ import {
   renderBrewDetails,
   waterTempExtra,
 } from '@/components/brews/brew-details'
-import { BrewWeight } from '@/components/brews/brew-weight'
+import { ratioColumn } from '@/components/brews/brew-ratio'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { BrewDialedInCell } from '@/components/brews/dialed-in-toggle-cell'
@@ -116,13 +116,12 @@ const columns = [
   }),
   columnHelper.accessor('water', {
     header: 'Water',
-    cell: (info) => (
-      <BrewWeight grams={info.getValue()} dose={info.row.original.dose} />
-    ),
+    cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
     sortingFn: (a, b) =>
       Number(a.original.water ?? 0) - Number(b.original.water ?? 0),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
+  ratioColumn((row: Brew) => row.water),
   columnHelper.accessor('steepTime', {
     header: 'Steep',
     cell: (info) => formatBrewSeconds(info.getValue()),

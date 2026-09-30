@@ -98,6 +98,9 @@ describe('PouroverBrewsSection', () => {
     expect(table.getByText('18g')).toBeTruthy() // dose
     expect(table.getByText('300g')).toBeTruthy() // water
     expect(table.getByText('1:16.67')).toBeTruthy()
+    expect(
+      within(table.getByText('300g').closest('td')!).queryByText('1:16.67'),
+    ).toBeNull()
     expect(table.getByText('2m 45s')).toBeTruthy() // brew time
     expect(table.getByText('22')).toBeTruthy() // grind setting
     // Water temp is no longer a summary column — it lives in the expander

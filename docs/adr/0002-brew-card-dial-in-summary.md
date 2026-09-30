@@ -21,17 +21,17 @@ Two choices here will look wrong to a future reader unless they read this, so pl
   promoting it only for the methods that do would break the consistent card shape, which is
   the whole point of this redesign. The lever is one tap away, not gone.
 
-- **A computed 1:x sits beside the real weights; it is not stored.** The prior dashboard
-  feeds emphasised the brew ratio as the headline metric. A ratio hides *how much coffee
-  and how much water* — the concrete numbers you need to reproduce a brew — so the summary
-  still shows the actual, labelled weights as the user entered them (`Dose 18g · Yield 38g`).
-  The first cut of this redesign started as a muted `1:x` hint beside those weights, then
-  dropped the number outright as redundant with the real numbers — the `brew-ratio` helper
-  went with it. We put a computed 1:x back: espresso is yield / dose; Pour Over, French
-  Press, AeroPress, and Cold Brew are water / dose. Missing either weight, or a zero dose,
-  shows no ratio. Nothing is stored and there is no column; the helper derives it from the
-  grams already on the brew. The stats carry their labels (Grind, Dose, Yield, Time) so
-  each number is unambiguous; only the self-identifying method-variant goes unlabelled.
+- **A computed 1:x is its own summary piece; it is not stored and not typed.** The prior
+  dashboard feeds emphasised the brew ratio as the headline metric. A ratio hides *how much
+  coffee and how much water* — the concrete numbers you need to reproduce a brew — so the
+  summary still shows the actual, labelled weights as the user entered them (`Dose 18g ·
+  Yield 38g`). The first cut of this redesign started as a muted `1:x` hint beside those
+  weights, then dropped the number outright as redundant with the real numbers — the
+  `brew-ratio` helper went with it. We put a computed 1:x back: espresso is yield / dose;
+  Pour Over, French Press, AeroPress, and Cold Brew are water / dose. The first put-back
+  sat inside the yield/water cell; it now stands as its own unlabeled field, because 1:x
+  identifies itself (same idea as the method-variant) and the grams stay exactly as
+  entered. Missing either weight, or a zero dose, shows no ratio. Nothing is stored.
 
 Related presentation decisions from the same redesign (not domain-surprising, recorded here
 for context, not as commitments): grinder sits in the expander despite grind-setting being
