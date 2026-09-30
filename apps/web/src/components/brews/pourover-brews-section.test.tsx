@@ -97,6 +97,7 @@ describe('PouroverBrewsSection', () => {
     const table = within(screen.getByRole('table'))
     expect(table.getByText('18g')).toBeTruthy() // dose
     expect(table.getByText('300g')).toBeTruthy() // water
+    expect(table.getByText('1:16.67')).toBeTruthy()
     expect(table.getByText('2m 45s')).toBeTruthy() // brew time
     expect(table.getByText('22')).toBeTruthy() // grind setting
     // Water temp is no longer a summary column — it lives in the expander
@@ -179,6 +180,34 @@ describe('PouroverBrewsSection', () => {
     // show the "No notes..." placeholder in the expander (BrewDetails).
     expect(table.getAllByText('-').length).toBeGreaterThanOrEqual(4)
     expect(table.getByText('No notes...')).toBeTruthy()
+    expect(table.queryByText(/^1:/)).toBeNull()
+  })
+
+  it('shows no ratio when dose or water is missing', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+      makePouroverBrew({
+        id: 'p1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        coffeeId: 'c1',
+        dose: null,
+        water: '300',
+      }),
+      makePouroverBrew({
+        id: 'p2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+        coffeeId: 'c2',
+        dose: '18',
+        water: null,
+      }),
+    ])
+
+    render(<PouroverBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('300g')).toBeTruthy()
+    expect(table.getByText('18g')).toBeTruthy()
+    expect(table.queryByText(/^1:/)).toBeNull()
   })
 
   it('highlights the dialed-in row and not the others', () => {

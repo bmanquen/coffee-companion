@@ -70,8 +70,36 @@ describe('DeviceDialedInReference', () => {
     ).toBeTruthy()
     expect(screen.getByText('Dialed-in for Linea Mini')).toBeTruthy()
     expect(
-      screen.getByText('Ethiopia Guji · Grind 21 · Dose 18g · Yield 36g · Time 27s'),
+      screen.getByText(
+        'Ethiopia Guji · Grind 21 · Dose 18g · Yield 36g · 1:2 · Time 27s',
+      ),
     ).toBeTruthy()
+  })
+
+  it('omits the ratio when a weight is missing', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(
+      trpc.dialedInBrew.get.queryKey({
+        coffeeId: COFFEE,
+        brewingMethod: 'espresso',
+        brewingDeviceId: DEVICE,
+      }),
+      [{ ...view, dose: null }],
+    )
+
+    render(
+      <DeviceDialedInReference
+        coffeeId={COFFEE}
+        brewingMethod="espresso"
+        brewingDeviceId={DEVICE}
+      />,
+      { wrapper: Wrapper },
+    )
+
+    expect(
+      screen.getByText('Ethiopia Guji · Grind 21 · Yield 36g · Time 27s'),
+    ).toBeTruthy()
+    expect(screen.queryByText(/1:/)).toBeNull()
   })
 
   it('does not query when the coffee or device is empty', () => {

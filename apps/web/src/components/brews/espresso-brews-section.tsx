@@ -19,6 +19,7 @@ import {
   brewLogRowClass,
   renderBrewDetails,
 } from '@/components/brews/brew-details'
+import { BrewWeight } from '@/components/brews/brew-weight'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { BrewDialedInCell } from '@/components/brews/dialed-in-toggle-cell'
@@ -124,7 +125,9 @@ const columns = [
   }),
   columnHelper.accessor('yield', {
     header: 'Yield',
-    cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
+    cell: (info) => (
+      <BrewWeight grams={info.getValue()} dose={info.row.original.dose} />
+    ),
     sortingFn: (a, b) =>
       Number(a.original.yield ?? 0) - Number(b.original.yield ?? 0),
     meta: { cardSummary: true, cardSummaryLabel: true },

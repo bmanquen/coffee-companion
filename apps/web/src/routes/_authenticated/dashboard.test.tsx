@@ -157,6 +157,7 @@ describe('Dashboard', () => {
     // Core weights are on the face — no expansion needed.
     expect(table.getByText('18g')).toBeTruthy()
     expect(table.getByText('36g')).toBeTruthy()
+    expect(table.getByText('1:2')).toBeTruthy()
     expect(table.getByText('28s')).toBeTruthy()
   })
 

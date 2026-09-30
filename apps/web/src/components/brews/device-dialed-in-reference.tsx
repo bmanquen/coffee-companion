@@ -4,6 +4,7 @@ import type {
   DialedInBrewView,
 } from '@coffee-companion/api/lib/dialed-in-brew'
 import { useTRPC } from '@/integrations/trpc/react'
+import { formatBrewRatio } from '@/lib/brew'
 
 function formatReference(view: DialedInBrewView) {
   if (view.sealed) return 'Sealed'
@@ -11,6 +12,8 @@ function formatReference(view: DialedInBrewView) {
   if (view.grindSetting) parts.push(`Grind ${view.grindSetting}`)
   if (view.dose) parts.push(`Dose ${view.dose}g`)
   if (view.outputGrams) parts.push(`${view.outputLabel} ${view.outputGrams}g`)
+  const ratio = formatBrewRatio(view.dose, view.outputGrams)
+  if (ratio) parts.push(ratio)
   if (view.time != null) parts.push(`Time ${view.time}${view.timeUnit}`)
   return parts.join(' · ')
 }
