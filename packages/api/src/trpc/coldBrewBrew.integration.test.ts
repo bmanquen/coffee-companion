@@ -320,15 +320,16 @@ describe('coldBrewBrew.getDialedIn', () => {
     })
   }
 
-  it('keeps two cold brews Dialed-in for the same coffee', async () => {
-    const coffee = await createCoffee(uniq('Two Members'))
+  it('returns every Dialed-in cold brew for the user', async () => {
+    const coffeeA = await createCoffee(uniq('Dialed A'))
+    const coffeeB = await createCoffee(uniq('Dialed B'))
     const first = await asA.coldBrewBrew.create({
       ...baseBrew(),
-      coffeeId: coffee.id,
+      coffeeId: coffeeA.id,
     })
     const second = await asA.coldBrewBrew.create({
       ...baseBrew(),
-      coffeeId: coffee.id,
+      coffeeId: coffeeB.id,
     })
     await mark(first.id)
     await mark(second.id)
