@@ -3,6 +3,7 @@ import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes, dialedInBrews } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
+import { dropStaleMembership } from '../lib/dialed-in-brew'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import {
   UNKNOWN_UUID,
@@ -378,6 +379,78 @@ describe('dialedInBrew.set / get / unset', () => {
     expect(idsOf(found)).toEqual([second.id])
     expect(
       (await asA.dialedInBrew.list()).some((row) => row.brewId === first.id),
+    ).toBe(false)
+  })
+
+  it('does not unmark a brew that has already moved to another set', async () => {
+    const coffeeA = (await createCoffee(uniq('Race From'))).id
+    const coffeeB = (await createCoffee(uniq('Race To'))).id
+    const shot = await logShot(espressoDeviceAId, '13.0', coffeeA)
+
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: shot.id,
+    })
+    await asA.espressoShot.update({
+      id: shot.id,
+      coffeeId: coffeeB,
+      grinderId,
+      brewingDeviceId: espressoDeviceAId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '13.0',
+    })
+
+    expect(
+      idsOf(await asA.dialedInBrew.get(espressoKey(espressoDeviceAId, coffeeB))),
+    ).toEqual([shot.id])
+
+    await dropStaleMembership(
+      USER_A,
+      shot.id,
+      espressoKey(espressoDeviceAId, coffeeA),
+    )
+
+    expect(
+      idsOf(await asA.dialedInBrew.get(espressoKey(espressoDeviceAId, coffeeB))),
+    ).toEqual([shot.id])
+    expect(
+      await asA.dialedInBrew.get(espressoKey(espressoDeviceAId, coffeeA)),
+    ).toEqual([])
+  })
+
+  it('drops a membership that no longer matches the brew', async () => {
+    const coffeeA = (await createCoffee(uniq('Stuck From'))).id
+    const coffeeB = (await createCoffee(uniq('Stuck To'))).id
+    const shot = await logShot(espressoDeviceAId, '13.5', coffeeA)
+
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: shot.id,
+    })
+    await asA.espressoShot.update({
+      id: shot.id,
+      coffeeId: coffeeB,
+      grinderId,
+      brewingDeviceId: espressoDeviceAId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '13.5',
+    })
+    await db
+      .update(dialedInBrews)
+      .set({ coffeeId: coffeeA })
+      .where(eq(dialedInBrews.brewId, shot.id))
+
+    expect(
+      await asA.dialedInBrew.get(espressoKey(espressoDeviceAId, coffeeA)),
+    ).toEqual([])
+    expect(
+      (await asA.dialedInBrew.list()).some((row) => row.brewId === shot.id),
     ).toBe(false)
   })
 

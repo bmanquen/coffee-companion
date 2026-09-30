@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Route } from './$shotId.edit'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 import {
   makeBrewingDevice,
   makeCoffee,
@@ -134,6 +135,31 @@ describe('EditEspressoShot form', () => {
       const body = String(init?.body ?? '')
       expect(body).toContain(SHOT)
       expect(body).toContain('19')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('invalidates dialed-in set lookups after save', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(trpcSuccess())
+    try {
+      const { queryClient, trpc, Wrapper } = seeded()
+      const setKey = {
+        coffeeId: COFFEE,
+        brewingMethod: 'espresso' as const,
+        brewingDeviceId: ESP_DEVICE,
+      }
+      queryClient.setQueryData(trpc.dialedInBrew.get.queryKey(setKey), [])
+
+      render(<EditEspressoShot />, { wrapper: Wrapper })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      await waitFor(() => {
+        expect(
+          queryClient.getQueryState(trpc.dialedInBrew.get.queryKey(setKey))
+            ?.isInvalidated,
+        ).toBe(true)
+      })
     } finally {
       fetchSpy.mockRestore()
     }

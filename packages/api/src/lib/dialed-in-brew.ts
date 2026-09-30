@@ -58,88 +58,104 @@ type LoadedBrew = {
   timeUnit: 's' | 'min'
 }
 
+function asLoaded(
+  brew: {
+    id: string
+    userId: string
+    coffeeId: string
+    brewingDeviceId: string
+    sealedAt: Date | null
+    grindSetting: string | null
+    dose: string | null
+    coffee: { name: string }
+    brewingDevice: { name: string } | null
+  },
+  outputGrams: string | null,
+  outputLabel: LoadedBrew['outputLabel'],
+  time: number | null,
+  timeUnit: LoadedBrew['timeUnit'],
+): LoadedBrew {
+  return { ...brew, outputGrams, outputLabel, time, timeUnit }
+}
+
+async function loadBrews(
+  brewingMethod: BrewingMethod,
+  brewIds: Array<string>,
+  userId: string,
+): Promise<Map<string, LoadedBrew>> {
+  if (brewIds.length === 0) return new Map()
+  const where = { id: { in: brewIds }, userId }
+  switch (brewingMethod) {
+    case 'espresso': {
+      const brews = await db.query.espressoShots.findMany({
+        where,
+        with: brewRelations,
+      })
+      return new Map(
+        brews.map((brew) => [
+          brew.id,
+          asLoaded(brew, brew.yield, 'Yield', brew.time, 's'),
+        ]),
+      )
+    }
+    case 'aeropress': {
+      const brews = await db.query.aeropressBrews.findMany({
+        where,
+        with: brewRelations,
+      })
+      return new Map(
+        brews.map((brew) => [
+          brew.id,
+          asLoaded(brew, brew.water, 'Water', brew.steepTime, 's'),
+        ]),
+      )
+    }
+    case 'pourover': {
+      const brews = await db.query.pouroverBrews.findMany({
+        where,
+        with: brewRelations,
+      })
+      return new Map(
+        brews.map((brew) => [
+          brew.id,
+          asLoaded(brew, brew.water, 'Water', brew.brewTime, 's'),
+        ]),
+      )
+    }
+    case 'frenchpress': {
+      const brews = await db.query.frenchpressBrews.findMany({
+        where,
+        with: brewRelations,
+      })
+      return new Map(
+        brews.map((brew) => [
+          brew.id,
+          asLoaded(brew, brew.water, 'Water', brew.steepTime, 's'),
+        ]),
+      )
+    }
+    case 'coldBrew': {
+      const brews = await db.query.coldBrewBrews.findMany({
+        where,
+        with: brewRelations,
+      })
+      return new Map(
+        brews.map((brew) => [
+          brew.id,
+          asLoaded(brew, brew.water, 'Water', brew.steepTime, 'min'),
+        ]),
+      )
+    }
+  }
+}
+
 async function loadBrew(
   brewingMethod: BrewingMethod,
   brewId: string,
   userId: string,
 ): Promise<LoadedBrew | null> {
-  switch (brewingMethod) {
-    case 'espresso': {
-      const brew = await db.query.espressoShots.findFirst({
-        where: { id: brewId, userId },
-        with: brewRelations,
-      })
-      return brew
-        ? {
-            ...brew,
-            outputGrams: brew.yield,
-            outputLabel: 'Yield',
-            time: brew.time,
-            timeUnit: 's',
-          }
-        : null
-    }
-    case 'aeropress': {
-      const brew = await db.query.aeropressBrews.findFirst({
-        where: { id: brewId, userId },
-        with: brewRelations,
-      })
-      return brew
-        ? {
-            ...brew,
-            outputGrams: brew.water,
-            outputLabel: 'Water',
-            time: brew.steepTime,
-            timeUnit: 's',
-          }
-        : null
-    }
-    case 'pourover': {
-      const brew = await db.query.pouroverBrews.findFirst({
-        where: { id: brewId, userId },
-        with: brewRelations,
-      })
-      return brew
-        ? {
-            ...brew,
-            outputGrams: brew.water,
-            outputLabel: 'Water',
-            time: brew.brewTime,
-            timeUnit: 's',
-          }
-        : null
-    }
-    case 'frenchpress': {
-      const brew = await db.query.frenchpressBrews.findFirst({
-        where: { id: brewId, userId },
-        with: brewRelations,
-      })
-      return brew
-        ? {
-            ...brew,
-            outputGrams: brew.water,
-            outputLabel: 'Water',
-            time: brew.steepTime,
-            timeUnit: 's',
-          }
-        : null
-    }
-    case 'coldBrew': {
-      const brew = await db.query.coldBrewBrews.findFirst({
-        where: { id: brewId, userId },
-        with: brewRelations,
-      })
-      return brew
-        ? {
-            ...brew,
-            outputGrams: brew.water,
-            outputLabel: 'Water',
-            time: brew.steepTime,
-            timeUnit: 'min',
-          }
-        : null
-    }
-  }
+  const loaded = await loadBrews(brewingMethod, [brewId], userId)
+  return loaded.get(brewId) ?? null
 }
 
 async function deviceNameFor(
@@ -225,11 +241,21 @@ export function withDialedInFlag<T extends { id: string }>(
   return brews.map((brew) => ({ ...brew, isDialedIn: ids.has(brew.id) }))
 }
 
-async function dropStaleMembership(userId: string, brewId: string) {
+export async function dropStaleMembership(
+  userId: string,
+  brewId: string,
+  key: DialedInSetKey,
+) {
   await db
     .delete(dialedInBrews)
     .where(
-      and(eq(dialedInBrews.userId, userId), eq(dialedInBrews.brewId, brewId)),
+      and(
+        eq(dialedInBrews.userId, userId),
+        eq(dialedInBrews.brewId, brewId),
+        eq(dialedInBrews.coffeeId, key.coffeeId),
+        eq(dialedInBrews.brewingMethod, key.brewingMethod),
+        eq(dialedInBrews.brewingDeviceId, key.brewingDeviceId),
+      ),
     )
 }
 
@@ -263,15 +289,20 @@ export async function getDialedInBrews(
     return []
   }
 
+  const loaded = await loadBrews(
+    key.brewingMethod,
+    rows.map((row) => row.brewId),
+    userId,
+  )
   const views: Array<DialedInBrewView> = []
   for (const row of rows) {
-    const brew = await loadBrew(key.brewingMethod, row.brewId, userId)
+    const brew = loaded.get(row.brewId)
     if (
       !brew ||
       brew.coffeeId !== key.coffeeId ||
       brew.brewingDeviceId !== key.brewingDeviceId
     ) {
-      await dropStaleMembership(userId, row.brewId)
+      await dropStaleMembership(userId, row.brewId, key)
       continue
     }
     views.push(
@@ -349,7 +380,11 @@ export async function unsetDialedInBrew(
   userId: string,
   brewId: string,
 ): Promise<void> {
-  await dropStaleMembership(userId, brewId)
+  await db
+    .delete(dialedInBrews)
+    .where(
+      and(eq(dialedInBrews.userId, userId), eq(dialedInBrews.brewId, brewId)),
+    )
 }
 
 export async function stampDialedIn<T extends { id: string }>(
