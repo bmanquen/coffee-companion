@@ -42,7 +42,9 @@ Consequences to understand before changing anything here:
   Missing `STRIPE_SECRET_KEY` is not a skip — otherwise a live Subscription
   keeps billing a customer we no longer have.
 - **Open Checkout Sessions are expired before Subscriptions are cancelled.**
-  A session left open can be paid after the account is gone.
+  A session left open can be paid after the account is gone. A session that
+  completes in the list-to-expire window is not a reason to stop — the
+  Subscription it created is cancelled on the next step.
 - **Every Stripe list page is read.** A live Subscription or open Checkout
   past the first hundred is still cancelled or expired.
 - **PostHog erasure runs after the row is gone.** A PostHog outage is reported,

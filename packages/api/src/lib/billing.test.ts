@@ -10,13 +10,20 @@ const list = vi.fn()
 const cancel = vi.fn()
 const listCheckout = vi.fn()
 const expireCheckout = vi.fn()
+const retrieveCheckout = vi.fn()
 const reportError = vi.hoisted(() => vi.fn())
 
 vi.mock('stripe', () => ({
   default: class {
     prices = { retrieve }
     subscriptions = { list, cancel }
-    checkout = { sessions: { list: listCheckout, expire: expireCheckout } }
+    checkout = {
+      sessions: {
+        list: listCheckout,
+        expire: expireCheckout,
+        retrieve: retrieveCheckout,
+      },
+    }
   },
 }))
 
@@ -274,6 +281,7 @@ describe('cancelBilledSubscriptions', () => {
     cancel.mockReset()
     listCheckout.mockReset()
     expireCheckout.mockReset()
+    retrieveCheckout.mockReset()
     listCheckout.mockResolvedValue({ data: [], has_more: false })
     expireCheckout.mockResolvedValue({})
   })
@@ -452,11 +460,47 @@ describe('cancelBilledSubscriptions', () => {
       has_more: false,
     })
     expireCheckout.mockRejectedValue(new Error('expire failed'))
+    retrieveCheckout.mockResolvedValue({ id: 'cs_open', status: 'open' })
 
     await expect(cancelBilledSubscriptions('cus_123')).rejects.toThrow(
       'expire failed',
     )
     expect(list).not.toHaveBeenCalled()
     expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('stops when expire fails and the session cannot be re-read', async () => {
+    configure()
+    listCheckout.mockResolvedValue({
+      data: [{ id: 'cs_open' }],
+      has_more: false,
+    })
+    expireCheckout.mockRejectedValue(new Error('expire failed'))
+    retrieveCheckout.mockRejectedValue(new Error('unreachable'))
+
+    await expect(cancelBilledSubscriptions('cus_123')).rejects.toThrow(
+      'expire failed',
+    )
+    expect(list).not.toHaveBeenCalled()
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('cancels the Subscription a Checkout created if it completed before expire', async () => {
+    configure()
+    listCheckout.mockResolvedValue({
+      data: [{ id: 'cs_open' }],
+      has_more: false,
+    })
+    expireCheckout.mockRejectedValue(new Error('not open'))
+    retrieveCheckout.mockResolvedValue({ id: 'cs_open', status: 'complete' })
+    list.mockResolvedValue({
+      data: [{ id: 'sub_new', status: 'active' }],
+      has_more: false,
+    })
+    cancel.mockResolvedValue({})
+
+    await cancelBilledSubscriptions('cus_123')
+
+    expect(cancel).toHaveBeenCalledWith('sub_new')
   })
 })

@@ -221,7 +221,19 @@ export async function cancelBilledSubscriptions(
     }),
   )
   for (const session of sessions) {
-    await config.client.checkout.sessions.expire(session.id)
+    try {
+      await config.client.checkout.sessions.expire(session.id)
+    } catch (error) {
+      // Completed in the list-to-expire window: the Subscription it
+      // created is cancelled below. Still open means expire really failed.
+      let latest
+      try {
+        latest = await config.client.checkout.sessions.retrieve(session.id)
+      } catch {
+        throw error
+      }
+      if (latest.status === 'open') throw error
+    }
   }
 
   const subscriptions = await listAllPages((params) =>
