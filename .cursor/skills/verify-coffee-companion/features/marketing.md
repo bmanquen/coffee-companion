@@ -4,7 +4,7 @@ The public site pitches Coffee Companion and sells Plans. A signed-out visitor s
 
 ## Sub-features
 
-- `marketing-home` shows the pitch, a way in, and a hero table with a Dialed-in brew.
+- `marketing-home` shows the pitch, a way in, and a hero table with a Dialed-in brew and a Ratio column.
 - `marketing-pricing-nav` reaches pricing from the marketing header.
 - `marketing-plans` renders Free, Pro, and Pro+ with the period toggle.
 - `marketing-faq` opens the sealing answer.
@@ -25,9 +25,9 @@ Preconditions:
 - Identity is `public`.
 - `helpers/control doctor` reports the expected URL and `coffee_companion_test`.
 
-- **Open home.** Run `helpers/control browser as public` and `helpers/control browser goto --path /`. The heading reads `Dial it in once. Never guess again.` and a button matching `/save your first brew/i` is visible.
-- **Hero table.** The page `role=table` is visible and contains `Ethiopia Guji`. The Dialed-in crosshair inside that table is labeled `Dialed in` (`expect --label "Dialed in" --first` — desktop table and mobile card both render it).
-- **Header pricing.** Choose `Pricing` in the marketing header. Run `helpers/control browser click --role link --name Pricing`. The URL ends with `/pricing` and the heading matches `/keep your history/i`.
+- **Open home.** Run `helpers/control browser as public` and `helpers/control browser goto --path /`. The heading reads `Dial it in once. Never guess again.` and a button matching `/save your first brew/i` is visible (`expect --role button --name "/save your first brew/i" --first` — hero and the closing section both render it).
+- **Hero table.** The page `role=table` is visible and contains `Ethiopia Guji`. The Dialed-in crosshair inside that table is labeled `Dialed in` (`expect --label "Dialed in" --first` — desktop table and mobile card both render it). Columnheader `Ratio` is visible (`expect --role columnheader --name Ratio --exact --first`).
+- **Header pricing.** Choose `Pricing` in the marketing header. Run `helpers/control browser click --role link --name Pricing --nav Marketing`. The URL ends with `/pricing` and the heading matches `/keep your history/i`.
 - **Plans.** Every plan heading is visible. Run `helpers/control browser expect --role heading --name Free --exact`, then the same for `Pro` and `Pro+`.
 - **Period toggle.** Annual `$44.99` is visible first. Run `helpers/control browser click --role button --name Monthly --exact`. Then `expect --text '$4.99'` (single quotes — the shell eats `$4` inside double quotes). `$44.99` is gone.
 - **FAQ.** Open `/pricing` and choose the question about old brews. Run `helpers/control browser goto --path /pricing` then `helpers/control browser click --role button --name "/what happens to my old Brews/i"`. Text matching `/your Shelf/i` and `/Nothing is ever deleted/i` is visible.
@@ -38,7 +38,7 @@ Preconditions:
 
 - Identity `data`, `free`, or `empty` on `/` redirects to `/dashboard`. Prove marketing as `public`.
 - Quote plan prices as `'$4.99'` / `'$44.99'`. Double quotes let the shell expand `$4` / `$44` and `expect --text "$4.99"` becomes `getByText('.99')`.
-- `Pricing` is in the header and the footer. Click the header (`navigation` named `Marketing`) or you may scroll the footer instead.
+- `Pricing` is in the header, the home `See pricing` link, and the footer. Unscoped `click --role link --name Pricing` matches all three. Use `--nav Marketing`.
 - DataTable renders a desktop table and a mobile card stack. At 1280px the table is the one to assert; a loose `getByText('Ethiopia Guji')` matches both.
 - Default billing period is annual (`$44.99`). Assert `$4.99` only after pressing `Monthly`.
 - `Subscribe` on this instance does not open Stripe Checkout (no `STRIPE_SECRET_KEY`). Do not treat a missing redirect as a product bug here.

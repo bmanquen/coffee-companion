@@ -78,4 +78,30 @@ describe('locatorFrom', () => {
       'first',
     ])
   })
+
+  it('scopes a header click to the named navigation', () => {
+    const { page, trail } = pageWithTrail()
+    locatorFrom(page, {
+      role: 'link',
+      name: 'Pricing',
+      nav: 'Marketing',
+    })
+    assert.deepEqual(trail, [
+      ['getByRole', 'navigation', { name: 'Marketing' }],
+      ['getByRole', 'link', { name: 'Pricing', exact: false }],
+    ])
+  })
+
+  it('coerces a regex name on the nav path the same way as other role clicks', () => {
+    const { page, trail } = pageWithTrail()
+    locatorFrom(page, {
+      role: 'link',
+      name: '/pricing/i',
+      nav: 'Marketing',
+    })
+    assert.deepEqual(trail, [
+      ['getByRole', 'navigation', { name: 'Marketing' }],
+      ['getByRole', 'link', { name: /pricing/i, exact: false }],
+    ])
+  })
 })

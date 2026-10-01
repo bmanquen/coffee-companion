@@ -502,6 +502,7 @@ async function cmdBrowser(argv) {
       text: flags.text,
       label: flags.label,
       row: flags.row,
+      nav: flags.nav,
       first: Boolean(flags.first),
     })
     console.log(JSON.stringify(result, null, 2))
@@ -703,9 +704,14 @@ function cmdCleanup() {
 
 function locatorFrom(page, spec) {
   if (spec.nav && spec.role) {
-    return page
-      .getByRole('navigation', { name: spec.nav })
-      .getByRole(spec.role, { name: spec.name, exact: Boolean(spec.exact) })
+    let locator = page
+      .getByRole('navigation', { name: coerceName(spec.nav) })
+      .getByRole(spec.role, {
+        name: coerceName(spec.name),
+        exact: Boolean(spec.exact),
+      })
+    if (spec.first) locator = locator.first()
+    return locator
   }
   if (spec.row && spec.role) {
     let locator = page
@@ -939,7 +945,7 @@ function usage() {
   seed                   Reseed the e2e bypass users (data + free)
   browser as <who>       public | data | empty | free
   browser goto --path /
-  browser click --role link --name Pricing
+  browser click --role link --name Pricing --nav Marketing
   browser click --role button --name "Edit grinder" --row "<unique>"
   browser fill --placeholder Name --value "Kenya Nyeri"
   browser fill --placeholder Name --value "Kenya Nyeri" --first

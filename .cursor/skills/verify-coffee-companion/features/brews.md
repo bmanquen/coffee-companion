@@ -4,7 +4,7 @@ Brews is the log of every Shot and Brew, tabbed by brewing method. A user reads 
 
 ## Sub-features
 
-- `brews-espresso` shows the Espresso tab (default) with Ethiopia Guji on `data`.
+- `brews-espresso` shows the Espresso tab (default) with Ethiopia Guji on `data`, and a Ratio column (computed 1:x from dose and yield).
 - `brews-aeropress` switches to the AeroPress tab and shows the Standard dialed-in brew.
 - `brews-log-espresso` logs a Shot from `/espresso/new` (coffee select prefills grinder and device).
 - `brews-log-aeropress` logs an AeroPress brew from `/aeropress/new`.
@@ -32,13 +32,13 @@ Preconditions:
 - Identity is `data`.
 - `helpers/control doctor` reports the expected URL and `coffee_companion_test`.
 
-- **Espresso log.** Run `helpers/control browser as data` and `helpers/control browser goto --path /brews`. Heading `Brews` is visible and `Ethiopia Guji` appears (`expect --text "Ethiopia Guji" --first` — create-espresso can add more rows for the same coffee).
+- **Espresso log.** Run `helpers/control browser as data` and `helpers/control browser goto --path /brews`. Heading `Brews` is visible and `Ethiopia Guji` appears (`expect --text "Ethiopia Guji" --first` — create-espresso can add more rows for the same coffee). Columnheader `Ratio` is visible (`expect --role columnheader --name Ratio --exact --first`).
 - **AeroPress tab.** Click tab `AeroPress`. Wait for `Standard` (`expect --text Standard --first` — that word is not on the Espresso tab, so it proves the switch). `Ethiopia Guji` remains visible.
 - **Log espresso.** Run `helpers/control browser goto --path /espresso/new`. Click text `Select Coffee`, then `Ethiopia Guji` (exact). `Niche Zero` and `Linea Mini` replace the Select placeholders. Fill `--label "Dose (g)"` → `18`, `--label "Yield (g)"` → `36`, `--label "Time (s)"` → `30`, `--label "Grind Setting"` → a unique marker. Click button `Log` (exact). The URL is `/brews` and heading `Brews` is visible.
 - **Log AeroPress.** Run `helpers/control browser goto --path /aeropress/new`. Select `Ethiopia Guji`. `Standard`, `Niche Zero`, and `AeroPress Go` prefill. Fill `--label "Dose (g)"` → `15`, `--label "Water (g)"` → `220`, `--label "Steep Time (minutes)"` → `1`, `--label "Steep Time (seconds)"` → `30`, `--label "Grind Setting"` → `18`. Click `Log`. Land on `/brews`.
 - **Roast date.** On `/espresso/new` with no coffee selected, click `Pick a date`, then a day button matching `/15th/`. `Pick a date` is gone (`expect --text "Pick a date" --count 0`).
 - **Dialed-in.** On `/brews` (Espresso) run `expect --role button --name "Dialed in Sumatra Lintong — clear"`. Off-state rows use `Mark {coffee} as dialed in` (Ethiopia Guji's seeded Shot is off).
-- **Device Dialed-in.** On `/brews`, click `Mark Ethiopia Guji as dialed in` on the espresso row. The control reads `Dialed in Ethiopia Guji — clear`. Open `/espresso/new`, select `Ethiopia Guji`. Status `Dialed-in for Linea Mini` is visible and names that coffee. Open `/aeropress/new`, select `Ethiopia Guji`. That Linea Mini status is absent. Back on `/brews`, click `Dialed in Ethiopia Guji — clear`. `/espresso/new` after selecting the coffee no longer shows the Linea Mini status.
+- **Device Dialed-in.** On `/brews`, click `Mark Ethiopia Guji as dialed in` (`click --role button --name "Mark Ethiopia Guji as dialed in" --first` — a log earlier in this recipe adds a second Ethiopia Guji espresso row). The control reads `Dialed in Ethiopia Guji — clear`. Open `/espresso/new`, select `Ethiopia Guji`. Status `Dialed-in for Linea Mini` is visible and names that coffee. Open `/aeropress/new`, select `Ethiopia Guji`. That Linea Mini status is absent. Back on `/brews`, click `Dialed in Ethiopia Guji — clear` (`--first`). `/espresso/new` after selecting the coffee no longer shows the Linea Mini status.
 - **Edit shot.** After logging a unique grind, run `click --role button --name "Edit shot" --first`. Heading is `Edit Espresso Shot`. Fill `--label "Grind Setting"` with an updated marker and click `Save`. Land on `/brews` and `expect --text "<updated>" --first`.
 - **Delete shot.** On that same new row, run `click --role button --name "Delete shot" --first`, then confirm `Delete` (exact). The updated grind is gone (`expect --text "<updated>" --count 0`).
 - **Proof.** After logging, on `/brews` run `helpers/control browser screenshot --path artifacts/<run>/brews/espresso.png` and `helpers/control browser snapshot --aria --path artifacts/<run>/brews/espresso.aria.txt`. Both show heading `Brews` and `Ethiopia Guji`. Extra shots from this run may remain; do not delete seeded rows to tidy the screenshot.
@@ -48,7 +48,7 @@ Preconditions:
 - Gate the AeroPress switch on `Standard`, not on `Ethiopia Guji` — that coffee is also on the Espresso tab.
 - SearchSelect: clicking the already-selected option clears the field. If the value is already right, leave it.
 - Espresso submit is `Log`, not `Save`. Edit routes use `Save`. After a log, `--first` on `Edit shot` / `Delete shot` hits the new row (most recent). Do not edit or delete seeded rows — log your own, then remove it.
-- Ethiopia Guji's seeded espresso Shot is not Dialed-in and has no grind. The AeroPress `Standard` brew is Dialed-in. The seeded espresso Dialed-in is Sumatra Lintong (`Dialed in Sumatra Lintong — clear`).
+- Ethiopia Guji's seeded espresso Shot is not Dialed-in and has no grind. The AeroPress `Standard` brew is Dialed-in. The seeded espresso Dialed-in is Sumatra Lintong (`Dialed in Sumatra Lintong — clear`). After this recipe logs another Ethiopia Guji Shot, two `Mark Ethiopia Guji as dialed in` buttons exist — use `--first` (most recent). On a clean seed there is only one and `--first` is unnecessary.
 - There is one Dialed-in control: the row crosshair. Marking a brew makes it the Dialed-in brew for that coffee × method × device; marking another for the same triple replaces it.
 - Dose, yield, time, and grind are required. They have labels, not the old `18.0` / `36.0` placeholders. Number fields are spinbuttons; `fill --label "Dose (g)"` is the handle (same as e2e `getByLabel`).
 - Pour Over, French Press, and Cold Brew have `/…/new` forms too; this map's live recipe starts with Espresso and AeroPress because those are what the seed fills. Drive the others when the change is about those methods.
