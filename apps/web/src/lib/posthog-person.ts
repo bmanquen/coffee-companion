@@ -1,10 +1,13 @@
+import { log } from '@coffee-companion/api/lib/log'
+import { reportError } from '@coffee-companion/api/lib/report-error'
+import { analyticsHost } from './analytics'
+
 export type PersonErasureConfig = {
   apiKey: string
   projectId: string
   host: string
 }
 
-const DEFAULT_HOST = 'https://us.i.posthog.com'
 const HTTP_NOT_FOUND = 404
 
 function trim(value: string | undefined): string | undefined {
@@ -27,10 +30,20 @@ export function posthogPersonConfig(): PersonErasureConfig | null {
     )
   }
 
+  // Same host as capture. A 404 from the wrong cloud would look like
+  // "already gone" while the real person stayed on the capture host.
+  const host = stripTrailingSlash(analyticsHost())
+  const override = trim(process.env.POSTHOG_HOST)
+  if (override && stripTrailingSlash(override) !== host) {
+    throw new Error(
+      'POSTHOG_HOST must match VITE_POSTHOG_HOST so person delete hits the same project as capture',
+    )
+  }
+
   return {
     apiKey,
     projectId,
-    host: stripTrailingSlash(trim(process.env.POSTHOG_HOST) ?? DEFAULT_HOST),
+    host,
   }
 }
 
@@ -39,7 +52,21 @@ export async function deletePostHogPerson(
   fetchImpl: typeof fetch = fetch,
 ) {
   const config = posthogPersonConfig()
-  if (!config) return
+  if (!config) {
+    const error = new Error(
+      'PostHog person delete skipped: POSTHOG_PERSONAL_API_KEY is not set',
+    )
+    log('warn', error.message, {
+      area: 'account',
+      operation: 'erasePerson',
+      accountId,
+    })
+    reportError(error, {
+      tags: { area: 'account', operation: 'erasePerson' },
+      user: { id: accountId },
+    })
+    return
+  }
 
   const response = await fetchImpl(
     `${config.host}/api/projects/${config.projectId}/persons/bulk_delete/`,

@@ -20,6 +20,8 @@ export async function deleteAccount(userId: string) {
 
   if (row.stripeCustomerId) {
     try {
+      // Also expires open Checkout Sessions — a session paid after this
+      // would start a Subscription on a customer we no longer have.
       await cancelBilledSubscriptions(row.stripeCustomerId)
     } catch (error) {
       reportError(error, {
@@ -31,9 +33,7 @@ export async function deleteAccount(userId: string) {
   }
 
   await db.transaction(async (tx) => {
-    await tx
-      .delete(verification)
-      .where(eq(verification.identifier, row.email))
+    await tx.delete(verification).where(eq(verification.identifier, row.email))
     await tx.delete(user).where(eq(user.id, userId))
   })
 

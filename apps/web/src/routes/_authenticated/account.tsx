@@ -90,6 +90,16 @@ function AccountContainer() {
   )
 }
 
+function deleteFailureDescription(error: unknown) {
+  if (
+    error instanceof Error &&
+    (error as { data?: { code?: string } }).data?.code === 'PRECONDITION_FAILED'
+  ) {
+    return error.message
+  }
+  return 'Please try again.'
+}
+
 export function AccountScreen({
   user,
   plan,
@@ -105,6 +115,8 @@ export function AccountScreen({
 }) {
   const [confirming, setConfirming] = useState(false)
   const [pending, setPending] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const busy = pending || exporting
 
   const manage = async () => {
     const { error } = await authClient.subscription.billingPortal({
@@ -118,12 +130,15 @@ export function AccountScreen({
   }
 
   const exportData = async () => {
+    setExporting(true)
     try {
       await onExport()
     } catch {
       toast.error('We could not export your data', {
         description: 'Please try again.',
       })
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -132,9 +147,9 @@ export function AccountScreen({
     try {
       await onDelete()
       setConfirming(false)
-    } catch {
+    } catch (error) {
       toast.error('We could not delete your account', {
-        description: 'Please try again.',
+        description: deleteFailureDescription(error),
       })
     } finally {
       setPending(false)
@@ -190,7 +205,7 @@ export function AccountScreen({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="outline" onClick={exportData}>
+          <Button variant="outline" disabled={busy} onClick={exportData}>
             Export data
           </Button>
         </CardContent>
@@ -207,7 +222,9 @@ export function AccountScreen({
         <CardContent>
           <Dialog open={confirming} onOpenChange={setConfirming}>
             <DialogTrigger asChild>
-              <Button variant="destructive">Delete account</Button>
+              <Button variant="destructive" disabled={busy}>
+                Delete account
+              </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -228,16 +245,12 @@ export function AccountScreen({
                 </li>
               </ul>
               <DialogFooter>
-                <Button
-                  variant="outline"
-                  disabled={pending}
-                  onClick={exportData}
-                >
+                <Button variant="outline" disabled={busy} onClick={exportData}>
                   Export data
                 </Button>
                 <Button
                   variant="destructive"
-                  disabled={pending}
+                  disabled={busy}
                   onClick={confirmDelete}
                 >
                   Delete account

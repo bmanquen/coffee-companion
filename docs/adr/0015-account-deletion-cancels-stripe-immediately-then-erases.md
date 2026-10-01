@@ -38,7 +38,15 @@ Consequences to understand before changing anything here:
 
 - **A deleted subscriber's paid period is forfeited.** Accepted: there is no
   account to keep serving.
+- **A stored Stripe customer without billing configured refuses deletion.**
+  Missing `STRIPE_SECRET_KEY` is not a skip — otherwise a live Subscription
+  keeps billing a customer we no longer have.
+- **Open Checkout Sessions are expired before Subscriptions are cancelled.**
+  A session left open can be paid after the account is gone.
+- **Every Stripe list page is read.** A live Subscription or open Checkout
+  past the first hundred is still cancelled or expired.
 - **PostHog erasure runs after the row is gone.** A PostHog outage is reported,
   not a reason to keep the account. Manual follow-up if the report fires.
 - **The personal API key and project id are required to actually reach PostHog.**
-  Missing them is the local/CI no-op, the same as a missing capture key.
+  Missing them is the local/CI no-op, the same as a missing capture key. The
+  skip is logged and reported so it is not silent; it does not keep the account.
