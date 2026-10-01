@@ -78,7 +78,7 @@ Identities (the `e2e_auth` cookie; server must have `E2E_BYPASS_AUTH=true`):
 ```bash
 .cursor/skills/verify-coffee-companion/helpers/control browser as public
 .cursor/skills/verify-coffee-companion/helpers/control browser goto --path /
-.cursor/skills/verify-coffee-companion/helpers/control browser click --role link --name Pricing
+.cursor/skills/verify-coffee-companion/helpers/control browser click --role link --name Pricing --nav Marketing
 .cursor/skills/verify-coffee-companion/helpers/control browser fill --placeholder Name --value "Kenya Nyeri"
 .cursor/skills/verify-coffee-companion/helpers/control browser fill --label "Dose (g)" --value 18
 .cursor/skills/verify-coffee-companion/helpers/control browser press --key Enter
@@ -88,23 +88,17 @@ Identities (the `e2e_auth` cookie; server must have `E2E_BYPASS_AUTH=true`):
 .cursor/skills/verify-coffee-companion/helpers/control browser snapshot --aria --path artifacts/<run>/page.aria.txt
 ```
 
-Regex names are `/pattern/i` strings. `--first` applies to `click`, `expect`, and `fill` (including `--placeholder`) — use it whenever desktop table and mobile card both render the same name. `--label` is `getByLabel` (the same handle `apps/web/e2e` uses for recipe fields). Number fields are `spinbutton`s; `--label "Dose (g)"` matches them without naming the role. Scope a list-row action with `--row` and the unique name (`click --role button --name "Edit grinder" --row "<unique>"`) — never `--first` or list position when the list sorts by name. Scope a click to the marketing header with `--` plus the daemon's `nav: Marketing` (the `drive marketing` recipe does this). For ad-hoc header clicks, prefer:
-
-```bash
-.cursor/skills/verify-coffee-companion/helpers/control browser click --role link --name Pricing
-```
-
-Pricing also appears in the footer; if both match, click the header one by going through the mapped marketing recipe.
+Regex names are `/pattern/i` strings. `--first` applies to `click`, `expect`, and `fill` (including `--placeholder`) — use it whenever desktop table and mobile card both render the same name. `--label` is `getByLabel` (the same handle `apps/web/e2e` uses for recipe fields). Number fields are `spinbutton`s; `--label "Dose (g)"` matches them without naming the role. Scope a list-row action with `--row` and the unique name (`click --role button --name "Edit grinder" --row "<unique>"`) — never `--first` or list position when the list sorts by name. Scope a header click with `--nav Marketing` so `Pricing` does not also match the home `See pricing` link and the footer.
 
 Stable handles (use these, not CSS or coordinates):
 
 - Marketing header: `navigation` named `Marketing`; links `Pricing`, brand `Coffee Companion`; button `Sign in`.
-- Home CTA: button `/save your first brew/i`.
-- Home hero table: `role=table`, `getByLabel('Dialed in')` (use `--first` — desktop table and mobile card both render it), text `Ethiopia Guji`.
+- Home CTA: button `/save your first brew/i` (use `--first` — hero and the closing section both render it).
+- Home hero table: `role=table`, `getByLabel('Dialed in')` (use `--first` — desktop table and mobile card both render it), text `Ethiopia Guji`, columnheader `Ratio`.
 - Pricing H1: `/keep your history/i`. Plan H2s: `Free`, `Pro`, `Pro+` (exact). Period toggle: button `Monthly` / default annual `$44.99`. Quote CLI price expects as `'$4.99'` — double quotes let the shell eat `$4`.
 - Signed-in chrome: button `Open menu` (desktop sheet); `navigation` named `Primary` (mobile bottom nav). Links `Home` (`/dashboard`), `Coffee`, `Brews`, `Equipment`. Button `Account menu`. Button `Sign Out`.
 - Dashboard H1 `Dashboard`. Method picker is the button whose exact name is the current method (`Espresso`, `AeroPress`, …). Options are `role=option`. Log links: `/Log Shot/i` → `/espresso/new`, `/Log Brew/i` → the method's `/…/new`.
-- Brews H1 `Brews`. Tabs: `Espresso`, `Pour Over`, `French Press`, `AeroPress`, `Cold Brew`. Row actions `Edit shot` / `Delete shot` (espresso) and `Edit brew` / `Delete brew` (other tabs). Confirm `Delete` (exact). Dialed-in toggle: `Mark {coffee} as dialed in` or `Dialed in {coffee} — clear` (espresso seed: Sumatra Lintong).
+- Brews H1 `Brews`. Tabs: `Espresso`, `Pour Over`, `French Press`, `AeroPress`, `Cold Brew`. Columnheader `Ratio` (computed 1:x from dose and yield/water). Row actions `Edit shot` / `Delete shot` (espresso) and `Edit brew` / `Delete brew` (other tabs). Confirm `Delete` (exact). Dialed-in toggle: `Mark {coffee} as dialed in` or `Dialed in {coffee} — clear` (espresso seed: Sumatra Lintong).
 - Coffees H1 `Coffees`. Link/button `Add Coffee`. Row actions `Edit coffee`, `Delete coffee`. Confirm `Delete` (exact).
 - Equipment H1 `Equipment`. Tabs `Grinders` (default) and `Brewing Devices`. Actions `Edit grinder`, `Delete grinder`, `Edit brewing device`, `Delete brewing device`.
 - Privacy H1 `/what we collect/i`. Recipient H2s `Sentry`, `PostHog`, `Google`, `Stripe`, `Resend` (exact). Footer link `Privacy` in `navigation` named `Footer`.
@@ -165,7 +159,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | `helpers/control launch` | Postgres (test DB, loopback + `*_test`) → migrate → seed → always rebuild → `node .output/server/index.mjs` |
 | `helpers/control doctor` | Pid, port ownership, HTTP + `Coffee Companion` marker |
 | `helpers/control seed` | `helpers/seed.mjs` → `seedE2eUsers()` |
-| `helpers/control browser …` | Playwright daemon (see Drive). `fill --label` / `expect --first` are the form and list handles |
+| `helpers/control browser …` | Playwright daemon (see Drive). `fill --label` / `expect --first` / `click --nav Marketing` are the form, list, and header handles |
 | `helpers/control drive marketing` | The only wired one-shot recipe (public home + pricing). Other map entries use `browser` commands |
 | `helpers/control cleanup` | Stop recorded pids; keep artifacts |
 | `helpers/ensure-postgres.sh` | Create/start local `coffee_companion_test` (scaffolding) |

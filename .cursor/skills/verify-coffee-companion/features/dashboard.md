@@ -4,7 +4,7 @@ The dashboard is the signed-in home: one method picker and that method's brew fe
 
 ## Sub-features
 
-- `dashboard-open` renders at `/dashboard` and is where `/` sends a signed-in visitor.
+- `dashboard-open` renders at `/dashboard` and is where `/` sends a signed-in visitor. The espresso feed shows a Ratio column.
 - `dashboard-chrome` shows the signed-in shell (Open menu, Account menu) and not `Sign in with Google`.
 - `dashboard-picker` lists every method alphabetically and switches the feed.
 - `dashboard-deeplink` honours `?method=` on load and keeps it across reload and back.
@@ -34,7 +34,7 @@ Preconditions:
 - **Deep link Cold Brew.** Run `helpers/control browser goto --path /dashboard?method=coldbrew`. Trigger `Cold Brew` is visible and `/Log Brew/i` has `href` `/cold-brew/new`.
 - **URL write.** From `?method=espresso`, choose Cold Brew. The URL matches `[?&]method=coldbrew`.
 - **Reload and back.** Open `?method=pourover`, reload: trigger still `Pour Over`. From `espresso`, switch to Cold Brew, then go back: trigger is `Espresso` again.
-- **Proof.** On `/dashboard?method=espresso` with the picker closed, run `helpers/control browser screenshot --path artifacts/<run>/dashboard/espresso.png` and `helpers/control browser snapshot --aria --path artifacts/<run>/dashboard/espresso.aria.txt`. Both show heading `Dashboard` and a Log Shot link.
+- **Proof.** On `/dashboard?method=espresso` with the picker closed, run `helpers/control browser screenshot --path artifacts/<run>/dashboard/espresso.png` and `helpers/control browser snapshot --aria --path artifacts/<run>/dashboard/espresso.aria.txt`. Both show heading `Dashboard`, a Log Shot link, and columnheader `Ratio` (`expect --role columnheader --name Ratio --exact --first`).
 
 ## Gotchas
 
