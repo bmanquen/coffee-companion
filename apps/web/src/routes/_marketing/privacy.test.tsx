@@ -78,6 +78,7 @@ describe('PrivacyPage', () => {
       own.getByText(/delete the account from that same page/i),
     ).toBeTruthy()
     expect(own.getByText(/export is the last chance/i)).toBeTruthy()
+    expect(own.getByText(/unused prepaid time is not refunded/i)).toBeTruthy()
     expect(
       own.getByText(
         /ask PostHog to delete the person .* when that call is configured/i,
