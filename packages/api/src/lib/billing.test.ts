@@ -8,12 +8,15 @@ import {
 const retrieve = vi.fn()
 const list = vi.fn()
 const cancel = vi.fn()
+const listCheckout = vi.fn()
+const expireCheckout = vi.fn()
 const reportError = vi.hoisted(() => vi.fn())
 
 vi.mock('stripe', () => ({
   default: class {
     prices = { retrieve }
     subscriptions = { list, cancel }
+    checkout = { sessions: { list: listCheckout, expire: expireCheckout } }
   },
 }))
 
@@ -238,6 +241,25 @@ describe('hasLiveSubscription', () => {
     expect(await hasLiveSubscription('cus_123')).toBe(false)
   })
 
+  it('looks past the first page, so a later live Subscription is still found', async () => {
+    configure()
+    list
+      .mockResolvedValueOnce({
+        data: [{ id: 'sub_ended', status: 'canceled' }],
+        has_more: true,
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 'sub_live', status: 'active' }],
+        has_more: false,
+      })
+
+    expect(await hasLiveSubscription('cus_123')).toBe(true)
+    expect(list).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ starting_after: 'sub_ended' }),
+    )
+  })
+
   it('refuses to answer when the provider cannot be reached', async () => {
     configure()
     list.mockRejectedValue(new Error('unreachable'))
@@ -250,12 +272,19 @@ describe('cancelBilledSubscriptions', () => {
   beforeEach(() => {
     list.mockReset()
     cancel.mockReset()
+    listCheckout.mockReset()
+    expireCheckout.mockReset()
+    listCheckout.mockResolvedValue({ data: [], has_more: false })
+    expireCheckout.mockResolvedValue({})
   })
 
-  it('does nothing when billing is switched off', async () => {
-    await cancelBilledSubscriptions('cus_123')
+  it('refuses when billing is switched off, so a stored customer is not deleted behind a silent skip', async () => {
+    await expect(cancelBilledSubscriptions('cus_123')).rejects.toThrow(
+      /unavailable/i,
+    )
 
     expect(list).not.toHaveBeenCalled()
+    expect(listCheckout).not.toHaveBeenCalled()
     expect(cancel).not.toHaveBeenCalled()
   })
 
@@ -325,6 +354,109 @@ describe('cancelBilledSubscriptions', () => {
     await expect(cancelBilledSubscriptions('cus_123')).rejects.toThrow(
       'unreachable',
     )
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('pages through every Subscription before treating cancel as complete', async () => {
+    configure()
+    list
+      .mockResolvedValueOnce({
+        data: [{ id: 'sub_ended', status: 'canceled' }],
+        has_more: true,
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 'sub_live', status: 'active' }],
+        has_more: false,
+      })
+    cancel.mockResolvedValue({})
+
+    await cancelBilledSubscriptions('cus_123')
+
+    expect(list).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ starting_after: 'sub_ended' }),
+    )
+    expect(cancel).toHaveBeenCalledWith('sub_live')
+  })
+
+  it('expires an open Checkout so it cannot start billing after the account is gone', async () => {
+    configure()
+    listCheckout.mockResolvedValue({
+      data: [{ id: 'cs_open' }],
+      has_more: false,
+    })
+    list.mockResolvedValue({ data: [], has_more: false })
+    expireCheckout.mockResolvedValue({})
+
+    await cancelBilledSubscriptions('cus_123')
+
+    expect(listCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: 'cus_123', status: 'open' }),
+    )
+    expect(expireCheckout).toHaveBeenCalledWith('cs_open')
+  })
+
+  it('pages through every open Checkout before treating expiry as complete', async () => {
+    configure()
+    listCheckout
+      .mockResolvedValueOnce({
+        data: [{ id: 'cs_first' }],
+        has_more: true,
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: 'cs_second' }],
+        has_more: false,
+      })
+    list.mockResolvedValue({ data: [], has_more: false })
+    expireCheckout.mockResolvedValue({})
+
+    await cancelBilledSubscriptions('cus_123')
+
+    expect(expireCheckout).toHaveBeenCalledWith('cs_first')
+    expect(expireCheckout).toHaveBeenCalledWith('cs_second')
+    expect(listCheckout).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ starting_after: 'cs_first' }),
+    )
+  })
+
+  it('expires open Checkouts before cancelling Subscriptions', async () => {
+    configure()
+    const order: Array<string> = []
+    listCheckout.mockImplementation(async () => {
+      order.push('checkout')
+      return { data: [{ id: 'cs_open' }], has_more: false }
+    })
+    expireCheckout.mockImplementation(async () => {
+      order.push('expire')
+      return {}
+    })
+    list.mockImplementation(async () => {
+      order.push('subscriptions')
+      return { data: [{ id: 'sub_live', status: 'active' }], has_more: false }
+    })
+    cancel.mockImplementation(async () => {
+      order.push('cancel')
+      return {}
+    })
+
+    await cancelBilledSubscriptions('cus_123')
+
+    expect(order).toEqual(['checkout', 'expire', 'subscriptions', 'cancel'])
+  })
+
+  it('stops when a Checkout cannot be expired, so the account is not deleted behind it', async () => {
+    configure()
+    listCheckout.mockResolvedValue({
+      data: [{ id: 'cs_open' }],
+      has_more: false,
+    })
+    expireCheckout.mockRejectedValue(new Error('expire failed'))
+
+    await expect(cancelBilledSubscriptions('cus_123')).rejects.toThrow(
+      'expire failed',
+    )
+    expect(list).not.toHaveBeenCalled()
     expect(cancel).not.toHaveBeenCalled()
   })
 })

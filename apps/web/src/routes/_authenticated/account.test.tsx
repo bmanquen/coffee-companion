@@ -241,4 +241,68 @@ describe('AccountScreen', () => {
       ),
     )
   })
+
+  it('shows the Stripe failure reason when cancellation stopped the delete', async () => {
+    const onDelete = vi
+      .fn()
+      .mockRejectedValue(
+        Object.assign(
+          new Error(
+            'We could not cancel your Subscription, so your account was not deleted. Try again.',
+          ),
+          { data: { code: 'PRECONDITION_FAILED' } },
+        ),
+      )
+    renderAccount({ onDelete })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Delete account',
+      }),
+    )
+
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        'We could not delete your account',
+        expect.objectContaining({
+          description:
+            'We could not cancel your Subscription, so your account was not deleted. Try again.',
+        }),
+      ),
+    )
+  })
+
+  it('does not let deletion start while an export is still running', async () => {
+    let finish!: () => void
+    const onExport = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve
+        }),
+    )
+    const onDelete = vi.fn()
+    renderAccount({ onExport, onDelete })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    const dialog = within(screen.getByRole('dialog'))
+    fireEvent.click(dialog.getByRole('button', { name: 'Export data' }))
+
+    expect(
+      dialog
+        .getByRole('button', { name: 'Delete account' })
+        .hasAttribute('disabled'),
+    ).toBe(true)
+
+    finish()
+
+    await waitFor(() =>
+      expect(
+        dialog
+          .getByRole('button', { name: 'Delete account' })
+          .hasAttribute('disabled'),
+      ).toBe(false),
+    )
+    expect(onDelete).not.toHaveBeenCalled()
+  })
 })

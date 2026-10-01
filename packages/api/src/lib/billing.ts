@@ -151,6 +151,35 @@ function wholeUnits(amount: number, currency: string): number {
   return amount / 10 ** maximumFractionDigits
 }
 
+// Stripe's list maximum. A live Subscription or an open Checkout past the
+// first page must still be found, so every page is read.
+const STRIPE_LIST_LIMIT = 100
+
+type StripeListPage<T extends { id: string }> = {
+  data: Array<T>
+  has_more: boolean
+}
+
+async function listAllPages<T extends { id: string }>(
+  fetchPage: (params: {
+    limit: number
+    starting_after?: string
+  }) => Promise<StripeListPage<T>>,
+): Promise<Array<T>> {
+  const collected: Array<T> = []
+  let startingAfter: string | undefined
+  do {
+    const page = await fetchPage({
+      limit: STRIPE_LIST_LIMIT,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    })
+    collected.push(...page.data)
+    const last = page.data.at(-1)
+    startingAfter = page.has_more && last ? last.id : undefined
+  } while (startingAfter)
+  return collected
+}
+
 // Whether the customer is already paying for a Subscription, on any Plan.
 // Asked of the provider rather than our table: the seller's own guard reads our
 // row, and a row that is missing, past due or left incomplete by an abandoned
@@ -162,27 +191,45 @@ export async function hasLiveSubscription(
   const config = billingConfig()
   if (!config) return false
 
-  const { data } = await config.client.subscriptions.list({
-    customer: customerId,
-    limit: 100,
-  })
-  return data.some((current) => paidStatuses.includes(current.status))
+  const subscriptions = await listAllPages((params) =>
+    config.client.subscriptions.list({ customer: customerId, ...params }),
+  )
+  return subscriptions.some((current) => paidStatuses.includes(current.status))
 }
 
 // Immediate cancel, not at period end: account deletion leaves nobody to
-// keep serving through the paid period (ADR-0015). Throws when the provider
-// cannot be reached, which is the caller's cue to stop and leave the account.
+// keep serving through the paid period (ADR-0015). Open Checkout Sessions
+// are expired first — a session left open can be paid after the account
+// is gone and start a Subscription we never cancelled. Throws when billing
+// is off or the provider cannot be reached, which is the caller's cue to
+// stop and leave the account.
 export async function cancelBilledSubscriptions(
   customerId: string,
 ): Promise<void> {
   const config = billingConfig()
-  if (!config) return
+  if (!config) {
+    throw new Error(
+      'Billing is unavailable, so a stored Stripe customer cannot be cancelled',
+    )
+  }
 
-  const { data } = await config.client.subscriptions.list({
-    customer: customerId,
-    limit: 100,
-  })
-  const live = data.filter((current) => paidStatuses.includes(current.status))
+  const sessions = await listAllPages((params) =>
+    config.client.checkout.sessions.list({
+      customer: customerId,
+      status: 'open',
+      ...params,
+    }),
+  )
+  for (const session of sessions) {
+    await config.client.checkout.sessions.expire(session.id)
+  }
+
+  const subscriptions = await listAllPages((params) =>
+    config.client.subscriptions.list({ customer: customerId, ...params }),
+  )
+  const live = subscriptions.filter((current) =>
+    paidStatuses.includes(current.status),
+  )
   for (const current of live) {
     await config.client.subscriptions.cancel(current.id)
   }
