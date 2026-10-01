@@ -42,6 +42,7 @@ test('offers deletion behind a confirmation that names what is about to go', asy
   await expect(dialog.getByText(/Coffees/)).toBeVisible()
   await expect(dialog.getByText(/Brews/)).toBeVisible()
   await expect(dialog.getByText(/Subscription/)).toBeVisible()
+  await expect(dialog.getByText(/not refunded/)).toBeVisible()
   await expect(dialog.getByText(/PostHog/)).toHaveCount(0)
   await expect(
     dialog.getByRole('button', { name: 'Export data' }),

@@ -241,7 +241,8 @@ export function AccountScreen({
                   of the library
                 </li>
                 <li>
-                  A live Subscription, cancelled now so nothing keeps billing
+                  A live Subscription, cancelled now so nothing keeps billing.
+                  Unused prepaid time is not refunded.
                 </li>
               </ul>
               <DialogFooter>
