@@ -17,6 +17,7 @@ export const E2E_USER_EMPTY = 'e2e-user-empty'
 // Holds the same library as E2E_USER_WITH_DATA but no Grant, so the two of them
 // read the same rows on different Plans.
 export const E2E_USER_FREE = 'e2e-user-free'
+export const E2E_USER_DELETE = 'e2e-user-delete'
 
 function makeSession(userId: string) {
   return {
@@ -28,6 +29,7 @@ function makeSession(userId: string) {
       image: null as string | null,
       createdAt: new Date(0),
       updatedAt: new Date(0),
+      deletedAt: null as Date | null,
     },
     session: {
       id: `e2e-session-${userId}`,

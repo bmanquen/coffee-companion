@@ -36,6 +36,7 @@ const IDENTITIES = {
   data: 'e2e-user-with-data',
   empty: 'e2e-user-empty',
   free: 'e2e-user-free',
+  delete: 'e2e-user-delete',
 }
 
 function die(message, code = 1) {
@@ -475,7 +476,7 @@ async function cmdBrowser(argv) {
   if (action === 'as') {
     const who = raw[0]
     if (!Object.hasOwn(IDENTITIES, who)) {
-      die(`Unknown identity "${who}". Use public | data | empty | free.`)
+      die(`Unknown identity "${who}". Use public | data | empty | free | delete.`)
     }
     const state = requireState()
     state.identity = who
@@ -943,7 +944,7 @@ function usage() {
   launch                 Start Postgres (test DB), migrate, seed, build, serve
   doctor                 Read-only check that this instance is worth driving
   seed                   Reseed the e2e bypass users (data + free)
-  browser as <who>       public | data | empty | free
+  browser as <who>       public | data | empty | free | delete
   browser goto --path /
   browser click --role link --name Pricing --nav Marketing
   browser click --role button --name "Edit grinder" --row "<unique>"

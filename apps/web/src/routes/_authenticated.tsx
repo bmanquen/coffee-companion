@@ -7,6 +7,7 @@ import Navigation from '@/components/Navigation'
 import { RenewalFailedNotice } from '@/components/renewal-failed-notice'
 import { identifyUser, identityFrom } from '@/lib/analytics'
 import { authClient } from '@/lib/auth-client'
+import { isPendingDeletion } from '@/lib/pending-deletion'
 import { getForwardedHeaders } from '@/lib/request-headers'
 import { sentryUserFrom } from '@/lib/sentry'
 import { setSentryUser } from '@/lib/sentry-client'
@@ -22,6 +23,9 @@ export const Route = createFileRoute('/_authenticated')({
     })
     if (!session) {
       throw redirect({ to: '/' })
+    }
+    if (isPendingDeletion(session.user)) {
+      throw redirect({ to: '/restore-account' })
     }
     return { session }
   },

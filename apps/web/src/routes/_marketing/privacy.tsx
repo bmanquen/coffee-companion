@@ -3,7 +3,8 @@ import type { Recipient } from '@/lib/privacy'
 import { H1 } from '@/components/typography/h1'
 import { Card } from '@/components/ui/card'
 import { marketingHead } from '@/lib/marketing-head'
-import { recipients } from '@/lib/privacy'
+import { posthogPersonConfig } from '@/lib/posthog-person'
+import { posthogPersonRetention, recipients } from '@/lib/privacy'
 
 const TITLE = 'Privacy — Coffee Companion'
 const DESCRIPTION =
@@ -12,10 +13,31 @@ const DESCRIPTION =
 export const Route = createFileRoute('/_marketing/privacy')({
   head: () =>
     marketingHead({ title: TITLE, description: DESCRIPTION, path: '/privacy' }),
-  component: PrivacyPage,
+  loader: () => ({
+    personDeleteConfigured: posthogPersonConfig() !== null,
+  }),
+  component: PrivacyRoute,
 })
 
-export function PrivacyPage() {
+function PrivacyRoute() {
+  const { personDeleteConfigured } = Route.useLoaderData()
+  return <PrivacyPage personDeleteConfigured={personDeleteConfigured} />
+}
+
+export function PrivacyPage({
+  personDeleteConfigured = false,
+}: {
+  personDeleteConfigured?: boolean
+}) {
+  const listed = recipients.map((recipient) =>
+    recipient.slug === 'posthog'
+      ? {
+          ...recipient,
+          retention: posthogPersonRetention(personDeleteConfigured),
+        }
+      : recipient,
+  )
+
   return (
     <div className="flex flex-col gap-10 py-12">
       <header className="flex flex-col gap-4">
@@ -28,7 +50,7 @@ export function PrivacyPage() {
         </p>
       </header>
 
-      {recipients.map((recipient) => (
+      {listed.map((recipient) => (
         <RecipientSection key={recipient.slug} recipient={recipient} />
       ))}
 
@@ -82,11 +104,12 @@ export function PrivacyPage() {
         <p className="text-muted-foreground">
           Everything the app holds about you can be exported from your account
           page, on any plan and whatever a plan hides from view. You can delete
-          the account from that same page. The export is the last chance to take
-          a copy — deletion cannot be undone. Deleting cancels a live
-          Subscription first and removes what we store. Unused prepaid time is
-          not refunded. We ask PostHog to delete the person for the account when
-          that call is configured; if it is not, the profile stays.
+          the account from that same page. The account and library are kept for
+          30 days so they can be restored, then deleted. Deleting cancels a live
+          Subscription immediately, and unused prepaid time is not refunded.{' '}
+          {personDeleteConfigured
+            ? 'The PostHog profile is deleted when those 30 days end.'
+            : 'The PostHog profile has no expiry until it is deleted in PostHog.'}
         </p>
       </Section>
     </div>

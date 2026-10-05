@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { recipients } from './privacy'
+import { recipients, posthogPersonRetention } from './privacy'
 
 describe('recipients', () => {
   it('names every third party the app sends data to', () => {
@@ -68,8 +68,13 @@ describe('recipients', () => {
       (recipient) => recipient.slug === 'posthog',
     )!
     expect(posthog.retention).toMatch(
-      /asks PostHog to delete it when that call is configured/i,
+      /no expiry until it is deleted in PostHog/i,
     )
-    expect(posthog.retention).toMatch(/otherwise the profile stays/i)
+  })
+
+  it('says the PostHog profile is deleted at the end of the window when that call will run', () => {
+    expect(posthogPersonRetention(true)).toMatch(
+      /deleted when those 30 days end/i,
+    )
   })
 })

@@ -77,16 +77,23 @@ describe('PrivacyPage', () => {
     expect(
       own.getByText(/delete the account from that same page/i),
     ).toBeTruthy()
-    expect(own.getByText(/export is the last chance/i)).toBeTruthy()
+    expect(own.getByText(/kept for 30 days so they can be restored/i)).toBeTruthy()
     expect(own.getByText(/unused prepaid time is not refunded/i)).toBeTruthy()
     expect(
-      own.getByText(
-        /ask PostHog to delete the person .* when that call is configured/i,
-      ),
+      own.getByText(/no expiry until it is deleted in PostHog/i),
     ).toBeTruthy()
-    expect(own.getByText(/if it is not, the profile stays/i)).toBeTruthy()
+    expect(own.queryByText(/cannot be undone/i)).toBeNull()
     expect(own.queryByText(/deletes the PostHog person/i)).toBeNull()
     expect(own.queryByText(/no button that deletes your account/i)).toBeNull()
     expect(own.queryByText(/write to us/i)).toBeNull()
+  })
+
+  it('says the PostHog profile is deleted at the end of the window when that call will run', () => {
+    render(<PrivacyPage personDeleteConfigured />)
+
+    const own = within(screen.getByRole('region', { name: 'Your own data' }))
+    expect(
+      own.getByText(/PostHog profile is deleted when those 30 days end/i),
+    ).toBeTruthy()
   })
 })

@@ -1,0 +1,28 @@
+name: Purge deleted accounts
+
+on:
+  schedule:
+    # Daily, after the 30-day restore window can have closed overnight.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  purge:
+    name: Purge expired deleted accounts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call the purge endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          PURGE_SECRET: ${{ secrets.PURGE_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$PURGE_SECRET" ]; then
+            echo "APP_URL and PURGE_SECRET are not set; nothing to purge"
+            exit 0
+          fi
+          curl -fsS -X POST "$APP_URL/api/purge-deleted-accounts" \
+            -H "Authorization: Bearer $PURGE_SECRET"

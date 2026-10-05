@@ -75,6 +75,19 @@ Health Check Path, set to `/api/health` — not from a file in this repo, so eac
 new environment needs it set once. Railway keeps a deploy whose health check
 never passes from taking traffic.
 
+### Purging deleted accounts
+
+Accounts marked deleted are hard-erased after 30 days by `POST
+/api/purge-deleted-accounts`, authorised with `Authorization: Bearer
+$PURGE_SECRET`. Missing `PURGE_SECRET` makes the route 404. GitHub Actions
+hits it daily when `APP_URL` and `PURGE_SECRET` are set as repository secrets;
+Railway Cron can call the same path from the dashboard, the way health checks
+are configured.
+
+```
+PURGE_SECRET=
+```
+
 ### Error monitoring
 
 Production errors go to [Sentry](https://sentry.io) when a DSN is set. Set both
@@ -143,12 +156,15 @@ VITE_POSTHOG_KEY=
 VITE_POSTHOG_HOST=
 ```
 
-Deleting an account asks PostHog to delete that person. That call uses a personal
-API key and the project id, not the capture key. Missing them is a no-op, the
-same as a missing capture key — the skip is logged and reported, and does not
-keep the account. The host is the same as capture (`VITE_POSTHOG_HOST`); if
-`POSTHOG_HOST` is set it must match, so a 404 on the wrong cloud is not treated
-as success.
+Deleting an account cancels a live Subscription immediately, then keeps the
+account recoverable for 30 days. Signing in during that window offers restore.
+Restore does not start a new Subscription. After 30 days the rows go, and
+PostHog is asked to delete that person. That call uses a personal API key and
+the project id, not the capture key. Missing them is a no-op, the same as a
+missing capture key — the skip is logged and reported, and the profile then
+has no expiry until it is deleted in PostHog. The host is the same as capture
+(`VITE_POSTHOG_HOST`); if `POSTHOG_HOST` is set it must match, so a 404 on the
+wrong cloud is not treated as success.
 
 ```
 POSTHOG_PERSONAL_API_KEY=

@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 import {
+  E2E_USER_DELETE,
   E2E_USER_EMPTY,
   E2E_USER_FREE,
   E2E_USER_WITH_DATA,
@@ -96,6 +97,14 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         storageState: authAs(E2E_USER_FREE),
+      },
+    },
+    {
+      name: 'authed-delete',
+      testMatch: /\.delete\.spec\.ts$/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: authAs(E2E_USER_DELETE),
       },
     },
   ],

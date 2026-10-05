@@ -167,12 +167,22 @@ describe('AccountScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
 
     const dialog = screen.getByRole('dialog')
-    expect(dialog.textContent).toMatch(/Coffees/)
-    expect(dialog.textContent).toMatch(/Brews/)
-    expect(dialog.textContent).toMatch(/Subscription/)
+    expect(dialog.textContent).toMatch(/kept for 30 days/i)
+    expect(dialog.textContent).toMatch(/restore them during that time/i)
+    expect(dialog.textContent).toMatch(/Subscription is cancelled now/i)
     expect(dialog.textContent).toMatch(/not refunded/)
     expect(dialog.textContent).not.toMatch(/PostHog/)
-    expect(dialog.textContent).toMatch(/cannot be undone/i)
+    expect(dialog.textContent).not.toMatch(/cannot be undone/i)
+  })
+
+  it('mentions a PostHog delete only when that call will run', () => {
+    renderAccount({ personDeleteConfigured: true })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+    expect(screen.getByRole('dialog').textContent).toMatch(
+      /PostHog profile is deleted when those 30 days end/i,
+    )
   })
 
   it('puts the export in front of the irreversible step', () => {
