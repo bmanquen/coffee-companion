@@ -302,13 +302,17 @@ async function seedFreeUser() {
   await seedLibrary(E2E_USER_FREE, grinder.id, device.id)
 }
 
-async function seedDeleteUser() {
+export async function resetE2eDeleteUser() {
   await db.delete(user).where(eq(user.id, E2E_USER_DELETE))
   await db.insert(user).values({
     id: E2E_USER_DELETE,
     name: 'E2E Delete Tester',
     email: 'e2e-delete@example.com',
   })
+}
+
+async function seedDeleteUser() {
+  await resetE2eDeleteUser()
 }
 
 // Seeds the auth-bypass test users so authenticated pages render real content

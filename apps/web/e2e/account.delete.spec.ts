@@ -1,19 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { eq } from 'drizzle-orm'
-import { db } from '@coffee-companion/api/db'
-import { user } from '@coffee-companion/api/db/schema'
-import { E2E_USER_DELETE } from '@coffee-companion/api/lib/e2e-auth'
+import { resetE2eDeleteUser } from '@coffee-companion/api/db/seed-e2e'
 import { clickUntil } from './helpers'
 
 test.describe.configure({ mode: 'serial' })
 
 test.beforeEach(async () => {
-  await db.delete(user).where(eq(user.id, E2E_USER_DELETE))
-  await db.insert(user).values({
-    id: E2E_USER_DELETE,
-    name: 'E2E Delete Tester',
-    email: 'e2e-delete@example.com',
-  })
+  await resetE2eDeleteUser()
 })
 
 test('deleting offers restore, blocks the app, and restore brings the account back', async ({
@@ -40,7 +32,9 @@ test('deleting offers restore, blocks the app, and restore brings the account ba
 
   await page.goto('/coffees')
   await expect(page).toHaveURL(/\/restore-account$/)
-  await expect(page.getByRole('heading', { name: 'Restore account' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Restore account' }),
+  ).toBeVisible()
 
   await clickUntil(
     page.getByRole('button', { name: 'Restore account' }),

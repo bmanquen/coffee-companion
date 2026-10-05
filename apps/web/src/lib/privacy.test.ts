@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { recipients, posthogPersonRetention } from './privacy'
+import { posthogPersonRetention, recipients } from './privacy'
 
 describe('recipients', () => {
   it('names every third party the app sends data to', () => {
