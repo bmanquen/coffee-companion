@@ -55,6 +55,7 @@ describe('fetchPersonDeleteConfigured', () => {
     process.env.POSTHOG_PERSONAL_API_KEY = 'phx_test'
     process.env.POSTHOG_PROJECT_ID = '12345'
     const fetchImpl = vi.fn().mockResolvedValue({
+      status: 200,
       json: async () => ({ configured: false }),
     })
 
@@ -64,9 +65,16 @@ describe('fetchPersonDeleteConfigured', () => {
 
   it('treats a configured server answer as configured', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
+      status: 200,
       json: async () => ({ configured: true }),
     })
 
     await expect(fetchPersonDeleteConfigured(fetchImpl)).resolves.toBe(true)
+  })
+
+  it('does not promise a person delete when the probe never arrives', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('offline'))
+
+    await expect(fetchPersonDeleteConfigured(fetchImpl)).resolves.toBe(false)
   })
 })
