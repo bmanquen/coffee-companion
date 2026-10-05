@@ -112,7 +112,12 @@ export async function restoreAccount(userId: string, now = new Date()) {
   throw new RestoreWindowClosed()
 }
 
-export async function purgeExpiredDeletedAccounts(now = new Date()) {
+export async function purgeExpiredDeletedAccounts(
+  now = new Date(),
+  // Lets a restore land after the select so the delete must still match
+  // the current deleted_at, not the id the select already held.
+  afterSelectingExpired?: () => Promise<void>,
+) {
   const pending = await db
     .select({ accountId: pendingPersonErasure.accountId })
     .from(pendingPersonErasure)
@@ -125,6 +130,8 @@ export async function purgeExpiredDeletedAccounts(now = new Date()) {
     .select({ id: user.id, email: user.email })
     .from(user)
     .where(and(isNotNull(user.deletedAt), lte(user.deletedAt, expiredCutoff)))
+
+  await afterSelectingExpired?.()
 
   let purged = 0
   for (const row of rows) {

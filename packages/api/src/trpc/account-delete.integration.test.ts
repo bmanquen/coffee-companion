@@ -394,6 +394,32 @@ describe('purge of deleted accounts', () => {
     }
   })
 
+  it('does not erase an account restored after purge has already selected it', async () => {
+    const racing = 'delete-account-restore-during-purge'
+    await insertUser(racing)
+    await db
+      .update(user)
+      .set({ deletedAt: new Date('2026-01-01T00:00:00.000Z') })
+      .where(eq(user.id, racing))
+    const erase = vi.fn()
+    setPersonErasure(erase)
+
+    try {
+      const result = await purgeExpiredDeletedAccounts(
+        new Date('2026-01-31T00:00:00.000Z'),
+        () => restoreAccount(racing, new Date('2026-01-15T00:00:00.000Z')),
+      )
+
+      expect(result).toEqual({ purged: 0 })
+      expect(erase).not.toHaveBeenCalled()
+      expect(
+        (await db.query.user.findFirst({ where: { id: racing } }))?.deletedAt,
+      ).toBeNull()
+    } finally {
+      await db.delete(user).where(eq(user.id, racing))
+    }
+  })
+
   it('does not erase an account that has been restored', async () => {
     const restored = 'delete-account-restored-then-purge'
     await insertUser(restored)
