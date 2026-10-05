@@ -1,11 +1,7 @@
-import { and, eq, isNotNull, lte } from 'drizzle-orm'
+import { and, eq, gt, isNotNull, lte } from 'drizzle-orm'
 import { db } from '../db'
 import { session, user, verification } from '../db/schema'
-import {
-  ACCOUNT_RESTORE_WINDOW_MS,
-  deletedAtOf,
-  isRestoreOpen,
-} from './account-status'
+import { ACCOUNT_RESTORE_WINDOW_MS, deletedAtOf } from './account-status'
 import { cancelBilledSubscriptions } from './billing'
 import { erasePerson } from './erase-person'
 import { reportError } from './report-error'
@@ -44,12 +40,22 @@ async function erasePersonAfterRow(userId: string) {
   }
 }
 
-async function hardDeleteAccount(userId: string, email: string): Promise<void> {
-  await db.transaction(async (tx) => {
+async function hardDeleteAccount(
+  userId: string,
+  email: string,
+  expiredCutoff: Date,
+): Promise<boolean> {
+  const removed = await db.transaction(async (tx) => {
+    const gone = await tx
+      .delete(user)
+      .where(and(eq(user.id, userId), lte(user.deletedAt, expiredCutoff)))
+      .returning({ id: user.id })
+    if (gone.length === 0) return false
     await tx.delete(verification).where(eq(verification.identifier, email))
-    await tx.delete(user).where(eq(user.id, userId))
+    return true
   })
-  await erasePersonAfterRow(userId)
+  if (removed) await erasePersonAfterRow(userId)
+  return removed
 }
 
 export async function deleteAccount(userId: string, now = new Date()) {
@@ -78,11 +84,17 @@ export async function deleteAccount(userId: string, now = new Date()) {
 }
 
 export async function restoreAccount(userId: string, now = new Date()) {
+  const stillOpenCutoff = new Date(now.getTime() - ACCOUNT_RESTORE_WINDOW_MS)
+  const restored = await db
+    .update(user)
+    .set({ deletedAt: null })
+    .where(and(eq(user.id, userId), gt(user.deletedAt, stillOpenCutoff)))
+    .returning({ id: user.id })
+  if (restored.length > 0) return
+
   const deletedAt = await deletedAtOf(userId)
   if (!deletedAt) throw new AccountNotPending()
-  if (!isRestoreOpen(deletedAt, now)) throw new RestoreWindowClosed()
-
-  await db.update(user).set({ deletedAt: null }).where(eq(user.id, userId))
+  throw new RestoreWindowClosed()
 }
 
 export async function purgeExpiredDeletedAccounts(now = new Date()) {
@@ -92,9 +104,10 @@ export async function purgeExpiredDeletedAccounts(now = new Date()) {
     .from(user)
     .where(and(isNotNull(user.deletedAt), lte(user.deletedAt, expiredCutoff)))
 
+  let purged = 0
   for (const row of rows) {
-    await hardDeleteAccount(row.id, row.email)
+    if (await hardDeleteAccount(row.id, row.email, expiredCutoff)) purged += 1
   }
 
-  return { purged: rows.length }
+  return { purged }
 }
