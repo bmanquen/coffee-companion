@@ -5,7 +5,10 @@ import { countries, session, user, verification } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import { setPersonErasure } from '../lib/erase-person'
 import { setErrorCapture } from '../lib/report-error'
-import { purgeExpiredDeletedAccounts } from '../lib/delete-account'
+import {
+  purgeExpiredDeletedAccounts,
+  restoreAccount,
+} from '../lib/delete-account'
 import {
   anonCaller,
   callerFor,
@@ -388,6 +391,32 @@ describe('purge of deleted accounts', () => {
       ).toBeTruthy()
     } finally {
       await db.delete(user).where(eq(user.id, recent))
+    }
+  })
+
+  it('does not erase an account that has been restored', async () => {
+    const restored = 'delete-account-restored-then-purge'
+    await insertUser(restored)
+    await db
+      .update(user)
+      .set({ deletedAt: new Date('2026-01-01T00:00:00.000Z') })
+      .where(eq(user.id, restored))
+    const erase = vi.fn()
+    setPersonErasure(erase)
+
+    try {
+      await restoreAccount(restored, new Date('2026-01-15T00:00:00.000Z'))
+      const result = await purgeExpiredDeletedAccounts(
+        new Date('2026-01-31T00:00:00.000Z'),
+      )
+      expect(result).toEqual({ purged: 0 })
+      expect(erase).not.toHaveBeenCalled()
+      expect(
+        (await db.query.user.findFirst({ where: { id: restored } }))
+          ?.deletedAt,
+      ).toBeNull()
+    } finally {
+      await db.delete(user).where(eq(user.id, restored))
     }
   })
 
