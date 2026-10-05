@@ -261,7 +261,9 @@ describe('account.delete', () => {
     const asBlocked = callerFor(blocked)
 
     try {
-      await expect(asBlocked.coffee.getAll()).rejects.toThrow(/forbidden/i)
+      await expect(asBlocked.coffee.getAll()).rejects.toThrow(
+        /deleted and can be restored/i,
+      )
     } finally {
       await db.delete(user).where(eq(user.id, blocked))
     }
