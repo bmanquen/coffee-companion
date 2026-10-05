@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { countries, session, user, verification } from '../db/schema'
+import { countries, pendingPersonErasure, session, user, verification } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import { setPersonErasure } from '../lib/erase-person'
 import { setErrorCapture } from '../lib/report-error'
@@ -474,8 +474,43 @@ describe('purge of deleted accounts', () => {
           user: { id: leftover },
         }),
       )
+      expect(
+        await db
+          .select()
+          .from(pendingPersonErasure)
+          .where(eq(pendingPersonErasure.accountId, leftover)),
+      ).toHaveLength(1)
     } finally {
+      await db
+        .delete(pendingPersonErasure)
+        .where(eq(pendingPersonErasure.accountId, leftover))
       await db.delete(user).where(eq(user.id, leftover))
+    }
+  })
+
+  it('retries a person delete that failed last time', async () => {
+    const leftover = 'delete-account-erase-retry'
+    await db
+      .insert(pendingPersonErasure)
+      .values({ accountId: leftover })
+    const erase = vi.fn().mockResolvedValue(undefined)
+    setPersonErasure(erase)
+
+    try {
+      await expect(purgeExpiredDeletedAccounts()).resolves.toEqual({
+        purged: 0,
+      })
+      expect(erase).toHaveBeenCalledWith(leftover)
+      expect(
+        await db
+          .select()
+          .from(pendingPersonErasure)
+          .where(eq(pendingPersonErasure.accountId, leftover)),
+      ).toEqual([])
+    } finally {
+      await db
+        .delete(pendingPersonErasure)
+        .where(eq(pendingPersonErasure.accountId, leftover))
     }
   })
 })

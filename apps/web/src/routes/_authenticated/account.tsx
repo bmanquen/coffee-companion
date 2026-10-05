@@ -30,17 +30,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { posthogPersonConfig } from '@/lib/posthog-person'
+import { loadPersonDeleteConfigured } from '@/lib/person-delete-configured'
 import { authClient } from '@/lib/auth-client'
 import { useSignOut } from '@/hooks/use-sign-out'
 import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute('/_authenticated/account')({
-  loader: ({ context }) => {
+  loader: async ({ context }) => {
     void context.queryClient.ensureQueryData(
       context.trpc.plan.current.queryOptions(),
     )
-    return { personDeleteConfigured: posthogPersonConfig() !== null }
+    return {
+      personDeleteConfigured: await loadPersonDeleteConfigured(),
+    }
   },
   component: AccountContainer,
 })

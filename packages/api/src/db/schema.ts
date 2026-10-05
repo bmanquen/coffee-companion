@@ -523,6 +523,15 @@ export const planInterests = pgTable(
   ],
 )
 
+// The user row is already gone. Kept so a PostHog outage can be retried on
+// the next purge without bringing the account back.
+export const pendingPersonErasure = pgTable('pending_person_erasure', {
+  accountId: text('account_id').primaryKey(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+})
+
 // Relations
 
 export const relations = defineRelations(

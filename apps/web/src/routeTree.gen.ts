@@ -15,6 +15,7 @@ import { Route as MarketingRouteImport } from './routes/_marketing'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as MarketingIndexRouteImport } from './routes/_marketing/index'
 import { Route as ApiPurgeDeletedAccountsRouteImport } from './routes/api.purge-deleted-accounts'
+import { Route as ApiPersonDeleteConfiguredRouteImport } from './routes/api.person-delete-configured'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as MarketingPrivacyRouteImport } from './routes/_marketing/privacy'
 import { Route as MarketingPricingRouteImport } from './routes/_marketing/pricing'
@@ -70,6 +71,12 @@ const ApiPurgeDeletedAccountsRoute = ApiPurgeDeletedAccountsRouteImport.update({
   path: '/api/purge-deleted-accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPersonDeleteConfiguredRoute =
+  ApiPersonDeleteConfiguredRouteImport.update({
+    id: '/api/person-delete-configured',
+    path: '/api/person-delete-configured',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -227,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof MarketingPricingRoute
   '/privacy': typeof MarketingPrivacyRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/person-delete-configured': typeof ApiPersonDeleteConfiguredRoute
   '/api/purge-deleted-accounts': typeof ApiPurgeDeletedAccountsRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
@@ -259,6 +267,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof MarketingPricingRoute
   '/privacy': typeof MarketingPrivacyRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/person-delete-configured': typeof ApiPersonDeleteConfiguredRoute
   '/api/purge-deleted-accounts': typeof ApiPurgeDeletedAccountsRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
@@ -293,6 +302,7 @@ export interface FileRoutesById {
   '/_marketing/pricing': typeof MarketingPricingRoute
   '/_marketing/privacy': typeof MarketingPrivacyRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/person-delete-configured': typeof ApiPersonDeleteConfiguredRoute
   '/api/purge-deleted-accounts': typeof ApiPurgeDeletedAccountsRoute
   '/_marketing/': typeof MarketingIndexRoute
   '/_authenticated/aeropress/new': typeof AuthenticatedAeropressNewRoute
@@ -328,6 +338,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/api/health'
+    | '/api/person-delete-configured'
     | '/api/purge-deleted-accounts'
     | '/aeropress/new'
     | '/coffees/new'
@@ -360,6 +371,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/api/health'
+    | '/api/person-delete-configured'
     | '/api/purge-deleted-accounts'
     | '/aeropress/new'
     | '/coffees/new'
@@ -393,6 +405,7 @@ export interface FileRouteTypes {
     | '/_marketing/pricing'
     | '/_marketing/privacy'
     | '/api/health'
+    | '/api/person-delete-configured'
     | '/api/purge-deleted-accounts'
     | '/_marketing/'
     | '/_authenticated/aeropress/new'
@@ -424,6 +437,7 @@ export interface RootRouteChildren {
   RestoreAccountRoute: typeof RestoreAccountRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiPersonDeleteConfiguredRoute: typeof ApiPersonDeleteConfiguredRoute
   ApiPurgeDeletedAccountsRoute: typeof ApiPurgeDeletedAccountsRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
@@ -471,6 +485,13 @@ declare module '@tanstack/react-router' {
       path: '/api/purge-deleted-accounts'
       fullPath: '/api/purge-deleted-accounts'
       preLoaderRoute: typeof ApiPurgeDeletedAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/person-delete-configured': {
+      id: '/api/person-delete-configured'
+      path: '/api/person-delete-configured'
+      fullPath: '/api/person-delete-configured'
+      preLoaderRoute: typeof ApiPersonDeleteConfiguredRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -737,6 +758,7 @@ const rootRouteChildren: RootRouteChildren = {
   RestoreAccountRoute: RestoreAccountRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiPersonDeleteConfiguredRoute: ApiPersonDeleteConfiguredRoute,
   ApiPurgeDeletedAccountsRoute: ApiPurgeDeletedAccountsRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,

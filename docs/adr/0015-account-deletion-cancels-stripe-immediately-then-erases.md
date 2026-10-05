@@ -15,7 +15,8 @@ and signing in during the window offers restore. Restore does not call Stripe.
 The cancelled Subscription stays cancelled; a new Subscription is a later
 Checkout. After 30 days the rows are hard-deleted, including the explicit
 verification-row delete, and the PostHog person for that account id is deleted
-through a seam so the API package never imports PostHog (ADR-0014). Sentry is
+through a seam so the API package never imports PostHog (ADR-0014). If that
+call fails, the account id is kept until a later purge succeeds. Sentry is
 not asked to erase — it holds only the account id for up to 90 days (ADR-0010,
 ADR-0012). Resend keeps its sending record under its own policy.
 
@@ -60,8 +61,9 @@ Consequences to understand before changing anything here:
 - **Every Stripe list page is read.** A live Subscription or open Checkout
   past the first hundred is still cancelled or expired.
 - **PostHog erasure runs when the 30 days end, after the row is gone.** A
-  PostHog outage is reported, not a reason to keep the rows. Manual follow-up
-  if the report fires. A person delete that already ran does not come back.
+  PostHog outage is reported, and the account id is kept in
+  `pending_person_erasure` until a later purge confirms the person delete. A
+  person delete that already ran does not come back.
 - **The personal API key and project id are required to actually reach PostHog.**
   Missing them is the local/CI no-op, the same as a missing capture key. The
   skip is logged and reported so it is not silent; the profile then has no

@@ -93,6 +93,23 @@ test('the pricing FAQ opens the sealing answer', async ({ page }) => {
   await expect(page.getByText(/Nothing is ever deleted/i)).toBeVisible()
 })
 
+test('client navigation to privacy keeps the PostHog retention copy', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  await page
+    .getByRole('navigation', { name: 'Footer' })
+    .getByRole('link', { name: 'Privacy' })
+    .click()
+  await expect(page).toHaveURL(/\/privacy$/)
+  await expect(
+    page.getByRole('region', { name: 'Your own data' }).getByText(
+      /no expiry until it is deleted in PostHog/i,
+    ),
+  ).toBeVisible()
+})
+
 test('the sitemap lists both marketing routes', async ({ page }) => {
   const response = await page.request.get('/sitemap.xml')
 

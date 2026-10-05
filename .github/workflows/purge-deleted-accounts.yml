@@ -21,8 +21,8 @@ jobs:
           PURGE_SECRET: ${{ secrets.PURGE_SECRET }}
         run: |
           if [ -z "$APP_URL" ] || [ -z "$PURGE_SECRET" ]; then
-            echo "APP_URL and PURGE_SECRET are not set; nothing to purge"
-            exit 0
+            echo "APP_URL and PURGE_SECRET must be set to purge expired accounts"
+            exit 1
           fi
           curl -fsS -X POST "$APP_URL/api/purge-deleted-accounts" \
             -H "Authorization: Bearer $PURGE_SECRET"
