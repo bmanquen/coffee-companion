@@ -12,18 +12,6 @@ export const rowFor = (page: Page, name: string) =>
 // hidden at this width, so scoping to it keeps a locator to one match.
 export const desktopTable = (page: Page) => page.locator('div.lg\\:block table')
 
-// Opens a row's detail, where the columns demoted off the summary live (ADR-0003)
-// — the Coffees list keeps the dial-in there. Clicks the row's own name cell so
-// the click never lands on a control.
-export async function expandRow(page: Page, name: string) {
-  const table = desktopTable(page)
-  await table
-    .getByRole('row', { name: new RegExp(name) })
-    .getByRole('cell', { name })
-    .click()
-  return table
-}
-
 // The server sends every page fully rendered, so a control is present, visible
 // and clickable a moment before React attaches its handler to it. A click that
 // lands in that window reaches the DOM, does nothing, and is reported as a
@@ -40,6 +28,19 @@ export async function clickUntil(control: Locator, effect: Locator) {
     await control.click({ timeout: 5_000 })
     await expect(effect).toBeVisible({ timeout: 2_000 })
   }).toPass({ timeout: 30_000 })
+}
+
+// Opens a row's detail, where the columns demoted off the summary live (ADR-0003)
+// — the Coffees list keeps the dial-in there. Clicks the row's own name cell so
+// the click never lands on a control. Driven by the expanded detail so a first
+// click after navigation isn't lost in the hydration gap.
+export async function expandRow(page: Page, name: string) {
+  const table = desktopTable(page)
+  const nameCell = table
+    .getByRole('row', { name: new RegExp(name) })
+    .getByRole('cell', { name })
+  await clickUntil(nameCell, table.locator('.opacity-100'))
+  return table
 }
 
 // Opening a picker and choosing a row, driven by the option so the open
