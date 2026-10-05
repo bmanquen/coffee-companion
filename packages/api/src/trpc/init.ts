@@ -3,6 +3,7 @@ import superjson from 'superjson'
 import { auth } from '../lib/auth'
 import { log, requestField } from '../lib/log'
 import { e2eBypassSession } from '../lib/e2e-auth'
+import { ACCOUNT_PENDING_DELETION, deletedAtOf } from '../lib/account-status'
 import { resolvePlan } from '../lib/allowance'
 import { shelfLoader } from '../lib/shelf'
 import type { Shelf } from '../lib/shelf'
@@ -102,9 +103,41 @@ export const authedProcedure = publicProcedure.use(
     const caller: Caller = { id: session.user.id }
     ctx.callers = (ctx.callers ?? new Map()).set(path, caller)
 
+    const deletedAt = await deletedAtOf(session.user.id)
+    if (deletedAt) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: ACCOUNT_PENDING_DELETION,
+      })
+    }
+
     const { plan, shelf } = await allowanceFor(ctx, session.user.id)
     caller.plan = plan
 
     return next({ ctx: { ...ctx, session, plan, shelf } })
+  },
+)
+
+// A session that belongs to an account in the restore window. Live accounts
+// and signed-out callers are refused.
+export const pendingProcedure = publicProcedure.use(
+  async ({ ctx, next, path }) => {
+    const session =
+      e2eBypassSession(ctx.headers) ??
+      (await auth.api.getSession({ headers: ctx.headers }))
+
+    if (!session) {
+      throw new TRPCError({ code: 'UNAUTHORIZED' })
+    }
+
+    const caller: Caller = { id: session.user.id }
+    ctx.callers = (ctx.callers ?? new Map()).set(path, caller)
+
+    const deletedAt = await deletedAtOf(session.user.id)
+    if (!deletedAt) {
+      throw new TRPCError({ code: 'FORBIDDEN' })
+    }
+
+    return next({ ctx: { ...ctx, session } })
   },
 )

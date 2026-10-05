@@ -39,11 +39,12 @@ test('offers deletion behind a confirmation that names what is about to go', asy
   )
 
   const dialog = page.getByRole('dialog')
-  await expect(dialog.getByText(/Coffees/)).toBeVisible()
-  await expect(dialog.getByText(/Brews/)).toBeVisible()
-  await expect(dialog.getByText(/Subscription/)).toBeVisible()
+  await expect(dialog.getByText(/kept for 30 days/)).toBeVisible()
+  await expect(dialog.getByText(/restore them during that time/)).toBeVisible()
+  await expect(dialog.getByText(/Subscription is cancelled now/)).toBeVisible()
   await expect(dialog.getByText(/not refunded/)).toBeVisible()
   await expect(dialog.getByText(/PostHog/)).toHaveCount(0)
+  await expect(dialog.getByText(/cannot be undone/i)).toHaveCount(0)
   await expect(
     dialog.getByRole('button', { name: 'Export data' }),
   ).toBeVisible()

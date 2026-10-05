@@ -8,6 +8,8 @@ vi.mock('../lib/auth', () => ({ auth: { api: { getSession } } }))
 const resolvePlan = vi.hoisted(() => vi.fn(async () => 'pro'))
 vi.mock('../lib/allowance', () => ({ resolvePlan }))
 vi.mock('../lib/shelf', () => ({ shelfLoader: () => async () => new Set() }))
+const deletedAtOf = vi.hoisted(() => vi.fn(async () => null as Date | null))
+vi.mock('../lib/account-status', () => ({ deletedAtOf }))
 
 const router = createTRPCRouter({
   authedBoom: authedProcedure.query(() => {
@@ -47,6 +49,7 @@ async function reportedCallers(...paths: Array<string>) {
 describe('authedProcedure', () => {
   beforeEach(() => {
     resolvePlan.mockResolvedValue('pro')
+    deletedAtOf.mockResolvedValue(null)
   })
 
   it('names the caller on the context an error report is given', async () => {

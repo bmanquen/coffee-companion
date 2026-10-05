@@ -30,15 +30,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { posthogPersonConfig } from '@/lib/posthog-person'
 import { authClient } from '@/lib/auth-client'
 import { useSignOut } from '@/hooks/use-sign-out'
 import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute('/_authenticated/account')({
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(
+  loader: ({ context }) => {
+    void context.queryClient.ensureQueryData(
       context.trpc.plan.current.queryOptions(),
-    ),
+    )
+    return { personDeleteConfigured: posthogPersonConfig() !== null }
+  },
   component: AccountContainer,
 })
 
@@ -60,6 +63,7 @@ function AccountContainer() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const signOut = useSignOut()
+  const { personDeleteConfigured } = Route.useLoaderData()
   const { data: current } = useSuspenseQuery(trpc.plan.current.queryOptions())
   const deleteAccount = useMutation(trpc.account.delete.mutationOptions())
 
@@ -86,6 +90,7 @@ function AccountContainer() {
       subscription={current.subscription}
       onExport={onExport}
       onDelete={onDelete}
+      personDeleteConfigured={personDeleteConfigured}
     />
   )
 }
@@ -106,12 +111,14 @@ export function AccountScreen({
   subscription,
   onExport,
   onDelete,
+  personDeleteConfigured = false,
 }: {
   user: { name: string; email: string }
   plan: PlanId
   subscription: CurrentSubscription | null
   onExport: () => Promise<void>
   onDelete: () => Promise<void>
+  personDeleteConfigured?: boolean
 }) {
   const [confirming, setConfirming] = useState(false)
   const [pending, setPending] = useState(false)
@@ -215,8 +222,8 @@ export function AccountScreen({
         <CardHeader>
           <CardTitle>Delete account</CardTitle>
           <CardDescription>
-            This cannot be undone. Export a copy first — that is the last chance
-            to read what we hold.
+            Export a copy first. Your account and library are kept for 30 days,
+            then deleted.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -230,21 +237,15 @@ export function AccountScreen({
               <DialogHeader>
                 <DialogTitle>Delete account</DialogTitle>
                 <DialogDescription>
-                  This cannot be undone. Export a copy first if you still want
-                  one. Deleting removes:
+                  Your account and library are kept for 30 days, then deleted.
+                  You can restore them during that time. Your Subscription is
+                  cancelled now, and any time you've already paid for is not
+                  refunded.
+                  {personDeleteConfigured
+                    ? ' Your PostHog profile is deleted when those 30 days end.'
+                    : null}
                 </DialogDescription>
               </DialogHeader>
-              <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-                <li>Your account and sign-in sessions</li>
-                <li>
-                  Your Coffees, Brews, Grinders, Brewing Devices, and the rest
-                  of the library
-                </li>
-                <li>
-                  A live Subscription, cancelled now so nothing keeps billing.
-                  Unused prepaid time is not refunded.
-                </li>
-              </ul>
               <DialogFooter>
                 <Button variant="outline" disabled={busy} onClick={exportData}>
                   Export data

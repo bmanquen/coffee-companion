@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { track } from '@/lib/analytics'
 import { authClient } from '@/lib/auth-client'
+import { isPendingDeletion } from '@/lib/pending-deletion'
 import { marketingHead } from '@/lib/marketing-head'
 import { getForwardedHeaders } from '@/lib/request-headers'
 
@@ -25,6 +26,9 @@ export const Route = createFileRoute('/_marketing/')({
     // Signed-in users have no use for the public page — send them to the app
     // rather than making them read a pitch for something they already use.
     if (session) {
+      if (isPendingDeletion(session.user)) {
+        throw redirect({ to: '/restore-account' })
+      }
       throw redirect({ to: '/dashboard' })
     }
   },

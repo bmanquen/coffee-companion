@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
-import { E2E_USER_FREE, E2E_USER_WITH_DATA } from '../lib/e2e-auth'
+import { E2E_USER_DELETE, E2E_USER_FREE, E2E_USER_WITH_DATA } from '../lib/e2e-auth'
 import {
   E2E_LIBRARY,
   FREE_GEAR,
@@ -302,12 +302,22 @@ async function seedFreeUser() {
   await seedLibrary(E2E_USER_FREE, grinder.id, device.id)
 }
 
+async function seedDeleteUser() {
+  await db.delete(user).where(eq(user.id, E2E_USER_DELETE))
+  await db.insert(user).values({
+    id: E2E_USER_DELETE,
+    name: 'E2E Delete Tester',
+    email: 'e2e-delete@example.com',
+  })
+}
+
 // Seeds the auth-bypass test users so authenticated pages render real content
 // during e2e. Idempotent — resets each user's rows every run. Closes the
 // connection pool when done (intended for one-shot test setup).
 export async function seedE2eUsers() {
   await seedGrantedUser()
   await seedFreeUser()
+  await seedDeleteUser()
 
   await db.$client.end()
 }

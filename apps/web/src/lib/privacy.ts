@@ -3,8 +3,16 @@
 // is actively false rather than merely incomplete.
 const SENTRY_RETENTION =
   'Sentry keeps errors, traces and replays for up to 90 days, then deletes them.'
-const POSTHOG_RETENTION =
-  'PostHog keeps events for a year, then deletes them. A PostHog person profile has no expiry of its own. Account deletion asks PostHog to delete it when that call is configured; otherwise the profile stays.'
+const POSTHOG_EVENTS_RETENTION =
+  'PostHog keeps events for a year, then deletes them.'
+
+export function posthogPersonRetention(
+  personDeleteConfigured: boolean,
+): string {
+  return personDeleteConfigured
+    ? `${POSTHOG_EVENTS_RETENTION} The PostHog profile is deleted when those 30 days end.`
+    : `${POSTHOG_EVENTS_RETENTION} A PostHog person profile has no expiry until it is deleted in PostHog.`
+}
 
 const CONTRACT_BASIS =
   'Performing the contract you asked us for. Without this the feature you pressed cannot happen at all.'
@@ -61,7 +69,7 @@ export const recipients: Array<Recipient> = [
       'Anything that identifies you outside our own system: no address we could contact you at, and no display name.',
       'What you type, click, or see. Session recording and autocapture are turned off at boot, and every URL we send is cut short of its query string.',
     ],
-    retention: POSTHOG_RETENTION,
+    retention: posthogPersonRetention(false),
     lawfulBasis:
       'Our legitimate interest in understanding how the app is used. What is sent is a random id, a route pattern, and six counted steps — enough to see where people stop, not enough to describe anyone.',
     policyUrl: 'https://posthog.com/privacy',

@@ -1,6 +1,11 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, isNotNull, lte } from 'drizzle-orm'
 import { db } from '../db'
-import { user, verification } from '../db/schema'
+import { session, user, verification } from '../db/schema'
+import {
+  ACCOUNT_RESTORE_WINDOW_MS,
+  deletedAtOf,
+  isRestoreOpen,
+} from './account-status'
 import { cancelBilledSubscriptions } from './billing'
 import { erasePerson } from './erase-person'
 import { reportError } from './report-error'
@@ -14,9 +19,43 @@ export class SubscriptionCancelFailed extends Error {
   }
 }
 
-export async function deleteAccount(userId: string) {
+export class RestoreWindowClosed extends Error {
+  constructor() {
+    super('This account can no longer be restored.')
+    this.name = 'RestoreWindowClosed'
+  }
+}
+
+export class AccountNotPending extends Error {
+  constructor() {
+    super('This account is not waiting to be restored.')
+    this.name = 'AccountNotPending'
+  }
+}
+
+async function erasePersonAfterRow(userId: string) {
+  try {
+    await erasePerson(userId)
+  } catch (error) {
+    reportError(error, {
+      tags: { area: 'account', operation: 'erasePerson' },
+      user: { id: userId },
+    })
+  }
+}
+
+async function hardDeleteAccount(userId: string, email: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.delete(verification).where(eq(verification.identifier, email))
+    await tx.delete(user).where(eq(user.id, userId))
+  })
+  await erasePersonAfterRow(userId)
+}
+
+export async function deleteAccount(userId: string, now = new Date()) {
   const row = await db.query.user.findFirst({ where: { id: userId } })
   if (!row) return
+  if (row.deletedAt) return
 
   if (row.stripeCustomerId) {
     try {
@@ -33,16 +72,36 @@ export async function deleteAccount(userId: string) {
   }
 
   await db.transaction(async (tx) => {
-    await tx.delete(verification).where(eq(verification.identifier, row.email))
-    await tx.delete(user).where(eq(user.id, userId))
+    await tx.update(user).set({ deletedAt: now }).where(eq(user.id, userId))
+    await tx.delete(session).where(eq(session.userId, userId))
   })
+}
 
-  try {
-    await erasePerson(userId)
-  } catch (error) {
-    reportError(error, {
-      tags: { area: 'account', operation: 'erasePerson' },
-      user: { id: userId },
-    })
+export async function restoreAccount(userId: string, now = new Date()) {
+  const deletedAt = await deletedAtOf(userId)
+  if (!deletedAt) throw new AccountNotPending()
+  if (!isRestoreOpen(deletedAt, now)) throw new RestoreWindowClosed()
+
+  await db.update(user).set({ deletedAt: null }).where(eq(user.id, userId))
+}
+
+export async function purgeAccount(userId: string): Promise<boolean> {
+  const row = await db.query.user.findFirst({ where: { id: userId } })
+  if (!row?.deletedAt) return false
+  await hardDeleteAccount(userId, row.email)
+  return true
+}
+
+export async function purgeExpiredDeletedAccounts(now = new Date()) {
+  const expiredCutoff = new Date(now.getTime() - ACCOUNT_RESTORE_WINDOW_MS)
+  const rows = await db
+    .select({ id: user.id, email: user.email })
+    .from(user)
+    .where(and(isNotNull(user.deletedAt), lte(user.deletedAt, expiredCutoff)))
+
+  for (const row of rows) {
+    await hardDeleteAccount(row.id, row.email)
   }
+
+  return { purged: rows.length }
 }

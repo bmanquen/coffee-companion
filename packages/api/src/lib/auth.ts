@@ -26,6 +26,15 @@ export const auth = betterAuth({
   baseURL,
   trustedOrigins: [baseURL],
   database: drizzleAdapter(db, { provider: 'pg', schema }),
+  user: {
+    additionalFields: {
+      deletedAt: {
+        type: 'date',
+        required: false,
+        input: false,
+      },
+    },
+  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,

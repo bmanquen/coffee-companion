@@ -1,10 +1,11 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { countries, user, verification } from '../db/schema'
+import { countries, session, user, verification } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import { setPersonErasure } from '../lib/erase-person'
 import { setErrorCapture } from '../lib/report-error'
+import { purgeExpiredDeletedAccounts } from '../lib/delete-account'
 import {
   anonCaller,
   callerFor,
@@ -46,6 +47,7 @@ seedUsers([USER, OTHER], async () => {
 
 const CUSTOMER_ID = 'cus_deleteAccount'
 const SHARED_NAME = `Shared land ${USER}`
+const DAY_MS = 24 * 60 * 60 * 1000
 
 let ownedCoffeeId: string
 let ownedShotId: string
@@ -54,6 +56,7 @@ let otherCoffeeId: string
 let sharedCountryId: string
 let ownVerificationId: string
 let otherVerificationId: string
+let sessionToken: string
 
 beforeAll(async () => {
   mocks.cancelBilledSubscriptions.mockResolvedValue(undefined)
@@ -127,6 +130,15 @@ beforeAll(async () => {
     })
     .returning()
   otherVerificationId = otherVerification.id
+
+  sessionToken = `tok-${USER}`
+  await db.insert(session).values({
+    id: crypto.randomUUID(),
+    expiresAt: new Date(Date.now() + 60_000),
+    token: sessionToken,
+    userId: USER,
+    updatedAt: new Date(),
+  })
 })
 
 afterEach(() => {
@@ -136,6 +148,18 @@ afterEach(() => {
   setErrorCapture(null)
 })
 
+async function insertUser(
+  id: string,
+  extras: Partial<typeof user.$inferInsert> = {},
+) {
+  await db.insert(user).values({
+    id,
+    name: id,
+    email: `${id}@example.com`,
+    ...extras,
+  })
+}
+
 describe('account.delete', () => {
   it('is refused without a session', async () => {
     await expect(anonCaller.account.delete()).rejects.toThrow(/unauthorized/i)
@@ -143,12 +167,7 @@ describe('account.delete', () => {
 
   it('does not delete when Stripe cannot cancel a live Subscription', async () => {
     const billed = 'delete-account-billed'
-    await db.insert(user).values({
-      id: billed,
-      name: billed,
-      email: `${billed}@example.com`,
-      stripeCustomerId: 'cus_stillBilled',
-    })
+    await insertUser(billed, { stripeCustomerId: 'cus_stillBilled' })
     const asBilled = callerFor(billed)
     mocks.cancelBilledSubscriptions.mockRejectedValueOnce(
       new Error('stripe down'),
@@ -161,9 +180,9 @@ describe('account.delete', () => {
         /could not cancel your Subscription/i,
       )
 
-      expect(
-        await db.query.user.findFirst({ where: { id: billed } }),
-      ).toBeTruthy()
+      const row = await db.query.user.findFirst({ where: { id: billed } })
+      expect(row).toBeTruthy()
+      expect(row?.deletedAt).toBeNull()
       expect(capture).toHaveBeenCalledWith(
         expect.any(Error),
         expect.objectContaining({
@@ -179,42 +198,44 @@ describe('account.delete', () => {
     }
   })
 
-  it('cancels at Stripe, then removes what the user owns and leaves the rest', async () => {
+  it('cancels at Stripe, marks the account deleted, keeps the library, and ends sessions', async () => {
     const erase = vi.fn().mockResolvedValue(undefined)
     setPersonErasure(erase)
 
     await asUser.account.delete()
 
     expect(mocks.cancelBilledSubscriptions).toHaveBeenCalledWith(CUSTOMER_ID)
-    expect(erase).toHaveBeenCalledWith(USER)
+    expect(erase).not.toHaveBeenCalled()
 
-    expect(await db.query.user.findFirst({ where: { id: USER } })).toBeUndefined()
+    const row = await db.query.user.findFirst({ where: { id: USER } })
+    expect(row?.deletedAt).toBeTruthy()
     expect(
       await db.query.coffees.findFirst({ where: { id: ownedCoffeeId } }),
-    ).toBeUndefined()
+    ).toBeTruthy()
     expect(
       await db.query.espressoShots.findFirst({ where: { id: ownedShotId } }),
-    ).toBeUndefined()
+    ).toBeTruthy()
     expect(
       await db.query.grinders.findFirst({ where: { id: ownedGrinderId } }),
-    ).toBeUndefined()
+    ).toBeTruthy()
     expect(
       await db.query.planGrants.findFirst({ where: { userId: USER } }),
-    ).toBeUndefined()
+    ).toBeTruthy()
     expect(
       await db.query.planInterests.findFirst({ where: { userId: USER } }),
-    ).toBeUndefined()
+    ).toBeTruthy()
     expect(
       await db
         .select()
         .from(verification)
         .where(eq(verification.id, ownVerificationId))
         .then((rows) => rows[0]),
+    ).toBeTruthy()
+    expect(
+      await db.query.session.findFirst({ where: { token: sessionToken } }),
     ).toBeUndefined()
 
-    expect(
-      await db.query.user.findFirst({ where: { id: OTHER } }),
-    ).toBeTruthy()
+    expect(await db.query.user.findFirst({ where: { id: OTHER } })).toBeTruthy()
     expect(
       await db.query.coffees.findFirst({ where: { id: otherCoffeeId } }),
     ).toBeTruthy()
@@ -230,20 +251,187 @@ describe('account.delete', () => {
     ).toBeTruthy()
   })
 
-  it('still deletes the account when PostHog erasure fails', async () => {
-    const leftover = 'delete-account-erase-fail'
-    await db.insert(user).values({
-      id: leftover,
-      name: leftover,
-      email: `${leftover}@example.com`,
+  it('refuses live procedures while the account is pending deletion', async () => {
+    const blocked = 'delete-account-blocked'
+    await insertUser(blocked)
+    await db
+      .update(user)
+      .set({ deletedAt: new Date() })
+      .where(eq(user.id, blocked))
+    const asBlocked = callerFor(blocked)
+
+    try {
+      await expect(asBlocked.coffee.getAll()).rejects.toThrow(/forbidden/i)
+    } finally {
+      await db.delete(user).where(eq(user.id, blocked))
+    }
+  })
+
+  it('restores the account without calling Stripe', async () => {
+    const restored = 'delete-account-restore'
+    await insertUser(restored, { stripeCustomerId: 'cus_restored' })
+    await db
+      .update(user)
+      .set({ deletedAt: new Date() })
+      .where(eq(user.id, restored))
+    const asRestored = callerFor(restored)
+
+    try {
+      await asRestored.account.restore()
+
+      expect(mocks.cancelBilledSubscriptions).not.toHaveBeenCalled()
+      const row = await db.query.user.findFirst({ where: { id: restored } })
+      expect(row?.deletedAt).toBeNull()
+      await expect(asRestored.coffee.getAll()).resolves.toEqual([])
+    } finally {
+      await db.delete(user).where(eq(user.id, restored))
+    }
+  })
+
+  it('does not restore after the window ends', async () => {
+    const tooLate = 'delete-account-too-late'
+    await insertUser(tooLate)
+    await db
+      .update(user)
+      .set({ deletedAt: new Date('2025-01-01T00:00:00.000Z') })
+      .where(eq(user.id, tooLate))
+    const asTooLate = callerFor(tooLate)
+
+    try {
+      await expect(asTooLate.account.restore()).rejects.toThrow(
+        /no longer be restored/i,
+      )
+      expect(
+        (await db.query.user.findFirst({ where: { id: tooLate } }))
+          ?.deletedAt,
+      ).toBeTruthy()
+    } finally {
+      await db.delete(user).where(eq(user.id, tooLate))
+    }
+  })
+
+  it('does not ask Stripe when the account was never a customer', async () => {
+    const free = 'delete-account-no-customer'
+    await insertUser(free)
+    const asFree = callerFor(free)
+
+    try {
+      await asFree.account.delete()
+
+      expect(mocks.cancelBilledSubscriptions).not.toHaveBeenCalled()
+      const row = await db.query.user.findFirst({ where: { id: free } })
+      expect(row?.deletedAt).toBeTruthy()
+    } finally {
+      await db.delete(user).where(eq(user.id, free))
+    }
+  })
+})
+
+describe('purge of deleted accounts', () => {
+  it('erases rows, verification rows, and the PostHog person after 30 days', async () => {
+    const stale = 'delete-account-stale'
+    await insertUser(stale)
+    await db.insert(verification).values({
+      id: crypto.randomUUID(),
+      identifier: `${stale}@example.com`,
+      value: 'stale-token',
+      expiresAt: new Date(Date.now() + 60_000),
     })
-    const asLeftover = callerFor(leftover)
+    const deletedAt = new Date('2026-01-01T00:00:00.000Z')
+    await db.update(user).set({ deletedAt }).where(eq(user.id, stale))
+    const erase = vi.fn().mockResolvedValue(undefined)
+    setPersonErasure(erase)
+
+    try {
+      const result = await purgeExpiredDeletedAccounts(
+        new Date('2026-01-31T00:00:00.000Z'),
+      )
+
+      expect(result).toEqual({ purged: 1 })
+      expect(erase).toHaveBeenCalledWith(stale)
+      expect(
+        await db.query.user.findFirst({ where: { id: stale } }),
+      ).toBeUndefined()
+      expect(
+        await db
+          .select()
+          .from(verification)
+          .where(eq(verification.identifier, `${stale}@example.com`))
+          .then((rows) => rows[0]),
+      ).toBeUndefined()
+    } finally {
+      await db.delete(user).where(eq(user.id, stale))
+    }
+  })
+
+  it('leaves an account inside the window', async () => {
+    const recent = 'delete-account-recent'
+    await insertUser(recent)
+    await db
+      .update(user)
+      .set({ deletedAt: new Date('2026-01-10T00:00:00.000Z') })
+      .where(eq(user.id, recent))
+    const erase = vi.fn()
+    setPersonErasure(erase)
+
+    try {
+      const result = await purgeExpiredDeletedAccounts(
+        new Date('2026-01-31T00:00:00.000Z'),
+      )
+
+      expect(result).toEqual({ purged: 0 })
+      expect(erase).not.toHaveBeenCalled()
+      expect(
+        await db.query.user.findFirst({ where: { id: recent } }),
+      ).toBeTruthy()
+    } finally {
+      await db.delete(user).where(eq(user.id, recent))
+    }
+  })
+
+  it('is a no-op the second time', async () => {
+    const stale = 'delete-account-idempotent'
+    await insertUser(stale)
+    await db.insert(verification).values({
+      id: crypto.randomUUID(),
+      identifier: `${stale}@example.com`,
+      value: 'idempotent-token',
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+    await db
+      .update(user)
+      .set({ deletedAt: new Date('2025-12-01T00:00:00.000Z') })
+      .where(eq(user.id, stale))
+    const erase = vi.fn().mockResolvedValue(undefined)
+    setPersonErasure(erase)
+
+    try {
+      const now = new Date('2026-01-31T00:00:00.000Z')
+      await expect(purgeExpiredDeletedAccounts(now)).resolves.toEqual({
+        purged: 1,
+      })
+      await expect(purgeExpiredDeletedAccounts(now)).resolves.toEqual({
+        purged: 0,
+      })
+      expect(erase).toHaveBeenCalledTimes(1)
+    } finally {
+      await db.delete(user).where(eq(user.id, stale))
+    }
+  })
+
+  it('still removes the rows when PostHog erasure fails', async () => {
+    const leftover = 'delete-account-erase-fail'
+    await insertUser(leftover)
+    await db
+      .update(user)
+      .set({ deletedAt: new Date(Date.now() - 31 * DAY_MS) })
+      .where(eq(user.id, leftover))
     const capture = vi.fn()
     setErrorCapture(capture)
     setPersonErasure(vi.fn().mockRejectedValue(new Error('posthog down')))
 
     try {
-      await asLeftover.account.delete()
+      await purgeExpiredDeletedAccounts()
 
       expect(
         await db.query.user.findFirst({ where: { id: leftover } }),
@@ -257,27 +445,6 @@ describe('account.delete', () => {
       )
     } finally {
       await db.delete(user).where(eq(user.id, leftover))
-    }
-  })
-
-  it('does not ask Stripe when the account was never a customer', async () => {
-    const free = 'delete-account-no-customer'
-    await db.insert(user).values({
-      id: free,
-      name: free,
-      email: `${free}@example.com`,
-    })
-    const asFree = callerFor(free)
-
-    try {
-      await asFree.account.delete()
-
-      expect(mocks.cancelBilledSubscriptions).not.toHaveBeenCalled()
-      expect(
-        await db.query.user.findFirst({ where: { id: free } }),
-      ).toBeUndefined()
-    } finally {
-      await db.delete(user).where(eq(user.id, free))
     }
   })
 })

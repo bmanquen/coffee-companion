@@ -1,10 +1,13 @@
 import { TRPCError } from '@trpc/server'
 import { db } from '../db'
 import {
+  AccountNotPending,
+  RestoreWindowClosed,
   SubscriptionCancelFailed,
   deleteAccount,
+  restoreAccount,
 } from '../lib/delete-account'
-import { authedProcedure, createTRPCRouter } from './init'
+import { authedProcedure, createTRPCRouter, pendingProcedure } from './init'
 
 // Creates accept any coffeeId/grinderId; only include nested rows this user owns.
 const brewWith = (userId: string) =>
@@ -116,6 +119,24 @@ export const accountRouter = createTRPCRouter({
       await deleteAccount(ctx.session.user.id)
     } catch (error) {
       if (error instanceof SubscriptionCancelFailed) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: error.message,
+        })
+      }
+      throw error
+    }
+    return { ok: true }
+  }),
+
+  restore: pendingProcedure.mutation(async ({ ctx }) => {
+    try {
+      await restoreAccount(ctx.session.user.id)
+    } catch (error) {
+      if (
+        error instanceof RestoreWindowClosed ||
+        error instanceof AccountNotPending
+      ) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: error.message,

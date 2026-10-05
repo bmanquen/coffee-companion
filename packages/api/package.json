@@ -38,6 +38,7 @@
     "./lib/erase-person": "./src/lib/erase-person.ts",
     "./lib/log": "./src/lib/log.ts",
     "./lib/health": "./src/lib/health.ts",
+    "./lib/delete-account": "./src/lib/delete-account.ts",
     "./test/database": "./test/database.ts"
   },
   "dependencies": {
