@@ -85,13 +85,6 @@ export async function restoreAccount(userId: string, now = new Date()) {
   await db.update(user).set({ deletedAt: null }).where(eq(user.id, userId))
 }
 
-export async function purgeAccount(userId: string): Promise<boolean> {
-  const row = await db.query.user.findFirst({ where: { id: userId } })
-  if (!row?.deletedAt) return false
-  await hardDeleteAccount(userId, row.email)
-  return true
-}
-
 export async function purgeExpiredDeletedAccounts(now = new Date()) {
   const expiredCutoff = new Date(now.getTime() - ACCOUNT_RESTORE_WINDOW_MS)
   const rows = await db
