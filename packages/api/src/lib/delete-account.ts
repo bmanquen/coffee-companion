@@ -1,6 +1,6 @@
 import { and, eq, gt, isNotNull, lte } from 'drizzle-orm'
 import { db } from '../db'
-import { session, user, verification } from '../db/schema'
+import { pendingPersonErasure, session, user, verification } from '../db/schema'
 import { ACCOUNT_RESTORE_WINDOW_MS, deletedAtOf } from './account-status'
 import { cancelBilledSubscriptions } from './billing'
 import { erasePerson } from './erase-person'
@@ -29,14 +29,29 @@ export class AccountNotPending extends Error {
   }
 }
 
+async function rememberFailedPersonErasure(accountId: string) {
+  await db
+    .insert(pendingPersonErasure)
+    .values({ accountId })
+    .onConflictDoNothing()
+}
+
+async function forgetPersonErasure(accountId: string) {
+  await db
+    .delete(pendingPersonErasure)
+    .where(eq(pendingPersonErasure.accountId, accountId))
+}
+
 async function erasePersonAfterRow(userId: string) {
   try {
     await erasePerson(userId)
+    await forgetPersonErasure(userId)
   } catch (error) {
     reportError(error, {
       tags: { area: 'account', operation: 'erasePerson' },
       user: { id: userId },
     })
+    await rememberFailedPersonErasure(userId)
   }
 }
 
@@ -98,6 +113,13 @@ export async function restoreAccount(userId: string, now = new Date()) {
 }
 
 export async function purgeExpiredDeletedAccounts(now = new Date()) {
+  const pending = await db
+    .select({ accountId: pendingPersonErasure.accountId })
+    .from(pendingPersonErasure)
+  for (const row of pending) {
+    await erasePersonAfterRow(row.accountId)
+  }
+
   const expiredCutoff = new Date(now.getTime() - ACCOUNT_RESTORE_WINDOW_MS)
   const rows = await db
     .select({ id: user.id, email: user.email })

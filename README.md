@@ -80,9 +80,9 @@ never passes from taking traffic.
 Accounts marked deleted are hard-erased after 30 days by `POST
 /api/purge-deleted-accounts`, authorised with `Authorization: Bearer
 $PURGE_SECRET`. Missing `PURGE_SECRET` makes the route 404. GitHub Actions
-hits it daily when `APP_URL` and `PURGE_SECRET` are set as repository secrets;
-Railway Cron can call the same path from the dashboard, the way health checks
-are configured.
+hits it daily; missing `APP_URL` or `PURGE_SECRET` fails the job so expired
+accounts cannot sit unnoticed. Railway Cron can call the same path from the
+dashboard, the way health checks are configured.
 
 ```
 PURGE_SECRET=
