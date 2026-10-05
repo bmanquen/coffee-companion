@@ -10,12 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as RestoreAccountRouteImport } from './routes/restore-account'
 import { Route as MarketingRouteImport } from './routes/_marketing'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as MarketingIndexRouteImport } from './routes/_marketing/index'
-import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ApiPurgeDeletedAccountsRouteImport } from './routes/api.purge-deleted-accounts'
-import { Route as RestoreAccountRouteImport } from './routes/restore-account'
+import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as MarketingPrivacyRouteImport } from './routes/_marketing/privacy'
 import { Route as MarketingPricingRouteImport } from './routes/_marketing/pricing'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -47,6 +47,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RestoreAccountRoute = RestoreAccountRouteImport.update({
+  id: '/restore-account',
+  path: '/restore-account',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MarketingRoute = MarketingRouteImport.update({
   id: '/_marketing',
   getParentRoute: () => rootRouteImport,
@@ -60,19 +65,14 @@ const MarketingIndexRoute = MarketingIndexRouteImport.update({
   path: '/',
   getParentRoute: () => MarketingRoute,
 } as any)
-const ApiHealthRoute = ApiHealthRouteImport.update({
-  id: '/api/health',
-  path: '/api/health',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPurgeDeletedAccountsRoute = ApiPurgeDeletedAccountsRouteImport.update({
   id: '/api/purge-deleted-accounts',
   path: '/api/purge-deleted-accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RestoreAccountRoute = RestoreAccountRouteImport.update({
-  id: '/restore-account',
-  path: '/restore-account',
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketingPrivacyRoute = MarketingPrivacyRouteImport.update({
@@ -220,6 +220,7 @@ const AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof MarketingIndexRoute
+  '/restore-account': typeof RestoreAccountRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/account': typeof AuthenticatedAccountRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -227,7 +228,6 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof MarketingPrivacyRoute
   '/api/health': typeof ApiHealthRoute
   '/api/purge-deleted-accounts': typeof ApiPurgeDeletedAccountsRoute
-  '/restore-account': typeof RestoreAccountRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/cold-brew/new': typeof AuthenticatedColdBrewNewRoute
@@ -252,6 +252,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof MarketingIndexRoute
+  '/restore-account': typeof RestoreAccountRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/account': typeof AuthenticatedAccountRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -259,7 +260,6 @@ export interface FileRoutesByTo {
   '/privacy': typeof MarketingPrivacyRoute
   '/api/health': typeof ApiHealthRoute
   '/api/purge-deleted-accounts': typeof ApiPurgeDeletedAccountsRoute
-  '/restore-account': typeof RestoreAccountRoute
   '/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/coffees/new': typeof AuthenticatedCoffeesNewRoute
   '/cold-brew/new': typeof AuthenticatedColdBrewNewRoute
@@ -286,6 +286,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_marketing': typeof MarketingRouteWithChildren
+  '/restore-account': typeof RestoreAccountRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/account': typeof AuthenticatedAccountRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -293,7 +294,6 @@ export interface FileRoutesById {
   '/_marketing/privacy': typeof MarketingPrivacyRoute
   '/api/health': typeof ApiHealthRoute
   '/api/purge-deleted-accounts': typeof ApiPurgeDeletedAccountsRoute
-  '/restore-account': typeof RestoreAccountRoute
   '/_marketing/': typeof MarketingIndexRoute
   '/_authenticated/aeropress/new': typeof AuthenticatedAeropressNewRoute
   '/_authenticated/coffees/new': typeof AuthenticatedCoffeesNewRoute
@@ -321,6 +321,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/restore-account'
     | '/sitemap.xml'
     | '/account'
     | '/dashboard'
@@ -328,7 +329,6 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/api/health'
     | '/api/purge-deleted-accounts'
-    | '/restore-account'
     | '/aeropress/new'
     | '/coffees/new'
     | '/cold-brew/new'
@@ -353,6 +353,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/restore-account'
     | '/sitemap.xml'
     | '/account'
     | '/dashboard'
@@ -360,7 +361,6 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/api/health'
     | '/api/purge-deleted-accounts'
-    | '/restore-account'
     | '/aeropress/new'
     | '/coffees/new'
     | '/cold-brew/new'
@@ -386,6 +386,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/_marketing'
+    | '/restore-account'
     | '/sitemap.xml'
     | '/_authenticated/account'
     | '/_authenticated/dashboard'
@@ -393,7 +394,6 @@ export interface FileRouteTypes {
     | '/_marketing/privacy'
     | '/api/health'
     | '/api/purge-deleted-accounts'
-    | '/restore-account'
     | '/_marketing/'
     | '/_authenticated/aeropress/new'
     | '/_authenticated/coffees/new'
@@ -421,10 +421,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   MarketingRoute: typeof MarketingRouteWithChildren
+  RestoreAccountRoute: typeof RestoreAccountRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiPurgeDeletedAccountsRoute: typeof ApiPurgeDeletedAccountsRoute
-  RestoreAccountRoute: typeof RestoreAccountRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
 }
@@ -436,6 +436,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/restore-account': {
+      id: '/restore-account'
+      path: '/restore-account'
+      fullPath: '/restore-account'
+      preLoaderRoute: typeof RestoreAccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_marketing': {
@@ -459,13 +466,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketingIndexRouteImport
       parentRoute: typeof MarketingRoute
     }
-    '/api/health': {
-      id: '/api/health'
-      path: '/api/health'
-      fullPath: '/api/health'
-      preLoaderRoute: typeof ApiHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/purge-deleted-accounts': {
       id: '/api/purge-deleted-accounts'
       path: '/api/purge-deleted-accounts'
@@ -473,11 +473,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPurgeDeletedAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/restore-account': {
-      id: '/restore-account'
-      path: '/restore-account'
-      fullPath: '/restore-account'
-      preLoaderRoute: typeof RestoreAccountRouteImport
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_marketing/privacy': {
@@ -734,10 +734,10 @@ const MarketingRouteWithChildren = MarketingRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   MarketingRoute: MarketingRouteWithChildren,
+  RestoreAccountRoute: RestoreAccountRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiPurgeDeletedAccountsRoute: ApiPurgeDeletedAccountsRoute,
-  RestoreAccountRoute: RestoreAccountRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
 }
