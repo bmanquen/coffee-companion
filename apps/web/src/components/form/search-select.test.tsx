@@ -203,6 +203,72 @@ describe('SearchSelect', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('ignores a late add failure after the search changes', async () => {
+    let rejectAdd!: (error: unknown) => void
+    const onAddItem = vi.fn(
+      () =>
+        new Promise<{ value: string; label: string }>((_, reject) => {
+          rejectAdd = reject
+        }),
+    )
+    render(<Harness onAddItem={onAddItem} />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Select Roaster'))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Heart' },
+      })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Add/ }))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Hearts' },
+      })
+    })
+    await act(async () => {
+      rejectAdd(
+        Object.assign(new Error('You already have one called Heart.'), {
+          data: { code: 'CONFLICT' },
+        }),
+      )
+    })
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('ignores a late add success after the search changes', async () => {
+    let resolveAdd!: (option: { value: string; label: string }) => void
+    const onAddItem = vi.fn(
+      () =>
+        new Promise<{ value: string; label: string }>((resolve) => {
+          resolveAdd = resolve
+        }),
+    )
+    render(<Harness onAddItem={onAddItem} />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Select Roaster'))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Heart' },
+      })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Add/ }))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Hearts' },
+      })
+    })
+    await act(async () => {
+      resolveAdd({ value: 'heart', label: 'Heart' })
+    })
+    expect(screen.getByText('Select Roaster')).toBeTruthy()
+  })
+
   it('clears the add alert when an option is picked', async () => {
     const onAddItem = vi.fn(async () => {
       throw Object.assign(new Error('You already have one called Heart.'), {
