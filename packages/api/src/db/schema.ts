@@ -14,9 +14,9 @@ import {
   uniqueIndex,
   uuid
 } from 'drizzle-orm/pg-core'
-import type { PgColumn } from 'drizzle-orm/pg-core'
 import { defineRelations, sql } from 'drizzle-orm'
 import { account, session, subscription, user } from './auth-schema'
+import type { PgColumn } from 'drizzle-orm/pg-core'
 
 export * from './auth-schema'
 

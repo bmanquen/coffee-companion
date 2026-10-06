@@ -91,8 +91,12 @@ function rowFor(
   return row
 }
 
+type LookupRow = { id: string; name: string; userId: string | null }
+
 function insert(lookup: Lookup, row: Record<string, unknown>) {
-  return db.insert(lookup.table).values(row as never).returning()
+  return db.insert(lookup.table).values(row as never).returning() as Promise<
+    Array<LookupRow>
+  >
 }
 
 describe.each(lookupTables())('$sqlName names', (lookup) => {
@@ -162,7 +166,7 @@ describe.each(lookupTables())('$sqlName names', (lookup) => {
         db
           .update(lookup.table)
           .set({ name: saved.toLowerCase() } as never)
-          .where(eq(lookup.table.id, mine.id)),
+          .where(eq(lookup.id, mine.id)),
       sharedSentence(saved),
     )
   })
