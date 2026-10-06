@@ -2,26 +2,13 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { lookupSqlNames } from '../../test/lookups'
 
 const DRIZZLE = join(dirname(fileURLToPath(import.meta.url)), '../../drizzle')
 const THIS_MIGRATION = 'lookup_name_uniqueness'
 
-const LOOKUP_TABLES = [
-  'aeropress_methods',
-  'brewing_device_types',
-  'coffee_processes',
-  'countries',
-  'farms',
-  'frenchpress_methods',
-  'pourover_methods',
-  'regions',
-  'roast_levels',
-  'roasters',
-  'varieties',
-]
-
 const insertIntoLookup = new RegExp(
-  `INSERT\\s+INTO\\s+"?(?:${LOOKUP_TABLES.join('|')})"?(?:\\s|\\()`,
+  `INSERT\\s+INTO\\s+"?(?:${lookupSqlNames().join('|')})"?(?:\\s|\\()`,
   'i',
 )
 

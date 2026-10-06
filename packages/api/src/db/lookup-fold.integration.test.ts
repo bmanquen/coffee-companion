@@ -3,6 +3,10 @@ import { sql } from 'drizzle-orm'
 import { Pool } from 'pg'
 import { db } from '../db'
 import { roasters } from '../db/schema'
+import {
+  lookupSqlNames,
+  lookupUniqueConstraintNames,
+} from '../../test/lookups'
 import { seedUsers, uniqFor } from '../../test/trpc'
 import type { PoolClient } from 'pg'
 
@@ -21,33 +25,8 @@ afterAll(async () => {
   await pool.end()
 })
 
-const CONSTRAINTS = [
-  'aeropress_methods_user_id_name_key_unique',
-  'brewing_device_types_user_id_name_key_unique',
-  'coffee_processes_user_id_name_key_unique',
-  'countries_user_id_name_key_unique',
-  'farms_user_id_name_key_region_id_unique',
-  'frenchpress_methods_user_id_name_key_unique',
-  'pourover_methods_user_id_name_key_unique',
-  'regions_user_id_name_key_country_id_unique',
-  'roast_levels_user_id_name_key_unique',
-  'roasters_user_id_name_key_unique',
-  'varieties_user_id_name_key_unique',
-] as const
-
-const LOOKUPS = [
-  'aeropress_methods',
-  'brewing_device_types',
-  'coffee_processes',
-  'countries',
-  'farms',
-  'frenchpress_methods',
-  'pourover_methods',
-  'regions',
-  'roast_levels',
-  'roasters',
-  'varieties',
-] as const
+const LOOKUPS = lookupSqlNames()
+const CONSTRAINTS = lookupUniqueConstraintNames()
 
 async function withSandbox(run: (client: PoolClient) => Promise<void>) {
   const client = await pool.connect()
@@ -155,12 +134,28 @@ describe('lookup_fold', () => {
         `INSERT INTO coffees_varieties (coffee_id, variety_id) VALUES ($1, $2), ($1, $3)`,
         [coffee.id, keptVariety.id, lostVariety.id],
       )
+      const [green] = (
+        await client.query<{ id: string }>(
+          `INSERT INTO green_coffees (name, user_id) VALUES ($1, $2) RETURNING id`,
+          [uniq('Green'), ALICE],
+        )
+      ).rows
+      await client.query(
+        `INSERT INTO green_coffees_varieties (green_coffee_id, variety_id)
+         VALUES ($1, $2), ($1, $3)`,
+        [green.id, keptVariety.id, lostVariety.id],
+      )
       await client.query(`SELECT * FROM lookup_fold()`)
       const links = await client.query(
         `SELECT variety_id FROM coffees_varieties WHERE coffee_id = $1`,
         [coffee.id],
       )
       expect(links.rows).toEqual([{ variety_id: keptVariety.id }])
+      const greenLinks = await client.query(
+        `SELECT variety_id FROM green_coffees_varieties WHERE green_coffee_id = $1`,
+        [green.id],
+      )
+      expect(greenLinks.rows).toEqual([{ variety_id: keptVariety.id }])
 
       for (const table of LOOKUPS) {
         await client.query(

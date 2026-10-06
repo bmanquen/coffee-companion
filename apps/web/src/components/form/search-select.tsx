@@ -24,15 +24,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { useFieldContext } from '@/hooks/form-context'
-import { mapMutationError } from '@/lib/form-error'
+import { mapMutationError, trpcErrorCode } from '@/lib/form-error'
 import { cn } from '@/lib/utils'
 
 const ADD_FAILED = 'Something went wrong. Try again.'
 
 function addErrorMessage(error: unknown) {
-  if (!(error instanceof Error)) return ADD_FAILED
-  const code = (error as { data?: { code?: unknown } }).data?.code
-  if (code !== 'CONFLICT') return ADD_FAILED
+  if (trpcErrorCode(error) !== 'CONFLICT') return ADD_FAILED
   return mapMutationError(error)?.message ?? ADD_FAILED
 }
 

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { lookupTables } from '../../test/lookups'
+import {
+  lookupTables,
+  lookupUniqueConstraintNames,
+} from '../../test/lookups'
 
 describe('lookupTables', () => {
   it('finds every lookup and the parent scope of regions and farms', () => {
@@ -26,5 +29,18 @@ describe('lookupTables', () => {
     expect(
       lookups.filter((lookup) => lookup.scope != null).map((lookup) => lookup.sqlName),
     ).toEqual(['regions', 'farms'])
+    expect(lookupUniqueConstraintNames().sort()).toEqual([
+      'aeropress_methods_user_id_name_key_unique',
+      'brewing_device_types_user_id_name_key_unique',
+      'coffee_processes_user_id_name_key_unique',
+      'countries_user_id_name_key_unique',
+      'farms_user_id_name_key_region_id_unique',
+      'frenchpress_methods_user_id_name_key_unique',
+      'pourover_methods_user_id_name_key_unique',
+      'regions_user_id_name_key_country_id_unique',
+      'roast_levels_user_id_name_key_unique',
+      'roasters_user_id_name_key_unique',
+      'varieties_user_id_name_key_unique',
+    ])
   })
 })
