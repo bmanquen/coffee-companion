@@ -19,11 +19,17 @@ test('adding a name another tab already saved shows the saved casing', async ({
   await waitForHydration(tabB.getByText('Select Roaster'))
   await tabB.getByText('Select Roaster').click()
   await tabB.getByPlaceholder('Search...').fill(saved)
-  await tabB.getByRole('button', { name: /Add/ }).click()
+  await tabB
+    .locator('[data-slot="popover-content"]')
+    .getByRole('option', { name: `Add “${saved}”` })
+    .click()
   await expect(tabB.getByText(saved, { exact: true })).toBeVisible()
 
   await page.getByPlaceholder('Search...').fill(saved.toLowerCase())
-  await page.getByRole('button', { name: /Add/ }).click()
+  await page
+    .locator('[data-slot="popover-content"]')
+    .getByRole('option', { name: `Add “${saved.toLowerCase()}”` })
+    .click()
   await expect(page.getByRole('alert')).toHaveText(
     `You already have one called ${saved}. Pick it there, or give this one a different name.`,
   )
