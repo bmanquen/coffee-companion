@@ -189,7 +189,7 @@ BEGIN
 
 	INSERT INTO lookup_fold_lookups (relid, rel, scope_col)
 	SELECT t.tgrelid, t.tgrelid::regclass,
-		NULLIF(split_part(convert_from(t.tgargs, 'UTF8'), E'\000', 1), '')
+		(regexp_match(pg_get_triggerdef(t.oid), $re$lookup_name_guard\('([^']*)'\)$re$))[1]
 	FROM pg_trigger t
 	JOIN pg_proc p ON p.oid = t.tgfoid
 	WHERE p.proname = 'lookup_name_guard'
@@ -297,9 +297,9 @@ DECLARE
 	fk record;
 	pk_names text[];
 	other_names text[];
-	pk_row text;
-	others_row text;
-	fk_mapped text;
+	pk_expr text;
+	others_expr text;
+	fk_mapped_expr text;
 	disagree boolean;
 BEGIN
 	FOR trig IN
@@ -350,9 +350,9 @@ BEGIN
 				IF fk.pk_cols IS NOT NULL AND fk.pk_cols[1] IS NOT NULL
 					AND EXISTS (
 						SELECT 1
-						FROM unnest(fk.pk_cols) AS attnum
+						FROM unnest(fk.pk_cols) AS pk_att(attnum)
 						JOIN pg_attribute a
-							ON a.attrelid = fk.ref_oid AND a.attnum = attnum
+							ON a.attrelid = fk.ref_oid AND a.attnum = pk_att.attnum
 						WHERE a.attname = fk.col
 					)
 				THEN
@@ -375,7 +375,7 @@ BEGIN
 						AND a.attnum > 0
 						AND NOT a.attisdropped;
 
-					pk_row := (
+					pk_expr := (
 						SELECT string_agg(
 							CASE
 								WHEN m.expr IS NOT NULL THEN m.expr
@@ -403,11 +403,11 @@ BEGIN
 					);
 
 					IF other_names = ARRAY[]::text[] THEN
-						others_row := '1';
+						others_expr := '''[]''::jsonb';
 					ELSE
-						others_row := (
+						others_expr := (
 							SELECT format(
-								'ROW(%s)',
+								'jsonb_build_array(%s)',
 								string_agg(
 									CASE
 										WHEN m.expr IS NOT NULL THEN m.expr
@@ -436,7 +436,7 @@ BEGIN
 						);
 					END IF;
 
-					fk_mapped := format(
+					fk_mapped_expr := format(
 						'COALESCE((SELECT p.keeper FROM lookup_fold_pairs p WHERE p.lookup = %s AND p.loser = t.%I), t.%I)',
 						rec.relid,
 						fk.col,
@@ -453,7 +453,7 @@ BEGIN
 							t.created_at,
 							t.%I AS fk_raw,
 							%s AS fk_mapped,
-							ROW(%s) AS pk_mapped,
+							jsonb_build_array(%s) AS pk_mapped,
 							%s AS others_mapped
 						FROM %s t
 						WHERE t.%I IN (
@@ -463,9 +463,9 @@ BEGIN
 						)
 						$q$,
 						fk.col,
-						fk_mapped,
-						pk_row,
-						others_row,
+						fk_mapped_expr,
+						pk_expr,
+						others_expr,
 						fk.ref_rel,
 						fk.col,
 						rec.relid,
