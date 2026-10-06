@@ -307,7 +307,7 @@ describe('lookup_fold', () => {
     })
   })
 
-  it('aborts rather than merging two coffees onto one roaster and name', async () => {
+  it('renames the later coffee when a roaster fold would collide on name', async () => {
     await withSandbox(async (client) => {
       const [shared] = (
         await client.query<{ id: string }>(
@@ -326,14 +326,37 @@ describe('lookup_fold', () => {
           [uniq('Medium'), ALICE],
         )
       ).rows
-      await client.query(
-        `INSERT INTO coffees (name, user_id, roaster_id, roast_level_id)
-         VALUES ('Geisha', $1, $2, $3), ('Geisha', $1, $4, $3)`,
-        [ALICE, shared.id, roast.id, copy.id],
+      const [onShared] = (
+        await client.query<{ id: string }>(
+          `INSERT INTO coffees (name, user_id, roaster_id, roast_level_id, created_at)
+           VALUES ('Geisha', $1, $2, $3, '2026-01-01') RETURNING id`,
+          [ALICE, shared.id, roast.id],
+        )
+      ).rows
+      const [onCopy] = (
+        await client.query<{ id: string }>(
+          `INSERT INTO coffees (name, user_id, roaster_id, roast_level_id, created_at)
+           VALUES ('Geisha', $1, $2, $3, '2026-01-02') RETURNING id`,
+          [ALICE, copy.id, roast.id],
+        )
+      ).rows
+      await client.query(`SELECT * FROM lookup_fold()`)
+      const rows = await client.query<{
+        id: string
+        name: string
+        roaster_id: string
+      }>(
+        `SELECT id, name, roaster_id FROM coffees WHERE id = ANY($1::uuid[]) ORDER BY created_at`,
+        [[onShared.id, onCopy.id]],
       )
-      await expect(client.query(`SELECT * FROM lookup_fold()`)).rejects.toThrow(
-        /unique|duplicate/i,
-      )
+      expect(rows.rows).toEqual([
+        { id: onShared.id, name: 'Geisha', roaster_id: shared.id },
+        {
+          id: onCopy.id,
+          name: `Geisha (${onCopy.id})`,
+          roaster_id: shared.id,
+        },
+      ])
     })
   })
 

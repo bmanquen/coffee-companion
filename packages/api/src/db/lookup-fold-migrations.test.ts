@@ -28,3 +28,13 @@ describe('migrations after lookup name uniqueness', () => {
     expect(missing).toEqual([])
   })
 })
+
+describe('seeds after lookup name uniqueness', () => {
+  it('fold after lookup upserts so user copies merge into the new shared default', () => {
+    const dir = dirname(fileURLToPath(import.meta.url))
+    const seed = readFileSync(join(dir, 'seed.ts'), 'utf8')
+    const seedE2e = readFileSync(join(dir, 'seed-e2e.ts'), 'utf8')
+    expect(seed).toContain('SELECT * FROM lookup_fold()')
+    expect(seedE2e).toContain('SELECT * FROM lookup_fold()')
+  })
+})

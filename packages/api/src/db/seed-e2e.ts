@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
 import { E2E_USER_DELETE, E2E_USER_FREE, E2E_USER_WITH_DATA } from '../lib/e2e-auth'
 import {
@@ -29,13 +29,13 @@ import { db } from './index'
 const DAY_MS = 24 * 60 * 60 * 1000
 const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS)
 
-// Device types are globally-unique system defaults (null userId); reuse or
-// create so repeated runs don't collide on the unique name.
+// Shared defaults (null userId); reuse or create so repeated runs don't
+// collide on the per-user unique name.
 async function roastLevelId(name: string) {
   const existing = await db
     .select()
     .from(roastLevels)
-    .where(eq(roastLevels.name, name))
+    .where(and(eq(roastLevels.name, name), isNull(roastLevels.userId)))
   if (existing[0]) return existing[0].id
 
   const [created] = await db
@@ -49,7 +49,9 @@ async function deviceTypeId(name: string) {
   const existing = await db
     .select()
     .from(brewingDeviceTypes)
-    .where(eq(brewingDeviceTypes.name, name))
+    .where(
+      and(eq(brewingDeviceTypes.name, name), isNull(brewingDeviceTypes.userId)),
+    )
   if (existing[0]) return existing[0].id
 
   const [created] = await db
@@ -63,7 +65,7 @@ async function countryIdNamed(name: string) {
   const existing = await db
     .select()
     .from(countries)
-    .where(eq(countries.name, name))
+    .where(and(eq(countries.name, name), isNull(countries.userId)))
   if (existing[0]) return existing[0].id
 
   const [created] = await db.insert(countries).values({ name }).returning()
@@ -74,7 +76,13 @@ async function regionIdNamed(name: string, countryId: string) {
   const existing = await db
     .select()
     .from(regions)
-    .where(and(eq(regions.name, name), eq(regions.countryId, countryId)))
+    .where(
+      and(
+        eq(regions.name, name),
+        eq(regions.countryId, countryId),
+        isNull(regions.userId),
+      ),
+    )
   if (existing[0]) return existing[0].id
 
   const [created] = await db
@@ -88,7 +96,9 @@ async function processIdNamed(name: string) {
   const existing = await db
     .select()
     .from(coffeeProcesses)
-    .where(eq(coffeeProcesses.name, name))
+    .where(
+      and(eq(coffeeProcesses.name, name), isNull(coffeeProcesses.userId)),
+    )
   if (existing[0]) return existing[0].id
 
   const [created] = await db
@@ -234,11 +244,16 @@ async function seedGrantedUser() {
     })
     .returning()
 
-  // Methods are globally-unique system defaults (null userId); reuse or create.
+  // Methods are shared defaults (null userId); reuse or create.
   const existingMethod = await db
     .select()
     .from(aeropressMethods)
-    .where(eq(aeropressMethods.name, 'Standard'))
+    .where(
+      and(
+        eq(aeropressMethods.name, 'Standard'),
+        isNull(aeropressMethods.userId),
+      ),
+    )
   const methodId =
     existingMethod[0]?.id ??
     (
@@ -322,6 +337,7 @@ export async function seedE2eUsers() {
   await seedGrantedUser()
   await seedFreeUser()
   await seedDeleteUser()
+  await db.execute(sql`SELECT * FROM lookup_fold()`)
 
   await db.$client.end()
 }

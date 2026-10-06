@@ -60,9 +60,6 @@ describe('lookup name uniqueness migration SQL', () => {
     const foldFn = statements.findIndex((item) =>
       item.includes('CREATE FUNCTION lookup_fold()'),
     )
-    const rename = statements.findIndex((item) =>
-      item.includes('roaster_id IS NOT NULL'),
-    )
     const foldCall = statements.findIndex((item) =>
       item.includes('SELECT * FROM lookup_fold()'),
     )
@@ -80,8 +77,7 @@ describe('lookup name uniqueness migration SQL', () => {
     expect(guardFn).toBeLessThan(lastTrigger)
     expect(lastTrigger).toBeLessThan(foldPlan)
     expect(foldPlan).toBeLessThan(foldFn)
-    expect(foldFn).toBeLessThan(rename)
-    expect(rename).toBeLessThan(foldCall)
+    expect(foldFn).toBeLessThan(foldCall)
     expect(foldCall).toBeLessThan(firstUnique)
     expect(lastUnique).toBe(statements.length - 1)
   })
@@ -92,6 +88,7 @@ describe('lookup name uniqueness migration SQL', () => {
     )
     expect(fold).toContain('DISABLE TRIGGER')
     expect(fold).toContain('ENABLE TRIGGER')
+    expect(fold).toContain('roaster_id IS NOT NULL')
   })
 })
 
