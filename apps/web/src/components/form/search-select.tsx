@@ -24,7 +24,17 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { useFieldContext } from '@/hooks/form-context'
+import { mapMutationError } from '@/lib/form-error'
 import { cn } from '@/lib/utils'
+
+const ADD_FAILED = 'Something went wrong. Try again.'
+
+function addErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) return ADD_FAILED
+  const code = (error as { data?: { code?: unknown } }).data?.code
+  if (code !== 'CONFLICT') return ADD_FAILED
+  return mapMutationError(error)?.message ?? ADD_FAILED
+}
 
 export type SearchSelectOption = {
   value: string
@@ -59,14 +69,21 @@ export function SearchSelect({
   const error = useFieldError()
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
   const options = initialOptions
 
   const selectedOption = options.find((o) => o.value === field.state.value)
+
+  const handleSearchChange = (value: string) => {
+    setAddError(null)
+    setSearch(value)
+  }
 
   const handleSelect = (value: string) => {
     const next = value === field.state.value ? '' : value
     field.handleChange(next)
     onValueChange?.(next)
+    setAddError(null)
     setSearch('')
     setOpen(false)
   }
@@ -75,14 +92,21 @@ export function SearchSelect({
     const trimmed = search.trim()
     if (!trimmed) return
 
-    const newOption = onAddItem
-      ? await onAddItem(trimmed)
-      : { value: trimmed.toLowerCase(), label: trimmed }
+    let newOption: SearchSelectOption | null
+    try {
+      newOption = onAddItem
+        ? await onAddItem(trimmed)
+        : { value: trimmed.toLowerCase(), label: trimmed }
+    } catch (error) {
+      setAddError(addErrorMessage(error))
+      return
+    }
 
     if (!newOption) return
 
     field.handleChange(newOption.value)
     onValueChange?.(newOption.value)
+    setAddError(null)
     setSearch('')
     setOpen(false)
   }
@@ -106,6 +130,7 @@ export function SearchSelect({
           onOpenChange={(next) => {
             setOpen(next)
             if (!next) {
+              setAddError(null)
               setSearch('')
               field.handleBlur()
             }
@@ -140,8 +165,13 @@ export function SearchSelect({
               <CommandInput
                 placeholder="Search..."
                 value={search}
-                onValueChange={setSearch}
+                onValueChange={handleSearchChange}
               />
+              {addError && (
+                <p role="alert" className="px-3 py-2 text-sm text-destructive">
+                  {addError}
+                </p>
+              )}
               <CommandList>
                 <CommandEmpty>
                   {search.trim() && onAddItem ? (
