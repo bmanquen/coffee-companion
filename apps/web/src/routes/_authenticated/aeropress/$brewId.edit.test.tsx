@@ -74,7 +74,7 @@ function seeded() {
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', createdAt: ts, updatedAt: ts },
+      type: { id: 't2', userId: null, name: 'Espresso', nameKey: 'espresso', createdAt: ts, updatedAt: ts },
     }),
   ])
   qc.setQueryData(

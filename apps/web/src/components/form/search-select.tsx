@@ -97,8 +97,8 @@ export function SearchSelect({
       newOption = onAddItem
         ? await onAddItem(trimmed)
         : { value: trimmed.toLowerCase(), label: trimmed }
-    } catch (error) {
-      setAddError(addErrorMessage(error))
+    } catch (failure) {
+      setAddError(addErrorMessage(failure))
       return
     }
 

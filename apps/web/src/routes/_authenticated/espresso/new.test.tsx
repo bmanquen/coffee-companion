@@ -78,6 +78,7 @@ function seeded() {
         id: 't2',
         userId: null,
         name: 'Espresso',
+        nameKey: 'espresso',
         createdAt: ts,
         updatedAt: ts,
       },
