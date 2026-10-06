@@ -23,7 +23,9 @@ test('adding a name another tab already saved shows the saved casing', async ({
     .locator('[data-slot="popover-content"]')
     .getByRole('option', { name: `Add “${saved}”` })
     .click()
-  await expect(tabB.getByText(saved, { exact: true })).toBeVisible()
+  await expect(tabB.getByRole('button', { name: 'Roaster' })).toContainText(
+    saved,
+  )
 
   await page.getByPlaceholder('Search...').fill(saved.toLowerCase())
   await page
