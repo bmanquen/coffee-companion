@@ -5,6 +5,7 @@ import { log, requestField } from '../lib/log'
 import { e2eBypassSession } from '../lib/e2e-auth'
 import { ACCOUNT_PENDING_DELETION, deletedAtOf } from '../lib/account-status'
 import { resolvePlan } from '../lib/allowance'
+import { lookupNameClashMessage } from '../lib/lookup-name'
 import { shelfLoader } from '../lib/shelf'
 import type { Shelf } from '../lib/shelf'
 import type { PlanId } from '../lib/plan'
@@ -37,8 +38,26 @@ const levelFor = (code: TRPCError['code']): LogLevel =>
 
 // One line per call, on the base procedure so anonymous calls are logged too,
 // and outermost so it sees what the authed middleware refused.
-export const publicProcedure = t.procedure.use(
-  async ({ ctx, next, path, type }) => {
+const lookupNameClashes = t.middleware(async ({ next }) => {
+  const result = await next()
+  if (!result.ok) {
+    const message = lookupNameClashMessage(result.error)
+    if (message) {
+      return {
+        ...result,
+        error: new TRPCError({
+          code: 'CONFLICT',
+          message,
+          cause: result.error.cause,
+        }),
+      }
+    }
+  }
+  return result
+})
+
+export const publicProcedure = t.procedure
+  .use(async ({ ctx, next, path, type }) => {
     const started = performance.now()
     const result = await next()
     const duration = Math.round(performance.now() - started)
@@ -55,8 +74,8 @@ export const publicProcedure = t.procedure.use(
     })
 
     return result
-  },
-)
+  })
+  .use(lookupNameClashes)
 
 // What a user's Plan allows them to read: the Plan itself, and the Shelf whose
 // size it sets.
