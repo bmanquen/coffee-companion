@@ -268,27 +268,30 @@ describe('lookup_fold', () => {
 
   it('moves a region with its country and then folds the matching name', async () => {
     await withSandbox(async (client) => {
+      const countryName = uniq('Colombia')
+      const regionName = uniq('Huila')
       const [sharedCountry] = (
         await client.query<{ id: string }>(
-          `INSERT INTO countries (name) VALUES ('Colombia') RETURNING id`,
+          `INSERT INTO countries (name) VALUES ($1) RETURNING id`,
+          [countryName],
         )
       ).rows
       const [userCountry] = (
         await client.query<{ id: string }>(
-          `INSERT INTO countries (name, user_id) VALUES ('colombia', $1) RETURNING id`,
-          [ALICE],
+          `INSERT INTO countries (name, user_id) VALUES ($1, $2) RETURNING id`,
+          [countryName.toLowerCase(), ALICE],
         )
       ).rows
       const [sharedRegion] = (
         await client.query<{ id: string }>(
-          `INSERT INTO regions (name, country_id) VALUES ('Huila', $1) RETURNING id`,
-          [sharedCountry.id],
+          `INSERT INTO regions (name, country_id) VALUES ($1, $2) RETURNING id`,
+          [regionName, sharedCountry.id],
         )
       ).rows
       const [userRegion] = (
         await client.query<{ id: string }>(
-          `INSERT INTO regions (name, user_id, country_id) VALUES ('huila', $1, $2) RETURNING id`,
-          [ALICE, userCountry.id],
+          `INSERT INTO regions (name, user_id, country_id) VALUES ($1, $2, $3) RETURNING id`,
+          [regionName.toLowerCase(), ALICE, userCountry.id],
         )
       ).rows
       await client.query(`SELECT * FROM lookup_fold()`)
