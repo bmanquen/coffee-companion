@@ -39,6 +39,7 @@
     "./lib/log": "./src/lib/log.ts",
     "./lib/health": "./src/lib/health.ts",
     "./lib/delete-account": "./src/lib/delete-account.ts",
+    "./lib/account-restore-window": "./src/lib/account-restore-window.ts",
     "./test/database": "./test/database.ts"
   },
   "dependencies": {
