@@ -74,12 +74,12 @@ function seeded() {
       id: PO_DEVICE,
       name: 'V60',
       brand: 'Hario',
-      type: { id: 't3', userId: null, name: 'Pour Over', createdAt: ts, updatedAt: ts },
+      type: { id: 't3', userId: null, name: 'Pour Over', nameKey: 'pour over', createdAt: ts, updatedAt: ts },
     }),
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', createdAt: ts, updatedAt: ts },
+      type: { id: 't2', userId: null, name: 'Espresso', nameKey: 'espresso', createdAt: ts, updatedAt: ts },
     }),
   ])
   qc.setQueryData(

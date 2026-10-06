@@ -35,6 +35,7 @@ const brewingDevice = {
     id: 'sample-device-type',
     userId: null,
     name: 'Espresso Machine',
+    nameKey: 'espresso machine',
     createdAt,
     updatedAt,
   },

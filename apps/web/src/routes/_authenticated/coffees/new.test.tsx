@@ -48,10 +48,10 @@ function seeded() {
   const { queryClient: qc, trpc } = providers
   const stamps = { createdAt: new Date(), updatedAt: new Date(), userId: null }
   qc.setQueryData(trpc.roaster.list.queryKey(), [
-    { id: ROASTER, name: 'Onyx', ...stamps },
+    { id: ROASTER, name: 'Onyx', nameKey: 'onyx', ...stamps },
   ])
   qc.setQueryData(trpc.roastLevel.list.queryKey(), [
-    { id: ROAST_LEVEL, name: 'Light', ...stamps },
+    { id: ROAST_LEVEL, name: 'Light', nameKey: 'light', ...stamps },
   ])
   qc.setQueryData(trpc.country.list.queryKey(), [])
   qc.setQueryData(trpc.coffeeProcess.getAll.queryKey(), [])

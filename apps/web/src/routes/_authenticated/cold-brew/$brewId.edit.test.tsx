@@ -69,12 +69,12 @@ function seeded() {
       id: CB_DEVICE,
       name: 'Toddy',
       brand: 'Toddy',
-      type: { id: 't5', userId: null, name: 'Cold Brew', createdAt: ts, updatedAt: ts },
+      type: { id: 't5', userId: null, name: 'Cold Brew', nameKey: 'cold brew', createdAt: ts, updatedAt: ts },
     }),
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', createdAt: ts, updatedAt: ts },
+      type: { id: 't2', userId: null, name: 'Espresso', nameKey: 'espresso', createdAt: ts, updatedAt: ts },
     }),
   ])
   qc.setQueryData(

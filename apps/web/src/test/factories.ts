@@ -20,6 +20,17 @@ type DeviceOption = RouterOutputs['brewingDevice']['list'][number]
 const createdAt = new Date('2026-06-01T08:00:00.000Z')
 const updatedAt = new Date('2026-06-15T10:30:00.000Z')
 
+function namedLookup(id: string, name: string) {
+  return {
+    id,
+    userId: null as string | null,
+    name,
+    nameKey: name.toLowerCase(),
+    createdAt,
+    updatedAt,
+  }
+}
+
 export function makeRecentShot(
   overrides: Partial<RecentShot> = {},
 ): RecentShot {
@@ -57,13 +68,7 @@ export function makeRecentShot(
       typeId: 't1',
       createdAt,
       updatedAt,
-      type: {
-        id: 't1',
-        userId: null,
-        name: 'Espresso',
-        createdAt,
-        updatedAt,
-      },
+      type: namedLookup('t1', 'Espresso'),
     },
     ...overrides,
   }
@@ -124,21 +129,9 @@ export function makeAeropressBrew(
       typeId: 't1',
       createdAt,
       updatedAt,
-      type: {
-        id: 't1',
-        userId: null,
-        name: 'AeroPress',
-        createdAt,
-        updatedAt,
-      },
+      type: namedLookup('t1', 'AeroPress'),
     },
-    method: {
-      id: 'm1',
-      userId: null,
-      name: 'Standard',
-      createdAt,
-      updatedAt,
-    },
+    method: namedLookup('m1', 'Standard'),
     ...overrides,
   }
 }
@@ -182,21 +175,9 @@ export function makePouroverBrew(
       typeId: 't3',
       createdAt,
       updatedAt,
-      type: {
-        id: 't3',
-        userId: null,
-        name: 'Pour Over',
-        createdAt,
-        updatedAt,
-      },
+      type: namedLookup('t3', 'Pour Over'),
     },
-    method: {
-      id: 'm1',
-      userId: null,
-      name: 'Standard',
-      createdAt,
-      updatedAt,
-    },
+    method: namedLookup('m1', 'Standard'),
     ...overrides,
   }
 }
@@ -240,21 +221,9 @@ export function makeFrenchpressBrew(
       typeId: 't4',
       createdAt,
       updatedAt,
-      type: {
-        id: 't4',
-        userId: null,
-        name: 'French Press',
-        createdAt,
-        updatedAt,
-      },
+      type: namedLookup('t4', 'French Press'),
     },
-    method: {
-      id: 'm1',
-      userId: null,
-      name: 'Standard',
-      createdAt,
-      updatedAt,
-    },
+    method: namedLookup('m1', 'Standard'),
     ...overrides,
   }
 }
@@ -299,13 +268,7 @@ export function makeColdBrewBrew(
       typeId: 't5',
       createdAt,
       updatedAt,
-      type: {
-        id: 't5',
-        userId: null,
-        name: 'Cold Brew',
-        createdAt,
-        updatedAt,
-      },
+      type: namedLookup('t5', 'Cold Brew'),
     },
     ...overrides,
   }
@@ -327,39 +290,45 @@ export function makeCoffee(overrides: Partial<CoffeeOption> = {}): CoffeeOption 
 export function makeAeropressMethod(
   overrides: Partial<MethodOption> = {},
 ): MethodOption {
+  const name = overrides.name ?? 'Standard'
   return {
     id: 'm1',
     userId: null,
-    name: 'Standard',
     createdAt,
     updatedAt,
     ...overrides,
+    name,
+    nameKey: overrides.nameKey ?? name.toLowerCase(),
   }
 }
 
 export function makePouroverMethod(
   overrides: Partial<PouroverMethodOption> = {},
 ): PouroverMethodOption {
+  const name = overrides.name ?? 'Standard'
   return {
     id: 'm1',
     userId: null,
-    name: 'Standard',
     createdAt,
     updatedAt,
     ...overrides,
+    name,
+    nameKey: overrides.nameKey ?? name.toLowerCase(),
   }
 }
 
 export function makeFrenchpressMethod(
   overrides: Partial<FrenchpressMethodOption> = {},
 ): FrenchpressMethodOption {
+  const name = overrides.name ?? 'Standard'
   return {
     id: 'm1',
     userId: null,
-    name: 'Standard',
     createdAt,
     updatedAt,
     ...overrides,
+    name,
+    nameKey: overrides.nameKey ?? name.toLowerCase(),
   }
 }
 
@@ -388,7 +357,7 @@ export function makeBrewingDevice(
     typeId: 't1',
     createdAt,
     updatedAt,
-    type: { id: 't1', userId: null, name: 'AeroPress', createdAt, updatedAt },
+    type: namedLookup('t1', 'AeroPress'),
     ...overrides,
   }
 }
