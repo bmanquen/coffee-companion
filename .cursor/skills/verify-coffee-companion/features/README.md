@@ -7,7 +7,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Launch with `.cursor/skills/verify-coffee-companion/helpers/control launch`.
 - Require `helpers/control doctor` to report `ok: true`, `baseUrl` `http://127.0.0.1:3000` (or the `VERIFY_PORT` you set), database `coffee_companion_test`, and app marker `Coffee Companion`.
 - Never drive an instance that was not started by this verification run. A server already on port 3000 is the development app.
-- Public routes use identity `public` (no `e2e_auth` cookie). Signed-in routes use `data`, `empty`, or `free` as the feature file says.
+- Public routes use identity `public` (no `e2e_auth` cookie). Signed-in routes use `data`, `empty`, `free`, or `delete` as the feature file says.
 - Seeded `data` / `free` library (most recently brewed first): Kenya Nyeri, Guatemala Huehuetenango, Rwanda Kivu, Peru Cajamarca, Burundi Kayanza, Sumatra Lintong, Brazil Cerrado. Extra on `data` only: Ethiopia Guji (most recent Shot), roaster Sey, Niche Zero, Linea Mini, AeroPress Go / Standard dialed-in brew.
 - Restore seeded data with `helpers/control seed` after a mutation. Do not remove proof artifacts during cleanup.
 
@@ -48,4 +48,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Coffees](./coffees.md) covers the Coffee list and create / edit / delete. Mapped; drive with `browser` commands — no `drive coffees` stub yet.
 - [Brews](./brews.md) covers the brew log tabs, the Ratio column, logging an Espresso Shot or AeroPress brew, and edit / delete / Dialed-in on a readable row. Mapped; drive with `browser` commands — no `drive brews` stub yet.
 - [Equipment](./equipment.md) covers Grinders and Brewing Devices, including Free's gear cap. Mapped; drive with `browser` commands — no `drive equipment` stub yet.
-- [Plans and Shelf](./plans-and-shelf.md) covers Pro vs Free reading, Sealed brews, the account Plan, account export, and account deletion behind a confirmation. Mapped; drive with `browser` commands — no `drive plans-and-shelf` stub yet.
+- [Plans and Shelf](./plans-and-shelf.md) covers Pro vs Free reading, Sealed brews, the account Plan, account export, account deletion behind a confirmation, and restore on `/restore-account`. Mapped; drive with `browser` commands — no `drive plans-and-shelf` stub yet.

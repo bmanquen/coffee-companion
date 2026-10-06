@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Verification scaffolding: reseed the e2e bypass users on the test database.
-// Deletes and re-inserts e2e-user-with-data and e2e-user-free. Never run this
+// Deletes and re-inserts e2e-user-with-data, e2e-user-free, and e2e-user-delete. Never run this
 // against a development or production DATABASE_URL.
 //
 // Resolve the API package from the file graph (this file sits outside

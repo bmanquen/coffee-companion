@@ -27,7 +27,7 @@ Launch does all of this, in order:
 2. Runs `pnpm install --frozen-lockfile` when `node_modules` is missing.
 3. Ensures a local Postgres database named `coffee_companion_test` via `helpers/ensure-postgres.sh`. That script is **verification scaffolding**: it may install Postgres and create the throwaway database. It starts whichever cluster `pg_lsclusters` lists (the Ubuntu `postgresql` package here is 16; CI's service container is 17 — majors may differ, the throwaway `*_test` database is what matters). Auth is `VERIFY_DATABASE_URL`, or `VERIFY_DB_PASSWORD`, or an ephemeral password generated at runtime. The connection string is written to `.run/database.url` (gitignored, mode 600). Stdout is only `ok host:port/db` — never a URI with a password. **Boundary (same as `packages/api/test/database.ts`):** host must be loopback (`127.0.0.1`, `localhost`, `::1`) and the database name must end with `_test`. `VERIFY_DATABASE_URL` and `VERIFY_DB_NAME` / `VERIFY_DB_HOST` are refused otherwise — a reachable non-test URL is not used.
 4. Applies migrations with `pnpm db:migrate` against that URL.
-5. Seeds the e2e bypass users (`e2e-user-with-data` on a Pro Grant, `e2e-user-free` on Free, same library). The empty identity is left unseeded.
+5. Seeds the e2e bypass users (`e2e-user-with-data` on a Pro Grant, `e2e-user-free` on Free, same library, and `e2e-user-delete` with no library). The empty identity is left unseeded.
 6. Always rebuilds `apps/web` with `pnpm --filter coffee-companion build`. Existence of `.output` is not enough: a leftover build from another branch would invalidate the proof. The production build is short (~15s here); launch does not reuse a stale artifact.
 7. Starts `node apps/web/.output/server/index.mjs` with `DATABASE_URL`, `PORT`, and `E2E_BYPASS_AUTH=true`. `BETTER_AUTH_SECRET` and `GOOGLE_CLIENT_SECRET` come from the environment or are generated for this process; they are not literals in the skill. Billing stays off (no `STRIPE_SECRET_KEY`).
 8. Waits until `GET http://127.0.0.1:$PORT` answers. Writes `.cursor/skills/verify-coffee-companion/.run/state.json`.
@@ -103,7 +103,7 @@ Stable handles (use these, not CSS or coordinates):
 - Coffees H1 `Coffees`. Link/button `Add Coffee`. Row actions `Edit coffee`, `Delete coffee`. Confirm `Delete` (exact).
 - Equipment H1 `Equipment`. Tabs `Grinders` (default) and `Brewing Devices`. Actions `Edit grinder`, `Delete grinder`, `Edit brewing device`, `Delete brewing device`.
 - Privacy H1 `/what we collect/i`. Recipient H2s `Sentry`, `PostHog`, `Google`, `Stripe`, `Resend` (exact). Footer link `Privacy` in `navigation` named `Footer`.
-- Account: heading `Account`, button `Export data`, button `Delete account`, link `See plans`. Grant users have no `Manage subscription`. Do not confirm account deletion against `data`, `free`, or `empty`. Identity `delete` is the one that may confirm.
+- Account: heading `Account`, button `Export data`, button `Delete account`, link `See plans`. Grant users have no `Manage subscription`. Do not confirm account deletion against `data`, `free`, or `empty`. Identity `delete` is the one that may confirm. After that confirm, heading `Restore account` on `/restore-account`.
 
 First click after a navigation can land before hydration (`apps/web/e2e/helpers.ts` `clickUntil`). The daemon retries clicks and waits for React's listener tag before `fill`. When you write a one-off Playwright spec instead, use `clickUntil` / `waitForHydration` from that file.
 
@@ -119,7 +119,7 @@ Reseed after a mutation that dirties the shared library:
 .cursor/skills/verify-coffee-companion/helpers/control seed
 ```
 
-Seed deletes and re-inserts the `data` and `free` users. Do not seed against anything but the test database.
+Seed deletes and re-inserts the `data`, `free`, and `delete` users. Do not seed against anything but the test database.
 
 Existing specs remain valid: with this instance up, `E2E_BASE_URL=$baseUrl pnpm --filter coffee-companion exec playwright test e2e/marketing.spec.ts` runs the public project against it (Playwright will not start a second server when `E2E_BASE_URL` is set). Prefer the control CLI for evidence capture; use the specs when you want the suite's assertions.
 
@@ -135,7 +135,7 @@ Standards:
 - Mutations need a second user-facing read (navigate away and back, or open the list) plus the visible value. Seeded names to look for: `Ethiopia Guji`, `Kenya Nyeri`, `Niche Zero`, `Linea Mini`, `Sey`, grind settings `21`–`27`.
 - Side effects: a new Coffee appears on `/coffees`; a logged Shot lands on `/brews` with the grind you typed; Sealed rows show `Sealed` and hide grind/dose.
 - Mocks: billing is already off without Stripe env. Do not press `Subscribe` expecting a Checkout session in this instance. Google sign-in is not the path — use the bypass cookie. Outbound mail is off without `RESEND_API_KEY`.
-- Record the feature file and identity (`public` / `data` / `empty` / `free`) with every artifact. `drive marketing` writes `proof.json` that does this.
+- Record the feature file and identity (`public` / `data` / `empty` / `free` / `delete`) with every artifact. `drive marketing` writes `proof.json` that does this.
 
 `artifacts/` is gitignored. Leave it on disk for the human; do not commit binaries.
 
