@@ -44,7 +44,7 @@ test('offers deletion behind a confirmation that names what is about to go', asy
   ).toBeVisible()
   await expect(dialog.getByText(/restore them during that time/)).toBeVisible()
   await expect(dialog.getByText(/Subscription is cancelled now/)).toBeVisible()
-  await expect(dialog.getByText(/not refunded/)).toBeVisible()
+  await expect(dialog.getByText(/will not be refunded/)).toBeVisible()
   await expect(dialog.getByText(/PostHog/)).toHaveCount(0)
   await expect(dialog.getByText(/cannot be undone/i)).toHaveCount(0)
   await expect(
