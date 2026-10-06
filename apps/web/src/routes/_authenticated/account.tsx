@@ -239,7 +239,7 @@ export function AccountScreen({
               <DialogHeader>
                 <DialogTitle>Delete account</DialogTitle>
                 <DialogDescription>
-                  Your account and library are kept for 30 days, then deleted.
+                  Your account and data are kept for 30 days, then deleted.
                   You can restore them during that time. Your Subscription is
                   cancelled now, and any time you've already paid for is not
                   refunded.

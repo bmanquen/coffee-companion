@@ -167,7 +167,7 @@ describe('AccountScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
 
     const dialog = screen.getByRole('dialog')
-    expect(dialog.textContent).toMatch(/kept for 30 days/i)
+    expect(dialog.textContent).toMatch(/account and data are kept for 30 days/i)
     expect(dialog.textContent).toMatch(/restore them during that time/i)
     expect(dialog.textContent).toMatch(/Subscription is cancelled now/i)
     expect(dialog.textContent).toMatch(/not refunded/)
