@@ -120,6 +120,89 @@ describe('SearchSelect', () => {
     expect(onAddItem).toHaveBeenCalledWith('Heart')
   })
 
+  it('keeps the popover open and names a CONFLICT inside it', async () => {
+    const onAddItem = vi.fn(async () => {
+      throw Object.assign(
+        new Error(
+          'You already have one called Kaffa Lab. Pick it there, or give this one a different name.',
+        ),
+        { data: { code: 'CONFLICT' } },
+      )
+    })
+    render(<Harness onAddItem={onAddItem} />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Select Roaster'))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'kaffa lab' },
+      })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Add/ }))
+    })
+    expect(
+      screen.getByRole('alert').textContent,
+    ).toBe(
+      'You already have one called Kaffa Lab. Pick it there, or give this one a different name.',
+    )
+    expect(screen.getByPlaceholderText('Search...')).toHaveProperty(
+      'value',
+      'kaffa lab',
+    )
+    expect(screen.getByText('Select Roaster')).toBeTruthy()
+  })
+
+  it('hides a raw failure from the picker', async () => {
+    const onAddItem = vi.fn(async () => {
+      throw Object.assign(new Error('Failed query: INSERT INTO roasters'), {
+        data: { code: 'INTERNAL_SERVER_ERROR' },
+      })
+    })
+    render(<Harness onAddItem={onAddItem} />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Select Roaster'))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Heart' },
+      })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Add/ }))
+    })
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Something went wrong. Try again.',
+    )
+  })
+
+  it('clears the add alert when the typed text changes', async () => {
+    const onAddItem = vi.fn(async () => {
+      throw Object.assign(new Error('You already have one called Heart.'), {
+        data: { code: 'CONFLICT' },
+      })
+    })
+    render(<Harness onAddItem={onAddItem} />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Select Roaster'))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Heart' },
+      })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Add/ }))
+    })
+    expect(screen.getByRole('alert')).toBeTruthy()
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Hearts' },
+      })
+    })
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('does not select when onAddItem returns null', async () => {
     const onAddItem = vi.fn(async () => null)
     render(<Harness onAddItem={onAddItem} />)
