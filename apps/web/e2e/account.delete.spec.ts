@@ -24,6 +24,14 @@ test('deleting offers restore, blocks the app, and restore brings the account ba
   )
 
   await expect(
+    page.getByText(
+      /Restore your account before [A-Za-z]+ \d{1,2}, \d{4} to keep it/,
+    ),
+  ).toBeVisible()
+  await expect(
+    page.getByText(/Your account data will be deleted on or after that day/),
+  ).toBeVisible()
+  await expect(
     page.getByText(/Your Subscription stays cancelled/),
   ).toBeVisible()
   await expect(

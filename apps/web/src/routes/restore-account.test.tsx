@@ -15,9 +15,19 @@ describe('RestoreAccountScreen', () => {
     mocks.toastError.mockClear()
   })
 
-  it('says restoring does not restart billing', () => {
-    render(<RestoreAccountScreen onRestore={vi.fn()} />)
+  it('says restoring does not restart billing', async () => {
+    render(
+      <RestoreAccountScreen
+        deletedAt={new Date('2026-10-05T12:00:00.000Z')}
+        onRestore={vi.fn()}
+      />,
+    )
 
+    expect(
+      await screen.findByText(
+        /Restore your account before .+ to keep it\. Your account data will be deleted on or after that day\./,
+      ),
+    ).toBeTruthy()
     expect(screen.getByText(/Subscription stays cancelled/)).toBeTruthy()
     expect(
       screen.getByText(/does not start a new one.*still not refunded/i),
@@ -29,7 +39,12 @@ describe('RestoreAccountScreen', () => {
 
   it('restores when asked', async () => {
     const onRestore = vi.fn().mockResolvedValue(undefined)
-    render(<RestoreAccountScreen onRestore={onRestore} />)
+    render(
+      <RestoreAccountScreen
+        deletedAt={new Date('2026-10-05T12:00:00.000Z')}
+        onRestore={onRestore}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore account' }))
 
@@ -38,7 +53,12 @@ describe('RestoreAccountScreen', () => {
 
   it('says so when restore fails', async () => {
     const onRestore = vi.fn().mockRejectedValue(new Error('unavailable'))
-    render(<RestoreAccountScreen onRestore={onRestore} />)
+    render(
+      <RestoreAccountScreen
+        deletedAt={new Date('2026-10-05T12:00:00.000Z')}
+        onRestore={onRestore}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore account' }))
 
