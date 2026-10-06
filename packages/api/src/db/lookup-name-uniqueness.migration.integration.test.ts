@@ -89,6 +89,7 @@ describe('lookup name uniqueness migration SQL', () => {
     expect(fold).toContain('DISABLE TRIGGER')
     expect(fold).toContain('ENABLE TRIGGER')
     expect(fold).toContain('roaster_id IS NOT NULL')
+    expect(fold).toContain('EXIT WHEN NOT taken')
   })
 })
 

@@ -363,6 +363,73 @@ describe('lookup_fold', () => {
     })
   })
 
+  it('picks another coffee name when name (id) is already taken', async () => {
+    await withSandbox(async (client) => {
+      const roasterName = uniq('Onyx')
+      const [shared] = (
+        await client.query<{ id: string }>(
+          `INSERT INTO roasters (name) VALUES ($1) RETURNING id`,
+          [roasterName],
+        )
+      ).rows
+      const [copy] = (
+        await client.query<{ id: string }>(
+          `INSERT INTO roasters (name, user_id) VALUES ($1, $2) RETURNING id`,
+          [roasterName.toLowerCase(), ALICE],
+        )
+      ).rows
+      const [roast] = (
+        await client.query<{ id: string }>(
+          `INSERT INTO roast_levels (name, user_id) VALUES ($1, $2) RETURNING id`,
+          [uniq('Medium'), ALICE],
+        )
+      ).rows
+      const [onCopy] = (
+        await client.query<{ id: string }>(
+          `INSERT INTO coffees (name, user_id, roaster_id, roast_level_id, created_at)
+           VALUES ('Geisha', $1, $2, $3, '2026-01-02') RETURNING id`,
+          [ALICE, copy.id, roast.id],
+        )
+      ).rows
+      await client.query(
+        `INSERT INTO coffees (name, user_id, roaster_id, roast_level_id, created_at)
+         VALUES ($1, $2, $3, $4, '2026-01-03')`,
+        [`Geisha (${onCopy.id})`, ALICE, shared.id, roast.id],
+      )
+      const [onShared] = (
+        await client.query<{ id: string }>(
+          `INSERT INTO coffees (name, user_id, roaster_id, roast_level_id, created_at)
+           VALUES ('Geisha', $1, $2, $3, '2026-01-01') RETURNING id`,
+          [ALICE, shared.id, roast.id],
+        )
+      ).rows
+      await client.query(`SELECT * FROM lookup_fold()`)
+      const rows = await client.query<{
+        id: string
+        name: string
+        roaster_id: string
+      }>(
+        `SELECT id, name, roaster_id FROM coffees WHERE id = $1`,
+        [onCopy.id],
+      )
+      expect(rows.rows).toEqual([
+        {
+          id: onCopy.id,
+          name: `Geisha (${onCopy.id}, 1)`,
+          roaster_id: shared.id,
+        },
+      ])
+      expect(
+        (
+          await client.query<{ id: string }>(
+            `SELECT id FROM coffees WHERE id = $1`,
+            [onShared.id],
+          )
+        ).rows,
+      ).toEqual([{ id: onShared.id }])
+    })
+  })
+
   it('returns nothing on a second run', async () => {
     const again = await pool.query(`SELECT * FROM lookup_fold()`)
     expect(again.rows).toEqual([])
