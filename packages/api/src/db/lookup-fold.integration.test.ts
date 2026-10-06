@@ -356,12 +356,10 @@ describe('a later shared default', () => {
       .values({ name, userId: ALICE })
       .returning()
     const [shared] = await db.insert(roasters).values({ name }).returning()
-    const folded = await db.execute(
-      sql`SELECT loser::text, keeper::text FROM lookup_fold()`,
+    const folded = await pool.query<{ loser: string; keeper: string }>(
+      `SELECT loser::text, keeper::text FROM lookup_fold()`,
     )
-    const rows = (folded as { rows: Array<{ loser: string; keeper: string }> })
-      .rows
-    expect(rows).toContainEqual({ loser: copy.id, keeper: shared.id })
+    expect(folded.rows).toContainEqual({ loser: copy.id, keeper: shared.id })
     const left = await db
       .select({ id: roasters.id })
       .from(roasters)

@@ -1,9 +1,11 @@
 import { is } from 'drizzle-orm'
-import { getTableConfig, PgTable } from 'drizzle-orm/pg-core'
+import { PgTable, getTableConfig } from 'drizzle-orm/pg-core'
 import * as schema from '../src/db/schema'
+import type { PgColumn } from 'drizzle-orm/pg-core'
 
 export type Lookup = {
   table: PgTable
+  id: PgColumn
   sqlName: string
   scope: { column: string; parent: PgTable } | null
 }
@@ -16,6 +18,11 @@ export function lookupTables(): Array<Lookup> {
     const config = getTableConfig(value)
     if (!config.columns.some((column) => column.name === 'name_key')) continue
 
+    const id = config.columns.find((column) => column.name === 'id')
+    if (!id) {
+      throw new Error(`${config.name} is a lookup without an id column`)
+    }
+
     const nameKeyUnique = config.uniqueConstraints.find((constraint) =>
       constraint.columns.some((column) => column.name === 'name_key'),
     )
@@ -23,7 +30,7 @@ export function lookupTables(): Array<Lookup> {
       (column) => column.name !== 'user_id' && column.name !== 'name_key',
     )
     if (!scopeColumn) {
-      lookups.push({ table: value, sqlName: config.name, scope: null })
+      lookups.push({ table: value, id, sqlName: config.name, scope: null })
       continue
     }
 
@@ -38,6 +45,7 @@ export function lookupTables(): Array<Lookup> {
     }
     lookups.push({
       table: value,
+      id,
       sqlName: config.name,
       scope: { column: scopeColumn.name, parent },
     })

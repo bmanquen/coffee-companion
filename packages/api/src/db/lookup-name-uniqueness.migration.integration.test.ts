@@ -10,9 +10,19 @@ const MIGRATION_SQL = readFileSync(
   'utf8',
 )
 
-const statements = MIGRATION_SQL.split('--> statement-breakpoint').map((s) =>
-  s.trim(),
-)
+const statements: Array<string> = MIGRATION_SQL.split(
+  '--> statement-breakpoint',
+).map((statement) => statement.trim())
+
+function lastIndex(
+  items: Array<string>,
+  matches: (item: string) => boolean,
+) {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (matches(items[i])) return i
+  }
+  return -1
+}
 
 let pool: Pool
 
@@ -26,37 +36,37 @@ afterAll(async () => {
 
 describe('lookup name uniqueness migration SQL', () => {
   it('drops the old indexes, then adds name_key, then the guard, then folds, then unique constraints', () => {
-    const firstDrop = statements.findIndex((s) => s.startsWith('DROP INDEX'))
-    const lastDrop = statements.findLastIndex((s) => s.startsWith('DROP INDEX'))
-    const firstAdd = statements.findIndex((s) =>
-      s.includes('ADD COLUMN "name_key"'),
+    const firstDrop = statements.findIndex((item) => item.startsWith('DROP INDEX'))
+    const lastDrop = lastIndex(statements, (item) => item.startsWith('DROP INDEX'))
+    const firstAdd = statements.findIndex((item) =>
+      item.includes('ADD COLUMN "name_key"'),
     )
-    const lastNotNull = statements.findLastIndex((s) =>
-      s.includes('ALTER COLUMN "name_key" SET NOT NULL'),
+    const lastNotNull = lastIndex(statements, (item) =>
+      item.includes('ALTER COLUMN "name_key" SET NOT NULL'),
     )
-    const guardFn = statements.findIndex((s) =>
-      s.includes('CREATE FUNCTION lookup_name_guard()'),
+    const guardFn = statements.findIndex((item) =>
+      item.includes('CREATE FUNCTION lookup_name_guard()'),
     )
-    const lastTrigger = statements.findLastIndex((s) =>
-      s.startsWith('CREATE TRIGGER'),
+    const lastTrigger = lastIndex(statements, (item) =>
+      item.startsWith('CREATE TRIGGER'),
     )
-    const foldPlan = statements.findIndex((s) =>
-      s.includes('CREATE FUNCTION lookup_fold_plan()'),
+    const foldPlan = statements.findIndex((item) =>
+      item.includes('CREATE FUNCTION lookup_fold_plan()'),
     )
-    const foldFn = statements.findIndex((s) =>
-      s.includes('CREATE FUNCTION lookup_fold()'),
+    const foldFn = statements.findIndex((item) =>
+      item.includes('CREATE FUNCTION lookup_fold()'),
     )
-    const rename = statements.findIndex((s) =>
-      s.includes('roaster_id IS NOT NULL'),
+    const rename = statements.findIndex((item) =>
+      item.includes('roaster_id IS NOT NULL'),
     )
-    const foldCall = statements.findIndex((s) =>
-      s.includes('SELECT * FROM lookup_fold()'),
+    const foldCall = statements.findIndex((item) =>
+      item.includes('SELECT * FROM lookup_fold()'),
     )
-    const firstUnique = statements.findIndex((s) =>
-      s.includes('UNIQUE NULLS NOT DISTINCT'),
+    const firstUnique = statements.findIndex((item) =>
+      item.includes('UNIQUE NULLS NOT DISTINCT'),
     )
-    const lastUnique = statements.findLastIndex((s) =>
-      s.includes('UNIQUE NULLS NOT DISTINCT'),
+    const lastUnique = lastIndex(statements, (item) =>
+      item.includes('UNIQUE NULLS NOT DISTINCT'),
     )
 
     expect(firstDrop).toBe(0)

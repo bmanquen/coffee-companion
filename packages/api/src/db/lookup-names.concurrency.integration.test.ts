@@ -36,12 +36,9 @@ describe('lookup name races', () => {
     const rejected = results.filter((r) => r.status === 'rejected')
     expect(fulfilled).toHaveLength(1)
     expect(rejected).toHaveLength(1)
-    const winner = (fulfilled[0] as PromiseFulfilledResult<{ name: string }>)
-      .value.name
-    const error = (rejected[0] as PromiseRejectedResult).reason
-    expect(error).toMatchObject({
+    expect(rejected[0].reason).toMatchObject({
       code: 'CONFLICT',
-      message: ownSentence(winner),
+      message: ownSentence(fulfilled[0].value.name),
     })
   })
 
