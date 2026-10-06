@@ -35,7 +35,7 @@ test('deleting offers restore, blocks the app, and restore brings the account ba
     page.getByText(/Your Subscription stays cancelled/),
   ).toBeVisible()
   await expect(
-    page.getByText(/does not start a new one.*still not refunded/i),
+    page.getByText(/does not start a new one.*will not be refunded/i),
   ).toBeVisible()
 
   await page.goto('/coffees')

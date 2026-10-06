@@ -30,7 +30,7 @@ describe('RestoreAccountScreen', () => {
     ).toBeTruthy()
     expect(screen.getByText(/Subscription stays cancelled/)).toBeTruthy()
     expect(
-      screen.getByText(/does not start a new one.*still not refunded/i),
+      screen.getByText(/does not start a new one.*will not be refunded/i),
     ).toBeTruthy()
     expect(
       screen.getByRole('button', { name: 'Restore account' }),
