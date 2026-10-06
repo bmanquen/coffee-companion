@@ -101,7 +101,7 @@ export function RestoreAccountScreen({
             {deadlineCopy ? <p>{deadlineCopy}</p> : null}
             <p>
               Your Subscription stays cancelled. Restoring your account does not
-              start a new one, and any time you've already paid for is still not
+              start a new one, and any time you've already paid for will not be
               refunded.
             </p>
           </CardDescription>
