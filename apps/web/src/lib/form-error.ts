@@ -5,7 +5,7 @@ export type MappedFormError =
   | { kind: 'form'; message: string }
   | { kind: 'plan-limit'; message: string }
 
-function trpcErrorCode(error: unknown): string | null {
+export function trpcErrorCode(error: unknown): string | null {
   if (!(error instanceof Error)) return null
   const data = (error as { data?: { code?: unknown } }).data
   return typeof data?.code === 'string' ? data.code : null

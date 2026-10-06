@@ -52,3 +52,20 @@ export function lookupTables(): Array<Lookup> {
   }
   return lookups
 }
+
+export function lookupSqlNames(): Array<string> {
+  return lookupTables().map((lookup) => lookup.sqlName)
+}
+
+export function lookupUniqueConstraintNames(): Array<string> {
+  return lookupTables().map((lookup) => {
+    const constraint = getTableConfig(lookup.table).uniqueConstraints.find(
+      (item) => item.columns.some((column) => column.name === 'name_key'),
+    )
+    const name = constraint?.getName() ?? constraint?.name
+    if (!name) {
+      throw new Error(`${lookup.sqlName} has no name_key unique constraint`)
+    }
+    return name
+  })
+}

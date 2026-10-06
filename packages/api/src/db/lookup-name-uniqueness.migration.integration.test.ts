@@ -3,6 +3,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
+import {
+  lookupSqlNames,
+  lookupUniqueConstraintNames,
+} from '../../test/lookups'
 
 const FOLDER = '20261006181737_lookup_name_uniqueness'
 const MIGRATION_SQL = readFileSync(
@@ -91,33 +95,8 @@ describe('lookup name uniqueness migration SQL', () => {
   })
 })
 
-const LOOKUPS = [
-  'aeropress_methods',
-  'brewing_device_types',
-  'coffee_processes',
-  'countries',
-  'farms',
-  'frenchpress_methods',
-  'pourover_methods',
-  'regions',
-  'roast_levels',
-  'roasters',
-  'varieties',
-] as const
-
-const CONSTRAINTS = [
-  'aeropress_methods_user_id_name_key_unique',
-  'brewing_device_types_user_id_name_key_unique',
-  'coffee_processes_user_id_name_key_unique',
-  'countries_user_id_name_key_unique',
-  'farms_user_id_name_key_region_id_unique',
-  'frenchpress_methods_user_id_name_key_unique',
-  'pourover_methods_user_id_name_key_unique',
-  'regions_user_id_name_key_country_id_unique',
-  'roast_levels_user_id_name_key_unique',
-  'roasters_user_id_name_key_unique',
-  'varieties_user_id_name_key_unique',
-] as const
+const LOOKUPS = lookupSqlNames()
+const CONSTRAINTS = lookupUniqueConstraintNames()
 
 const OLD_INDEXES = [
   `CREATE UNIQUE INDEX "aeropress_methods_name_idx" ON "aeropress_methods" ("name")`,

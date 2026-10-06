@@ -203,6 +203,56 @@ describe('SearchSelect', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('clears the add alert when an option is picked', async () => {
+    const onAddItem = vi.fn(async () => {
+      throw Object.assign(new Error('You already have one called Heart.'), {
+        data: { code: 'CONFLICT' },
+      })
+    })
+    render(<Harness onAddItem={onAddItem} />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Select Roaster'))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Heart' },
+      })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Add/ }))
+    })
+    expect(screen.getByRole('alert')).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('option', { name: 'Sey' }))
+    })
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('clears the add alert when the popover closes', async () => {
+    const onAddItem = vi.fn(async () => {
+      throw Object.assign(new Error('You already have one called Heart.'), {
+        data: { code: 'CONFLICT' },
+      })
+    })
+    render(<Harness onAddItem={onAddItem} />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('Select Roaster'))
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search...'), {
+        target: { value: 'Heart' },
+      })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Add/ }))
+    })
+    expect(screen.getByRole('alert')).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(screen.getByText('Select Roaster'))
+    })
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('does not select when onAddItem returns null', async () => {
     const onAddItem = vi.fn(async () => null)
     render(<Harness onAddItem={onAddItem} />)
