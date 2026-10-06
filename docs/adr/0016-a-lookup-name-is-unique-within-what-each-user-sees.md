@@ -15,6 +15,8 @@ first, then `lookup_fold()`.
 `lookup_fold()` keeps the shared row when a user copy matches it, else the
 oldest `created_at, id`. Identical relation rows (variety links, origins
 that agree outside their key) dedupe; any other PK collision — two origins
-of one coffee with different regions — aborts. Folding a user's
-`aeropress` into shared `AeroPress` makes that user's devices qualify for
-AeroPress brews; the shared gating casing is the keeper.
+of one coffee with different regions — aborts. A roaster fold that would
+give one user two coffees with the same name renames the later coffee, so
+a later shared default can call `lookup_fold()` without aborting. Folding
+a user's `aeropress` into shared `AeroPress` makes that user's devices
+qualify for AeroPress brews; the shared gating casing is the keeper.

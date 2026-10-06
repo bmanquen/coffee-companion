@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, isNull, sql } from 'drizzle-orm'
 import { AEROPRESS_METHOD_DEFAULTS } from '../lib/aeropress'
 import {
   aeropressBrews,
@@ -388,22 +388,32 @@ async function seed() {
     .delete(brewingDevices)
     .where(eq(brewingDevices.userId, SEED_USER_ID))
 
-  // Lookup maps are built from a full table read (not insert().returning(),
-  // which only returns newly inserted rows) so foreign keys resolve whether or
-  // not the lookup rows already existed.
+  // Lookup maps read shared rows (not insert().returning(), which only
+  // returns newly inserted rows) so foreign keys resolve whether or not the
+  // lookup already existed. Names are unique per user, not globally, so a
+  // user copy of the same name is a different row.
   await db.insert(coffeeProcesses).values(processesData).onConflictDoNothing()
   const processMap = new Map(
-    (await db.select().from(coffeeProcesses)).map((p) => [p.name, p.id]),
+    (
+      await db
+        .select()
+        .from(coffeeProcesses)
+        .where(isNull(coffeeProcesses.userId))
+    ).map((p) => [p.name, p.id]),
   )
 
   await db.insert(varieties).values(varietiesData).onConflictDoNothing()
   const varietyMap = new Map(
-    (await db.select().from(varieties)).map((v) => [v.name, v.id]),
+    (
+      await db.select().from(varieties).where(isNull(varieties.userId))
+    ).map((v) => [v.name, v.id]),
   )
 
   await db.insert(countries).values(countriesData).onConflictDoNothing()
   const countryMap = new Map(
-    (await db.select().from(countries)).map((c) => [c.name, c.id]),
+    (
+      await db.select().from(countries).where(isNull(countries.userId))
+    ).map((c) => [c.name, c.id]),
   )
 
   await db
@@ -416,7 +426,9 @@ async function seed() {
     )
     .onConflictDoNothing()
   const regionMap = new Map(
-    (await db.select().from(regions)).map((r) => [r.name, r.id]),
+    (await db.select().from(regions).where(isNull(regions.userId))).map(
+      (r) => [r.name, r.id],
+    ),
   )
 
   await db
@@ -429,17 +441,24 @@ async function seed() {
     )
     .onConflictDoNothing()
   const farmMap = new Map(
-    (await db.select().from(farms)).map((f) => [f.name, f.id]),
+    (await db.select().from(farms).where(isNull(farms.userId))).map((f) => [
+      f.name,
+      f.id,
+    ]),
   )
 
   await db.insert(roasters).values(roastersData).onConflictDoNothing()
   const roasterMap = new Map(
-    (await db.select().from(roasters)).map((r) => [r.name, r.id]),
+    (
+      await db.select().from(roasters).where(isNull(roasters.userId))
+    ).map((r) => [r.name, r.id]),
   )
 
   await db.insert(roastLevels).values(roastLevelsData).onConflictDoNothing()
   const roastLevelMap = new Map(
-    (await db.select().from(roastLevels)).map((r) => [r.name, r.id]),
+    (
+      await db.select().from(roastLevels).where(isNull(roastLevels.userId))
+    ).map((r) => [r.name, r.id]),
   )
 
   // Grinders are user-owned and were cleared above, so insert fresh.
@@ -459,7 +478,12 @@ async function seed() {
     .values(brewingDeviceTypesData)
     .onConflictDoNothing()
   const brewingDeviceTypeMap = new Map(
-    (await db.select().from(brewingDeviceTypes)).map((t) => [t.name, t.id]),
+    (
+      await db
+        .select()
+        .from(brewingDeviceTypes)
+        .where(isNull(brewingDeviceTypes.userId))
+    ).map((t) => [t.name, t.id]),
   )
 
   // AeroPress brew methods are system defaults (userId null), upserted by name.
@@ -468,7 +492,12 @@ async function seed() {
     .values(AEROPRESS_METHOD_DEFAULTS.map((name) => ({ name })))
     .onConflictDoNothing()
   const aeropressMethodMap = new Map(
-    (await db.select().from(aeropressMethods)).map((m) => [m.name, m.id]),
+    (
+      await db
+        .select()
+        .from(aeropressMethods)
+        .where(isNull(aeropressMethods.userId))
+    ).map((m) => [m.name, m.id]),
   )
   const standardMethodId = aeropressMethodMap.get('Standard')!
 
@@ -480,7 +509,12 @@ async function seed() {
     .values({ name: 'Standard' })
     .onConflictDoNothing()
   const pouroverMethodMap = new Map(
-    (await db.select().from(pouroverMethods)).map((m) => [m.name, m.id]),
+    (
+      await db
+        .select()
+        .from(pouroverMethods)
+        .where(isNull(pouroverMethods.userId))
+    ).map((m) => [m.name, m.id]),
   )
   const pouroverStandardMethodId = pouroverMethodMap.get('Standard')!
 
@@ -492,9 +526,16 @@ async function seed() {
     .values({ name: 'Standard' })
     .onConflictDoNothing()
   const frenchpressMethodMap = new Map(
-    (await db.select().from(frenchpressMethods)).map((m) => [m.name, m.id]),
+    (
+      await db
+        .select()
+        .from(frenchpressMethods)
+        .where(isNull(frenchpressMethods.userId))
+    ).map((m) => [m.name, m.id]),
   )
   const frenchpressStandardMethodId = frenchpressMethodMap.get('Standard')!
+
+  await db.execute(sql`SELECT * FROM lookup_fold()`)
 
   // Brewing devices are user-owned and were cleared above, so insert fresh.
   await db.insert(brewingDevices).values(

@@ -301,6 +301,7 @@ DECLARE
 	others_expr text;
 	fk_mapped_expr text;
 	disagree boolean;
+	updated int;
 BEGIN
 	FOR trig IN
 		SELECT t.tgrelid::regclass AS rel, t.tgname
@@ -322,6 +323,31 @@ BEGIN
 
 		INSERT INTO lookup_fold_applied
 		SELECT * FROM lookup_fold_plan();
+
+		-- Folding a user's roaster into its shared twin can give one user two
+		-- coffees with the same roaster and name. Rename the later ones so this
+		-- function never has to choose between two coffees. Later shared-default
+		-- folds hit the same case. Coffees with no roaster cannot collide on
+		-- that index (NULLS DISTINCT), so they are left alone.
+		LOOP
+			UPDATE "coffees" AS keepers
+			SET "name" = keepers."name" || ' (' || keepers."id"::text || ')'
+			FROM (
+				SELECT coffee.id,
+					ROW_NUMBER() OVER (
+						PARTITION BY coffee.user_id, coalesce(plan.keeper, coffee.roaster_id), coffee.name
+						ORDER BY (plan.loser IS NULL) DESC, coffee.created_at ASC, coffee.id ASC
+					) AS rn
+				FROM "coffees" coffee
+				LEFT JOIN lookup_fold_pairs plan
+					ON plan.lookup = 'roasters'::regclass
+					AND plan.loser = coffee.roaster_id
+				WHERE coffee.roaster_id IS NOT NULL
+			) AS ranked
+			WHERE keepers.id = ranked.id AND ranked.rn > 1;
+			GET DIAGNOSTICS updated = ROW_COUNT;
+			EXIT WHEN updated = 0;
+		END LOOP;
 
 		FOR rec IN
 			SELECT * FROM lookup_fold_lookups ORDER BY ord DESC, rel::text
@@ -561,35 +587,6 @@ BEGIN
 	RETURN QUERY SELECT a.lookup, a.loser, a.keeper FROM lookup_fold_applied a;
 END
 $lookup_fold$;--> statement-breakpoint
--- Folding a user's roaster into its shared twin can give one user two coffees
--- with the same roaster and name. Rename the later ones so lookup_fold() never
--- has to choose between two coffees. Coffees with no roaster cannot collide on
--- that index (NULLS DISTINCT), so they are left alone.
-DO $rename_folded_coffees$
-DECLARE
-	updated int;
-BEGIN
-	LOOP
-		UPDATE "coffees" AS keepers
-		SET "name" = keepers."name" || ' (' || keepers."id"::text || ')'
-		FROM (
-			SELECT coffee.id,
-				ROW_NUMBER() OVER (
-					PARTITION BY coffee.user_id, coalesce(plan.keeper, coffee.roaster_id), coffee.name
-					ORDER BY (plan.loser IS NULL) DESC, coffee.created_at ASC, coffee.id ASC
-				) AS rn
-			FROM "coffees" coffee
-			LEFT JOIN lookup_fold_plan() plan
-				ON plan.lookup = 'roasters'::regclass
-				AND plan.loser = coffee.roaster_id
-			WHERE coffee.roaster_id IS NOT NULL
-		) AS ranked
-		WHERE keepers.id = ranked.id AND ranked.rn > 1;
-		GET DIAGNOSTICS updated = ROW_COUNT;
-		EXIT WHEN updated = 0;
-	END LOOP;
-END
-$rename_folded_coffees$;--> statement-breakpoint
 SELECT * FROM lookup_fold();--> statement-breakpoint
 ALTER TABLE "aeropress_methods" ADD CONSTRAINT "aeropress_methods_user_id_name_key_unique" UNIQUE NULLS NOT DISTINCT("user_id","name_key");--> statement-breakpoint
 ALTER TABLE "brewing_device_types" ADD CONSTRAINT "brewing_device_types_user_id_name_key_unique" UNIQUE NULLS NOT DISTINCT("user_id","name_key");--> statement-breakpoint
