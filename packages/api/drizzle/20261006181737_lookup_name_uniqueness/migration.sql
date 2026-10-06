@@ -301,7 +301,10 @@ DECLARE
 	others_expr text;
 	fk_mapped_expr text;
 	disagree boolean;
-	updated int;
+	coffee_row record;
+	candidate text;
+	n int;
+	taken boolean;
 BEGIN
 	FOR trig IN
 		SELECT t.tgrelid::regclass AS rel, t.tgname
@@ -328,12 +331,13 @@ BEGIN
 		-- coffees with the same roaster and name. Rename the later ones so this
 		-- function never has to choose between two coffees. Later shared-default
 		-- folds hit the same case. Coffees with no roaster cannot collide on
-		-- that index (NULLS DISTINCT), so they are left alone.
-		LOOP
-			UPDATE "coffees" AS keepers
-			SET "name" = keepers."name" || ' (' || keepers."id"::text || ')'
+		-- that index (NULLS DISTINCT), so they are left alone. If `name (id)`
+		-- is already taken on the keeper roaster, try `name (id, 1)` and up.
+		FOR coffee_row IN
+			SELECT ranked.id, ranked.user_id, ranked.roaster_id, ranked.name
 			FROM (
-				SELECT coffee.id,
+				SELECT coffee.id, coffee.user_id, coffee.name,
+					coalesce(plan.keeper, coffee.roaster_id) AS roaster_id,
 					ROW_NUMBER() OVER (
 						PARTITION BY coffee.user_id, coalesce(plan.keeper, coffee.roaster_id), coffee.name
 						ORDER BY (plan.loser IS NULL) DESC, coffee.created_at ASC, coffee.id ASC
@@ -344,9 +348,28 @@ BEGIN
 					AND plan.loser = coffee.roaster_id
 				WHERE coffee.roaster_id IS NOT NULL
 			) AS ranked
-			WHERE keepers.id = ranked.id AND ranked.rn > 1;
-			GET DIAGNOSTICS updated = ROW_COUNT;
-			EXIT WHEN updated = 0;
+			WHERE ranked.rn > 1
+		LOOP
+			n := 0;
+			LOOP
+				candidate := coffee_row.name || ' (' || coffee_row.id::text
+					|| CASE WHEN n = 0 THEN ')' ELSE ', ' || n::text || ')' END;
+				SELECT EXISTS (
+					SELECT 1
+					FROM "coffees" other
+					LEFT JOIN lookup_fold_pairs plan
+						ON plan.lookup = 'roasters'::regclass
+						AND plan.loser = other.roaster_id
+					WHERE other.id <> coffee_row.id
+						AND other.user_id IS NOT DISTINCT FROM coffee_row.user_id
+						AND other.name = candidate
+						AND coalesce(plan.keeper, other.roaster_id)
+							IS NOT DISTINCT FROM coffee_row.roaster_id
+				) INTO taken;
+				EXIT WHEN NOT taken;
+				n := n + 1;
+			END LOOP;
+			UPDATE "coffees" SET "name" = candidate WHERE id = coffee_row.id;
 		END LOOP;
 
 		FOR rec IN
