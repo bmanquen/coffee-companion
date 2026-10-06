@@ -303,7 +303,7 @@ DECLARE
 	disagree boolean;
 	coffee_row record;
 	candidate text;
-	n int;
+	suffix int;
 	taken boolean;
 BEGIN
 	FOR trig IN
@@ -350,10 +350,10 @@ BEGIN
 			) AS ranked
 			WHERE ranked.rn > 1
 		LOOP
-			n := 0;
+			suffix := 0;
 			LOOP
 				candidate := coffee_row.name || ' (' || coffee_row.id::text
-					|| CASE WHEN n = 0 THEN ')' ELSE ', ' || n::text || ')' END;
+					|| CASE WHEN suffix = 0 THEN ')' ELSE ', ' || suffix::text || ')' END;
 				SELECT EXISTS (
 					SELECT 1
 					FROM "coffees" other
@@ -367,7 +367,7 @@ BEGIN
 							IS NOT DISTINCT FROM coffee_row.roaster_id
 				) INTO taken;
 				EXIT WHEN NOT taken;
-				n := n + 1;
+				suffix := suffix + 1;
 			END LOOP;
 			UPDATE "coffees" SET "name" = candidate WHERE id = coffee_row.id;
 		END LOOP;
