@@ -56,11 +56,12 @@ describe('lookup name races', () => {
         `INSERT INTO roasters (name, user_id) VALUES ($1, $2)`,
         [saved.toLowerCase(), ALICE],
       )
-      await new Promise((resolve) => setTimeout(resolve, 200))
-      await a.query('COMMIT')
-      await expect(pending).rejects.toSatisfy(
+      const refused = expect(pending).rejects.toSatisfy(
         (error: unknown) => lookupNameClashMessage(error) === ownSentence(saved),
       )
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      await a.query('COMMIT')
+      await refused
     } finally {
       await a.query('ROLLBACK').catch(() => {})
       a.release()
@@ -79,12 +80,13 @@ describe('lookup name races', () => {
         `INSERT INTO roasters (name, user_id) VALUES ($1, $2)`,
         [saved.toLowerCase(), ALICE],
       )
-      await new Promise((resolve) => setTimeout(resolve, 200))
-      await a.query('COMMIT')
-      await expect(pending).rejects.toSatisfy(
+      const refused = expect(pending).rejects.toSatisfy(
         (error: unknown) =>
           lookupNameClashMessage(error) === sharedSentence(saved),
       )
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      await a.query('COMMIT')
+      await refused
     } finally {
       await a.query('ROLLBACK').catch(() => {})
       a.release()
