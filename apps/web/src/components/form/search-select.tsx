@@ -1,5 +1,5 @@
 import { CheckIcon, ChevronDownIcon, PlusIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { FormLabel } from './form-label'
 import { useFieldError } from './use-field-error'
 import { useFieldRequired } from './use-field-required'
@@ -68,12 +68,18 @@ export function SearchSelect({
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
+  const addRequest = useRef(0)
   const options = initialOptions
 
   const selectedOption = options.find((o) => o.value === field.state.value)
 
-  const handleSearchChange = (value: string) => {
+  const abandonAdd = () => {
+    addRequest.current += 1
     setAddError(null)
+  }
+
+  const handleSearchChange = (value: string) => {
+    abandonAdd()
     setSearch(value)
   }
 
@@ -81,7 +87,7 @@ export function SearchSelect({
     const next = value === field.state.value ? '' : value
     field.handleChange(next)
     onValueChange?.(next)
-    setAddError(null)
+    abandonAdd()
     setSearch('')
     setOpen(false)
   }
@@ -90,16 +96,21 @@ export function SearchSelect({
     const trimmed = search.trim()
     if (!trimmed) return
 
+    const request = addRequest.current + 1
+    addRequest.current = request
+
     let newOption: SearchSelectOption | null
     try {
       newOption = onAddItem
         ? await onAddItem(trimmed)
         : { value: trimmed.toLowerCase(), label: trimmed }
     } catch (failure) {
+      if (request !== addRequest.current) return
       setAddError(addErrorMessage(failure))
       return
     }
 
+    if (request !== addRequest.current) return
     if (!newOption) return
 
     field.handleChange(newOption.value)
@@ -128,7 +139,7 @@ export function SearchSelect({
           onOpenChange={(next) => {
             setOpen(next)
             if (!next) {
-              setAddError(null)
+              abandonAdd()
               setSearch('')
               field.handleBlur()
             }
