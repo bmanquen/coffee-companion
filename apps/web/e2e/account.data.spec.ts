@@ -33,6 +33,12 @@ test('offers deletion behind a confirmation that names what is about to go', asy
 }) => {
   await page.goto('/account')
 
+  await expect(
+    page.getByText(
+      /Export a copy first\. Your account data is kept for 30 days, then deleted\./,
+    ),
+  ).toBeVisible()
+
   await clickUntil(
     page.getByRole('button', { name: 'Delete account' }),
     page.getByRole('dialog'),
@@ -40,9 +46,9 @@ test('offers deletion behind a confirmation that names what is about to go', asy
 
   const dialog = page.getByRole('dialog')
   await expect(
-    dialog.getByText(/account and data are kept for 30 days/),
+    dialog.getByText(/account data is kept for 30 days/),
   ).toBeVisible()
-  await expect(dialog.getByText(/restore them during that time/)).toBeVisible()
+  await expect(dialog.getByText(/restore it during that time/)).toBeVisible()
   await expect(dialog.getByText(/Subscription is cancelled now/)).toBeVisible()
   await expect(dialog.getByText(/will not be refunded/)).toBeVisible()
   await expect(dialog.getByText(/PostHog/)).toHaveCount(0)
