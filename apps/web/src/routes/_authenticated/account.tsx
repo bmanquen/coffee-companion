@@ -241,8 +241,8 @@ export function AccountScreen({
                 <DialogDescription>
                   Your account and data are kept for 30 days, then deleted.
                   You can restore them during that time. Your Subscription is
-                  cancelled now, and any time you've already paid for is not
-                  refunded.
+                  cancelled now, and any time you've already paid for will not
+                  be refunded.
                   {personDeleteConfigured
                     ? ' Your PostHog profile is deleted when those 30 days end.'
                     : null}

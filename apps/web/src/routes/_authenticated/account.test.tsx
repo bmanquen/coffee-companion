@@ -170,7 +170,7 @@ describe('AccountScreen', () => {
     expect(dialog.textContent).toMatch(/account and data are kept for 30 days/i)
     expect(dialog.textContent).toMatch(/restore them during that time/i)
     expect(dialog.textContent).toMatch(/Subscription is cancelled now/i)
-    expect(dialog.textContent).toMatch(/not refunded/)
+    expect(dialog.textContent).toMatch(/will not be refunded/)
     expect(dialog.textContent).not.toMatch(/PostHog/)
     expect(dialog.textContent).not.toMatch(/cannot be undone/i)
   })
