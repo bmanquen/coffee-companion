@@ -10,9 +10,11 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid
 } from 'drizzle-orm/pg-core'
+import type { PgColumn } from 'drizzle-orm/pg-core'
 import { defineRelations, sql } from 'drizzle-orm'
 import { account, session, subscription, user } from './auth-schema'
 
@@ -28,54 +30,52 @@ const timestamps = {
     .$onUpdate(() => sql`now()`),
 }
 
+const lookupColumns = {
+  id: uuid().primaryKey().defaultRandom(),
+  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+  name: text().notNull(),
+  // lookup_name_guard() repeats lower(name) because a BEFORE trigger cannot read a generated column.
+  nameKey: text('name_key').notNull().generatedAlwaysAs(sql`lower(name)`),
+  ...timestamps,
+}
+
+function lookupNameKey(
+  table: { userId: PgColumn; nameKey: PgColumn },
+  scope?: PgColumn,
+) {
+  return unique()
+    .on(table.userId, table.nameKey, ...(scope ? [scope] : []))
+    .nullsNotDistinct()
+}
+
 export const countries = pgTable(
   'countries',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
-    ...timestamps,
-  },
-  (table) => [uniqueIndex('countries_name_idx').on(table.name)],
+  { ...lookupColumns },
+  (t) => [lookupNameKey(t)],
 )
 
 export const regions = pgTable(
   'regions',
   {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
+    ...lookupColumns,
     countryId: uuid('country_id').references(() => countries.id),
-    ...timestamps,
   },
-  (table) => [
-    uniqueIndex('regions_name_country_idx').on(table.name, table.countryId),
-  ],
+  (t) => [lookupNameKey(t, t.countryId)],
 )
 
 export const roastLevels = pgTable(
   'roast_levels',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
-    ...timestamps,
-  },
-  (table) => [uniqueIndex('roast_levels_name_idx').on(table.name)],
+  { ...lookupColumns },
+  (t) => [lookupNameKey(t)],
 )
 
 export const farms = pgTable(
   'farms',
   {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
+    ...lookupColumns,
     regionId: uuid('region_id').references(() => regions.id),
-    ...timestamps,
   },
-  (table) => [
-    uniqueIndex('farms_name_region_idx').on(table.name, table.regionId),
-  ],
+  (t) => [lookupNameKey(t, t.regionId)],
 )
 
 export const greenCoffees = pgTable(
@@ -107,13 +107,8 @@ export const greenCoffees = pgTable(
 
 export const roasters = pgTable(
   'roasters',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
-    ...timestamps,
-  },
-  (table) => [uniqueIndex('roasters_name_idx').on(table.name)],
+  { ...lookupColumns },
+  (t) => [lookupNameKey(t)],
 )
 
 export const coffees = pgTable(
@@ -143,13 +138,8 @@ export const coffees = pgTable(
 
 export const varieties = pgTable(
   'varieties',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
-    ...timestamps,
-  },
-  (table) => [uniqueIndex('varieties_name_idx').on(table.name)],
+  { ...lookupColumns },
+  (t) => [lookupNameKey(t)],
 )
 
 export const coffeesVarieties = pgTable(
@@ -214,13 +204,8 @@ export const greenCoffeesVarieties = pgTable(
 
 export const coffeeProcesses = pgTable(
   'coffee_processes',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
-    ...timestamps,
-  },
-  (table) => [uniqueIndex('coffee_processes_name_idx').on(table.name)],
+  { ...lookupColumns },
+  (t) => [lookupNameKey(t)],
 )
 
 export const grinders = pgTable(
@@ -242,13 +227,8 @@ export const grinders = pgTable(
 
 export const brewingDeviceTypes = pgTable(
   'brewing_device_types',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
-    ...timestamps,
-  },
-  (table) => [uniqueIndex('brewing_device_types_name_idx').on(table.name)],
+  { ...lookupColumns },
+  (t) => [lookupNameKey(t)],
 )
 
 export const brewingDevices = pgTable(
@@ -317,13 +297,8 @@ export const espressoShots = pgTable(
 // user-extensible.
 export const aeropressMethods = pgTable(
   'aeropress_methods',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
-    ...timestamps,
-  },
-  (table) => [uniqueIndex('aeropress_methods_name_idx').on(table.name)],
+  { ...lookupColumns },
+  (t) => [lookupNameKey(t)],
 )
 
 export const aeropressBrews = pgTable(
@@ -351,13 +326,8 @@ export const aeropressBrews = pgTable(
 // their own. Kept as a lookup (not an enum) so it stays user-extensible.
 export const pouroverMethods = pgTable(
   'pourover_methods',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
-    ...timestamps,
-  },
-  (table) => [uniqueIndex('pourover_methods_name_idx').on(table.name)],
+  { ...lookupColumns },
+  (t) => [lookupNameKey(t)],
 )
 
 export const pouroverBrews = pgTable(
@@ -386,13 +356,8 @@ export const pouroverBrews = pgTable(
 // as aeropressMethods/pouroverMethods.
 export const frenchpressMethods = pgTable(
   'frenchpress_methods',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
-    name: text().notNull(),
-    ...timestamps,
-  },
-  (table) => [uniqueIndex('frenchpress_methods_name_idx').on(table.name)],
+  { ...lookupColumns },
+  (t) => [lookupNameKey(t)],
 )
 
 export const frenchpressBrews = pgTable(
