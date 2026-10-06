@@ -364,7 +364,7 @@ async function cmdSeed() {
       cwd: repoRoot,
     },
   )
-  console.log(JSON.stringify({ ok: true, seeded: ['data', 'free'] }, null, 2))
+  console.log(JSON.stringify({ ok: true, seeded: ['data', 'free', 'delete'] }, null, 2))
 }
 
 function sendDaemon(payload, timeoutMs = 60_000) {
@@ -943,7 +943,7 @@ function usage() {
 
   launch                 Start Postgres (test DB), migrate, seed, build, serve
   doctor                 Read-only check that this instance is worth driving
-  seed                   Reseed the e2e bypass users (data + free)
+  seed                   Reseed the e2e bypass users (data + free + delete)
   browser as <who>       public | data | empty | free | delete
   browser goto --path /
   browser click --role link --name Pricing --nav Marketing
