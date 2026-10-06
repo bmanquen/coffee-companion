@@ -224,8 +224,8 @@ export function AccountScreen({
         <CardHeader>
           <CardTitle>Delete account</CardTitle>
           <CardDescription>
-            Export a copy first. Your account and library are kept for 30 days,
-            then deleted.
+            Export a copy first. Your account data is kept for 30 days, then
+            deleted.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -239,8 +239,8 @@ export function AccountScreen({
               <DialogHeader>
                 <DialogTitle>Delete account</DialogTitle>
                 <DialogDescription>
-                  Your account and data are kept for 30 days, then deleted.
-                  You can restore them during that time. Your Subscription is
+                  Your account data is kept for 30 days, then deleted. You can
+                  restore it during that time. Your Subscription is
                   cancelled now, and any time you've already paid for will not
                   be refunded.
                   {personDeleteConfigured

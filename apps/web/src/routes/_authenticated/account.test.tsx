@@ -164,11 +164,17 @@ describe('AccountScreen', () => {
   it('offers deletion behind a confirmation that names what is about to go', () => {
     renderAccount()
 
+    expect(
+      screen.getByText(
+        /Export a copy first\. Your account data is kept for 30 days, then deleted\./,
+      ),
+    ).toBeTruthy()
+
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
 
     const dialog = screen.getByRole('dialog')
-    expect(dialog.textContent).toMatch(/account and data are kept for 30 days/i)
-    expect(dialog.textContent).toMatch(/restore them during that time/i)
+    expect(dialog.textContent).toMatch(/account data is kept for 30 days/i)
+    expect(dialog.textContent).toMatch(/restore it during that time/i)
     expect(dialog.textContent).toMatch(/Subscription is cancelled now/i)
     expect(dialog.textContent).toMatch(/will not be refunded/)
     expect(dialog.textContent).not.toMatch(/PostHog/)

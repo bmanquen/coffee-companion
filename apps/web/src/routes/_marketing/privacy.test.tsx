@@ -77,7 +77,11 @@ describe('PrivacyPage', () => {
     expect(
       own.getByText(/delete the account from that same page/i),
     ).toBeTruthy()
-    expect(own.getByText(/kept for 30 days so they can be restored/i)).toBeTruthy()
+    expect(
+      own.getByText(
+        /keep your account data for 30 days so you can restore it/i,
+      ),
+    ).toBeTruthy()
     expect(own.getByText(/unused prepaid time is not refunded/i)).toBeTruthy()
     expect(
       own.getByText(/no expiry until it is deleted in PostHog/i),

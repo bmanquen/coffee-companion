@@ -104,9 +104,10 @@ export function PrivacyPage({
         <p className="text-muted-foreground">
           Everything the app holds about you can be exported from your account
           page, on any plan and whatever a plan hides from view. You can delete
-          the account from that same page. The account and library are kept for
-          30 days so they can be restored, then deleted. Deleting cancels a live
-          Subscription immediately, and unused prepaid time is not refunded.{' '}
+          the account from that same page. If you delete your account, we keep
+          your account data for 30 days so you can restore it, then delete it.
+          Deleting cancels a live Subscription immediately, and unused prepaid
+          time is not refunded.{' '}
           {personDeleteConfigured
             ? 'The PostHog profile is deleted when those 30 days end.'
             : 'The PostHog profile has no expiry until it is deleted in PostHog.'}
