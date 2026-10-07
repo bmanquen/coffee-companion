@@ -468,7 +468,7 @@ async function cmdBrowser(argv) {
   const [action, ...raw] = argv
   if (!action) {
     die(
-      'Usage: control browser <as|goto|click|fill|press|expect|screenshot|snapshot|status> …',
+      'Usage: control browser <as|goto|click|fill|press|expect|screenshot|snapshot|status|tab> …',
     )
   }
   const { flags } = parseArgs(raw)
@@ -565,6 +565,21 @@ async function cmdBrowser(argv) {
 
   if (action === 'status') {
     const result = await withDaemon({ op: 'status' })
+    console.log(JSON.stringify(result, null, 2))
+    return
+  }
+
+  if (action === 'tab') {
+    if (raw[0] === 'new') {
+      const result = await withDaemon({ op: 'tab', action: 'new' })
+      console.log(JSON.stringify(result, null, 2))
+      return
+    }
+    const index = flags.index ?? raw[0]
+    if (index === undefined || index === '') {
+      die('Usage: control browser tab new | control browser tab --index 0')
+    }
+    const result = await withDaemon({ op: 'tab', index: Number(index) })
     console.log(JSON.stringify(result, null, 2))
     return
   }
@@ -775,6 +790,7 @@ async function runDaemon() {
   const browser = await chromium.launch({ headless: true })
   let context = null
   let page = null
+  let pages = []
   let identity = state.identity ?? 'public'
 
   async function applyIdentity(next) {
@@ -796,6 +812,7 @@ async function runDaemon() {
       ])
     }
     page = await context.newPage()
+    pages = [page]
     const recorded = readState()
     if (recorded) {
       recorded.identity = next
@@ -830,7 +847,25 @@ async function runDaemon() {
           identity,
           url: page.url(),
           title: await page.title(),
+          tab: pages.indexOf(page),
+          tabs: pages.length,
         }
+      case 'tab': {
+        if (msg.action === 'new') {
+          page = await context.newPage()
+          pages.push(page)
+          return { index: pages.length - 1, tabs: pages.length }
+        }
+        const index = Number(msg.index)
+        if (!Number.isInteger(index) || index < 0 || index >= pages.length) {
+          throw new Error(
+            `No tab ${msg.index}. Open one with \`browser tab new\`; 0 is the first.`,
+          )
+        }
+        page = pages[index]
+        await page.bringToFront()
+        return { index, tabs: pages.length, url: page.url() }
+      }
       case 'as':
         await applyIdentity(msg.user)
         return { identity: msg.user }
@@ -956,6 +991,8 @@ function usage() {
   browser expect --text Standard --first
   browser screenshot --path artifacts/foo.png
   browser snapshot --aria --path artifacts/foo.aria.txt
+  browser tab new        Open a second tab in this session (same cookie)
+  browser tab --index 0  Switch to a tab (0 is the first; \`as\` resets tabs)
   drive marketing        One-shot recipe for the mapped marketing feature
   cleanup                Stop pids this run started; keep artifacts/
 

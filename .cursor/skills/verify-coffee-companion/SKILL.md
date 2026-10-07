@@ -87,6 +87,8 @@ Identities (the `e2e_auth` cookie; server must have `E2E_BYPASS_AUTH=true`):
 .cursor/skills/verify-coffee-companion/helpers/control browser expect --text Standard --first
 .cursor/skills/verify-coffee-companion/helpers/control browser screenshot --path artifacts/<run>/page.png
 .cursor/skills/verify-coffee-companion/helpers/control browser snapshot --aria --path artifacts/<run>/page.aria.txt
+.cursor/skills/verify-coffee-companion/helpers/control browser tab new
+.cursor/skills/verify-coffee-companion/helpers/control browser tab --index 0
 ```
 
 Regex names are `/pattern/i` strings. `--first` applies to `click`, `expect`, and `fill` (including `--placeholder`) — use it whenever desktop table and mobile card both render the same name. `--label` is `getByLabel` (the same handle `apps/web/e2e` uses for recipe fields). Number fields are `spinbutton`s; `--label "Dose (g)"` matches them without naming the role. Scope a list-row action with `--row` and the unique name (`click --role button --name "Edit grinder" --row "<unique>"`) — never `--first` or list position when the list sorts by name. Scope a header click with `--nav Marketing` so `Pricing` does not also match the home `See pricing` link and the footer.
@@ -100,7 +102,7 @@ Stable handles (use these, not CSS or coordinates):
 - Signed-in chrome: button `Open menu` (desktop sheet); `navigation` named `Primary` (mobile bottom nav). Links `Home` (`/dashboard`), `Coffee`, `Brews`, `Equipment`. Button `Account menu`. Button `Sign Out`.
 - Dashboard H1 `Dashboard`. Method picker is the button whose exact name is the current method (`Espresso`, `AeroPress`, …). Options are `role=option`. Log links: `/Log Shot/i` → `/espresso/new`, `/Log Brew/i` → the method's `/…/new`.
 - Brews H1 `Brews`. Tabs: `Espresso`, `Pour Over`, `French Press`, `AeroPress`, `Cold Brew`. Columnheader `Ratio` (computed 1:x from dose and yield/water). Row actions `Edit shot` / `Delete shot` (espresso) and `Edit brew` / `Delete brew` (other tabs). Confirm `Delete` (exact). Dialed-in toggle: `Mark {coffee} as dialed in` or `Dialed in {coffee} — clear` (espresso seed: Sumatra Lintong).
-- Coffees H1 `Coffees`. Link/button `Add Coffee`. Row actions `Edit coffee`, `Delete coffee`. Confirm `Delete` (exact).
+- Coffees H1 `Coffees`. Link/button `Add Coffee`. Row actions `Edit coffee`, `Delete coffee`. Confirm `Delete` (exact). Roaster (and other lookup) names are unique per user, ignoring case. A stale picker still offers Add; the alert is `You already have one called {saved}. Pick it there, or give this one a different name.` Two tabs: `browser tab new` / `browser tab --index 0` (`as` resets them). The Add row is `role=option` `/Add .+/` — not the form `Add` button.
 - Equipment H1 `Equipment`. Tabs `Grinders` (default) and `Brewing Devices`. Actions `Edit grinder`, `Delete grinder`, `Edit brewing device`, `Delete brewing device`.
 - Privacy H1 `/what we collect/i`. Recipient H2s `Sentry`, `PostHog`, `Google`, `Stripe`, `Resend` (exact). Footer link `Privacy` in `navigation` named `Footer`.
 - Account: heading `Account`, button `Export data`, button `Delete account`, link `See plans`. Grant users have no `Manage subscription`. Do not confirm account deletion against `data`, `free`, or `empty`. Identity `delete` is the one that may confirm. After that confirm, heading `Restore account` on `/restore-account`.
@@ -160,7 +162,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | `helpers/control launch` | Postgres (test DB, loopback + `*_test`) → migrate → seed → always rebuild → `node .output/server/index.mjs` |
 | `helpers/control doctor` | Pid, port ownership, HTTP + `Coffee Companion` marker |
 | `helpers/control seed` | `helpers/seed.mjs` → `seedE2eUsers()` |
-| `helpers/control browser …` | Playwright daemon (see Drive). `fill --label` / `expect --first` / `click --nav Marketing` are the form, list, and header handles |
+| `helpers/control browser …` | Playwright daemon (see Drive). `fill --label` / `expect --first` / `click --nav Marketing` are the form, list, and header handles. `tab new` / `tab --index 0` are a second tab in the same session |
 | `helpers/control drive marketing` | The only wired one-shot recipe (public home + pricing). Other map entries use `browser` commands |
 | `helpers/control cleanup` | Stop recorded pids; keep artifacts |
 | `helpers/ensure-postgres.sh` | Create/start local `coffee_companion_test` (scaffolding) |
