@@ -262,7 +262,7 @@ const brewBase = {
   coffeeId: uuid('coffee_id')
     .references(() => coffees.id, { onDelete: 'cascade' })
     .notNull(),
-  roastDate: date('roast_date'),
+  roastDate: date('roast_date', { mode: 'string' }),
   grinderId: uuid('grinder_id')
     .references(() => grinders.id, { onDelete: 'cascade' })
     .notNull(),

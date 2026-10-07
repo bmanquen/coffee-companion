@@ -1,5 +1,6 @@
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 import { z } from 'zod'
+import { calendarDateSchema } from '../lib/calendar-date'
 import {
   aeropressBrews,
   aeropressMethods,
@@ -173,6 +174,8 @@ const requiredInt = () =>
 
 const requiredGrindSetting = () => z.string().min(1, 'Enter a grind setting')
 
+const roastDate = () => calendarDateSchema.nullable().optional()
+
 // Espresso Shots
 export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
   coffeeId: () => z.uuid('Select a coffee'),
@@ -188,8 +191,11 @@ export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
     yield: decimalString(),
     time: requiredInt(),
     grindSetting: requiredGrindSetting(),
+    roastDate: roastDate(),
   })
-export const selectEspressoShotSchema = createSelectSchema(espressoShots)
+export const selectEspressoShotSchema = createSelectSchema(espressoShots, {
+  roastDate: calendarDateSchema.nullable(),
+})
 export type InsertEspressoShot = z.infer<typeof insertEspressoShotSchema>
 export type EspressoShot = z.infer<typeof selectEspressoShotSchema>
 
@@ -218,8 +224,11 @@ export const insertAeropressBrewSchema = createInsertSchema(aeropressBrews, {
     water: decimalString(),
     steepTime: requiredInt(),
     grindSetting: requiredGrindSetting(),
+    roastDate: roastDate(),
   })
-export const selectAeropressBrewSchema = createSelectSchema(aeropressBrews)
+export const selectAeropressBrewSchema = createSelectSchema(aeropressBrews, {
+  roastDate: calendarDateSchema.nullable(),
+})
 export type InsertAeropressBrew = z.infer<typeof insertAeropressBrewSchema>
 export type AeropressBrew = z.infer<typeof selectAeropressBrewSchema>
 
@@ -249,8 +258,11 @@ export const insertPouroverBrewSchema = createInsertSchema(pouroverBrews, {
     brewTime: requiredInt(),
     waterTemp: requiredInt(),
     grindSetting: requiredGrindSetting(),
+    roastDate: roastDate(),
   })
-export const selectPouroverBrewSchema = createSelectSchema(pouroverBrews)
+export const selectPouroverBrewSchema = createSelectSchema(pouroverBrews, {
+  roastDate: calendarDateSchema.nullable(),
+})
 export type InsertPouroverBrew = z.infer<typeof insertPouroverBrewSchema>
 export type PouroverBrew = z.infer<typeof selectPouroverBrewSchema>
 
@@ -286,8 +298,11 @@ export const insertFrenchpressBrewSchema = createInsertSchema(frenchpressBrews, 
     steepTime: requiredInt(),
     waterTemp: requiredInt(),
     grindSetting: requiredGrindSetting(),
+    roastDate: roastDate(),
   })
-export const selectFrenchpressBrewSchema = createSelectSchema(frenchpressBrews)
+export const selectFrenchpressBrewSchema = createSelectSchema(frenchpressBrews, {
+  roastDate: calendarDateSchema.nullable(),
+})
 export type InsertFrenchpressBrew = z.infer<typeof insertFrenchpressBrewSchema>
 export type FrenchpressBrew = z.infer<typeof selectFrenchpressBrewSchema>
 
@@ -312,7 +327,10 @@ export const insertColdBrewBrewSchema = createInsertSchema(coldBrewBrews, {
       error: 'Select Counter or Fridge',
     }),
     grindSetting: requiredGrindSetting(),
+    roastDate: roastDate(),
   })
-export const selectColdBrewBrewSchema = createSelectSchema(coldBrewBrews)
+export const selectColdBrewBrewSchema = createSelectSchema(coldBrewBrews, {
+  roastDate: calendarDateSchema.nullable(),
+})
 export type InsertColdBrewBrew = z.infer<typeof insertColdBrewBrewSchema>
 export type ColdBrewBrew = z.infer<typeof selectColdBrewBrewSchema>
