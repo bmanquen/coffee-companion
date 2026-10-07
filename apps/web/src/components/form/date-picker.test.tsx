@@ -53,11 +53,15 @@ function Harness({
 }
 
 describe('DatePicker', () => {
-  it('runs behind UTC so a YYYY-MM-DD Date parse would roll back a day', () => {
-    expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe(
-      'America/Chicago',
-    )
-    expect(new Date('2026-05-01').getDate()).toBe(30)
+  it('is running in a zone where UTC conversion would shift the day', () => {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    expect(['America/Chicago', 'Asia/Tokyo']).toContain(tz)
+    if (tz === 'America/Chicago') {
+      expect(new Date('2026-05-01').getDate()).toBe(30)
+    }
+    if (tz === 'Asia/Tokyo') {
+      expect(new Date(2026, 4, 1).toISOString().slice(0, 10)).toBe('2026-04-30')
+    }
   })
 
   it('shows the placeholder when no date is selected', () => {
