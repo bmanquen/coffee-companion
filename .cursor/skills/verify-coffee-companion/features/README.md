@@ -45,7 +45,7 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Marketing site](./marketing.md) covers the public home pitch, the hero brew table (including Ratio), and pricing (plans, period toggle, FAQ). This is the only feature with a `helpers/control drive marketing` shortcut.
 - [Privacy](./privacy.md) covers the public privacy page reached from the marketing footer. Mapped; drive with `browser` commands — no `drive privacy` stub yet.
 - [Dashboard](./dashboard.md) covers the signed-in home, method picker, and per-method log links. Mapped; drive with `browser` commands — no `drive dashboard` stub yet.
-- [Coffees](./coffees.md) covers the Coffee list and create / edit / delete. Mapped; drive with `browser` commands — no `drive coffees` stub yet.
+- [Coffees](./coffees.md) covers the Coffee list, create / edit / delete, and a Roaster picker name clash. Mapped; drive with `browser` commands — no `drive coffees` stub yet.
 - [Brews](./brews.md) covers the brew log tabs, the Ratio column, logging an Espresso Shot or AeroPress brew, and edit / delete / Dialed-in on a readable row. Mapped; drive with `browser` commands — no `drive brews` stub yet.
 - [Equipment](./equipment.md) covers Grinders and Brewing Devices, including Free's gear cap. Mapped; drive with `browser` commands — no `drive equipment` stub yet.
 - [Plans and Shelf](./plans-and-shelf.md) covers Pro vs Free reading, Sealed brews, the account Plan, account export, account deletion behind a confirmation, and restore on `/restore-account`. Mapped; drive with `browser` commands — no `drive plans-and-shelf` stub yet.
