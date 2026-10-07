@@ -57,4 +57,12 @@ describe('local calendar conversion', () => {
       calendarDaysUntil('2026-06-01', new Date('2026-06-13T08:00:00Z')),
     ).toBe(12)
   })
+
+  it('counts calendar days across a spring-forward', () => {
+    expect(calendarDaysUntil('2026-03-07', new Date(2026, 2, 9))).toBe(2)
+  })
+
+  it('counts calendar days across a fall-back', () => {
+    expect(calendarDaysUntil('2026-10-31', new Date(2026, 10, 2))).toBe(2)
+  })
 })

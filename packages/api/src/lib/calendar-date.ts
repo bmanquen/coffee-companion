@@ -24,7 +24,11 @@ export function calendarDateFromLocalDate(value: Date): string {
 }
 
 export function calendarDaysUntil(from: string, at: Date): number {
-  const start = localDateFromCalendarDate(from)
-  const end = new Date(at.getFullYear(), at.getMonth(), at.getDate())
-  return Math.round((end.getTime() - start.getTime()) / 86_400_000)
+  const [year, month, day] = parts(from)
+  // Civil Y-M-D through UTC so a 23- or 25-hour local day still counts as one.
+  return (
+    (Date.UTC(at.getFullYear(), at.getMonth(), at.getDate()) -
+      Date.UTC(year, month - 1, day)) /
+    86_400_000
+  )
 }
