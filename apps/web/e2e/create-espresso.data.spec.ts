@@ -67,3 +67,25 @@ test('roast-date picker stays open when changing months', async ({ page }) => {
   await expect(page.getByText('Pick a date')).toBeVisible()
 })
 
+test('roast-date picker keeps the date when the selected day is tapped again', async ({
+  page,
+}) => {
+  await page.goto('/espresso/new')
+
+  const fifteenth = page.getByRole('button', { name: /15th/ })
+  await clickUntil(page.getByText('Pick a date'), fifteenth)
+  await fifteenth.click()
+
+  await expect(page.getByRole('grid')).toHaveCount(0)
+  await expect(page.getByLabel('Roast Date')).toContainText(/15th/)
+
+  await page.getByLabel('Roast Date').click()
+  const selectedDay = page.getByRole('button', { name: /15th/ })
+  await expect(selectedDay).toBeVisible()
+  await selectedDay.click()
+
+  await expect(page.getByRole('grid')).toHaveCount(0)
+  await expect(page.getByLabel('Roast Date')).toContainText(/15th/)
+  await expect(page.getByLabel('Roast Date')).toBeFocused()
+})
+
