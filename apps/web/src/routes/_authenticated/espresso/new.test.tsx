@@ -178,6 +178,18 @@ describe('NewEspressoShot form', () => {
     expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
   })
 
+  it('auto-fills roast date as the same calendar day', () => {
+    const { Wrapper } = seeded()
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+
+    expect(screen.getByText('May 1st, 2026')).toBeTruthy()
+    expect(screen.queryByText('April 30th, 2026')).toBeNull()
+  })
+
   it('submits a create with the entered dose and yield', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
@@ -211,6 +223,9 @@ describe('NewEspressoShot form', () => {
       expect(body).toContain('18')
       expect(body).toContain('36')
       expect(body).toContain(COFFEE)
+      expect(body).toContain('2026-05-01')
+      expect(body).not.toContain('2026-04-30')
+      expect(body).not.toMatch(/2026-05-01T/)
       await waitFor(() =>
         expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
           method: 'espresso',

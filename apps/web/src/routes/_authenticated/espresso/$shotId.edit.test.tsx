@@ -81,6 +81,7 @@ function seeded() {
       brewingDeviceId: ESP_DEVICE,
       dose: '18',
       yield: '36',
+      roastDate: '2026-05-01',
     }),
   )
   return providers
@@ -109,6 +110,8 @@ describe('EditEspressoShot form', () => {
     // The dose/yield inputs are prefilled from the loaded shot.
     expect(screen.getByDisplayValue('18')).toBeTruthy()
     expect(screen.getByDisplayValue('36')).toBeTruthy()
+    expect(screen.getByText('May 1st, 2026')).toBeTruthy()
+    expect(screen.queryByText('April 30th, 2026')).toBeNull()
   })
 
   it('submits an update carrying the shot id', async () => {
@@ -135,6 +138,9 @@ describe('EditEspressoShot form', () => {
       const body = String(init?.body ?? '')
       expect(body).toContain(SHOT)
       expect(body).toContain('19')
+      expect(body).toContain('2026-05-01')
+      expect(body).not.toContain('2026-04-30')
+      expect(body).not.toMatch(/2026-05-01T/)
     } finally {
       fetchSpy.mockRestore()
     }

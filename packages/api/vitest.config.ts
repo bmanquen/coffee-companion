@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    env: { TZ: 'America/Chicago' },
     include: ['src/**/*.test.ts'],
     // Integration tests need a database and run via vitest.integration.config.ts.
     exclude: ['**/node_modules/**', '**/*.integration.test.ts'],
