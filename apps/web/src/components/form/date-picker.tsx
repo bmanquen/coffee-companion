@@ -4,6 +4,7 @@ import {
 } from '@coffee-companion/api/lib/calendar-date'
 import { format } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
+import { useState } from 'react'
 import { FormLabel } from './form-label'
 import { useFieldError } from './use-field-error'
 import { useFieldRequired } from './use-field-required'
@@ -26,6 +27,7 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
   const field = useFieldContext<string | null>()
   const required = useFieldRequired()
   const error = useFieldError()
+  const [open, setOpen] = useState(false)
   const selected = field.state.value
     ? localDateFromCalendarDate(field.state.value)
     : undefined
@@ -40,7 +42,7 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
         {label}
       </FormLabel>
       <FieldContent>
-        <Popover>
+        <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button
               id={field.name}
@@ -59,7 +61,9 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
               mode="single"
               selected={selected}
               onSelect={(date) => {
-                if (date) field.handleChange(calendarDateFromLocalDate(date))
+                if (!date) return
+                field.handleChange(calendarDateFromLocalDate(date))
+                setOpen(false)
               }}
             />
           </PopoverContent>

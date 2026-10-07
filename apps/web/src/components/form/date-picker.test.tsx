@@ -4,16 +4,62 @@ import type { ReactNode } from 'react'
 import { useAppForm } from '@/hooks/form'
 
 // Mock the Radix Popover + Calendar so the date-picker's own logic (display +
-// onSelect) runs without browser-only APIs. Real calendar use is covered by e2e.
-vi.mock('@/components/ui/popover', () => ({
-  Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  PopoverContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-}))
+// onSelect + close) runs without browser-only APIs. Real calendar use is
+// covered by e2e.
+vi.mock('@/components/ui/popover', async () => {
+  const React = await import('react')
+
+  const Ctx = React.createContext<{
+    open: boolean
+    setOpen: (open: boolean) => void
+  } | null>(null)
+
+  function Popover({
+    children,
+    open: openProp,
+    onOpenChange,
+  }: {
+    children: ReactNode
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+  }) {
+    const [uncontrolled, setUncontrolled] = React.useState(false)
+    const isControlled = openProp !== undefined
+    const open = isControlled ? openProp : uncontrolled
+    const setOpen = (next: boolean) => {
+      if (!isControlled) setUncontrolled(next)
+      onOpenChange?.(next)
+    }
+    return React.createElement(
+      Ctx.Provider,
+      { value: { open, setOpen } },
+      children,
+    )
+  }
+
+  function PopoverTrigger({
+    children,
+  }: {
+    children: ReactNode
+    asChild?: boolean
+  }) {
+    const ctx = React.useContext(Ctx)
+    if (!ctx) throw new Error('PopoverTrigger outside Popover')
+    return React.createElement(
+      'div',
+      { onClick: () => ctx.setOpen(!ctx.open) },
+      children,
+    )
+  }
+
+  function PopoverContent({ children }: { children: ReactNode }) {
+    const ctx = React.useContext(Ctx)
+    if (!ctx?.open) return null
+    return React.createElement('div', null, children)
+  }
+
+  return { Popover, PopoverTrigger, PopoverContent }
+})
 vi.mock('@/components/ui/calendar', () => ({
   Calendar: ({ onSelect }: { onSelect: (date?: Date) => void }) => (
     <>
@@ -24,6 +70,18 @@ vi.mock('@/components/ui/calendar', () => ({
       <button type="button" onClick={() => onSelect(undefined)}>
         pick-nothing
       </button>
+      <button
+        type="button"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onSelect(new Date(2026, 0, 20))
+          }
+        }}
+      >
+        focused-day
+      </button>
+      <button type="button">go-to-next-month</button>
     </>
   ),
 }))
@@ -50,6 +108,12 @@ function Harness({
       )}
     </form.AppField>
   )
+}
+
+async function openPicker() {
+  await act(async () => {
+    fireEvent.click(screen.getByLabelText('Roast date'))
+  })
 }
 
 describe('DatePicker', () => {
@@ -83,9 +147,10 @@ describe('DatePicker', () => {
     expect(screen.getByText('January 15th, 2026')).toBeTruthy()
   })
 
-  it('stores a picked day as YYYY-MM-DD, not a Date', async () => {
+  it('stores a picked day as YYYY-MM-DD, not a Date, and closes', async () => {
     render(<Harness />)
     expect(screen.getByText('Pick a date')).toBeTruthy()
+    await openPicker()
     await act(async () => {
       fireEvent.click(screen.getByText('pick-jan-15'))
     })
@@ -93,11 +158,47 @@ describe('DatePicker', () => {
     expect(screen.getByTestId('stored-roast-date').textContent).toBe(
       '"2026-01-15"',
     )
+    expect(screen.queryByText('pick-jan-15')).toBeNull()
+  })
+
+  it('closes when a focused day is selected with the keyboard', async () => {
+    render(<Harness />)
+    await openPicker()
+    await act(async () => {
+      fireEvent.keyDown(screen.getByText('focused-day'), { key: 'Enter' })
+    })
+    expect(screen.getByText('January 20th, 2026')).toBeTruthy()
+    expect(screen.getByTestId('stored-roast-date').textContent).toBe(
+      '"2026-01-20"',
+    )
+    expect(screen.queryByText('focused-day')).toBeNull()
+  })
+
+  it('stays open when the month is changed', async () => {
+    render(<Harness />)
+    await openPicker()
+    await act(async () => {
+      fireEvent.click(screen.getByText('go-to-next-month'))
+    })
+    expect(screen.getByText('pick-jan-15')).toBeTruthy()
+    expect(screen.getByText('Pick a date')).toBeTruthy()
+    expect(screen.getByTestId('stored-roast-date').textContent).toBe('null')
+  })
+
+  it('stays open when arrow keys move between days', async () => {
+    render(<Harness />)
+    await openPicker()
+    await act(async () => {
+      fireEvent.keyDown(screen.getByText('focused-day'), { key: 'ArrowRight' })
+    })
+    expect(screen.getByText('focused-day')).toBeTruthy()
+    expect(screen.getByText('Pick a date')).toBeTruthy()
   })
 
   it('ignores a cleared selection rather than storing undefined', async () => {
     render(<Harness value="2026-01-15" />)
 
+    await openPicker()
     await act(async () => {
       fireEvent.click(screen.getByText('pick-nothing'))
     })
