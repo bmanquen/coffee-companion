@@ -1,6 +1,13 @@
 import { defineConfig } from 'vitest/config'
 import tsConfigPaths from 'vite-tsconfig-paths'
 
+const roastDateTests = [
+  'src/components/form/date-picker.test.tsx',
+  'src/lib/brew.test.ts',
+  'src/routes/_authenticated/espresso/new.test.tsx',
+  'src/routes/_authenticated/espresso/$shotId.edit.test.tsx',
+]
+
 // Unit + component tests (Vitest + Testing Library, jsdom). E2E lives in ./e2e
 // and runs under Playwright, so it's excluded here.
 export default defineConfig({
@@ -8,11 +15,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    // Date-only YYYY-MM-DD strings parse as UTC midnight; Chicago is behind
-    // UTC, so a Date conversion would show the previous calendar day.
-    env: { TZ: 'America/Chicago' },
     setupFiles: ['./vitest.setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.ts'],
     exclude: ['**/node_modules/**', 'e2e/**'],
     coverage: {
       provider: 'v8',
@@ -43,5 +46,24 @@ export default defineConfig({
         branches: 75,
       },
     },
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'chicago',
+          env: { TZ: 'America/Chicago' },
+          include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.ts'],
+        },
+      },
+      // toISOString() on local midnight rolls back a day ahead of UTC.
+      {
+        extends: true,
+        test: {
+          name: 'tokyo',
+          env: { TZ: 'Asia/Tokyo' },
+          include: roastDateTests,
+        },
+      },
+    ],
   },
 })

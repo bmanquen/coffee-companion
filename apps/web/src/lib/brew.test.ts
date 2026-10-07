@@ -22,8 +22,7 @@ describe('daysOffRoast', () => {
   })
 
   it('is 0 when brewed later that local calendar day', () => {
-    // 04:00Z is 23:00 the previous UTC date in America/Chicago.
-    expect(daysOffRoast('2026-06-10', new Date('2026-06-11T04:00:00Z'))).toBe(0)
+    expect(daysOffRoast('2026-06-10', new Date(2026, 5, 10, 23, 0, 0))).toBe(0)
   })
 
   it('clamps to 0 when brewed before the roast date', () => {
