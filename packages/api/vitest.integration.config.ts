@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    env: { TZ: 'America/Chicago' },
     // Unit + integration together, so a coverage run reflects everything the
     // backend is actually tested by (the unit tests ride along harmlessly).
     include: ['src/**/*.test.ts', 'src/**/*.integration.test.ts'],

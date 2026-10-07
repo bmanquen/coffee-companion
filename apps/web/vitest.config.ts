@@ -8,6 +8,9 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Date-only YYYY-MM-DD strings parse as UTC midnight; Chicago is behind
+    // UTC, so a Date conversion would show the previous calendar day.
+    env: { TZ: 'America/Chicago' },
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.ts'],
     exclude: ['**/node_modules/**', 'e2e/**'],

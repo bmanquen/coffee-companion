@@ -86,6 +86,25 @@ describe('espressoShot.create', () => {
     expect(shot.yield).toBe('36')
   })
 
+  it('keeps roast date as the same YYYY-MM-DD calendar day', async () => {
+    const shot = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      roastDate: '2026-05-01',
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+    })
+    expect(shot.roastDate).toBe('2026-05-01')
+    expect(typeof shot.roastDate).toBe('string')
+
+    const fetched = await asA.espressoShot.getById(shot.id)
+    expect(fetched.roastDate).toBe('2026-05-01')
+    expect(typeof fetched.roastDate).toBe('string')
+  })
+
   it('rejects a non-espresso brewing device', async () => {
     await expect(
       asA.espressoShot.create({
@@ -176,6 +195,35 @@ describe('espressoShot.update', () => {
     })
     expect(updated.dose).toBe('20')
     expect(updated.yield).toBe('40')
+  })
+
+  it('keeps roast date as the same YYYY-MM-DD calendar day', async () => {
+    const created = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      roastDate: '2026-05-01',
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+    })
+    const updated = await asA.espressoShot.update({
+      id: created.id,
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      roastDate: '2026-04-15',
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+    })
+    expect(updated.roastDate).toBe('2026-04-15')
+    expect(typeof updated.roastDate).toBe('string')
+
+    const fetched = await asA.espressoShot.getById(created.id)
+    expect(fetched.roastDate).toBe('2026-04-15')
   })
 
   it('rejects a non-espresso brewing device', async () => {

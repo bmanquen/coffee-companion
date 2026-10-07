@@ -7,7 +7,7 @@ import {
 } from './brew'
 
 describe('daysOffRoast', () => {
-  it('counts whole days from roast date to brew time', () => {
+  it('counts whole local calendar days from roast date to brew time', () => {
     expect(daysOffRoast('2026-06-01', new Date('2026-06-13T08:00:00Z'))).toBe(12)
   })
 
@@ -17,6 +17,11 @@ describe('daysOffRoast', () => {
 
   it('is 0 on the roast day', () => {
     expect(daysOffRoast('2026-06-10', new Date('2026-06-10T12:00:00Z'))).toBe(0)
+  })
+
+  it('is 0 when brewed later that local calendar day', () => {
+    // 04:00Z is 23:00 the previous UTC date in America/Chicago.
+    expect(daysOffRoast('2026-06-10', new Date('2026-06-11T04:00:00Z'))).toBe(0)
   })
 
   it('clamps to 0 when brewed before the roast date', () => {

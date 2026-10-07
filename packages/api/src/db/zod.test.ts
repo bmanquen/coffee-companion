@@ -35,6 +35,30 @@ describe('insertEspressoShotSchema', () => {
     ).toBe(true)
   })
 
+  it('keeps roast date as a YYYY-MM-DD string', () => {
+    const parsed = insertEspressoShotSchema.parse({
+      ...valid,
+      roastDate: '2026-05-01',
+    })
+    expect(parsed.roastDate).toBe('2026-05-01')
+    expect(typeof parsed.roastDate).toBe('string')
+  })
+
+  it('does not coerce a Date or timestamp into roast date', () => {
+    expect(
+      insertEspressoShotSchema.safeParse({
+        ...valid,
+        roastDate: new Date('2026-05-01T00:00:00.000Z'),
+      }).success,
+    ).toBe(false)
+    expect(
+      insertEspressoShotSchema.safeParse({
+        ...valid,
+        roastDate: '2026-05-01T00:00:00.000Z',
+      }).success,
+    ).toBe(false)
+  })
+
   it('rejects null/omitted recipe fields, but not roast date or notes', () => {
     expect(
       insertEspressoShotSchema.safeParse({
@@ -218,6 +242,10 @@ describe('insertPouroverBrewSchema', () => {
         notes: undefined,
       }).success,
     ).toBe(true)
+    expect(
+      insertPouroverBrewSchema.parse({ ...valid, roastDate: '2026-05-01' })
+        .roastDate,
+    ).toBe('2026-05-01')
     expect(
       insertPouroverBrewSchema.safeParse({ ...valid, brewTime: null }).success,
     ).toBe(false)
