@@ -30,7 +30,7 @@ test('log an espresso shot via the new-shot form', async ({ page }) => {
 // Exercises the DatePicker calendar (Radix popover + react-day-picker) in a
 // real browser — roast date lives on the shot form. No coffee is selected, so
 // the field isn't prefilled and starts empty.
-test('roast-date picker selects a date', async ({ page }) => {
+test('roast-date picker selects a date and closes', async ({ page }) => {
   await page.goto('/espresso/new')
 
   // Day buttons are labelled by full date (e.g. "Monday, June 15th, 2026");
@@ -40,4 +40,30 @@ test('roast-date picker selects a date', async ({ page }) => {
   await fifteenth.click()
 
   await expect(page.getByText('Pick a date')).toHaveCount(0)
+  await expect(page.getByRole('grid')).toHaveCount(0)
+  await expect(page.getByLabel('Roast Date')).toBeFocused()
 })
+
+test('roast-date picker closes on keyboard select', async ({ page }) => {
+  await page.goto('/espresso/new')
+
+  const fifteenth = page.getByRole('button', { name: /15th/ })
+  await clickUntil(page.getByText('Pick a date'), fifteenth)
+  await fifteenth.press('Space')
+
+  await expect(page.getByText('Pick a date')).toHaveCount(0)
+  await expect(page.getByRole('grid')).toHaveCount(0)
+  await expect(page.getByLabel('Roast Date')).toBeFocused()
+})
+
+test('roast-date picker stays open when changing months', async ({ page }) => {
+  await page.goto('/espresso/new')
+
+  const fifteenth = page.getByRole('button', { name: /15th/ })
+  await clickUntil(page.getByText('Pick a date'), fifteenth)
+  await page.getByRole('button', { name: /Go to the Next Month/i }).click()
+
+  await expect(page.getByRole('grid')).toBeVisible()
+  await expect(page.getByText('Pick a date')).toBeVisible()
+})
+
