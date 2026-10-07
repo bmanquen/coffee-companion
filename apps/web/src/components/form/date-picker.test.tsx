@@ -66,9 +66,9 @@ vi.mock('@/components/ui/calendar', () => ({
       <button type="button" onClick={() => onSelect(new Date(2026, 0, 15))}>
         pick-jan-15
       </button>
-      {/* Radix hands back undefined when a selection is cleared. */}
+      {/* react-day-picker single mode (without required) unselects on re-click. */}
       <button type="button" onClick={() => onSelect(undefined)}>
-        pick-nothing
+        reselect-current
       </button>
       <button
         type="button"
@@ -195,18 +195,19 @@ describe('DatePicker', () => {
     expect(screen.getByText('Pick a date')).toBeTruthy()
   })
 
-  it('ignores a cleared selection rather than storing undefined', async () => {
+  it('keeps the value and closes when the current day is re-selected', async () => {
     render(<Harness value="2026-01-15" />)
 
     await openPicker()
     await act(async () => {
-      fireEvent.click(screen.getByText('pick-nothing'))
+      fireEvent.click(screen.getByText('reselect-current'))
     })
 
     expect(screen.getByText('January 15th, 2026')).toBeTruthy()
     expect(screen.getByTestId('stored-roast-date').textContent).toBe(
       '"2026-01-15"',
     )
+    expect(screen.queryByText('reselect-current')).toBeNull()
   })
 
   it('associates the label with the trigger', () => {

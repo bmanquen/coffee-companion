@@ -59,10 +59,14 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
           <PopoverContent>
             <Calendar
               mode="single"
+              required
               selected={selected}
               onSelect={(date) => {
-                if (!date) return
-                field.handleChange(calendarDateFromLocalDate(date))
+                // Single mode without `required` unselects on re-click
+                // (undefined). Keep the stored day and still close.
+                if (date) {
+                  field.handleChange(calendarDateFromLocalDate(date))
+                }
                 setOpen(false)
               }}
             />
