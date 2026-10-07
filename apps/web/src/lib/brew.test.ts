@@ -8,7 +8,9 @@ import {
 
 describe('daysOffRoast', () => {
   it('counts whole local calendar days from roast date to brew time', () => {
-    expect(daysOffRoast('2026-06-01', new Date('2026-06-13T08:00:00Z'))).toBe(12)
+    expect(daysOffRoast('2026-06-01', new Date('2026-06-13T08:00:00Z'))).toBe(
+      12,
+    )
   })
 
   it('is null when there is no roast date', () => {

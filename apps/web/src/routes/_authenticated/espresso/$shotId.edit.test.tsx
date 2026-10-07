@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Route } from './$shotId.edit'
 import { useFieldContext } from '@/hooks/form-context'
@@ -68,7 +74,14 @@ function seeded() {
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', nameKey: 'espresso', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't2',
+        userId: null,
+        name: 'Espresso',
+        nameKey: 'espresso',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
     makeBrewingDevice({ id: AERO_DEVICE, name: 'AeroPress Go' }),
   ])
@@ -94,7 +107,9 @@ describe('EditEspressoShot form', () => {
     const { Wrapper } = seeded()
     render(<EditEspressoShot />, { wrapper: Wrapper })
 
-    const deviceSelect = screen.getByRole('combobox', { name: 'Brewing Device' })
+    const deviceSelect = screen.getByRole('combobox', {
+      name: 'Brewing Device',
+    })
     expect(
       within(deviceSelect).getByRole('option', { name: 'Linea Mini' }),
     ).toBeTruthy()
@@ -115,14 +130,12 @@ describe('EditEspressoShot form', () => {
   })
 
   it('submits an update carrying the shot id', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
     try {
       const { Wrapper } = seeded()
       render(<EditEspressoShot />, { wrapper: Wrapper })
@@ -147,7 +160,9 @@ describe('EditEspressoShot form', () => {
   })
 
   it('invalidates dialed-in lookups after save', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(trpcSuccess())
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = seeded()
       const setKey = {

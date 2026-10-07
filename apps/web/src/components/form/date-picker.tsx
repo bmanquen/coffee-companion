@@ -65,7 +65,9 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
           </PopoverContent>
         </Popover>
         {error.shown && (
-          <FieldError id={error.errorId}>{error.messages.join(', ')}</FieldError>
+          <FieldError id={error.errorId}>
+            {error.messages.join(', ')}
+          </FieldError>
         )}
       </FieldContent>
     </Field>

@@ -200,9 +200,12 @@ export type InsertEspressoShot = z.infer<typeof insertEspressoShotSchema>
 export type EspressoShot = z.infer<typeof selectEspressoShotSchema>
 
 // AeroPress Methods (system-defaults + user lookup, like brewing device types)
-export const insertAeropressMethodSchema = createInsertSchema(aeropressMethods, {
-  name: (schema) => schema.min(1),
-})
+export const insertAeropressMethodSchema = createInsertSchema(
+  aeropressMethods,
+  {
+    name: (schema) => schema.min(1),
+  },
+)
 export const selectAeropressMethodSchema = createSelectSchema(aeropressMethods)
 export type InsertAeropressMethod = z.infer<typeof insertAeropressMethodSchema>
 export type AeropressMethod = z.infer<typeof selectAeropressMethodSchema>
@@ -282,12 +285,15 @@ export type FrenchpressMethod = z.infer<typeof selectFrenchpressMethodSchema>
 
 // French Press Brews. Weights (dose/water) are decimal strings like pourover;
 // steep time is whole seconds and water temp is whole degrees Celsius.
-export const insertFrenchpressBrewSchema = createInsertSchema(frenchpressBrews, {
-  coffeeId: () => z.uuid('Select a coffee'),
-  grinderId: () => z.uuid('Select a grinder'),
-  brewingDeviceId: () => z.uuid('Select a brewing device'),
-  methodId: () => z.uuid('Select a method'),
-})
+export const insertFrenchpressBrewSchema = createInsertSchema(
+  frenchpressBrews,
+  {
+    coffeeId: () => z.uuid('Select a coffee'),
+    grinderId: () => z.uuid('Select a grinder'),
+    brewingDeviceId: () => z.uuid('Select a brewing device'),
+    methodId: () => z.uuid('Select a method'),
+  },
+)
   .omit({
     id: true,
     userId: true,
@@ -300,9 +306,12 @@ export const insertFrenchpressBrewSchema = createInsertSchema(frenchpressBrews, 
     grindSetting: requiredGrindSetting(),
     roastDate: roastDate(),
   })
-export const selectFrenchpressBrewSchema = createSelectSchema(frenchpressBrews, {
-  roastDate: calendarDateSchema.nullable(),
-})
+export const selectFrenchpressBrewSchema = createSelectSchema(
+  frenchpressBrews,
+  {
+    roastDate: calendarDateSchema.nullable(),
+  },
+)
 export type InsertFrenchpressBrew = z.infer<typeof insertFrenchpressBrewSchema>
 export type FrenchpressBrew = z.infer<typeof selectFrenchpressBrewSchema>
 
