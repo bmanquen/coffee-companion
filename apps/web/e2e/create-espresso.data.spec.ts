@@ -88,4 +88,3 @@ test('roast-date picker keeps the date when the selected day is tapped again', a
   await expect(page.getByLabel('Roast Date')).toContainText(/15th/)
   await expect(page.getByLabel('Roast Date')).toBeFocused()
 })
-

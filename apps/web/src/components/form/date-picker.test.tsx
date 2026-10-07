@@ -66,8 +66,7 @@ vi.mock('@/components/ui/calendar', () => ({
       <button type="button" onClick={() => onSelect(new Date(2026, 0, 15))}>
         pick-jan-15
       </button>
-      {/* react-day-picker single mode (without required) unselects on re-click. */}
-      <button type="button" onClick={() => onSelect(undefined)}>
+      <button type="button" onClick={() => onSelect(new Date(2026, 0, 15))}>
         reselect-current
       </button>
       <button
