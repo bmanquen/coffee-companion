@@ -293,12 +293,12 @@ describe('insertGrinderSchema', () => {
       insertGrinderSchema.safeParse({ name: 'Niche Zero', brand: 'Niche' })
         .success,
     ).toBe(true)
-    expect(insertGrinderSchema.safeParse({ name: '', brand: 'Niche' }).success).toBe(
-      false,
-    )
-    expect(insertGrinderSchema.safeParse({ name: 'Niche Zero', brand: '' }).success).toBe(
-      false,
-    )
+    expect(
+      insertGrinderSchema.safeParse({ name: '', brand: 'Niche' }).success,
+    ).toBe(false)
+    expect(
+      insertGrinderSchema.safeParse({ name: 'Niche Zero', brand: '' }).success,
+    ).toBe(false)
   })
 })
 

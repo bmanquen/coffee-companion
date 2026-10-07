@@ -17,10 +17,7 @@ vi.mock('@/components/ui/popover', () => ({
 vi.mock('@/components/ui/calendar', () => ({
   Calendar: ({ onSelect }: { onSelect: (date?: Date) => void }) => (
     <>
-      <button
-        type="button"
-        onClick={() => onSelect(new Date(2026, 0, 15))}
-      >
+      <button type="button" onClick={() => onSelect(new Date(2026, 0, 15))}>
         pick-jan-15
       </button>
       {/* Radix hands back undefined when a selection is cleared. */}

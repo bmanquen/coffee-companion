@@ -63,7 +63,10 @@ beforeAll(async () => {
   })
   pourOverDeviceId = pourOverDevice.id
 
-  const grinder = await asA.grinder.create({ name: uniq('Niche'), brand: 'Niche' })
+  const grinder = await asA.grinder.create({
+    name: uniq('Niche'),
+    brand: 'Niche',
+  })
   grinderId = grinder.id
 
   const coffee = await createCoffee(uniq('Ethiopia Guji'))

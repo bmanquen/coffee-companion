@@ -29,7 +29,9 @@ function formatApplicableParts(
   const parts = fromSeconds(total)
   const suffix = { hours: 'h', minutes: 'm', seconds: 's' } as const
   const shown = units
-    .map((unit) => Number(parts[unit]) && `${Number(parts[unit])}${suffix[unit]}`)
+    .map(
+      (unit) => Number(parts[unit]) && `${Number(parts[unit])}${suffix[unit]}`,
+    )
     .filter(Boolean)
   return shown.length === 0 ? zero : shown.join(' ')
 }
