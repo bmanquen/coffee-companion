@@ -39,8 +39,9 @@ jobs:
     name: Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # No database: web tests seed the React Query cache (tRPC is never called)
-    # and the api unit config excludes the DB-backed *.integration.test.ts.
+    # No database: web tests seed the React Query cache (tRPC is never called),
+    # the api unit config excludes the DB-backed *.integration.test.ts, and
+    # mobile tests are node-side Vitest.
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -50,6 +51,9 @@ jobs:
 
       - name: API unit tests
         run: pnpm --filter @coffee-companion/api test
+
+      - name: Mobile unit tests
+        run: pnpm --filter @coffee-companion/mobile test
 
       - name: Upload web coverage report
         if: ${{ !cancelled() }}
