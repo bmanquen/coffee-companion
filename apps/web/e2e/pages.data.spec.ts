@@ -12,7 +12,9 @@ test('brews page shows the espresso log', async ({ page }) => {
   // .first(): the create-espresso flow can add another shot for this coffee,
   // so tolerate more than one row (tests share the seeded user/DB).
   await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()
-  await expect(page.getByLabel('Brewing method')).toContainText('Espresso')
+  await expect(
+    page.getByRole('button', { name: 'Brewing method Espresso' }),
+  ).toBeVisible()
   await expect(page.getByRole('tab')).toHaveCount(0)
 })
 
@@ -27,6 +29,9 @@ test('brews page AeroPress method shows the aeropress log', async ({
   await pickBrewsMethod(page, 'AeroPress')
   await expect(method).toBeVisible()
   await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Brewing method AeroPress' }),
+  ).toBeFocused()
   await expect(page).toHaveURL(/[?&]method=aeropress\b/)
 })
 
@@ -57,8 +62,25 @@ test('brews method select is keyboard-navigable', async ({ page }) => {
   )
   await page.keyboard.type('cold')
   await page.keyboard.press('Enter')
-  await expect(page.getByLabel('Brewing method')).toContainText('Cold Brew')
+  const trigger = page.getByRole('button', {
+    name: 'Brewing method Cold Brew',
+  })
+  await expect(trigger).toBeVisible()
+  await expect(trigger).toBeFocused()
   await expect(page).toHaveURL(/[?&]method=coldbrew\b/)
+})
+
+test('brews method select Escape closes and restores focus', async ({
+  page,
+}) => {
+  await page.goto('/brews')
+  const trigger = page.getByRole('button', {
+    name: 'Brewing method Espresso',
+  })
+  await clickUntil(trigger, page.getByPlaceholder('Search methods'))
+  await page.keyboard.press('Escape')
+  await expect(page.getByPlaceholder('Search methods')).toHaveCount(0)
+  await expect(trigger).toBeFocused()
 })
 
 test('coffees page lists coffees', async ({ page }) => {

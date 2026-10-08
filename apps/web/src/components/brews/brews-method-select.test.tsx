@@ -62,8 +62,19 @@ describe('BrewsMethodSelect', () => {
 
     expect(trigger.textContent).toContain('Espresso')
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(
+      screen.getByRole('button', { name: 'Brewing method Espresso' }),
+    ).toBe(trigger)
     expect(screen.queryByRole('option')).toBeNull()
     expect(screen.queryByPlaceholderText('Search methods')).toBeNull()
+  })
+
+  it('includes the selected method in the accessible name', () => {
+    renderSelect('aeropress')
+
+    expect(
+      screen.getByRole('button', { name: 'Brewing method AeroPress' }),
+    ).toBeTruthy()
   })
 
   it('opens on click and lists every method in tab order', () => {
@@ -82,7 +93,7 @@ describe('BrewsMethodSelect', () => {
     ])
   })
 
-  it('reports the chosen method and closes', () => {
+  it('reports the chosen method, closes, and returns focus to the trigger', () => {
     const { trigger, onSelectMethod } = renderSelect()
     fireEvent.click(trigger)
 
@@ -90,6 +101,20 @@ describe('BrewsMethodSelect', () => {
 
     expect(onSelectMethod).toHaveBeenCalledWith('aeropress')
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('closes on Escape and returns focus to the trigger', () => {
+    const { trigger } = renderSelect()
+    fireEvent.click(trigger)
+
+    fireEvent.keyDown(screen.getByPlaceholderText('Search methods'), {
+      key: 'Escape',
+    })
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByPlaceholderText('Search methods')).toBeNull()
+    expect(document.activeElement).toBe(trigger)
   })
 
   it('shows the no-match copy with curly quotes around the query', () => {

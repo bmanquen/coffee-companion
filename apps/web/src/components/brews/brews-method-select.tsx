@@ -1,5 +1,5 @@
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
-import { useId, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { brewMethods } from './methods'
 import type { BrewMethod } from './methods'
 import {
@@ -27,23 +27,36 @@ export function BrewsMethodSelect({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const restoreFocusRef = useRef(false)
   const triggerId = useId()
+  const labelId = useId()
+  const valueId = useId()
 
   const selected = brewMethods.find((m) => m.value === selectedMethod)
 
-  const close = () => {
+  const close = (restoreFocus = false) => {
+    if (restoreFocus) restoreFocusRef.current = true
     setOpen(false)
     setQuery('')
   }
 
+  useLayoutEffect(() => {
+    if (open || !restoreFocusRef.current) return
+    restoreFocusRef.current = false
+    triggerRef.current?.focus()
+  }, [open])
+
   const handleSelect = (next: BrewMethod) => {
     onSelectMethod(next)
-    close()
+    close(true)
   }
 
   return (
     <div className="flex w-full flex-col gap-2 sm:w-72">
-      <Label htmlFor={triggerId}>Brewing method</Label>
+      <Label id={labelId} htmlFor={triggerId}>
+        Brewing method
+      </Label>
       <div
         ref={containerRef}
         className="relative w-full"
@@ -52,23 +65,29 @@ export function BrewsMethodSelect({
             close()
           }
         }}
+        onKeyDownCapture={(e) => {
+          if (e.key !== 'Escape' || !open) return
+          e.preventDefault()
+          e.stopPropagation()
+          close(true)
+        }}
       >
         <button
+          ref={triggerRef}
           id={triggerId}
           type="button"
           aria-haspopup="listbox"
           aria-expanded={open}
+          aria-labelledby={`${labelId} ${valueId}`}
           className="flex h-9 w-full cursor-pointer items-center justify-between rounded-md border bg-transparent px-3 py-2 text-sm font-medium text-foreground"
           onClick={() => (open ? close() : setOpen(true))}
         >
-          {selected?.label}
+          <span id={valueId}>{selected?.label}</span>
           <ChevronDownIcon className="size-4 opacity-50" />
         </button>
         {open && (
           <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
             <Command>
-              {/* Autofocus moves focus into Command so cmdk's
-                  arrow/Enter/Escape handling works, and doubles as type-to-filter. */}
               <CommandInput
                 placeholder="Search methods"
                 value={query}
