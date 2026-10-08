@@ -28,6 +28,8 @@ const USER_RETRYING_RETIRED = 'plan-user-retrying-retired'
 const USER_MANAGING = 'plan-user-managing'
 const USER_MANAGING_CANCELED = 'plan-user-managing-canceled'
 const USER_MANAGING_DATED = 'plan-user-managing-dated'
+const USER_GRANTED_DATED = 'plan-user-granted-dated'
+const USER_GRANT_ENDED = 'plan-user-grant-ended'
 
 seedUsers([
   USER_FREE,
@@ -43,6 +45,8 @@ seedUsers([
   USER_MANAGING,
   USER_MANAGING_CANCELED,
   USER_MANAGING_DATED,
+  USER_GRANTED_DATED,
+  USER_GRANT_ENDED,
 ])
 
 describe('plan.current', () => {
@@ -52,6 +56,8 @@ describe('plan.current', () => {
       limits: { grinders: 1, brewingDevices: 3 },
       renewalFailing: false,
       subscription: null,
+      grant: null,
+      endedGrant: null,
     })
   })
 
@@ -63,6 +69,36 @@ describe('plan.current', () => {
       limits: { grinders: null, brewingDevices: null },
       renewalFailing: false,
       subscription: null,
+      grant: { plan: 'pro', endsAt: null },
+      endedGrant: null,
+    })
+  })
+
+  it('reports when a Grant will end', async () => {
+    const endsAt = new Date(Date.now() + 60_000)
+    await grantPlan(USER_GRANTED_DATED, 'pro', { expiresAt: endsAt })
+
+    expect(await callerFor(USER_GRANTED_DATED).plan.current()).toEqual({
+      plan: 'pro',
+      limits: { grinders: null, brewingDevices: null },
+      renewalFailing: false,
+      subscription: null,
+      grant: { plan: 'pro', endsAt },
+      endedGrant: null,
+    })
+  })
+
+  it('does not confer a Grant that has expired', async () => {
+    const endedAt = new Date(Date.now() - 60_000)
+    await grantPlan(USER_GRANT_ENDED, 'pro', { expiresAt: endedAt })
+
+    expect(await callerFor(USER_GRANT_ENDED).plan.current()).toEqual({
+      plan: 'free',
+      limits: { grinders: 1, brewingDevices: 3 },
+      renewalFailing: false,
+      subscription: null,
+      grant: null,
+      endedGrant: { plan: 'pro', endedAt },
     })
   })
 
@@ -123,9 +159,9 @@ describe('plan.current while a renewal is failing', () => {
   })
 
   it('reports the failure, so the app can offer to fix the card', async () => {
-    expect(
-      (await callerFor(USER_RETRYING).plan.current()).renewalFailing,
-    ).toBe(true)
+    expect((await callerFor(USER_RETRYING).plan.current()).renewalFailing).toBe(
+      true,
+    )
   })
 
   it('reports it even when a Grant is carrying the Plan anyway', async () => {
@@ -154,10 +190,12 @@ describe('plan.current while a renewal is failing', () => {
     // nothing the user could usefully be asked to fix.
     await subscribeRetiredPlan(USER_RETRYING_RETIRED, 'past_due')
 
-    expect(await callerFor(USER_RETRYING_RETIRED).plan.current()).toMatchObject({
-      plan: 'free',
-      renewalFailing: false,
-    })
+    expect(await callerFor(USER_RETRYING_RETIRED).plan.current()).toMatchObject(
+      {
+        plan: 'free',
+        renewalFailing: false,
+      },
+    )
   })
 })
 
@@ -165,18 +203,18 @@ describe('plan.current for a subscriber', () => {
   it('reports a Subscription with no end in sight', async () => {
     await subscribePlan(USER_MANAGING, 'pro')
 
-    expect((await callerFor(USER_MANAGING).plan.current()).subscription).toEqual(
-      { plan: 'pro', endsAt: null },
-    )
+    expect(
+      (await callerFor(USER_MANAGING).plan.current()).subscription,
+    ).toEqual({ plan: 'pro', endsAt: null })
   })
 
   it('says when access ends once a cancellation is pending', async () => {
     const endsAt = new Date('2026-10-14T09:30:00.000Z')
     await scheduleCancellation(USER_MANAGING, endsAt)
 
-    expect((await callerFor(USER_MANAGING).plan.current()).subscription).toEqual(
-      { plan: 'pro', endsAt },
-    )
+    expect(
+      (await callerFor(USER_MANAGING).plan.current()).subscription,
+    ).toEqual({ plan: 'pro', endsAt })
   })
 
   it('reads the end date when Stripe recorded it as a date', async () => {

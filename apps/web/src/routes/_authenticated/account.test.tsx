@@ -9,6 +9,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountScreen } from './account'
 import type * as ReactRouter from '@tanstack/react-router'
 
+const restoreBy = new Date('2026-11-07T12:00:00.000Z')
+const grantEnds = new Date('2026-10-14T09:30:00.000Z')
+
 const mocks = vi.hoisted(() => ({
   billingPortal: vi.fn(),
   toastError: vi.fn(),
@@ -50,8 +53,11 @@ function renderAccount(
   return render(
     <AccountScreen
       user={user}
-      plan="pro"
+      plan="free"
       subscription={null}
+      grant={null}
+      endedGrant={null}
+      restoreBy={restoreBy}
       onExport={vi.fn()}
       onDelete={vi.fn()}
       {...props}
@@ -67,7 +73,7 @@ describe('AccountScreen', () => {
   })
 
   it('shows who is signed in and the Plan they hold', () => {
-    renderAccount()
+    renderAccount({ plan: 'pro', grant: { plan: 'pro', endsAt: null } })
 
     expect(screen.getByText('Ada Lovelace')).toBeTruthy()
     expect(screen.getByText('ada@example.com')).toBeTruthy()
@@ -105,9 +111,51 @@ describe('AccountScreen', () => {
   it('points someone with no Subscription at the plans instead', () => {
     renderAccount()
 
+    expect(screen.getByText("You don't have a subscription.")).toBeTruthy()
     expect(
       screen.queryByRole('button', { name: 'Manage subscription' }),
     ).toBeNull()
+    expect(
+      screen.getByRole('link', { name: 'See plans' }).getAttribute('href'),
+    ).toBe('/pricing')
+  })
+
+  it('says a Grant with no end date was added, with nothing to manage', () => {
+    renderAccount({ plan: 'pro', grant: { plan: 'pro', endsAt: null } })
+
+    expect(
+      screen.getByText(
+        "You're on Pro. This plan was added to your account, so there's no billing to manage.",
+      ),
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: 'Manage subscription' }),
+    ).toBeNull()
+    expect(screen.queryByRole('link', { name: 'See plans' })).toBeNull()
+  })
+
+  it('says when a Grant will end, with nothing to manage', () => {
+    renderAccount({
+      plan: 'pro',
+      grant: { plan: 'pro', endsAt: grantEnds },
+    })
+
+    expect(
+      screen.getByText(
+        /You're on Pro until October 14(th)?, 2026\. This plan was added to your account, so there's no billing to manage\./,
+      ),
+    ).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'See plans' })).toBeNull()
+  })
+
+  it('says when a Grant has ended and points at the plans', () => {
+    renderAccount({
+      endedGrant: { plan: 'pro', endedAt: grantEnds },
+    })
+
+    expect(
+      screen.getByText(/Your Pro plan ended on October 14(th)?, 2026\./),
+    ).toBeTruthy()
     expect(
       screen.getByRole('link', { name: 'See plans' }).getAttribute('href'),
     ).toBe('/pricing')
@@ -175,10 +223,78 @@ describe('AccountScreen', () => {
     const dialog = screen.getByRole('dialog')
     expect(dialog.textContent).toMatch(/account data is kept for 30 days/i)
     expect(dialog.textContent).toMatch(/restore it during that time/i)
-    expect(dialog.textContent).toMatch(/Subscription is cancelled now/i)
-    expect(dialog.textContent).toMatch(/will not be refunded/)
+    expect(dialog.textContent).not.toMatch(/Subscription is cancelled now/i)
+    expect(dialog.textContent).not.toMatch(/will not be refunded/)
     expect(dialog.textContent).not.toMatch(/PostHog/)
     expect(dialog.textContent).not.toMatch(/cannot be undone/i)
+  })
+
+  it('keeps the Subscription cancel line for a subscriber', () => {
+    renderAccount({
+      plan: 'pro',
+      subscription: { plan: 'pro', endsAt: null },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+    expect(screen.getByRole('dialog').textContent).toMatch(
+      /Subscription is cancelled now/,
+    )
+    expect(screen.getByRole('dialog').textContent).toMatch(
+      /will not be refunded/,
+    )
+  })
+
+  it('tells a Grant holder the Plan comes back on restore', () => {
+    renderAccount({ plan: 'pro', grant: { plan: 'pro', endsAt: null } })
+
+    expect(
+      screen.getByText(
+        /If you restore your account before November 7(th)?, 2026, your Pro plan comes back with it\./,
+      ),
+    ).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.textContent).toMatch(
+      /If you restore your account before November 7(th)?, 2026, your Pro plan comes back with it\./,
+    )
+    expect(dialog.textContent).not.toMatch(/Subscription is cancelled now/)
+    expect(dialog.textContent).not.toMatch(/will not be refunded/)
+  })
+
+  it('says a dated Grant only comes back if it has not ended', () => {
+    renderAccount({
+      plan: 'pro',
+      grant: { plan: 'pro', endsAt: grantEnds },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+    expect(screen.getByRole('dialog').textContent).toMatch(
+      /If you restore your account before November 7(th)?, 2026, your Pro plan comes back with it, as long as it hasn't ended by then\./,
+    )
+    expect(screen.getByRole('dialog').textContent).not.toMatch(
+      /Subscription is cancelled now/,
+    )
+  })
+
+  it('keeps the cancel line and adds the Grant line when both apply', () => {
+    renderAccount({
+      plan: 'pro',
+      subscription: { plan: 'pro', endsAt: null },
+      grant: { plan: 'pro', endsAt: null },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.textContent).toMatch(/Subscription is cancelled now/)
+    expect(dialog.textContent).toMatch(/will not be refunded/)
+    expect(dialog.textContent).toMatch(
+      /If you restore your account before November 7(th)?, 2026, your Pro plan comes back with it\./,
+    )
   })
 
   it('mentions a PostHog delete only when that call will run', () => {

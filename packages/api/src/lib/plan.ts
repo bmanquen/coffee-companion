@@ -8,6 +8,14 @@ export type PlanId = 'free' | 'pro' | 'proPlus'
 // ends if a cancellation is pending.
 export type CurrentSubscription = { plan: PlanId; endsAt: Date | null }
 
+// A Grant as the app shows it: which Plan it confers, and when that ends if
+// the Grant has an expiry. endsAt is null when the Grant does not expire.
+export type CurrentGrant = { plan: PlanId; endsAt: Date | null }
+
+// A Grant that has already expired. Shown only so /account can say the Plan
+// ended, rather than treating the user as someone who never had one.
+export type EndedGrant = { plan: PlanId; endedAt: Date }
+
 export type BillingPeriod = 'monthly' | 'annual'
 
 // A declined renewal is Stripe retrying a card, not an ending, and nothing may

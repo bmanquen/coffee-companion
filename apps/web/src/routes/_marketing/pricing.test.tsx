@@ -681,6 +681,8 @@ describe('PricingScreen', () => {
         limits: planLimits[currentPlan],
         renewalFailing: false,
         subscription: null,
+        grant: null,
+        endedGrant: null,
       })
     queryClient.setQueryData(
       trpc.planInterest.list.queryKey(),

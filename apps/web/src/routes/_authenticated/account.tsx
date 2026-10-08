@@ -7,9 +7,12 @@ import {
 } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
+import { restoreDeadline } from '@coffee-companion/api/lib/account-restore-window'
 import { planName } from '@coffee-companion/api/lib/plan'
 import type {
+  CurrentGrant,
   CurrentSubscription,
+  EndedGrant,
   PlanId,
 } from '@coffee-companion/api/lib/plan'
 import { H1 } from '@/components/typography/h1'
@@ -90,6 +93,9 @@ function AccountContainer() {
       user={session.user}
       plan={current.plan}
       subscription={current.subscription}
+      grant={current.grant}
+      endedGrant={current.endedGrant}
+      restoreBy={restoreDeadline(new Date())}
       onExport={onExport}
       onDelete={onDelete}
       personDeleteConfigured={personDeleteConfigured}
@@ -107,10 +113,38 @@ function deleteFailureDescription(error: unknown) {
   return 'Please try again.'
 }
 
+function day(date: Date) {
+  return format(date, 'PPP')
+}
+
+function grantLiveCopy(grant: CurrentGrant) {
+  const name = planName[grant.plan]
+  const added =
+    "This plan was added to your account, so there's no billing to manage."
+  return grant.endsAt
+    ? `You're on ${name} until ${day(grant.endsAt)}. ${added}`
+    : `You're on ${name}. ${added}`
+}
+
+function grantEndedCopy(ended: EndedGrant) {
+  return `Your ${planName[ended.plan]} plan ended on ${day(ended.endedAt)}.`
+}
+
+function grantRestoreCopy(grant: CurrentGrant, restoreBy: Date) {
+  const name = planName[grant.plan]
+  const before = day(restoreBy)
+  return grant.endsAt
+    ? `If you restore your account before ${before}, your ${name} plan comes back with it, as long as it hasn't ended by then.`
+    : `If you restore your account before ${before}, your ${name} plan comes back with it.`
+}
+
 export function AccountScreen({
   user,
   plan,
   subscription,
+  grant = null,
+  endedGrant = null,
+  restoreBy,
   onExport,
   onDelete,
   personDeleteConfigured = false,
@@ -118,10 +152,35 @@ export function AccountScreen({
   user: { name: string; email: string }
   plan: PlanId
   subscription: CurrentSubscription | null
+  grant?: CurrentGrant | null
+  endedGrant?: EndedGrant | null
+  restoreBy?: Date
   onExport: () => Promise<void>
   onDelete: () => Promise<void>
   personDeleteConfigured?: boolean
 }) {
+  const restoreDate = restoreBy ?? restoreDeadline(new Date())
+  const grantLine = grant ? grantRestoreCopy(grant, restoreDate) : null
+  const cancelLine =
+    "Your Subscription is cancelled now, and any time you've already paid for will not be refunded."
+
+  let subscriptionCopy: string
+  let subscriptionAction: 'manage' | 'plans' | null
+  if (subscription) {
+    subscriptionCopy = subscription.endsAt
+      ? `${planName[subscription.plan]} until ${day(subscription.endsAt)}`
+      : `${planName[subscription.plan]}, renewing`
+    subscriptionAction = 'manage'
+  } else if (grant) {
+    subscriptionCopy = grantLiveCopy(grant)
+    subscriptionAction = null
+  } else if (endedGrant) {
+    subscriptionCopy = grantEndedCopy(endedGrant)
+    subscriptionAction = 'plans'
+  } else {
+    subscriptionCopy = "You don't have a subscription."
+    subscriptionAction = 'plans'
+  }
   const [confirming, setConfirming] = useState(false)
   const [pending, setPending] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -183,27 +242,21 @@ export function AccountScreen({
       <Card>
         <CardHeader>
           <CardTitle>Subscription</CardTitle>
-          {subscription ? (
-            <CardDescription>
-              {subscription.endsAt
-                ? `${planName[subscription.plan]} until ${format(subscription.endsAt, 'PPP')}`
-                : `${planName[subscription.plan]}, renewing`}
-            </CardDescription>
-          ) : (
-            <CardDescription>You have no Subscription.</CardDescription>
-          )}
+          <CardDescription>{subscriptionCopy}</CardDescription>
         </CardHeader>
-        <CardContent>
-          {subscription ? (
-            <Button variant="outline" onClick={manage}>
-              Manage subscription
-            </Button>
-          ) : (
-            <Button variant="outline" asChild>
-              <Link to="/pricing">See plans</Link>
-            </Button>
-          )}
-        </CardContent>
+        {subscriptionAction ? (
+          <CardContent>
+            {subscriptionAction === 'manage' ? (
+              <Button variant="outline" onClick={manage}>
+                Manage subscription
+              </Button>
+            ) : (
+              <Button variant="outline" asChild>
+                <Link to="/pricing">See plans</Link>
+              </Button>
+            )}
+          </CardContent>
+        ) : null}
       </Card>
 
       <Card>
@@ -223,9 +276,12 @@ export function AccountScreen({
       <Card>
         <CardHeader>
           <CardTitle>Delete account</CardTitle>
-          <CardDescription>
-            Export a copy first. Your account data is kept for 30 days, then
-            deleted.
+          <CardDescription className="flex flex-col gap-2">
+            <span>
+              Export a copy first. Your account data is kept for 30 days, then
+              deleted.
+            </span>
+            {grantLine ? <span>{grantLine}</span> : null}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -240,9 +296,9 @@ export function AccountScreen({
                 <DialogTitle>Delete account</DialogTitle>
                 <DialogDescription>
                   Your account data is kept for 30 days, then deleted. You can
-                  restore it during that time. Your Subscription is
-                  cancelled now, and any time you've already paid for will not
-                  be refunded.
+                  restore it during that time.
+                  {subscription ? ` ${cancelLine}` : null}
+                  {grantLine ? ` ${grantLine}` : null}
                   {personDeleteConfigured
                     ? ' Your PostHog profile is deleted when those 30 days end.'
                     : null}
