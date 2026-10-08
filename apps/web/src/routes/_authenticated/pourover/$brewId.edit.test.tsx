@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Route } from './$brewId.edit'
 import { useFieldContext } from '@/hooks/form-context'
@@ -74,12 +80,26 @@ function seeded() {
       id: PO_DEVICE,
       name: 'V60',
       brand: 'Hario',
-      type: { id: 't3', userId: null, name: 'Pour Over', nameKey: 'pour over', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't3',
+        userId: null,
+        name: 'Pour Over',
+        nameKey: 'pour over',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
     makeBrewingDevice({
       id: ESP_DEVICE,
       name: 'Linea Mini',
-      type: { id: 't2', userId: null, name: 'Espresso', nameKey: 'espresso', createdAt: ts, updatedAt: ts },
+      type: {
+        id: 't2',
+        userId: null,
+        name: 'Espresso',
+        nameKey: 'espresso',
+        createdAt: ts,
+        updatedAt: ts,
+      },
     }),
   ])
   qc.setQueryData(
@@ -106,7 +126,9 @@ describe('EditPouroverBrew form', () => {
     const { Wrapper } = seeded()
     render(<EditPouroverBrew />, { wrapper: Wrapper })
 
-    const deviceSelect = screen.getByRole('combobox', { name: 'Brewing Device' })
+    const deviceSelect = screen.getByRole('combobox', {
+      name: 'Brewing Device',
+    })
     expect(
       within(deviceSelect).getByRole('option', { name: 'V60' }),
     ).toBeTruthy()
@@ -136,12 +158,7 @@ describe('EditPouroverBrew form', () => {
   it('submits an update carrying the brew id', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response('[]', {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      )
+      .mockResolvedValue(trpcSuccess())
     try {
       const { Wrapper } = seeded()
       render(<EditPouroverBrew />, { wrapper: Wrapper })
@@ -162,13 +179,21 @@ describe('EditPouroverBrew form', () => {
       expect(body).toContain('19')
       // 3 minutes + the loaded 45 seconds → 225 whole seconds.
       expect(body).toMatch(/"brewTime":225/)
+      await waitFor(() =>
+        expect(mocks.navigate).toHaveBeenCalledWith({
+          to: '/brews',
+          search: { method: 'pourover' },
+        }),
+      )
     } finally {
       fetchSpy.mockRestore()
     }
   })
 
   it('invalidates dialed-in lookups after save', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(trpcSuccess())
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = seeded()
       const setKey = {

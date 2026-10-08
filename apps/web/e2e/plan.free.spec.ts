@@ -112,7 +112,7 @@ test('an off-Shelf coffee is still loggable, and the new brew reads straight awa
   await page.getByLabel('Grind Setting').fill(grindSetting)
 
   await page.getByRole('button', { name: 'Log', exact: true }).click()
-  await expect(page).toHaveURL(/\/brews$/)
+  await expect(page).toHaveURL(/\/brews\?method=espresso\b/)
 
   // The fresh Brew is readable...
   const fresh = rowFor(page, grindSetting)

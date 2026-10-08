@@ -130,12 +130,9 @@ describe('EditEspressoShot form', () => {
   })
 
   it('submits an update carrying the shot id', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { Wrapper } = seeded()
       render(<EditEspressoShot />, { wrapper: Wrapper })
@@ -154,6 +151,12 @@ describe('EditEspressoShot form', () => {
       expect(body).toContain('2026-05-01')
       expect(body).not.toContain('2026-04-30')
       expect(body).not.toMatch(/2026-05-01T/)
+      await waitFor(() =>
+        expect(mocks.navigate).toHaveBeenCalledWith({
+          to: '/brews',
+          search: { method: 'espresso' },
+        }),
+      )
     } finally {
       fetchSpy.mockRestore()
     }

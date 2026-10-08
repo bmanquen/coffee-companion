@@ -135,7 +135,7 @@ Standards:
 - Capture the action and the resulting state. A final screen alone is not enough: keep the screenshot from before the click when the click's effect is the claim.
 - Every artifact set includes an ARIA snapshot and a full-page screenshot that shows Coffee Companion chrome (marketing header or the signed-in `Dashboard` / `Brews` / `Coffees` heading).
 - Mutations need a second user-facing read (navigate away and back, or open the list) plus the visible value. Seeded names to look for: `Ethiopia Guji`, `Kenya Nyeri`, `Niche Zero`, `Linea Mini`, `Sey`, grind settings `21`–`27`.
-- Side effects: a new Coffee appears on `/coffees`; a logged Shot lands on `/brews` with the grind you typed; Sealed rows show `Sealed` and hide grind/dose.
+- Side effects: a new Coffee appears on `/coffees`; a logged Shot lands on `/brews?method=espresso` with the grind you typed; Sealed rows show `Sealed` and hide grind/dose.
 - Mocks: billing is already off without Stripe env. Do not press `Subscribe` expecting a Checkout session in this instance. Google sign-in is not the path — use the bypass cookie. Outbound mail is off without `RESEND_API_KEY`.
 - Record the feature file and identity (`public` / `data` / `empty` / `free` / `delete`) with every artifact. `drive marketing` writes `proof.json` that does this.
 

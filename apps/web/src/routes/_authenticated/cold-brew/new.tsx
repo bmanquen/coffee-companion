@@ -9,6 +9,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertColdBrewBrew } from '@coffee-companion/api/db/zod'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
+import { brewsLogLocation } from '@/components/brews/methods'
 import { SteepMinutesInput } from '@/components/form/steep-minutes-input'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
@@ -64,7 +65,7 @@ function NewColdBrewBrew() {
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.coldBrewBrew.getAll.queryOptions())
         track('brew_logged', { method: 'coldbrew' })
-        navigate({ to: '/brews' })
+        navigate(brewsLogLocation('coldbrew'))
       },
     }),
   )

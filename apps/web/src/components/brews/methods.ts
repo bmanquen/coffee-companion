@@ -25,3 +25,9 @@ export function isBrewMethod(value: string | undefined): value is BrewMethod {
 export function resolveBrewMethod(param: string | undefined): BrewMethod {
   return isBrewMethod(param) ? param : 'espresso'
 }
+
+// Typed /brews location for a method's log. Forms navigate here after save
+// so the select opens on the method that was just logged or edited.
+export function brewsLogLocation(method: BrewMethod) {
+  return { to: '/brews' as const, search: { method } }
+}

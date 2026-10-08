@@ -231,6 +231,10 @@ describe('NewEspressoShot form', () => {
           method: 'espresso',
         }),
       )
+      expect(mocks.navigate).toHaveBeenCalledWith({
+        to: '/brews',
+        search: { method: 'espresso' },
+      })
     } finally {
       fetchSpy.mockRestore()
     }

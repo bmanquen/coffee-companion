@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { brewMethods, isBrewMethod, resolveBrewMethod } from './methods'
+import {
+  brewMethods,
+  brewsLogLocation,
+  isBrewMethod,
+  resolveBrewMethod,
+} from './methods'
 
 describe('brewMethods', () => {
   it('keeps the tab labels and order', () => {
@@ -43,5 +48,18 @@ describe('resolveBrewMethod', () => {
     expect(resolveBrewMethod(undefined)).toBe('espresso')
     expect(resolveBrewMethod('')).toBe('espresso')
     expect(resolveBrewMethod('mokapot')).toBe('espresso')
+  })
+})
+
+describe('brewsLogLocation', () => {
+  it('is a /brews location carrying the method search param', () => {
+    expect(brewsLogLocation('aeropress')).toEqual({
+      to: '/brews',
+      search: { method: 'aeropress' },
+    })
+    expect(brewsLogLocation('espresso')).toEqual({
+      to: '/brews',
+      search: { method: 'espresso' },
+    })
   })
 })

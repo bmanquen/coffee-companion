@@ -3,7 +3,8 @@ import { clickUntil } from './helpers'
 
 // Covers aeropress/new end-to-end: the coffee SearchSelect (seeded), the
 // prefill that fills method + grinder + device from the coffee's most recent
-// brew, the number fields, and a real create mutation landing back on /brews.
+// brew, the number fields, and a real create mutation landing on the
+// AeroPress log.
 test('log an aeropress brew via the new-brew form', async ({ page }) => {
   await page.goto('/aeropress/new')
 
@@ -25,6 +26,10 @@ test('log an aeropress brew via the new-brew form', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Log', exact: true }).click()
 
-  await expect(page).toHaveURL(/\/brews$/)
+  await expect(page).toHaveURL(/\/brews\?method=aeropress\b/)
   await expect(page.getByRole('heading', { name: 'Brews' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Brewing method AeroPress' }),
+  ).toBeVisible()
+  await expect(page.getByText('Standard').first()).toBeVisible()
 })

@@ -210,6 +210,10 @@ describe('NewFrenchpressBrew form', () => {
           method: 'frenchpress',
         }),
       )
+      expect(mocks.navigate).toHaveBeenCalledWith({
+        to: '/brews',
+        search: { method: 'frenchpress' },
+      })
     } finally {
       fetchSpy.mockRestore()
     }

@@ -9,6 +9,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertPouroverBrew } from '@coffee-companion/api/db/zod'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
+import { brewsLogLocation } from '@/components/brews/methods'
 import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
@@ -82,7 +83,7 @@ function NewPouroverBrew() {
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.pouroverBrew.getAll.queryOptions())
         track('brew_logged', { method: 'pourover' })
-        navigate({ to: '/brews' })
+        navigate(brewsLogLocation('pourover'))
       },
     }),
   )

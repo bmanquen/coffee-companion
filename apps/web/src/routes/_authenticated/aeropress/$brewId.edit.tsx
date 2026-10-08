@@ -8,6 +8,7 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import type { InsertAeropressBrew } from '@coffee-companion/api/db/zod'
+import { brewsLogLocation } from '@/components/brews/methods'
 import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
@@ -83,7 +84,7 @@ function EditAeropressBrew() {
           trpc.aeropressBrew.getById.queryOptions(brewId),
         )
         invalidateDeviceDialedInQueries(queryClient, trpc)
-        navigate({ to: '/brews' })
+        navigate(brewsLogLocation('aeropress'))
       },
     }),
   )
@@ -108,7 +109,10 @@ function EditAeropressBrew() {
       onChange: insertAeropressBrewSchema as never,
     },
     onSubmit: async ({ value }) => {
-      await submitFormMutation(form, updateBrew.mutateAsync, { ...value, id: brewId })
+      await submitFormMutation(form, updateBrew.mutateAsync, {
+        ...value,
+        id: brewId,
+      })
     },
   })
 
@@ -170,9 +174,7 @@ function EditAeropressBrew() {
           )}
         </form.AppField>
         <form.AppField name="grindSetting">
-          {(field) => (
-            <field.TextField label="Grind Setting" />
-          )}
+          {(field) => <field.TextField label="Grind Setting" />}
         </form.AppField>
         <form.AppField name="notes">
           {(field) => (

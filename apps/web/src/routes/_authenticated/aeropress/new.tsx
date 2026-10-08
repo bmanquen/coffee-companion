@@ -9,6 +9,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertAeropressBrew } from '@coffee-companion/api/db/zod'
 import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
+import { brewsLogLocation } from '@/components/brews/methods'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
@@ -82,7 +83,7 @@ function NewAeropressBrew() {
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.aeropressBrew.getAll.queryOptions())
         track('brew_logged', { method: 'aeropress' })
-        navigate({ to: '/brews' })
+        navigate(brewsLogLocation('aeropress'))
       },
     }),
   )

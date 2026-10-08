@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { pickBrewsMethod } from './helpers'
 
 // Covers the aeropress edit form: open a brew's edit page from the AeroPress
-// log, change a field, save, and confirm the update lands back on /brews.
+// log, change a field, save, and confirm the update lands on the AeroPress log.
 test('edit an aeropress brew updates it in the log', async ({ page }) => {
   await page.goto('/brews')
 
@@ -22,7 +22,9 @@ test('edit an aeropress brew updates it in the log', async ({ page }) => {
   await page.getByLabel('Steep Time (seconds)').fill('3')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
-  await expect(page).toHaveURL(/\/brews$/)
-  await pickBrewsMethod(page, 'AeroPress')
+  await expect(page).toHaveURL(/\/brews\?method=aeropress\b/)
+  await expect(
+    page.getByRole('button', { name: 'Brewing method AeroPress' }),
+  ).toBeVisible()
   await expect(page.getByText('2m 3s').first()).toBeVisible()
 })
