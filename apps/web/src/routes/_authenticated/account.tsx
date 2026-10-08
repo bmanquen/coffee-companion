@@ -133,9 +133,12 @@ function grantAccountCopy(grant: CurrentGrant, restoreBy: Date) {
     ? `You're on ${name} until ${day(grant.endsAt)}.${after} ${added}`
     : `You're on ${name}. ${added}`
   const before = day(restoreBy)
-  const restore = grant.endsAt
-    ? `If you restore your account before ${before}, your ${name} plan comes back with it, as long as it hasn't ended by then.`
-    : `If you restore your account before ${before}, your ${name} plan comes back with it.`
+  const restore =
+    grant.endsAt && grant.afterThat
+      ? `If you restore your account before ${before}, your ${name} plan comes back with it until ${day(grant.endsAt)}, and then you'll move to ${planName[grant.afterThat]}.`
+      : grant.endsAt
+        ? `If you restore your account before ${before}, your ${name} plan comes back with it, as long as it hasn't ended by then.`
+        : `If you restore your account before ${before}, your ${name} plan comes back with it.`
   return { subscription, restore }
 }
 
@@ -278,12 +281,9 @@ export function AccountScreen({
       <Card>
         <CardHeader>
           <CardTitle>Delete account</CardTitle>
-          <CardDescription className="flex flex-col gap-2">
-            <span>
-              Export a copy first. Your account data is kept for 30 days, then
-              deleted.
-            </span>
-            {grantLine ? <span>{grantLine}</span> : null}
+          <CardDescription>
+            Export a copy first. Your account data is kept for 30 days, then
+            deleted.
           </CardDescription>
         </CardHeader>
         <CardContent>
