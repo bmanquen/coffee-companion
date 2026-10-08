@@ -133,13 +133,15 @@ export async function endedGrant(userId: string): Promise<EndedGrant | null> {
     )
 
   const ended = rows
-    .filter((row) => row.planId !== 'free' && row.expiresAt)
-    .sort(
-      (left, right) =>
-        (right.expiresAt?.getTime() ?? 0) - (left.expiresAt?.getTime() ?? 0),
+    .filter(
+      (row): row is { planId: PlanId; expiresAt: Date } =>
+        row.planId !== 'free' && row.expiresAt !== null,
     )
+    .sort(
+      (left, right) => right.expiresAt.getTime() - left.expiresAt.getTime(),
+    )
+  if (ended.length === 0) return null
   const latest = ended[0]
-  if (!latest?.expiresAt) return null
   return { plan: latest.planId, endedAt: latest.expiresAt }
 }
 
