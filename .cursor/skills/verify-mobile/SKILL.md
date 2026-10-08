@@ -46,11 +46,11 @@ Launch does all of this, in order:
 1. Refuses if `.run/state.json` already records a live Metro pid, or if `VERIFY_METRO_PORT` (default `8081`) is taken.
 2. Runs `pnpm install --frozen-lockfile` when `node_modules` is missing.
 3. Starts `pnpm exec expo start --port $PORT --localhost` from `apps/mobile` with `CI=1` (non-interactive). Stdout/stderr go to `.run/metro.log`.
-4. Waits until `GET http://127.0.0.1:$PORT/status` is `packager-status:running`.
-5. Fetches the app bundle (`/index.bundle?platform=android&dev=true&minify=false`, falling back to `/index.ts.bundle?…`) and requires the body to mention `Coffee Companion`.
+4. Waits until `GET http://localhost:$PORT/status` is `packager-status:running`.
+5. Fetches the app bundle (`/apps/mobile/index.bundle?platform=android&dev=true&minify=false` — Metro's project root is the pnpm workspace). Requires the body to mention `Coffee Companion`.
 6. Writes `.cursor/skills/verify-mobile/.run/state.json`.
 
-Ready signal: launch prints JSON with `ok: true`, `baseUrl`, `metroPid`, and `bundleUrl`. Default URL is `http://127.0.0.1:8081`.
+Ready signal: launch prints JSON with `ok: true`, `baseUrl`, `metroPid`, and `bundleUrl`. Default URL is `http://localhost:8081`. Expo `--localhost` binds IPv6 `::1` here; `127.0.0.1` does not reach it.
 
 Isolation:
 
