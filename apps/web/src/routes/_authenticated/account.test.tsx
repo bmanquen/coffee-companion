@@ -11,6 +11,7 @@ import type * as ReactRouter from '@tanstack/react-router'
 
 const restoreBy = new Date('2026-11-07T12:00:00.000Z')
 const grantEnds = new Date('2026-10-14T09:30:00.000Z')
+const proPlusEnds = new Date('2026-11-01T18:00:00.000Z')
 
 const mocks = vi.hoisted(() => ({
   billingPortal: vi.fn(),
@@ -73,7 +74,7 @@ describe('AccountScreen', () => {
   })
 
   it('shows who is signed in and the Plan they hold', () => {
-    renderAccount({ plan: 'pro', grant: { plan: 'pro', endsAt: null } })
+    renderAccount({ plan: 'pro', grant: { plan: 'pro', endsAt: null, afterThat: null } })
 
     expect(screen.getByText('Ada Lovelace')).toBeTruthy()
     expect(screen.getByText('ada@example.com')).toBeTruthy()
@@ -121,7 +122,7 @@ describe('AccountScreen', () => {
   })
 
   it('says a Grant with no end date was added, with nothing to manage', () => {
-    renderAccount({ plan: 'pro', grant: { plan: 'pro', endsAt: null } })
+    renderAccount({ plan: 'pro', grant: { plan: 'pro', endsAt: null, afterThat: null } })
 
     expect(
       screen.getByText(
@@ -137,7 +138,7 @@ describe('AccountScreen', () => {
   it('says when a Grant will end, with nothing to manage', () => {
     renderAccount({
       plan: 'pro',
-      grant: { plan: 'pro', endsAt: grantEnds },
+      grant: { plan: 'pro', endsAt: grantEnds, afterThat: null },
     })
 
     expect(
@@ -145,6 +146,24 @@ describe('AccountScreen', () => {
         /You're on Pro until October 14(th)?, 2026\. This plan was added to your account, so there's no billing to manage\./,
       ),
     ).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'See plans' })).toBeNull()
+  })
+
+  it('says what continues after a dated Grant when a lesser Grant has no end', () => {
+    renderAccount({
+      plan: 'proPlus',
+      grant: { plan: 'proPlus', endsAt: proPlusEnds, afterThat: 'pro' },
+    })
+
+    expect(
+      screen.getByText(
+        /You're on Pro\+ until November 1(st)?, 2026\. After that, you'll be on Pro\. This plan was added to your account, so there's no billing to manage\./,
+      ),
+    ).toBeTruthy()
+    expect(screen.queryByText(/^You're on Pro\./)).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Manage subscription' }),
+    ).toBeNull()
     expect(screen.queryByRole('link', { name: 'See plans' })).toBeNull()
   })
 
@@ -246,7 +265,7 @@ describe('AccountScreen', () => {
   })
 
   it('tells a Grant holder the Plan comes back on restore', () => {
-    renderAccount({ plan: 'pro', grant: { plan: 'pro', endsAt: null } })
+    renderAccount({ plan: 'pro', grant: { plan: 'pro', endsAt: null, afterThat: null } })
 
     expect(
       screen.getByText(
@@ -264,10 +283,30 @@ describe('AccountScreen', () => {
     expect(dialog.textContent).not.toMatch(/will not be refunded/)
   })
 
+  it('names the same Plan and date in the delete dialog as on the card', () => {
+    renderAccount({
+      plan: 'proPlus',
+      grant: { plan: 'proPlus', endsAt: proPlusEnds, afterThat: 'pro' },
+    })
+
+    expect(
+      screen.getByText(/You're on Pro\+ until November 1(st)?, 2026\./),
+    ).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.textContent).toMatch(
+      /If you restore your account before November 7(th)?, 2026, your Pro\+ plan comes back with it, as long as it hasn't ended by then\./,
+    )
+    expect(dialog.textContent).not.toMatch(/your Pro plan comes back/)
+    expect(dialog.textContent).not.toMatch(/Subscription is cancelled now/)
+  })
+
   it('says a dated Grant only comes back if it has not ended', () => {
     renderAccount({
       plan: 'pro',
-      grant: { plan: 'pro', endsAt: grantEnds },
+      grant: { plan: 'pro', endsAt: grantEnds, afterThat: null },
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
@@ -284,7 +323,7 @@ describe('AccountScreen', () => {
     renderAccount({
       plan: 'pro',
       subscription: { plan: 'pro', endsAt: null },
-      grant: { plan: 'pro', endsAt: null },
+      grant: { plan: 'pro', endsAt: null, afterThat: null },
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))

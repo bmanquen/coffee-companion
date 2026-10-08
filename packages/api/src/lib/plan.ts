@@ -8,9 +8,15 @@ export type PlanId = 'free' | 'pro' | 'proPlus'
 // ends if a cancellation is pending.
 export type CurrentSubscription = { plan: PlanId; endsAt: Date | null }
 
-// A Grant as the app shows it: which Plan it confers, and when that ends if
-// the Grant has an expiry. endsAt is null when the Grant does not expire.
-export type CurrentGrant = { plan: PlanId; endsAt: Date | null }
+// A Grant as the app shows it: the most generous live paid Grant, when that
+// ends if it expires, and the Plan that continues after that date when a
+// lesser Grant outlasts it. endsAt and afterThat are null when the winning
+// Grant does not expire.
+export type CurrentGrant = {
+  plan: PlanId
+  endsAt: Date | null
+  afterThat: PlanId | null
+}
 
 // A Grant that has already expired. Shown only so /account can say the Plan
 // ended, rather than treating the user as someone who never had one.

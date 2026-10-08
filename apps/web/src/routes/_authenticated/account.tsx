@@ -117,25 +117,26 @@ function day(date: Date) {
   return format(date, 'PPP')
 }
 
-function grantLiveCopy(grant: CurrentGrant) {
-  const name = planName[grant.plan]
-  const added =
-    "This plan was added to your account, so there's no billing to manage."
-  return grant.endsAt
-    ? `You're on ${name} until ${day(grant.endsAt)}. ${added}`
-    : `You're on ${name}. ${added}`
-}
-
 function grantEndedCopy(ended: EndedGrant) {
   return `Your ${planName[ended.plan]} plan ended on ${day(ended.endedAt)}.`
 }
 
-function grantRestoreCopy(grant: CurrentGrant, restoreBy: Date) {
+function grantAccountCopy(grant: CurrentGrant, restoreBy: Date) {
   const name = planName[grant.plan]
+  const added =
+    "This plan was added to your account, so there's no billing to manage."
+  const after =
+    grant.endsAt && grant.afterThat
+      ? ` After that, you'll be on ${planName[grant.afterThat]}.`
+      : ''
+  const subscription = grant.endsAt
+    ? `You're on ${name} until ${day(grant.endsAt)}.${after} ${added}`
+    : `You're on ${name}. ${added}`
   const before = day(restoreBy)
-  return grant.endsAt
+  const restore = grant.endsAt
     ? `If you restore your account before ${before}, your ${name} plan comes back with it, as long as it hasn't ended by then.`
     : `If you restore your account before ${before}, your ${name} plan comes back with it.`
+  return { subscription, restore }
 }
 
 export function AccountScreen({
@@ -160,7 +161,8 @@ export function AccountScreen({
   personDeleteConfigured?: boolean
 }) {
   const restoreDate = restoreBy ?? restoreDeadline(new Date())
-  const grantLine = grant ? grantRestoreCopy(grant, restoreDate) : null
+  const grantLines = grant ? grantAccountCopy(grant, restoreDate) : null
+  const grantLine = grantLines?.restore ?? null
   const cancelLine =
     "Your Subscription is cancelled now, and any time you've already paid for will not be refunded."
 
@@ -171,8 +173,8 @@ export function AccountScreen({
       ? `${planName[subscription.plan]} until ${day(subscription.endsAt)}`
       : `${planName[subscription.plan]}, renewing`
     subscriptionAction = 'manage'
-  } else if (grant) {
-    subscriptionCopy = grantLiveCopy(grant)
+  } else if (grantLines) {
+    subscriptionCopy = grantLines.subscription
     subscriptionAction = null
   } else if (endedGrant) {
     subscriptionCopy = grantEndedCopy(endedGrant)
