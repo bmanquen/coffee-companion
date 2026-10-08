@@ -40,6 +40,9 @@ test('offers deletion behind a confirmation that names what is about to go', asy
       /Export a copy first\. Your account data is kept for 30 days, then deleted\./,
     ),
   ).toBeVisible()
+  await expect(
+    page.getByText(/If you restore your account before/),
+  ).toHaveCount(0)
 
   await clickUntil(
     page.getByRole('button', { name: 'Delete account' }),

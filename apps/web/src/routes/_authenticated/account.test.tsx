@@ -265,13 +265,19 @@ describe('AccountScreen', () => {
   })
 
   it('tells a Grant holder the Plan comes back on restore', () => {
-    renderAccount({ plan: 'pro', grant: { plan: 'pro', endsAt: null, afterThat: null } })
+    renderAccount({
+      plan: 'pro',
+      grant: { plan: 'pro', endsAt: null, afterThat: null },
+    })
 
     expect(
       screen.getByText(
-        /If you restore your account before November 7(th)?, 2026, your Pro plan comes back with it\./,
+        /Export a copy first\. Your account data is kept for 30 days, then deleted\./,
       ),
     ).toBeTruthy()
+    expect(
+      screen.queryByText(/If you restore your account before/),
+    ).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
 
@@ -283,7 +289,7 @@ describe('AccountScreen', () => {
     expect(dialog.textContent).not.toMatch(/will not be refunded/)
   })
 
-  it('names the same Plan and date in the delete dialog as on the card', () => {
+  it('says a stacked Grant comes back until its end, then moves to the lesser Plan', () => {
     renderAccount({
       plan: 'proPlus',
       grant: { plan: 'proPlus', endsAt: proPlusEnds, afterThat: 'pro' },
@@ -292,14 +298,17 @@ describe('AccountScreen', () => {
     expect(
       screen.getByText(/You're on Pro\+ until November 1(st)?, 2026\./),
     ).toBeTruthy()
+    expect(
+      screen.queryByText(/If you restore your account before/),
+    ).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
 
     const dialog = screen.getByRole('dialog')
     expect(dialog.textContent).toMatch(
-      /If you restore your account before November 7(th)?, 2026, your Pro\+ plan comes back with it, as long as it hasn't ended by then\./,
+      /If you restore your account before November 7(th)?, 2026, your Pro\+ plan comes back with it until November 1(st)?, 2026, and then you'll move to Pro\./,
     )
-    expect(dialog.textContent).not.toMatch(/your Pro plan comes back/)
+    expect(dialog.textContent).not.toMatch(/hasn't ended by then/)
     expect(dialog.textContent).not.toMatch(/Subscription is cancelled now/)
   })
 
