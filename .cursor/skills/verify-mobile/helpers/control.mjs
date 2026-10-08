@@ -37,8 +37,8 @@ const LAUNCH_BUNDLE_TIMEOUT_MS = 120_000
 const DOCTOR_FETCH_TIMEOUT_MS = 15_000
 
 const BUNDLE_PATHS = [
-  '/index.bundle?platform=android&dev=true&minify=false',
-  '/index.ts.bundle?platform=android&dev=true&minify=false',
+  '/apps/mobile/index.bundle?platform=android&dev=true&minify=false',
+  '/apps/mobile/index.ts.bundle?platform=android&dev=true&minify=false',
 ]
 
 function die(message, code = 1) {
@@ -166,7 +166,7 @@ async function waitForMetro(baseUrl, timeoutMs) {
     }
     await sleep(250)
   }
-  die(`Timed out waiting for Metro at ${statusUrl}`)
+  throw new Error(`Timed out waiting for Metro at ${statusUrl}`)
 }
 
 async function fetchAppBundle(baseUrl, timeoutMs) {
@@ -187,7 +187,7 @@ async function fetchAppBundle(baseUrl, timeoutMs) {
     }
     await sleep(500)
   }
-  die(`Timed out waiting for an app bundle: ${lastError}`)
+  throw new Error(`Timed out waiting for an app bundle: ${lastError}`)
 }
 
 function stopRecordedPid(pid, kind, stopped) {
@@ -246,7 +246,8 @@ async function cmdLaunch() {
   )
   metro.unref()
 
-  const baseUrl = `http://127.0.0.1:${port}`
+  // Expo `--localhost` binds ::1 here. 127.0.0.1 does not reach it.
+  const baseUrl = `http://localhost:${port}`
   try {
     await waitForMetro(baseUrl, LAUNCH_STATUS_TIMEOUT_MS)
     const bundle = await fetchAppBundle(baseUrl, LAUNCH_BUNDLE_TIMEOUT_MS)
@@ -257,9 +258,11 @@ async function cmdLaunch() {
       )
     }
 
+    const metroPids = [...new Set([metro.pid, ...portListenerPids(port)].filter(Boolean))]
     const state = {
       runId: `verify-${new Date().toISOString().replace(/[:.]/g, '-')}`,
       metroPid: metro.pid,
+      metroPids,
       port,
       baseUrl,
       bundleUrl: bundle.url,
@@ -290,7 +293,10 @@ async function cmdLaunch() {
     )
   } catch (error) {
     stopRecordedPid(metro.pid, 'metro', [])
-    throw error
+    for (const pid of portListenerPids(port)) {
+      stopRecordedPid(pid, 'metro', [])
+    }
+    die(error.message)
   }
 }
 
@@ -442,7 +448,12 @@ async function cmdDrive(feature) {
 function cmdCleanup() {
   const state = readState()
   const stopped = []
-  stopRecordedPid(state?.metroPid, 'metro', stopped)
+  const pids = new Set()
+  if (state?.metroPid) pids.add(state.metroPid)
+  for (const pid of state?.metroPids ?? []) pids.add(pid)
+  for (const pid of pids) {
+    stopRecordedPid(pid, 'metro', stopped)
+  }
 
   if (existsSync(runDir)) {
     rmSync(runDir, { recursive: true, force: true })
