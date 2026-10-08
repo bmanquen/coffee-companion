@@ -1,7 +1,13 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { countries, pendingPersonErasure, session, user, verification } from '../db/schema'
+import {
+  countries,
+  pendingPersonErasure,
+  session,
+  user,
+  verification,
+} from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import { setPersonErasure } from '../lib/erase-person'
 import { setErrorCapture } from '../lib/report-error'
@@ -108,9 +114,10 @@ beforeAll(async () => {
 
   await asUser.planInterest.register({ planId: 'proPlus' })
 
-  const otherCoffee = await createCoffeeFor(asOther, uniqOther)(
-    uniqOther('Other coffee'),
-  )
+  const otherCoffee = await createCoffeeFor(
+    asOther,
+    uniqOther,
+  )(uniqOther('Other coffee'))
   otherCoffeeId = otherCoffee.id
 
   const [ownVerification] = await db
@@ -275,6 +282,7 @@ describe('account.delete', () => {
   it('restores the account without calling Stripe', async () => {
     const restored = 'delete-account-restore'
     await insertUser(restored, { stripeCustomerId: 'cus_restored' })
+    await grantPlan(restored, 'pro', { reason: 'restore keeps the grant' })
     await db
       .update(user)
       .set({ deletedAt: new Date() })
@@ -287,6 +295,10 @@ describe('account.delete', () => {
       expect(mocks.cancelBilledSubscriptions).not.toHaveBeenCalled()
       const row = await db.query.user.findFirst({ where: { id: restored } })
       expect(row?.deletedAt).toBeNull()
+      expect(
+        (await db.query.planGrants.findFirst({ where: { userId: restored } }))
+          ?.planId,
+      ).toBe('pro')
       await expect(asRestored.coffee.getAll()).resolves.toEqual([])
     } finally {
       await db.delete(user).where(eq(user.id, restored))
@@ -307,8 +319,7 @@ describe('account.delete', () => {
         /no longer be restored/i,
       )
       expect(
-        (await db.query.user.findFirst({ where: { id: tooLate } }))
-          ?.deletedAt,
+        (await db.query.user.findFirst({ where: { id: tooLate } }))?.deletedAt,
       ).toBeTruthy()
     } finally {
       await db.delete(user).where(eq(user.id, tooLate))
@@ -336,6 +347,7 @@ describe('purge of deleted accounts', () => {
   it('erases rows, verification rows, and the PostHog person after 30 days', async () => {
     const stale = 'delete-account-stale'
     await insertUser(stale)
+    await grantPlan(stale, 'pro', { reason: 'purge removes the grant' })
     await db.insert(verification).values({
       id: crypto.randomUUID(),
       identifier: `${stale}@example.com`,
@@ -356,6 +368,9 @@ describe('purge of deleted accounts', () => {
       expect(erase).toHaveBeenCalledWith(stale)
       expect(
         await db.query.user.findFirst({ where: { id: stale } }),
+      ).toBeUndefined()
+      expect(
+        await db.query.planGrants.findFirst({ where: { userId: stale } }),
       ).toBeUndefined()
       expect(
         await db
@@ -438,8 +453,7 @@ describe('purge of deleted accounts', () => {
       expect(result).toEqual({ purged: 0 })
       expect(erase).not.toHaveBeenCalled()
       expect(
-        (await db.query.user.findFirst({ where: { id: restored } }))
-          ?.deletedAt,
+        (await db.query.user.findFirst({ where: { id: restored } }))?.deletedAt,
       ).toBeNull()
     } finally {
       await db.delete(user).where(eq(user.id, restored))
@@ -516,9 +530,7 @@ describe('purge of deleted accounts', () => {
 
   it('retries a person delete that failed last time', async () => {
     const leftover = 'delete-account-erase-retry'
-    await db
-      .insert(pendingPersonErasure)
-      .values({ accountId: leftover })
+    await db.insert(pendingPersonErasure).values({ accountId: leftover })
     const erase = vi.fn().mockResolvedValue(undefined)
     setPersonErasure(erase)
 

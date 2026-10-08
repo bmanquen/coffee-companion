@@ -23,14 +23,12 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactRouter>()
   return {
     ...actual,
-    createFileRoute:
-      () =>
-      (opts: Record<string, unknown>) => ({
-        ...opts,
-        useRouteContext: () => ({
-          session: { user: { id: 'user_123' } },
-        }),
+    createFileRoute: () => (opts: Record<string, unknown>) => ({
+      ...opts,
+      useRouteContext: () => ({
+        session: { user: { id: 'user_123' } },
       }),
+    }),
     Outlet: () => null,
   }
 })
@@ -89,6 +87,8 @@ describe('AuthenticatedLayout identify-on-boot', () => {
       limits: planLimits.pro,
       renewalFailing: false,
       subscription: null,
+      grant: null,
+      endedGrant: null,
     })
 
     render(<AuthenticatedLayout />, { wrapper: Wrapper })

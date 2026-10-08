@@ -12,14 +12,16 @@ test('shows the Plan a Grant confers, with nothing to manage', async ({
 
   await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible()
   await expect(page.getByText('Pro', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText(
+      "You're on Pro. This plan was added to your account, so there's no billing to manage.",
+    ),
+  ).toBeVisible()
 
   await expect(
     page.getByRole('button', { name: 'Manage subscription' }),
   ).toHaveCount(0)
-  await expect(page.getByRole('link', { name: 'See plans' })).toHaveAttribute(
-    'href',
-    '/pricing',
-  )
+  await expect(page.getByRole('link', { name: 'See plans' })).toHaveCount(0)
 })
 
 test('offers an export of account data', async ({ page }) => {
@@ -49,8 +51,13 @@ test('offers deletion behind a confirmation that names what is about to go', asy
     dialog.getByText(/account data is kept for 30 days/),
   ).toBeVisible()
   await expect(dialog.getByText(/restore it during that time/)).toBeVisible()
-  await expect(dialog.getByText(/Subscription is cancelled now/)).toBeVisible()
-  await expect(dialog.getByText(/will not be refunded/)).toBeVisible()
+  await expect(
+    dialog.getByText(
+      /If you restore your account before .+ your Pro plan comes back with it/,
+    ),
+  ).toBeVisible()
+  await expect(dialog.getByText(/Subscription is cancelled now/)).toHaveCount(0)
+  await expect(dialog.getByText(/will not be refunded/)).toHaveCount(0)
   await expect(dialog.getByText(/PostHog/)).toHaveCount(0)
   await expect(dialog.getByText(/cannot be undone/i)).toHaveCount(0)
   await expect(
