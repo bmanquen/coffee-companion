@@ -41,7 +41,9 @@ jobs:
     timeout-minutes: 15
     # No database: web tests seed the React Query cache (tRPC is never called),
     # the api unit config excludes the DB-backed *.integration.test.ts, and
-    # mobile tests are node-side Vitest.
+    # mobile tests render the welcome screen in-process with React Native
+    # Testing Library. No emulator or Metro job: iOS needs macOS + Xcode, and
+    # an Android AVD is not cheap on ubuntu-latest.
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
