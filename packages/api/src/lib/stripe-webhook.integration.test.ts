@@ -3,7 +3,13 @@ import Stripe from 'stripe'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes, subscription, user } from '../db/schema'
-import { callerFor, createCoffeeFor, seedUsers, uniqFor } from '../../test/trpc'
+import {
+  callerFor,
+  createCoffeeFor,
+  grantPlan,
+  seedUsers,
+  uniqFor,
+} from '../../test/trpc'
 import { auth } from './auth'
 import { ESPRESSO_DEVICE_TYPE } from './espresso'
 
@@ -189,7 +195,12 @@ describe('the Stripe webhook', () => {
     const response = await deliver(subscriptionCreated)
 
     expect(response.ok).toBe(true)
-    expect(await planOf()).toBe('pro')
+    expect(await asBuyer.plan.current()).toMatchObject({
+      plan: 'pro',
+      subscription: { plan: 'pro', endsAt: null },
+      grant: null,
+      endedGrant: null,
+    })
   })
 
   it('reopens everything Sealed while the buyer was on Free', async () => {
@@ -205,5 +216,15 @@ describe('the Stripe webhook', () => {
     expect(response.ok).toBe(true)
     expect(await planOf()).toBe('pro')
     expect(await subscriptionRowCount()).toBe(1)
+  })
+
+  it('keeps the Stripe Subscription on /account when a Grant is also live', async () => {
+    await grantPlan(BUYER, 'proPlus', { reason: 'webhook plus grant' })
+
+    expect(await asBuyer.plan.current()).toMatchObject({
+      plan: 'proPlus',
+      subscription: { plan: 'pro', endsAt: null },
+      grant: { plan: 'proPlus', endsAt: null },
+    })
   })
 })
