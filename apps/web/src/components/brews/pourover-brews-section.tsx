@@ -135,7 +135,7 @@ const columns = [
   expanderColumn<Brew>(),
 ]
 
-// The Pour Over brew log — one tab of the /brews page. Mirrors the equipment
+// The Pour Over brew log on /brews. Mirrors the equipment
 // page's section components (heading + add button + filters + table).
 export function PouroverBrewsSection() {
   'use no memo'

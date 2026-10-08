@@ -50,6 +50,18 @@ export async function pickOption(trigger: Locator, option: Locator) {
   await option.click()
 }
 
+// The /brews method switcher: labelled "Brewing method", options are the
+// method names the page used to show as tabs.
+export const brewsMethodSelect = (page: Page) =>
+  page.getByLabel('Brewing method')
+
+export async function pickBrewsMethod(page: Page, method: string) {
+  await pickOption(
+    brewsMethodSelect(page),
+    page.getByRole('option', { name: method, exact: true }),
+  )
+}
+
 // The counterpart for an interaction with no effect to drive it. An unhydrated
 // fill sets the DOM value and React never hears it, so the form state stays
 // empty and the submit that follows fails validation instead of navigating; an

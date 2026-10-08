@@ -133,7 +133,7 @@ const columns = [
   expanderColumn<Brew>(),
 ]
 
-// The Cold Brew log — one tab of the /brews page. Mirrors the other brew
+// The Cold Brew log on /brews. Mirrors the other brew
 // sections: a per-coffee dialed-in toggle, the recipe columns, and per-row
 // edit/delete actions.
 export function ColdBrewBrewsSection() {

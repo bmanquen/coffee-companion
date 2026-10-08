@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { clickUntil } from './helpers'
+import { clickUntil, pickBrewsMethod } from './helpers'
 
 // Authenticated page smoke tests. Run in the `authed-data` project (bypass
 // cookie for the seeded user). The SSR cookie-forwarding fix lets these routes
@@ -8,21 +8,57 @@ import { clickUntil } from './helpers'
 test('brews page shows the espresso log', async ({ page }) => {
   await page.goto('/brews')
   await expect(page.getByRole('heading', { name: 'Brews' })).toBeVisible()
-  // The Espresso tab is selected by default.
+  // Espresso is selected by default (no ?method=).
   // .first(): the create-espresso flow can add another shot for this coffee,
   // so tolerate more than one row (tests share the seeded user/DB).
   await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()
+  await expect(page.getByLabel('Brewing method')).toContainText('Espresso')
+  await expect(page.getByRole('tab')).toHaveCount(0)
 })
 
-test('brews page AeroPress tab shows the aeropress log', async ({ page }) => {
+test('brews page AeroPress method shows the aeropress log', async ({
+  page,
+}) => {
   await page.goto('/brews')
   // The seeded dialed-in AeroPress brew for Ethiopia Guji, on the Standard
   // method. Gate on Standard, not on the coffee: Ethiopia Guji is on the
-  // default Espresso tab too, so it would not show the tab had switched.
+  // default Espresso log too, so it would not show the method had switched.
   const method = page.getByText('Standard').first()
-  await clickUntil(page.getByRole('tab', { name: 'AeroPress' }), method)
-  await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()
+  await pickBrewsMethod(page, 'AeroPress')
   await expect(method).toBeVisible()
+  await expect(page.getByText('Ethiopia Guji').first()).toBeVisible()
+  await expect(page).toHaveURL(/[?&]method=aeropress\b/)
+})
+
+test('brews page deep-links a method via the URL', async ({ page }) => {
+  await page.goto('/brews?method=aeropress')
+  await expect(page.getByLabel('Brewing method')).toContainText('AeroPress')
+  await expect(page.getByText('Standard').first()).toBeVisible()
+})
+
+test('brews method select filters by typed query', async ({ page }) => {
+  await page.goto('/brews')
+  await clickUntil(
+    page.getByLabel('Brewing method'),
+    page.getByPlaceholder('Search methods'),
+  )
+  await page.getByPlaceholder('Search methods').fill('aero')
+  await expect(page.getByRole('option')).toHaveText(['AeroPress'])
+
+  await page.getByPlaceholder('Search methods').fill('chemex')
+  await expect(page.getByText('No methods match “chemex”.')).toBeVisible()
+})
+
+test('brews method select is keyboard-navigable', async ({ page }) => {
+  await page.goto('/brews')
+  await clickUntil(
+    page.getByLabel('Brewing method'),
+    page.getByPlaceholder('Search methods'),
+  )
+  await page.keyboard.type('cold')
+  await page.keyboard.press('Enter')
+  await expect(page.getByLabel('Brewing method')).toContainText('Cold Brew')
+  await expect(page).toHaveURL(/[?&]method=coldbrew\b/)
 })
 
 test('coffees page lists coffees', async ({ page }) => {
