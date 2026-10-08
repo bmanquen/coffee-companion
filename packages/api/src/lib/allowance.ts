@@ -75,14 +75,23 @@ function paidGrant(
   if (plan === 'free') return null
   const ofPlan = paid.filter((row) => row.planId === plan)
   if (ofPlan.some((row) => row.expiresAt === null)) {
-    return { plan, endsAt: null }
+    return { plan, endsAt: null, afterThat: null }
   }
   const endsAt = ofPlan.reduce<Date | null>((latest, row) => {
     if (!row.expiresAt) return latest
     if (!latest || row.expiresAt > latest) return row.expiresAt
     return latest
   }, null)
-  return { plan, endsAt }
+  if (!endsAt) return { plan, endsAt: null, afterThat: null }
+  const continuing = paid
+    .filter((row) => row.expiresAt === null || row.expiresAt > endsAt)
+    .map((row) => row.planId)
+  const afterThat = mostGenerous(continuing)
+  return {
+    plan,
+    endsAt,
+    afterThat: afterThat === 'free' ? null : afterThat,
+  }
 }
 
 // A Grant and a Subscription are the two sources of a Plan, and the most

@@ -224,7 +224,7 @@ describe('the Stripe webhook', () => {
     expect(await asBuyer.plan.current()).toMatchObject({
       plan: 'proPlus',
       subscription: { plan: 'pro', endsAt: null },
-      grant: { plan: 'proPlus', endsAt: null },
+      grant: { plan: 'proPlus', endsAt: null, afterThat: null },
     })
   })
 })

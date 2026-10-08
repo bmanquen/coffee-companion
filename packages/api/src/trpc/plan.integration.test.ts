@@ -30,6 +30,11 @@ const USER_MANAGING_CANCELED = 'plan-user-managing-canceled'
 const USER_MANAGING_DATED = 'plan-user-managing-dated'
 const USER_GRANTED_DATED = 'plan-user-granted-dated'
 const USER_GRANT_ENDED = 'plan-user-grant-ended'
+const USER_GRANTS_TWO_DATED = 'plan-user-grants-two-dated'
+const USER_GRANTS_OPEN_AND_DATED = 'plan-user-grants-open-and-dated'
+const USER_GRANTS_STACKED = 'plan-user-grants-stacked'
+const USER_GRANTS_EXPIRED_AND_LIVE = 'plan-user-grants-expired-and-live'
+const USER_GRANTS_TWO_ENDED = 'plan-user-grants-two-ended'
 
 seedUsers([
   USER_FREE,
@@ -47,6 +52,11 @@ seedUsers([
   USER_MANAGING_DATED,
   USER_GRANTED_DATED,
   USER_GRANT_ENDED,
+  USER_GRANTS_TWO_DATED,
+  USER_GRANTS_OPEN_AND_DATED,
+  USER_GRANTS_STACKED,
+  USER_GRANTS_EXPIRED_AND_LIVE,
+  USER_GRANTS_TWO_ENDED,
 ])
 
 describe('plan.current', () => {
@@ -69,7 +79,7 @@ describe('plan.current', () => {
       limits: { grinders: null, brewingDevices: null },
       renewalFailing: false,
       subscription: null,
-      grant: { plan: 'pro', endsAt: null },
+      grant: { plan: 'pro', endsAt: null, afterThat: null },
       endedGrant: null,
     })
   })
@@ -83,8 +93,89 @@ describe('plan.current', () => {
       limits: { grinders: null, brewingDevices: null },
       renewalFailing: false,
       subscription: null,
-      grant: { plan: 'pro', endsAt },
+      grant: { plan: 'pro', endsAt, afterThat: null },
       endedGrant: null,
+    })
+  })
+
+  it('keeps one Grant when two dated Grants confer the same Plan', async () => {
+    const earlier = new Date(Date.now() + 60_000)
+    const later = new Date(Date.now() + 120_000)
+    await grantPlan(USER_GRANTS_TWO_DATED, 'pro', { expiresAt: earlier })
+    await grantPlan(USER_GRANTS_TWO_DATED, 'pro', { expiresAt: later })
+
+    expect(await callerFor(USER_GRANTS_TWO_DATED).plan.current()).toEqual({
+      plan: 'pro',
+      limits: { grinders: null, brewingDevices: null },
+      renewalFailing: false,
+      subscription: null,
+      grant: { plan: 'pro', endsAt: later, afterThat: null },
+      endedGrant: null,
+    })
+  })
+
+  it('uses the open-ended Grant when the same Plan also has a dated one', async () => {
+    await grantPlan(USER_GRANTS_OPEN_AND_DATED, 'pro', {
+      expiresAt: new Date(Date.now() + 60_000),
+    })
+    await grantPlan(USER_GRANTS_OPEN_AND_DATED, 'pro')
+
+    expect(await callerFor(USER_GRANTS_OPEN_AND_DATED).plan.current()).toEqual({
+      plan: 'pro',
+      limits: { grinders: null, brewingDevices: null },
+      renewalFailing: false,
+      subscription: null,
+      grant: { plan: 'pro', endsAt: null, afterThat: null },
+      endedGrant: null,
+    })
+  })
+
+  it('names the more generous Plan and the Plan that continues after it ends', async () => {
+    const endsAt = new Date(Date.now() + 60_000)
+    await grantPlan(USER_GRANTS_STACKED, 'proPlus', { expiresAt: endsAt })
+    await grantPlan(USER_GRANTS_STACKED, 'pro')
+
+    expect(await callerFor(USER_GRANTS_STACKED).plan.current()).toEqual({
+      plan: 'proPlus',
+      limits: { grinders: null, brewingDevices: null },
+      renewalFailing: false,
+      subscription: null,
+      grant: { plan: 'proPlus', endsAt, afterThat: 'pro' },
+      endedGrant: null,
+    })
+  })
+
+  it('ignores an expired Grant when another is still live', async () => {
+    await grantPlan(USER_GRANTS_EXPIRED_AND_LIVE, 'proPlus', {
+      expiresAt: new Date(Date.now() - 60_000),
+    })
+    await grantPlan(USER_GRANTS_EXPIRED_AND_LIVE, 'pro')
+
+    expect(await callerFor(USER_GRANTS_EXPIRED_AND_LIVE).plan.current()).toEqual(
+      {
+        plan: 'pro',
+        limits: { grinders: null, brewingDevices: null },
+        renewalFailing: false,
+        subscription: null,
+        grant: { plan: 'pro', endsAt: null, afterThat: null },
+        endedGrant: null,
+      },
+    )
+  })
+
+  it('reports the latest ended Grant when every Grant has expired', async () => {
+    const earlier = new Date(Date.now() - 120_000)
+    const later = new Date(Date.now() - 60_000)
+    await grantPlan(USER_GRANTS_TWO_ENDED, 'pro', { expiresAt: earlier })
+    await grantPlan(USER_GRANTS_TWO_ENDED, 'proPlus', { expiresAt: later })
+
+    expect(await callerFor(USER_GRANTS_TWO_ENDED).plan.current()).toEqual({
+      plan: 'free',
+      limits: { grinders: 1, brewingDevices: 3 },
+      renewalFailing: false,
+      subscription: null,
+      grant: null,
+      endedGrant: { plan: 'proPlus', endedAt: later },
     })
   })
 
