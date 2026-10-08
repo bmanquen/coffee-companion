@@ -135,7 +135,7 @@ const columns = [
   expanderColumn<Brew>(),
 ]
 
-// The AeroPress brew log — one tab of the /brews page. Mirrors the equipment
+// The AeroPress brew log on /brews. Mirrors the equipment
 // page's section components (heading + add button + filters + table).
 export function AeropressBrewsSection() {
   'use no memo'

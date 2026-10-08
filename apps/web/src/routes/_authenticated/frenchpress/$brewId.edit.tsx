@@ -8,6 +8,7 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import type { InsertFrenchpressBrew } from '@coffee-companion/api/db/zod'
+import { brewsLogLocation } from '@/components/brews/methods'
 import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
@@ -89,7 +90,7 @@ function EditFrenchpressBrew() {
           trpc.frenchpressBrew.getById.queryOptions(brewId),
         )
         invalidateDeviceDialedInQueries(queryClient, trpc)
-        navigate({ to: '/brews' })
+        navigate(brewsLogLocation('frenchpress'))
       },
     }),
   )
@@ -115,7 +116,10 @@ function EditFrenchpressBrew() {
       onChange: insertFrenchpressBrewSchema as never,
     },
     onSubmit: async ({ value }) => {
-      await submitFormMutation(form, updateBrew.mutateAsync, { ...value, id: brewId })
+      await submitFormMutation(form, updateBrew.mutateAsync, {
+        ...value,
+        id: brewId,
+      })
     },
   })
 
@@ -177,17 +181,10 @@ function EditFrenchpressBrew() {
           )}
         </form.AppField>
         <form.AppField name="waterTemp">
-          {(field) => (
-            <field.TextField
-              label="Water Temp (°C)"
-              type="number"
-            />
-          )}
+          {(field) => <field.TextField label="Water Temp (°C)" type="number" />}
         </form.AppField>
         <form.AppField name="grindSetting">
-          {(field) => (
-            <field.TextField label="Grind Setting" />
-          )}
+          {(field) => <field.TextField label="Grind Setting" />}
         </form.AppField>
         <form.AppField name="notes">
           {(field) => (

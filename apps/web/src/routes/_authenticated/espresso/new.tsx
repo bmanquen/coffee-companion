@@ -9,6 +9,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
+import { brewsLogLocation } from '@/components/brews/methods'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
@@ -63,7 +64,7 @@ function NewEspressoShot() {
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
         track('brew_logged', { method: 'espresso' })
-        navigate({ to: '/brews' })
+        navigate(brewsLogLocation('espresso'))
       },
     }),
   )

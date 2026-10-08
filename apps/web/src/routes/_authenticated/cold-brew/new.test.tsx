@@ -209,6 +209,10 @@ describe('NewColdBrewBrew form', () => {
           method: 'coldbrew',
         }),
       )
+      expect(mocks.navigate).toHaveBeenCalledWith({
+        to: '/brews',
+        search: { method: 'coldbrew' },
+      })
     } finally {
       fetchSpy.mockRestore()
     }

@@ -163,12 +163,9 @@ describe('EditFrenchpressBrew form', () => {
   })
 
   it('submits an update carrying the brew id', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('[]', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { Wrapper } = seeded()
       render(<EditFrenchpressBrew />, { wrapper: Wrapper })
@@ -189,13 +186,21 @@ describe('EditFrenchpressBrew form', () => {
       expect(body).toContain('31')
       // 4 minutes + the loaded 30 seconds → 270 whole seconds.
       expect(body).toMatch(/"steepTime":270/)
+      await waitFor(() =>
+        expect(mocks.navigate).toHaveBeenCalledWith({
+          to: '/brews',
+          search: { method: 'frenchpress' },
+        }),
+      )
     } finally {
       fetchSpy.mockRestore()
     }
   })
 
   it('invalidates dialed-in lookups after save', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(trpcSuccess())
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = seeded()
       const setKey = {

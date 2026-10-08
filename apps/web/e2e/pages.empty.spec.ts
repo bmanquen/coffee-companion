@@ -1,19 +1,19 @@
 import { expect, test } from '@playwright/test'
-import { clickUntil } from './helpers'
+import { clickUntil, pickBrewsMethod } from './helpers'
 
 // Empty-state page tests. Run in the `authed-empty` project (bypass cookie for
 // an unseeded user), so every authenticated page renders its empty state.
 
 test('brews page shows the espresso empty state', async ({ page }) => {
   await page.goto('/brews')
-  // The Espresso tab is selected by default.
+  // Espresso is selected by default.
   await expect(page.getByText(/No espresso shots yet/i)).toBeVisible()
 })
 
 test('brews page shows the aeropress empty state', async ({ page }) => {
   await page.goto('/brews')
   const emptyState = page.getByText(/No aeropress brews yet/i)
-  await clickUntil(page.getByRole('tab', { name: 'AeroPress' }), emptyState)
+  await pickBrewsMethod(page, 'AeroPress')
   await expect(emptyState).toBeVisible()
 })
 

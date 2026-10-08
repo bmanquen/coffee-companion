@@ -1,11 +1,11 @@
 # Brews
 
-Brews is the log of every Shot and Brew, tabbed by brewing method. A user reads history here, logs the next one from the method's `/…/new` form, and edits, deletes, or marks Dialed-in on a readable row.
+Brews is the log of every Shot and Brew, switched by a searchable brewing-method select. A user reads history here, logs the next one from the method's `/…/new` form, and edits, deletes, or marks Dialed-in on a readable row.
 
 ## Sub-features
 
-- `brews-espresso` shows the Espresso tab (default) with Ethiopia Guji on `data`, and a Ratio column (computed 1:x from dose and yield).
-- `brews-aeropress` switches to the AeroPress tab and shows the Standard dialed-in brew.
+- `brews-espresso` shows the Espresso log (default) with Ethiopia Guji on `data`, and a Ratio column (computed 1:x from dose and yield).
+- `brews-aeropress` switches the method select to AeroPress and shows the Standard dialed-in brew.
 - `brews-log-espresso` logs a Shot from `/espresso/new` (coffee select prefills grinder and device).
 - `brews-log-aeropress` logs an AeroPress brew from `/aeropress/new`.
 - `brews-roast-date` picks a roast date on the espresso form calendar.
@@ -20,9 +20,10 @@ Brews is the log of every Shot and Brew, tabbed by brewing method. A user reads 
 
 - Choose `Brews` in the desktop `Open menu` sheet or the mobile `Primary` nav.
 - Open `/brews`.
+- Open `/brews?method=aeropress` (or pourover / frenchpress / coldbrew / espresso) to land on that method.
 - Choose `Log Shot` or `Log Brew` on the dashboard feed.
 - Open `/espresso/new`, `/aeropress/new`, `/pourover/new`, `/frenchpress/new`, or `/cold-brew/new`.
-- Choose `Edit shot` or `Delete shot` on a readable espresso row (other tabs: `Edit brew` / `Delete brew`).
+- Choose `Edit shot` or `Delete shot` on a readable espresso row (other methods: `Edit brew` / `Delete brew`).
 
 ## Driving it with control
 
@@ -32,25 +33,26 @@ Preconditions:
 - Identity is `data`.
 - `helpers/control doctor` reports the expected URL and `coffee_companion_test`.
 
-- **Espresso log.** Run `helpers/control browser as data` and `helpers/control browser goto --path /brews`. Heading `Brews` is visible and `Ethiopia Guji` appears (`expect --text "Ethiopia Guji" --first` — create-espresso can add more rows for the same coffee). Columnheader `Ratio` is visible (`expect --role columnheader --name Ratio --exact --first`).
-- **AeroPress tab.** Click tab `AeroPress`. Wait for `Standard` (`expect --text Standard --first` — that word is not on the Espresso tab, so it proves the switch). `Ethiopia Guji` remains visible.
-- **Log espresso.** Run `helpers/control browser goto --path /espresso/new`. Click text `Select Coffee`, then `Ethiopia Guji` (exact). `Niche Zero` and `Linea Mini` replace the Select placeholders. Fill `--label "Dose (g)"` → `18`, `--label "Yield (g)"` → `36`, `--label "Time (s)"` → `30`, `--label "Grind Setting"` → a unique marker. Click button `Log` (exact). The URL is `/brews` and heading `Brews` is visible.
-- **Log AeroPress.** Run `helpers/control browser goto --path /aeropress/new`. Select `Ethiopia Guji`. `Standard`, `Niche Zero`, and `AeroPress Go` prefill (`expect --text "AeroPress Go" --exact` — the seeded `Dialed-in for AeroPress Go` banner also contains that name). Status `Dialed-in for AeroPress Go` is visible. Fill `--label "Dose (g)"` → `15`, `--label "Water (g)"` → `220`, `--label "Steep Time (minutes)"` → `1`, `--label "Steep Time (seconds)"` → `30`, `--label "Grind Setting"` → `18`. Click `Log`. Land on `/brews`.
+- **Espresso log.** Run `helpers/control browser as data` and `helpers/control browser goto --path /brews`. Heading `Brews` is visible and `Ethiopia Guji` appears (`expect --text "Ethiopia Guji" --first` — create-espresso can add more rows for the same coffee). The method select is labelled `Brewing method` and reads `Espresso` (`expect --label "Brewing method"`). Columnheader `Ratio` is visible (`expect --role columnheader --name Ratio --exact --first`).
+- **AeroPress method.** Click `--label "Brewing method"`, then option `AeroPress` (exact). Wait for `Standard` (`expect --text Standard --first` — that word is not on the Espresso log, so it proves the switch). `Ethiopia Guji` remains visible. The URL carries `method=aeropress`.
+- **Log espresso.** Run `helpers/control browser goto --path /espresso/new`. Click text `Select Coffee`, then `Ethiopia Guji` (exact). `Niche Zero` and `Linea Mini` replace the Select placeholders. Fill `--label "Dose (g)"` → `18`, `--label "Yield (g)"` → `36`, `--label "Time (s)"` → `30`, `--label "Grind Setting"` → a unique marker. Click button `Log` (exact). The URL is `/brews?method=espresso` and heading `Brews` is visible.
+- **Log AeroPress.** Run `helpers/control browser goto --path /aeropress/new`. Select `Ethiopia Guji`. `Standard`, `Niche Zero`, and `AeroPress Go` prefill (`expect --text "AeroPress Go" --exact` — the seeded `Dialed-in for AeroPress Go` banner also contains that name). Status `Dialed-in for AeroPress Go` is visible. Fill `--label "Dose (g)"` → `15`, `--label "Water (g)"` → `220`, `--label "Steep Time (minutes)"` → `1`, `--label "Steep Time (seconds)"` → `30`, `--label "Grind Setting"` → `18`. Click `Log`. Land on `/brews?method=aeropress` with the method select reading `AeroPress`.
 - **Roast date.** On a fresh `/espresso/new` with no coffee selected, click `Pick a date`. Changing months (`Go to the Next Month`) must leave the calendar open and `Pick a date` still on the trigger. Then click a day button matching `/15th/`. `Pick a date` is gone (`expect --text "Pick a date" --count 0`) and the trigger shows the picked day. Re-open and tap that same day: the value stays and the calendar closes.
 - **Dialed-in.** On `/brews` (Espresso) run `expect --role button --name "Dialed in Sumatra Lintong — clear"`. Off-state rows use `Mark {coffee} as dialed in` (Ethiopia Guji's seeded Shot is off).
 - **Device Dialed-in.** On `/brews`, click `Mark Ethiopia Guji as dialed in` (`click --role button --name "Mark Ethiopia Guji as dialed in" --first` — a log earlier in this recipe adds a second Ethiopia Guji espresso row). The control reads `Dialed in Ethiopia Guji — clear`. Open `/espresso/new`, select `Ethiopia Guji`. Status `Dialed-in for Linea Mini` is visible and names that coffee. Open `/aeropress/new`, select `Ethiopia Guji`. That Linea Mini status is absent. Back on `/brews`, click `Dialed in Ethiopia Guji — clear` (`--first`). `/espresso/new` after selecting the coffee no longer shows the Linea Mini status.
-- **Edit shot.** After logging a unique grind, run `click --role button --name "Edit shot" --first`. Heading is `Edit Espresso Shot`. Fill `--label "Grind Setting"` with an updated marker and click `Save`. Land on `/brews` and `expect --text "<updated>" --first`.
+- **Edit shot.** After logging a unique grind, run `click --role button --name "Edit shot" --first`. Heading is `Edit Espresso Shot`. Fill `--label "Grind Setting"` with an updated marker and click `Save`. Land on `/brews?method=espresso` and `expect --text "<updated>" --first`.
 - **Delete shot.** On that same new row, run `click --role button --name "Delete shot" --first`, then confirm `Delete` (exact). The updated grind is gone (`expect --text "<updated>" --count 0`).
 - **Proof.** After logging, on `/brews` run `helpers/control browser screenshot --path artifacts/<run>/brews/espresso.png` and `helpers/control browser snapshot --aria --path artifacts/<run>/brews/espresso.aria.txt`. Both show heading `Brews` and `Ethiopia Guji`. Extra shots from this run may remain; do not delete seeded rows to tidy the screenshot.
 
 ## Gotchas
 
-- Gate the AeroPress switch on `Standard`, not on `Ethiopia Guji` — that coffee is also on the Espresso tab.
+- Gate the AeroPress switch on `Standard`, not on `Ethiopia Guji` — that coffee is also on the Espresso log.
+- The method switcher is the labelled `Brewing method` control, not tabs. Open it, then click `role=option` `AeroPress` (exact — `AeroPress Go` is a device name on that log). Type in `Search methods` to filter; no matches reads `No methods match “{query}”.`
 - SearchSelect: clicking the already-selected option clears the field. If the value is already right, leave it.
 - Espresso submit is `Log`, not `Save`. Edit routes use `Save`. After a log, `--first` on `Edit shot` / `Delete shot` hits the new row (most recent). Do not edit or delete seeded rows — log your own, then remove it.
 - Ethiopia Guji's seeded espresso Shot is not Dialed-in and has no grind. The AeroPress `Standard` brew is Dialed-in. Selecting that coffee on `/aeropress/new` shows `Dialed-in for AeroPress Go`, so `expect --text "AeroPress Go"` without `--exact` also matches the banner. The seeded espresso Dialed-in is Sumatra Lintong (`Dialed in Sumatra Lintong — clear`). After this recipe logs another Ethiopia Guji Shot, two `Mark Ethiopia Guji as dialed in` buttons exist — use `--first` (most recent). On a clean seed there is only one and `--first` is unnecessary.
 - There is one Dialed-in control: the row crosshair. Marking a brew makes it the Dialed-in brew for that coffee × method × device; marking another for the same triple replaces it.
 - Dose, yield, time, and grind are required. They have labels, not the old `18.0` / `36.0` placeholders. Number fields are spinbuttons; `fill --label "Dose (g)"` is the handle (same as e2e `getByLabel`).
-- Pour Over, French Press, and Cold Brew have `/…/new` forms too; this map's live recipe starts with Espresso and AeroPress because those are what the seed fills. Drive the others when the change is about those methods.
+- Pour Over, French Press, and Cold Brew have `/…/new` forms too; this map's live recipe starts with Espresso and AeroPress because those are what the seed fills. Drive the others when the change is about those methods. `/brews?method=pourover` (and the other values) opens that log directly.
 - Identity `free` Seals off-Shelf rows on this page. Do not treat missing grind settings on Sumatra Lintong / Brazil Cerrado as a logging bug — see [Plans and Shelf](./plans-and-shelf.md).
 - `clickUntil` applies on `/espresso/new`: `Select Coffee` is in the SSR HTML before the handler attaches.

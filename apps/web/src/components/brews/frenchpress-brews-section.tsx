@@ -137,7 +137,7 @@ const columns = [
   expanderColumn<Brew>(),
 ]
 
-// The French Press brew log — one tab of the /brews page. Mirrors the equipment
+// The French Press brew log on /brews. Mirrors the equipment
 // page's section components (heading + add button + filters + table).
 export function FrenchpressBrewsSection() {
   'use no memo'

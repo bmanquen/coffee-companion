@@ -23,7 +23,7 @@ test('log an espresso shot via the new-shot form', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Log', exact: true }).click()
 
-  await expect(page).toHaveURL(/\/brews$/)
+  await expect(page).toHaveURL(/\/brews\?method=espresso\b/)
   await expect(page.getByRole('heading', { name: 'Brews' })).toBeVisible()
 })
 

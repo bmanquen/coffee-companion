@@ -193,6 +193,10 @@ describe('NewAeropressBrew form', () => {
           method: 'aeropress',
         }),
       )
+      expect(mocks.navigate).toHaveBeenCalledWith({
+        to: '/brews',
+        search: { method: 'aeropress' },
+      })
     } finally {
       fetchSpy.mockRestore()
     }

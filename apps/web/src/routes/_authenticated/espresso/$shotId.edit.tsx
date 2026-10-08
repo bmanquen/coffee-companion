@@ -8,6 +8,7 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
 import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
+import { brewsLogLocation } from '@/components/brews/methods'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
@@ -65,7 +66,7 @@ function EditEspressoShot() {
           trpc.espressoShot.getById.queryOptions(shotId),
         )
         invalidateDeviceDialedInQueries(queryClient, trpc)
-        navigate({ to: '/brews' })
+        navigate(brewsLogLocation('espresso'))
       },
     }),
   )
@@ -89,7 +90,10 @@ function EditEspressoShot() {
       onChange: insertEspressoShotSchema as never,
     },
     onSubmit: async ({ value }) => {
-      await submitFormMutation(form, updateShot.mutateAsync, { ...value, id: shotId })
+      await submitFormMutation(form, updateShot.mutateAsync, {
+        ...value,
+        id: shotId,
+      })
     },
   })
 
@@ -138,14 +142,10 @@ function EditEspressoShot() {
           )}
         </form.AppField>
         <form.AppField name="time">
-          {(field) => (
-            <field.TextField label="Time (s)" type="number" />
-          )}
+          {(field) => <field.TextField label="Time (s)" type="number" />}
         </form.AppField>
         <form.AppField name="grindSetting">
-          {(field) => (
-            <field.TextField label="Grind Setting" />
-          )}
+          {(field) => <field.TextField label="Grind Setting" />}
         </form.AppField>
         <form.AppField name="notes">
           {(field) => (

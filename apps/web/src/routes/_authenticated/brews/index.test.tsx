@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Route } from './index'
+import { Brews } from './index'
 import type * as ReactRouter from '@tanstack/react-router'
+import type { ReactNode } from 'react'
 import { createTestProviders } from '@/test/providers'
 import { makeAeropressBrew, makeRecentShot } from '@/test/factories'
 
@@ -25,9 +26,32 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   }
 })
 
-// Render the route's own component in place (no abstraction). Each section is
-// distinguished by its action button: "Log Shot" (espresso) vs "Log Brew".
-const BrewsIndex = Route.options.component!
+// cmdk needs a browser; the select's own open/close/select is covered in
+// brews-method-select.test.tsx. Here we only need options to be clickable.
+vi.mock('@/components/ui/command', () => ({
+  Command: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  CommandList: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  CommandGroup: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CommandEmpty: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CommandInput: ({ placeholder }: { placeholder?: string }) => (
+    <input placeholder={placeholder} />
+  ),
+  CommandItem: ({
+    children,
+    onSelect,
+  }: {
+    children: ReactNode
+    onSelect?: () => void
+  }) => (
+    <div role="option" onClick={() => onSelect?.()}>
+      {children}
+    </div>
+  ),
+}))
 
 function seeded() {
   const providers = createTestProviders()
@@ -42,28 +66,43 @@ function seeded() {
   return providers
 }
 
-describe('BrewsIndex brew-method tabs', () => {
-  it('shows both method tabs and the Espresso log by default', () => {
-    const { Wrapper } = seeded()
-    render(<BrewsIndex />, { wrapper: Wrapper })
+function renderBrews(
+  selectedMethod: 'espresso' | 'aeropress' = 'espresso',
+  onSelectMethod = vi.fn(),
+) {
+  const { Wrapper } = seeded()
+  render(
+    <Brews selectedMethod={selectedMethod} onSelectMethod={onSelectMethod} />,
+    { wrapper: Wrapper },
+  )
+  return { onSelectMethod }
+}
 
-    expect(screen.getByRole('tab', { name: 'Espresso' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'AeroPress' })).toBeTruthy()
+describe('Brews method select', () => {
+  it('shows the labelled select and the Espresso log by default', () => {
+    renderBrews()
+
+    expect(screen.getByLabelText('Brewing method')).toBeTruthy()
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.queryByRole('tablist')).toBeNull()
 
     expect(screen.getByText('Log Shot')).toBeTruthy()
     expect(screen.queryByText('Log Brew')).toBeNull()
   })
 
-  it('switches to the AeroPress log and back when tabs are clicked', () => {
-    const { Wrapper } = seeded()
-    render(<BrewsIndex />, { wrapper: Wrapper })
+  it('switches to the AeroPress log when that method is selected', () => {
+    const { onSelectMethod } = renderBrews()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'AeroPress' }))
+    fireEvent.click(screen.getByLabelText('Brewing method'))
+    fireEvent.click(screen.getByRole('option', { name: 'AeroPress' }))
+
+    expect(onSelectMethod).toHaveBeenCalledWith('aeropress')
+  })
+
+  it('renders the AeroPress log when that method is the selection', () => {
+    renderBrews('aeropress')
+
     expect(screen.getByText('Log Brew')).toBeTruthy()
     expect(screen.queryByText('Log Shot')).toBeNull()
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Espresso' }))
-    expect(screen.getByText('Log Shot')).toBeTruthy()
-    expect(screen.queryByText('Log Brew')).toBeNull()
   })
 })
