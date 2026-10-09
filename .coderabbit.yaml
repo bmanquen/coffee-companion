@@ -20,7 +20,9 @@ reviews:
 
   # --- Greptile-style summary ---
   high_level_summary: true
-  high_level_summary_in_walkthrough: true   # keep it out of the PR description
+  # Write the summary into the PR description by replacing `@coderabbitai summary`.
+  # true here sends it to the walkthrough instead, and that path ignored our format.
+  high_level_summary_in_walkthrough: false
   high_level_summary_instructions: |
     Format the summary exactly like this:
 
