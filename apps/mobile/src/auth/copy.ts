@@ -19,6 +19,6 @@ export const HAS_ACCOUNT_LINE = `${HAS_ACCOUNT_PROMPT} ${HAS_ACCOUNT_ACTION}`
 
 export const ERROR_SIGN_IN_FAILED = "We couldn't sign you in. Try again."
 export const ERROR_SIGN_IN_UNAVAILABLE =
-  "Sign-in isn't available on this build."
+  "Sign-in isn't available right now. Try again later."
 export const ERROR_PLAY_SERVICES =
-  'Google Play services are required to sign in.'
+  'To sign in with Google, this phone needs Google Play services.'

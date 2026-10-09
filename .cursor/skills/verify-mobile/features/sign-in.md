@@ -7,7 +7,7 @@ Opening the Coffee Companion mobile app while signed out shows Sign in, with Goo
 - `sign-in-google` offers `Sign in with Google` (or `Sign up with Google` after the no-account line).
 - `sign-in-apple` offers `Sign in with Apple` on iOS only.
 - `sign-in-signup` switches the heading and button labels via `Don't have an account? Sign up`.
-- `sign-in-errors` shows `We couldn't sign you in. Try again.`, `Sign-in isn't available on this build.`, or `Google Play services are required to sign in.`
+- `sign-in-errors` shows `We couldn't sign you in. Try again.`, `Sign-in isn't available right now. Try again later.`, or `To sign in with Google, this phone needs Google Play services.`
 - `sign-out` returns a signed-in user to this screen and clears the secure session.
 
 ## How to get to it (user POV)
