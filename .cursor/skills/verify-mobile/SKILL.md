@@ -59,7 +59,7 @@ Isolation:
 
 Human-facing `pnpm --filter @coffee-companion/mobile start` is the wrong process: interactive, easy to confuse with another checkout.
 
-Teardown is `helpers/control cleanup` (see Cleanup). Run cleanup after every failed iteration too.
+If launch fails after Metro has started (timeout or a bundle that is not this app), it stops the process it spawned before exiting. Teardown for a recorded instance is `helpers/control cleanup` (see Cleanup). Run cleanup after every failed iteration too.
 
 ## Doctor
 
@@ -86,7 +86,7 @@ Prefer this repo's React Native Testing Library harness. Selectors below are the
 .cursor/skills/verify-mobile/helpers/control drive welcome
 ```
 
-`drive welcome` renders `<App />` in-process and writes the host tree under `artifacts/<runId>/welcome/`.
+`drive welcome` first confirms the recorded Metro is up and answering — the same pid, port-ownership, `/status`, and bundle checks as `doctor`. A dead Metro or a leftover `.run/state.json` fails with exit `2` and does not run the screen test. When that check is green, drive renders `<App />` in-process and writes the host tree under `artifacts/<runId>/welcome/`.
 
 Stable handles (use these, not coordinates):
 
@@ -139,7 +139,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | --- | --- |
 | `helpers/control launch` | Dedicated Expo Metro → wait for `/status` → require `Coffee Companion` in the bundle |
 | `helpers/control doctor` | Pid, port ownership, Metro `/status`, bundle + `Coffee Companion` marker |
-| `helpers/control drive welcome` | The only wired one-shot recipe (RNTL welcome screen) |
+| `helpers/control drive welcome` | Confirm Metro is answering, then the RNTL welcome screen |
 | `helpers/control cleanup` | Stop recorded Metro pid; keep artifacts |
 | `helpers/metro.test.mjs` | Node tests for the Metro / bundle markers |
 

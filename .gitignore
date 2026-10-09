@@ -3,7 +3,6 @@ node_modules
 dist
 .expo
 expo-env.d.ts
-web-build
 .kotlin
 dist-ssr
 *.local

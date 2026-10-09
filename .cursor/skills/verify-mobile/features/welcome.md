@@ -16,6 +16,7 @@ Preconditions:
 
 - Coffee Companion Metro is healthy at `http://localhost:8081` (or the `VERIFY_METRO_PORT` you set).
 - `helpers/control doctor` reports the expected URL, `packager-status:running`, and app marker `Coffee Companion`.
+- `drive welcome` re-checks that Metro is answering before it renders. A state file alone is not enough.
 - Drive is React Native Testing Library in-process. No device is attached.
 
 - **Read the heading.** Run `helpers/control drive welcome`. The host tree contains a `header` whose name is `Coffee Companion`, on a view labelled `Welcome` with `testID=welcome-screen`. The heading node has `testID=welcome-heading`.

@@ -252,7 +252,7 @@ async function cmdLaunch() {
     await waitForMetro(baseUrl, LAUNCH_STATUS_TIMEOUT_MS)
     const bundle = await fetchAppBundle(baseUrl, LAUNCH_BUNDLE_TIMEOUT_MS)
     if (!bundleHasAppMarker(bundle.body)) {
-      die(
+      throw new Error(
         `Metro answered but the bundle at ${bundle.url} does not mention ${APP_MARKER}. ` +
           'This instance is not the Coffee Companion mobile app.',
       )
@@ -292,16 +292,14 @@ async function cmdLaunch() {
       ),
     )
   } catch (error) {
+    // Only the process we spawned (and its group). Do not SIGTERM whatever
+    // happens to be listening on the port after a race.
     stopRecordedPid(metro.pid, 'metro', [])
-    for (const pid of portListenerPids(port)) {
-      stopRecordedPid(pid, 'metro', [])
-    }
     die(error.message)
   }
 }
 
-async function cmdDoctor() {
-  const state = requireState()
+async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   const problems = []
 
   if (!pidAlive(state.metroPid)) {
@@ -334,10 +332,7 @@ async function cmdDoctor() {
   let status = null
   let metroMarker = false
   try {
-    const response = await fetchText(
-      `${state.baseUrl}/status`,
-      DOCTOR_FETCH_TIMEOUT_MS,
-    )
+    const response = await fetchText(`${state.baseUrl}/status`, timeoutMs)
     status = response.status
     metroMarker = isMetroReady(response.body)
     if (status < HTTP_OK_MIN || status >= HTTP_OK_MAX) {
@@ -356,7 +351,7 @@ async function cmdDoctor() {
   let appMarker = false
   let bundleUrl = state.bundleUrl ?? `${state.baseUrl}${BUNDLE_PATHS[0]}`
   try {
-    const bundle = await fetchAppBundle(state.baseUrl, DOCTOR_FETCH_TIMEOUT_MS)
+    const bundle = await fetchAppBundle(state.baseUrl, timeoutMs)
     bundleUrl = bundle.url
     bundleStatus = bundle.status
     appMarker = bundleHasAppMarker(bundle.body)
@@ -367,7 +362,7 @@ async function cmdDoctor() {
     problems.push(`app bundle check failed: ${error.message}`)
   }
 
-  const report = {
+  return {
     ok: problems.length === 0,
     baseUrl: state.baseUrl,
     metroPid: state.metroPid,
@@ -381,7 +376,23 @@ async function cmdDoctor() {
     harness: 'rntl',
     problems,
   }
+}
 
+async function requireDrivableMetro(state) {
+  const report = await inspectMetro(state)
+  if (report.ok) return report
+  console.error(JSON.stringify(report, null, 2))
+  die(
+    `Metro at ${state.baseUrl} is not up or not answering. ` +
+      `Problems: ${report.problems.join('; ')}. ` +
+      'Relaunch with `helpers/control launch`, or inspect with `helpers/control doctor`.',
+    EXIT_NOT_DRIVABLE,
+  )
+}
+
+async function cmdDoctor() {
+  const state = requireState()
+  const report = await inspectMetro(state)
   console.log(JSON.stringify(report, null, 2))
   if (!report.ok) process.exit(EXIT_NOT_DRIVABLE)
 }
@@ -396,6 +407,7 @@ async function cmdDrive(feature) {
   }
 
   const state = requireState()
+  await requireDrivableMetro(state)
   const dest = join(artifactsDir, state.runId, 'welcome')
   ensureDir(dest)
 
@@ -484,7 +496,13 @@ function usage() {
 `)
 }
 
-export { isMetroReady, bundleHasAppMarker, METRO_READY_MARKER, APP_MARKER }
+export {
+  isMetroReady,
+  bundleHasAppMarker,
+  inspectMetro,
+  METRO_READY_MARKER,
+  APP_MARKER,
+}
 
 const invokedAsCli =
   Boolean(process.argv[1]) &&
