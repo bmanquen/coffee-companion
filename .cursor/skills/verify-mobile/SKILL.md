@@ -71,8 +71,8 @@ Read-only. Run this first whenever anything looks off, and again after a failed 
 
 Doctor is green only when all of these hold:
 
-- The pid in `.run/state.json` is alive (or owns the process group listening on the port).
-- That instance owns `VERIFY_METRO_PORT` (`lsof -t -iTCP:$PORT -sTCP:LISTEN`; `ss` is a fallback).
+- The recorded `metroPid` in `.run/state.json` is alive.
+- That instance owns `VERIFY_METRO_PORT` (`lsof -t -iTCP:$PORT -sTCP:LISTEN`; `ss` is a fallback). Process-group ownership only identifies the port listener.
 - `GET $baseUrl/status` returns 2xx/3xx and the body is `packager-status:running`.
 - The app bundle mentions `Coffee Companion`.
 
@@ -93,7 +93,7 @@ Stable handles (use these, not coordinates):
 - Welcome screen: `testID=welcome-screen`, `accessibilityLabel=Welcome`.
 - Heading: `accessibilityRole=header`, name `Coffee Companion`, `testID=welcome-heading`.
 
-The same queries, as a raw Jest file against a launched instance:
+The same queries as a raw Jest file. This renders `<App />` in-process and does not check Metro — only `helpers/control drive welcome` does:
 
 ```bash
 VERIFY_MOBILE_ARTIFACTS=.cursor/skills/verify-mobile/artifacts/<run>/welcome \
