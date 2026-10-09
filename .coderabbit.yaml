@@ -1,6 +1,117 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Greptile-style CodeRabbit config: few high-signal comments, a verdict-style
+# summary with a confidence score, and an approve/request-changes sign-off.
+
+language: en-US
+tone_instructions: >-
+  Be terse and direct. Only comment when there is a concrete bug, security issue,
+  or behavior change. No praise, no restating the diff, no speculative "consider" advice.
+
 reviews:
+  # "quiet" posts only the most important comments inline and folds the rest
+  # into the review summary. This is the biggest single lever toward Greptile's feel.
+  profile: quiet
+
+  # Sign-off: Request changes when issues are found, auto-approve once
+  # CodeRabbit's threads are resolved and no pre-merge checks are failing.
   request_changes_workflow: true
+  # Stop authors from self-approving with @coderabbitai approve/resolve.
+  allow_author_approval: false
+
+  # --- Greptile-style summary ---
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true   # keep it out of the PR description
+  high_level_summary_instructions: |
+    Format the summary exactly like this:
+
+    **Confidence: X/5**, followed by one sentence explaining the score.
+      5 = safe to merge, no concerns
+      4 = safe to merge, minor non-blocking notes
+      3 = needs a closer human look at specific areas
+      2 = likely bugs or risky changes, fix before merging
+      1 = serious correctness, security, or breaking-change problems
+
+    **What changed**: 2-4 bullets, behavior-level, not file-level.
+
+    **Issues to address before merge**: a numbered list of only blocking
+    problems, each with file:line and one sentence. Write "None" if there are none.
+
+    **Worth a human look**: up to 3 bullets for areas where intent or context
+    can't be judged from the diff alone. Omit this section if empty.
+
+  # Trim walkthrough noise
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  in_progress_fortune: false
+  poem: false
+  review_details: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    ignore_title_keywords: ["wip", "do not review"]
+
+  # Don't spend comments on generated or vendored files
+  path_filters:
+    - "!**/*.lock"
+    - "!**/package-lock.json"
+    - "!**/pnpm-lock.yaml"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/generated/**"
+    - "!**/*.snap"
+
+  # Tell it where to focus (edit the paths to match your repo)
+  path_instructions:
+    - path: "**/*.{ts,tsx}"
+      instructions: |
+        Only flag: missing await / unhandled promises, null/undefined paths,
+        incorrect hook dependency arrays, stale closures, leaked subscriptions
+        or listeners, and changes to exported types or function signatures.
+        Do not comment on style, naming, or formatting; the linter handles those.
+    - path: "**/*.kt"
+      instructions: |
+        Focus on coroutine scope and cancellation, main-thread blocking,
+        nullability escapes (!!), lifecycle leaks, and public API changes.
+        Ignore formatting; detekt/ktlint handles it.
+
   pre_merge_checks:
+    override_requested_reviewers_only: true
     docstrings:
+      mode: "off"          # turn back on if you actually want coverage gating
+    title:
       mode: "off"
+    description:
+      mode: "warning"
+    issue_assessment:
+      mode: "off"
+    custom_checks:
+      - name: "No blocking issues"
+        mode: "error"
+        instructions: |
+          Fail if the review found any correctness bug, security vulnerability,
+          data-loss risk, or crash path that is still present in the latest
+          commit. Pass otherwise. Style, naming, and nitpicks never cause a failure.
+      - name: "Public API changes documented"
+        mode: "warning"
+        instructions: |
+          If any exported function, type, component prop, or public Kotlin
+          class/method signature was added, removed, or changed, pass only if the
+          PR description mentions it under a "Breaking changes" or "API changes"
+          heading. Pass if there are no public API changes.
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+knowledge_base:
+  learnings:
+    scope: auto
