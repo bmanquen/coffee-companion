@@ -35,6 +35,8 @@ const SIGTERM = 'SIGTERM'
 const LAUNCH_STATUS_TIMEOUT_MS = 60_000
 const LAUNCH_BUNDLE_TIMEOUT_MS = 120_000
 const DOCTOR_FETCH_TIMEOUT_MS = 15_000
+const BUNDLE_REQUEST_CAP_MS = 20_000
+const BUNDLE_RETRY_SLEEP_MS = 500
 
 const BUNDLE_PATHS = [
   '/apps/mobile/index.bundle?platform=android&dev=true&minify=false',
@@ -174,9 +176,16 @@ async function fetchAppBundle(baseUrl, timeoutMs) {
   let lastError = 'no bundle URL answered'
   while (Date.now() - start < timeoutMs) {
     for (const path of BUNDLE_PATHS) {
+      const remainingMs = timeoutMs - (Date.now() - start)
+      if (remainingMs <= 0) {
+        throw new Error(`Timed out waiting for an app bundle: ${lastError}`)
+      }
       const url = `${baseUrl}${path}`
       try {
-        const { status, body } = await fetchText(url, 20_000)
+        const { status, body } = await fetchText(
+          url,
+          Math.min(BUNDLE_REQUEST_CAP_MS, remainingMs),
+        )
         if (status >= HTTP_OK_MIN && status < HTTP_OK_MAX && body.length > 0) {
           return { url, status, body }
         }
@@ -185,7 +194,9 @@ async function fetchAppBundle(baseUrl, timeoutMs) {
         lastError = `GET ${url} failed: ${error.message}`
       }
     }
-    await sleep(500)
+    const remainingMs = timeoutMs - (Date.now() - start)
+    if (remainingMs <= 0) break
+    await sleep(Math.min(BUNDLE_RETRY_SLEEP_MS, remainingMs))
   }
   throw new Error(`Timed out waiting for an app bundle: ${lastError}`)
 }
@@ -499,6 +510,7 @@ function usage() {
 export {
   isMetroReady,
   bundleHasAppMarker,
+  fetchAppBundle,
   inspectMetro,
   METRO_READY_MARKER,
   APP_MARKER,
