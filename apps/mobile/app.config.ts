@@ -27,11 +27,11 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'light',
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.bmanquen.coffeecompanion',
+    bundleIdentifier: 'dev.offbyonelabs.coffeecompanion',
     usesAppleSignIn: true,
   },
   android: {
-    package: 'com.bmanquen.coffeecompanion',
+    package: 'dev.offbyonelabs.coffeecompanion',
     adaptiveIcon: {
       backgroundColor: '#FFFFFF',
       foregroundImage: './assets/android-icon-foreground.png',

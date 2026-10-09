@@ -50,7 +50,7 @@ describe('POST /api/auth/sign-in/apple-native', () => {
   })
 
   it('refuses a token the server cannot verify', async () => {
-    process.env.APPLE_BUNDLE_ID = 'com.bmanquen.coffeecompanion'
+    process.env.APPLE_BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
     process.env.APPLE_TEAM_ID = 'TEAM123456'
     process.env.APPLE_KEY_ID = 'KEYID1234'
     process.env.APPLE_PRIVATE_KEY =

@@ -1,5 +1,5 @@
 export const APP_SCHEME = 'coffeecompanion'
-export const APP_BUNDLE_ID = 'com.bmanquen.coffeecompanion'
+export const APP_BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
 
 export function apiBaseUrl(): string {
   return process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000'

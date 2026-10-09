@@ -20,7 +20,7 @@ import {
 } from './apple'
 import type { AppleNativeConfig } from './apple'
 
-const BUNDLE_ID = 'com.bmanquen.coffeecompanion'
+const BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
 const KEY_ID = 'TESTKEY1'
 const TEAM_ID = 'TEAM123456'
 

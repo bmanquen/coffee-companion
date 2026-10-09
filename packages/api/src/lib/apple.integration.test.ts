@@ -15,7 +15,7 @@ import {
 } from './apple'
 import type { AppleCrypto, AppleNativeConfig } from './apple'
 
-const BUNDLE_ID = 'com.bmanquen.coffeecompanion'
+const BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
 const KEY_ID = 'INTGKEY1'
 const TEAM_ID = 'TEAMINTG01'
 const createdUserIds: Array<string> = []
