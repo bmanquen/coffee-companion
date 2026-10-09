@@ -1,37 +1,59 @@
 import { StatusBar } from 'expo-status-bar'
-import { StyleSheet, Text, View } from 'react-native'
-import {
-  WELCOME_A11Y_LABEL,
-  WELCOME_HEADING_ROLE,
-  WELCOME_HEADING_TEST_ID,
-  WELCOME_SCREEN_TEST_ID,
-  welcomeMessage,
-} from './welcome'
+import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import { SignedInHome } from './auth/SignedInHome'
+import { SignInScreen } from './auth/SignInScreen'
+import { useAuth } from './auth/use-auth'
+import type { Auth } from './auth/use-auth'
 
-/** Renders the mobile welcome screen and configures the status bar. */
-export function App() {
+export function App({ auth }: { auth?: Auth }) {
+  return auth ? <Shell auth={auth} /> : <Live />
+}
+
+function Live() {
+  return <Shell auth={useAuth()} />
+}
+
+function Shell({ auth }: { auth: Auth }) {
   return (
-    <View
-      accessibilityLabel={WELCOME_A11Y_LABEL}
-      testID={WELCOME_SCREEN_TEST_ID}
-      style={styles.container}
-    >
-      <Text
-        accessibilityRole={WELCOME_HEADING_ROLE}
-        testID={WELCOME_HEADING_TEST_ID}
-      >
-        {welcomeMessage()}
-      </Text>
+    <>
+      {auth.loading && !auth.session ? (
+        <View style={styles.loading}>
+          <ActivityIndicator />
+        </View>
+      ) : auth.session ? (
+        <SignedInHome
+          name={auth.session.user.name}
+          onSignOut={() => {
+            void auth.signOut()
+          }}
+        />
+      ) : (
+        <SignInScreen
+          mode={auth.mode}
+          error={auth.error}
+          busy={auth.busy}
+          showApple={auth.showApple}
+          onGoogle={() => {
+            void auth.signInGoogle()
+          }}
+          onApple={() => {
+            void auth.signInApple()
+          }}
+          onToggleMode={() =>
+            auth.setMode(auth.mode === 'sign-in' ? 'sign-up' : 'sign-in')
+          }
+        />
+      )}
       <StatusBar style="auto" />
-    </View>
+    </>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
-    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#fff',
   },
 })

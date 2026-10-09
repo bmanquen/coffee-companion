@@ -7,7 +7,7 @@ description: Drive the Coffee Companion mobile app (apps/mobile, Expo) the way a
 
 Coffee Companion is a personal coffee-brewing tracker. The surface this skill drives is the **Expo mobile app** (`apps/mobile`, SDK 57). iOS and Android only — there is no Expo web target. The web UI has its own skill (`.cursor/skills/verify-coffee-companion`).
 
-This skill is for the next agent, mid-task. Drive the running app. Do not substitute a `welcomeMessage()` unit assertion, a Metro log line, or a source-file read for a screen-tree proof.
+This skill is for the next agent, mid-task. Drive the running app. Do not substitute a `welcomeMessage()` unit assertion, a Metro log line, or a source-file read for a screen-tree proof. Native Google and Apple sheets are not this harness — those still need a development build and a real device or simulator.
 
 Read `features/README.md` before driving. Use the matching feature file as the recipe.
 
@@ -80,29 +80,32 @@ Doctor prints JSON (`ok`, `baseUrl`, `metroPid`, `portOwners`, `httpStatus`, `me
 
 ## Drive
 
-Prefer this repo's React Native Testing Library harness. Selectors below are the same `testID`s, `accessibilityRole`, and `accessibilityLabel` `apps/mobile/src/welcome.ts` exports and `apps/mobile/src/welcome.test.tsx` uses.
+Prefer this repo's React Native Testing Library harness. Selectors below are the same `testID`s, `accessibilityRole`, and `accessibilityLabel` the screen modules export.
 
 ```bash
 .cursor/skills/verify-mobile/helpers/control drive welcome
+.cursor/skills/verify-mobile/helpers/control drive sign-in
 ```
 
-`drive welcome` first confirms the recorded Metro is up and answering — the same pid, port-ownership, `/status`, and bundle checks as `doctor`. A dead Metro or a leftover `.run/state.json` fails with exit `2` and does not run the screen test. When that check is green, drive renders `<App />` in-process and writes the host tree under `artifacts/<runId>/welcome/`.
+Each drive first confirms the recorded Metro is up and answering — the same pid, port-ownership, `/status`, and bundle checks as `doctor`. A dead Metro or a leftover `.run/state.json` fails with exit `2` and does not run the screen test. When that check is green, drive renders the screen in-process and writes the host tree under `artifacts/<runId>/<feature>/`.
 
 Stable handles (use these, not coordinates):
 
-- Welcome screen: `testID=welcome-screen`, `accessibilityLabel=Welcome`.
-- Heading: `accessibilityRole=header`, name `Coffee Companion`, `testID=welcome-heading`.
+- Welcome (signed in): `testID=welcome-screen`, `accessibilityLabel=Welcome`. Heading `Coffee Companion` (`testID=welcome-heading`). Button `Sign Out`.
+- Sign-in (signed out): `testID=sign-in-screen`, `accessibilityLabel=Sign in`. Brand header `Coffee Companion`. Heading `Sign in` (`testID=sign-in-heading`). Buttons `Sign in with Google`, `Sign in with Apple` (iOS), `Sign up`. Error `testID=sign-in-error`.
 
-The same queries as a raw Jest file. This renders `<App />` in-process and does not check Metro — only `helpers/control drive welcome` does:
+The same queries as a raw Jest file. This renders in-process and does not check Metro — only `helpers/control drive <feature>` does:
 
 ```bash
 VERIFY_MOBILE_ARTIFACTS=.cursor/skills/verify-mobile/artifacts/<run>/welcome \
   pnpm --filter @coffee-companion/mobile exec jest --ci src/welcome.test.tsx
+VERIFY_MOBILE_ARTIFACTS=.cursor/skills/verify-mobile/artifacts/<run>/sign-in \
+  pnpm --filter @coffee-companion/mobile exec jest --ci src/auth/sign-in.test.tsx
 ```
 
-Only one one-shot recipe is wired: `drive welcome`. A missing `drive <name>` stub is not a skip and not a pass.
+One-shot recipes: `drive welcome` and `drive sign-in`. A missing `drive <name>` stub is not a skip and not a pass.
 
-CI runs that same welcome test without Metro (`pnpm --filter @coffee-companion/mobile test`). That is cheap and is wired in the unit job. CI does **not** launch Metro or an emulator: iOS needs macOS, and an Android AVD is not cheap on `ubuntu-latest`.
+CI runs those same screen tests without Metro (`pnpm --filter @coffee-companion/mobile test`). That is cheap and is wired in the unit job. CI does **not** launch Metro or an emulator: iOS needs macOS, and an Android AVD is not cheap on `ubuntu-latest`. Native Google Sign-In needs a development build and is not exercised in CI.
 
 ## Evidence
 
@@ -111,11 +114,11 @@ Proof lives under `.cursor/skills/verify-mobile/artifacts/<runId>/`. That direct
 Standards:
 
 - Exercise the real user path through the screen tree. Do not assert `welcomeMessage()` in isolation and call it a screen proof.
-- Capture the action and the resulting state. Today the only action is "open the app"; the resulting state is the welcome heading. `tree.txt` is that state.
-- Every artifact set includes a host-tree dump that shows `Coffee Companion` and the welcome `testID`s. This harness cannot capture a device screenshot.
-- Side effects: none yet (no navigation, no API, no persistence). When a later feature writes something, prove it with a second user-facing read.
-- Mocks: RNTL uses Test Renderer in Node. Native views and the status bar are not a device. Do not mock the welcome heading to "make the tree look right".
-- Record the feature file and harness (`rntl`) with every artifact. `drive welcome` writes `proof.json` that does this.
+- Capture the action and the resulting state. Opening signed-out is the sign-in screen; opening signed-in is the welcome heading plus `Sign Out`. `tree.txt` is that state.
+- Every artifact set includes a host-tree dump that shows `Coffee Companion` and the screen `testID`s. This harness cannot capture a device screenshot.
+- Side effects: session tokens belong in `expo-secure-store` and are cleared on Sign Out. Prove that in the unit tests; this harness mocks SecureStore.
+- Mocks: RNTL uses Test Renderer in Node. Native Google/Apple sheets and the status bar are not a device. Do not mock the heading to "make the tree look right".
+- Record the feature file and harness (`rntl`) with every artifact. `drive welcome` and `drive sign-in` write `proof.json` that does this.
 
 `artifacts/` is gitignored. Leave it on disk for the human; do not commit binaries.
 
@@ -139,7 +142,8 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | --- | --- |
 | `helpers/control launch` | Dedicated Expo Metro → wait for `/status` → require `Coffee Companion` in the bundle |
 | `helpers/control doctor` | Pid, port ownership, Metro `/status`, bundle + `Coffee Companion` marker |
-| `helpers/control drive welcome` | Confirm Metro is answering, then the RNTL welcome screen |
+| `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
+| `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
 | `helpers/control cleanup` | Stop recorded Metro pid; keep artifacts |
 | `helpers/metro.test.mjs` | Node tests for the Metro / bundle markers |
 
@@ -147,7 +151,10 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 .cursor/skills/verify-mobile/helpers/control launch
 .cursor/skills/verify-mobile/helpers/control doctor
 .cursor/skills/verify-mobile/helpers/control drive welcome
+.cursor/skills/verify-mobile/helpers/control drive sign-in
 ls .cursor/skills/verify-mobile/artifacts/*/welcome/proof.json
+ls .cursor/skills/verify-mobile/artifacts/*/sign-in/proof.json
 .cursor/skills/verify-mobile/helpers/control cleanup
 ls .cursor/skills/verify-mobile/artifacts/*/welcome/proof.json
+ls .cursor/skills/verify-mobile/artifacts/*/sign-in/proof.json
 ```

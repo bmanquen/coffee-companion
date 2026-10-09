@@ -78,7 +78,7 @@ export const recipients: Array<Recipient> = [
     name: 'Google',
     slug: 'google',
     purpose:
-      'Signs you in. Coffee Companion has no password of its own, so Google is how you prove who you are.',
+      'Signs you in on the web and on Android. Coffee Companion has no password of its own.',
     receives: [
       'The fact that you are signing in to Coffee Companion, at the moment you press the button.',
     ],
@@ -90,6 +90,24 @@ export const recipients: Array<Recipient> = [
       'Google keeps its own record of the sign-in under its policy. We keep your name, address, and avatar as it returns them, for as long as you have an account.',
     lawfulBasis: CONTRACT_BASIS,
     policyUrl: 'https://policies.google.com/privacy',
+  },
+  {
+    name: 'Apple',
+    slug: 'apple',
+    purpose:
+      'Signs you in on iPhone. Coffee Companion has no password of its own, so Apple is the other way to prove who you are.',
+    receives: [
+      'The fact that you are signing in to Coffee Companion, at the moment you press the button.',
+      'A name and an email the first time you allow them. Later presses do not send them again, and the email may be a Hide My Email relay that Apple forwards.',
+    ],
+    neverReceives: [
+      'Anything you keep in the app. Sign-in is the whole of the exchange, and it runs on Apple, not here.',
+      'Any further contact after sign-in. We do not read your mail, your contacts, or your calendar.',
+    ],
+    retention:
+      'Apple keeps its own record of the sign-in under its policy. We keep your name and the address it returned — including a Hide My Email relay — for as long as you have an account, and we keep Apple’s refresh token so deleting the account can revoke that sign-in.',
+    lawfulBasis: CONTRACT_BASIS,
+    policyUrl: 'https://www.apple.com/legal/privacy/',
   },
   {
     name: 'Stripe',

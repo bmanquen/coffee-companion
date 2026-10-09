@@ -7,6 +7,7 @@ describe('recipients', () => {
       'Sentry',
       'PostHog',
       'Google',
+      'Apple',
       'Stripe',
       'Resend',
     ])

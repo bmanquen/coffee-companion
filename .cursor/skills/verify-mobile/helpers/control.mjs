@@ -408,10 +408,49 @@ async function cmdDoctor() {
   if (!report.ok) process.exit(EXIT_NOT_DRIVABLE)
 }
 
+const DRIVES = {
+  welcome: {
+    test: 'src/welcome.test.tsx',
+    identity: 'data',
+    fail: 'welcome screen drive failed — the RNTL render did not show Coffee Companion',
+    required: ['Coffee Companion', 'welcome-screen', 'Sign Out'],
+    observed: {
+      heading: 'Coffee Companion',
+      testID: 'welcome-screen',
+      headingTestID: 'welcome-heading',
+      accessibilityLabel: 'Welcome',
+      headingRole: 'header',
+      signOut: 'Sign Out',
+    },
+  },
+  'sign-in': {
+    test: 'src/auth/sign-in.test.tsx',
+    identity: 'public',
+    fail: 'sign-in screen drive failed — the RNTL render did not show Sign in',
+    required: [
+      'Coffee Companion',
+      'Sign in',
+      'Sign in with Google',
+      "Don't have an account?",
+    ],
+    observed: {
+      heading: 'Sign in',
+      brand: 'Coffee Companion',
+      testID: 'sign-in-screen',
+      headingTestID: 'sign-in-heading',
+      accessibilityLabel: 'Sign in',
+      google: 'Sign in with Google',
+      apple: 'Sign in with Apple',
+      noAccount: "Don't have an account? Sign up",
+    },
+  },
+}
+
 async function cmdDrive(feature) {
-  if (feature !== 'welcome') {
+  const recipe = DRIVES[feature]
+  if (!recipe) {
     die(
-      `Only \`drive welcome\` is implemented as a one-shot recipe. ` +
+      `Only \`drive welcome\` and \`drive sign-in\` are implemented as one-shot recipes. ` +
         `${feature ? `"${feature}"` : 'That feature'} is mapped under features/ — drive it from its file. ` +
         `Do not treat a missing drive stub as verification.`,
     )
@@ -419,19 +458,19 @@ async function cmdDrive(feature) {
 
   const state = requireState()
   await requireDrivableMetro(state)
-  const dest = join(artifactsDir, state.runId, 'welcome')
+  const dest = join(artifactsDir, state.runId, feature)
   ensureDir(dest)
 
   const test = run(
     'pnpm',
-    ['--filter', '@coffee-companion/mobile', 'exec', 'jest', '--ci', 'src/welcome.test.tsx'],
+    ['--filter', '@coffee-companion/mobile', 'exec', 'jest', '--ci', recipe.test],
     {
       cwd: repoRoot,
       env: { VERIFY_MOBILE_ARTIFACTS: dest },
     },
   )
   if (test.status !== 0) {
-    die('welcome screen drive failed — the RNTL render did not show Coffee Companion')
+    die(recipe.fail)
   }
 
   const treePath = join(dest, 'tree.txt')
@@ -441,28 +480,24 @@ async function cmdDrive(feature) {
   }
 
   const tree = readFileSync(treePath, 'utf8')
-  if (!tree.includes(APP_MARKER)) {
-    die(`Welcome tree dump does not mention ${APP_MARKER}`)
+  for (const marker of recipe.required) {
+    if (!tree.includes(marker)) {
+      die(`${feature} tree dump does not mention ${marker}`)
+    }
   }
 
   const proof = {
-    feature: 'welcome',
+    feature,
     runId: state.runId,
     baseUrl: state.baseUrl,
     harness: 'rntl',
-    identity: 'public',
+    identity: recipe.identity,
     platformsDriven: [],
     capturedAt: new Date().toISOString(),
     artifacts: [treePath, treeJsonPath, join(dest, 'proof.json')],
-    observed: {
-      heading: APP_MARKER,
-      testID: 'welcome-screen',
-      headingTestID: 'welcome-heading',
-      accessibilityLabel: 'Welcome',
-      headingRole: 'header',
-    },
+    observed: recipe.observed,
     note:
-      'In-process React Native Testing Library render. No iOS simulator or Android emulator was attached.',
+      'In-process React Native Testing Library render. No iOS simulator or Android emulator was attached. Native Google and Apple sheets were not presented.',
   }
   writeFileSync(join(dest, 'proof.json'), `${JSON.stringify(proof, null, 2)}\n`)
   console.log(JSON.stringify({ ok: true, ...proof }, null, 2))
@@ -501,7 +536,8 @@ function usage() {
 
   launch           Start Expo Metro on VERIFY_METRO_PORT (default 8081)
   doctor           Read-only check that this Metro is worth driving
-  drive welcome    Render the welcome screen with React Native Testing Library
+  drive welcome    Render the signed-in welcome screen with React Native Testing Library
+  drive sign-in    Render the signed-out sign-in screen with React Native Testing Library
   cleanup          Stop the recorded Metro pid; keep artifacts/
 
 `)

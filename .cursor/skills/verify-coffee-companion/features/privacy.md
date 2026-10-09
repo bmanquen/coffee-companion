@@ -6,7 +6,7 @@ The public privacy page names every company Coffee Companion sends data to, what
 
 - `privacy-open` renders at `/privacy` with heading `What we collect, and who we send it to`.
 - `privacy-footer` reaches it from the marketing footer `Privacy` link.
-- `privacy-recipients` lists Sentry, PostHog, Google, Stripe, and Resend, each with a policy link.
+- `privacy-recipients` lists Sentry, PostHog, Google, Apple, Stripe, and Resend, each with a policy link.
 - `privacy-own-data` states that everything the app holds can be exported from the account page on any plan (including what a plan hides from view), and that the account can be deleted from that same page. If you delete your account, we keep your account data for 30 days so you can restore it, then delete it. Unused prepaid time is not refunded. It does not promise a PostHog person delete when that call is not configured.
 
 ## How to get to it (user POV)
@@ -23,7 +23,7 @@ Preconditions:
 - `helpers/control doctor` reports the expected URL and `coffee_companion_test`.
 
 - **Footer.** Run `helpers/control browser as public` and `helpers/control browser goto --path /`. Click link `Privacy`. The URL ends with `/privacy` and the heading matches `/what we collect/i`.
-- **Recipients.** Every recipient heading is visible. Run `helpers/control browser expect --role heading --name Sentry --exact`, then the same for `PostHog`, `Google`, `Stripe`, and `Resend`.
+- **Recipients.** Every recipient heading is visible. Run `helpers/control browser expect --role heading --name Sentry --exact`, then the same for `PostHog`, `Google`, `Apple`, `Stripe`, and `Resend`.
 - **Own data.** Text matching `/exported from your account page/i` is visible. Text matching `/delete the account from that same page/i` is visible. Text matching `/keep your account data for 30 days so you can restore it/i` is visible. Text matching `/unused prepaid time is not refunded/i` is visible. Heading `Your own data` is visible.
 - **Direct.** Run `helpers/control browser goto --path /privacy`. The same heading is visible. Both screenshots show the marketing header `Coffee Companion`.
 - **Proof.** Run `helpers/control browser screenshot --path artifacts/<run>/privacy/page.png` and `helpers/control browser snapshot --aria --path artifacts/<run>/privacy/page.aria.txt` on `/privacy`.

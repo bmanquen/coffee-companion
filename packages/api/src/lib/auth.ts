@@ -7,8 +7,10 @@ import {
 } from 'better-auth/api'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import { stripe } from '@better-auth/stripe'
+import { expo } from '@better-auth/expo'
 import { db } from '../db'
 import * as schema from '../db/auth-schema'
+import { appleNativeSignIn } from './apple-native-plugin'
 import {
   billingConfig,
   hasLiveSubscription,
@@ -17,6 +19,15 @@ import {
 
 const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'
 
+const APP_SCHEME_ORIGIN = 'coffeecompanion://'
+const EXPO_ORIGIN = 'exp://'
+
+const googleClientIds = [
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_IOS_CLIENT_ID,
+  process.env.GOOGLE_ANDROID_CLIENT_ID,
+].filter((id): id is string => Boolean(id))
+
 // Resolved here, at import, so a deployment missing a price fails on the way up
 // rather than under the first customer to press Subscribe. Null switches
 // billing off entirely, which is how a fresh clone and CI run.
@@ -24,7 +35,7 @@ const billing = billingConfig()
 
 export const auth = betterAuth({
   baseURL,
-  trustedOrigins: [baseURL],
+  trustedOrigins: [baseURL, APP_SCHEME_ORIGIN, EXPO_ORIGIN],
   database: drizzleAdapter(db, { provider: 'pg', schema }),
   user: {
     additionalFields: {
@@ -37,7 +48,10 @@ export const auth = betterAuth({
   },
   socialProviders: {
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientId:
+        googleClientIds.length <= 1
+          ? (googleClientIds[0] ?? (process.env.GOOGLE_CLIENT_ID as string))
+          : googleClientIds,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     },
   },
@@ -59,6 +73,8 @@ export const auth = betterAuth({
     }),
   },
   plugins: [
+    expo(),
+    appleNativeSignIn(),
     tanstackStartCookies(),
     ...(billing
       ? [
