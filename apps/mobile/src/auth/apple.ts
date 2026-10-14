@@ -8,6 +8,11 @@ import {
   SignInUnavailable,
   errorCode,
 } from './errors'
+import {
+  logAuthFailure,
+  nativeFailureDetail,
+  serverFailureDetail,
+} from './log'
 
 export function appleSignInAvailable() {
   return Platform.OS === 'ios'
@@ -27,6 +32,7 @@ export async function signInWithApple() {
       ],
     })
     if (!credential.identityToken || !credential.authorizationCode) {
+      logAuthFailure('apple', { code: 'missing_identity' })
       throw new SignInFailed()
     }
 
@@ -44,7 +50,10 @@ export async function signInWithApple() {
           : null,
       },
     })
-    if (error) throw new SignInFailed()
+    if (error) {
+      logAuthFailure('apple-server', serverFailureDetail(error))
+      throw new SignInFailed()
+    }
   } catch (error) {
     if (
       error instanceof SignInCancelled ||
@@ -56,6 +65,7 @@ export async function signInWithApple() {
     if (errorCode(error) === APPLE_ERR_REQUEST_CANCELED) {
       throw new SignInCancelled()
     }
+    logAuthFailure('apple', nativeFailureDetail(error))
     throw new SignInFailed()
   }
 }

@@ -16,6 +16,11 @@ import {
   SignInUnavailable,
   errorCode,
 } from './errors'
+import {
+  logAuthFailure,
+  nativeFailureDetail,
+  serverFailureDetail,
+} from './log'
 
 let configured = false
 
@@ -56,13 +61,17 @@ export async function signInWithGoogle() {
     const response = await GoogleSignin.signIn()
     if (isCancelledResponse(response)) throw new SignInCancelled()
     if (!isSuccessResponse(response) || !response.data.idToken) {
+      logAuthFailure('google', { code: 'missing_id_token' })
       throw new SignInFailed()
     }
     const { error } = await authClient.signIn.social({
       provider: 'google',
       idToken: { token: response.data.idToken },
     })
-    if (error) throw new SignInFailed()
+    if (error) {
+      logAuthFailure('google-server', serverFailureDetail(error))
+      throw new SignInFailed()
+    }
   } catch (error) {
     if (
       error instanceof SignInCancelled ||
@@ -72,6 +81,7 @@ export async function signInWithGoogle() {
     ) {
       throw error
     }
+    logAuthFailure('google', nativeFailureDetail(error))
     asGoogleFailure(error)
   }
 }
