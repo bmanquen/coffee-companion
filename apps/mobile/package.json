@@ -7,9 +7,11 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
+    "dev:mobile": "expo start",
+    "dev:lan": "expo start --lan",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
-    "test": "jest --ci"
+    "test": "jest --ci && node --test scripts/check-env.test.mjs"
   },
   "dependencies": {
     "@better-auth/expo": "1.6.26",

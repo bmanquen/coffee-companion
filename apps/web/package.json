@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3000",
+    "dev:mobile": "vite dev --port 3000 --host 127.0.0.1",
     "dev:lan": "vite dev --port 3000 --host 0.0.0.0",
     "build": "vite build",
     "serve": "vite preview",
