@@ -30,6 +30,10 @@ const sentryServerExternals = [
 ]
 
 const config = defineConfig({
+  server: {
+    // IPv4 loopback so the Android emulator can reach it via 10.0.2.2; not on the LAN.
+    host: '127.0.0.1',
+  },
   plugins: [
     devtools(),
     nitro({
