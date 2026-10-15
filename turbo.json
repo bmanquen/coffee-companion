@@ -17,6 +17,14 @@
       "persistent": true,
       "cache": false
     },
+    "dev:mobile": {
+      "persistent": true,
+      "cache": false
+    },
+    "dev:lan": {
+      "persistent": true,
+      "cache": false
+    },
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },

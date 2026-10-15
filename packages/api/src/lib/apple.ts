@@ -39,9 +39,15 @@ export class AppleTokenExchangeFailed extends Error {
 }
 
 export class AppleNotConfigured extends Error {
-  constructor() {
+  constructor(missing: ReadonlyArray<string> = []) {
     super(
-      'Apple Sign In is configured, but not completely. Unset APPLE_BUNDLE_ID to run without it.',
+      missing.length
+        ? [
+            'Apple Sign In is configured, but not completely:',
+            ...missing.map((name) => `  - ${name} is not set (apps/web/.env)`),
+            'Unset APPLE_BUNDLE_ID to run without it.',
+          ].join('\n')
+        : 'Apple Sign In is configured, but not completely. Unset APPLE_BUNDLE_ID to run without it.',
     )
     this.name = 'AppleNotConfigured'
   }
@@ -111,7 +117,7 @@ export function appleNativeConfig(): AppleNativeConfig | null {
 
   const missing = configVars.filter((name) => !process.env[name])
   if (missing.length) {
-    throw new AppleNotConfigured()
+    throw new AppleNotConfigured(missing)
   }
 
   return {
