@@ -26,7 +26,7 @@ Four other companies receive something, and none of them is a monitoring decisio
 Their basis is **performance of a contract** — the user asked for the thing, and the
 sending is the thing:
 
-- **Google** is sign-in on the web and on Android. There is no password of our own, so
+- **Google** is sign-in on the web, iOS, and Android. There is no password of our own, so
   proving who you are runs through Google or Apple.
 - **Apple** is Sign in with Apple on iPhone. The same account tables, and the same
   contract basis: the user pressed the button. Hide My Email relay addresses only

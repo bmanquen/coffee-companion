@@ -78,7 +78,7 @@ export const recipients: Array<Recipient> = [
     name: 'Google',
     slug: 'google',
     purpose:
-      'Signs you in on the web and on Android. Coffee Companion has no password of its own.',
+      'Signs you in on the web, iOS, and Android. Coffee Companion has no password of its own.',
     receives: [
       'The fact that you are signing in to Coffee Companion, at the moment you press the button.',
     ],

@@ -265,6 +265,74 @@ describe('signInWithAppleNative', () => {
     expect(row?.refreshToken).toBe('rt_once')
   })
 
+  it('does not attach Apple to an existing user from an unverified token email', async () => {
+    const victimId = remember(globalThis.crypto.randomUUID())
+    await db.insert(user).values({
+      id: victimId,
+      name: 'Already Here',
+      email: `${victimId}@example.com`,
+    })
+    const { config, identityToken, tokens } = await fixture()
+
+    await expect(
+      signInWithAppleNative(
+        {
+          identityToken: await identityToken('apple.sub.unverified-email', {
+            email: `${victimId}@example.com`,
+            email_verified: 'false',
+          }),
+          authorizationCode: 'auth-unverified',
+        },
+        config,
+        tokens(),
+      ),
+    ).rejects.toBeInstanceOf(AppleSignInRefused)
+
+    expect(await appleAccountOf(victimId)).toBeUndefined()
+  })
+
+  it('keeps one Apple account when two first sign-ins race on the same subject', async () => {
+    const { config, identityToken, tokens } = await fixture()
+    const email = 'race@privaterelay.appleid.com'
+    const input = {
+      authorizationCode: 'auth-race',
+      fullName: { givenName: 'Ada', familyName: 'Lovelace' },
+    }
+
+    const [first, second] = await Promise.all([
+      signInWithAppleNative(
+        {
+          ...input,
+          identityToken: await identityToken('apple.sub.race', { email }),
+        },
+        config,
+        tokens({ refresh_token: 'rt_race_a' }),
+      ),
+      signInWithAppleNative(
+        {
+          ...input,
+          identityToken: await identityToken('apple.sub.race', { email }),
+        },
+        config,
+        tokens({ refresh_token: 'rt_race_b' }),
+      ),
+    ])
+    remember(first.user.id)
+    remember(second.user.id)
+
+    expect(first.user.id).toBe(second.user.id)
+    expect(first.session.token).not.toBe(second.session.token)
+
+    const rows = await db.query.account.findMany({
+      where: {
+        providerId: APPLE_PROVIDER_ID,
+        accountId: 'apple.sub.race',
+      },
+    })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.userId).toBe(first.user.id)
+  })
+
   it('does not attach Apple to an existing user from a client-supplied email', async () => {
     const victimId = remember(globalThis.crypto.randomUUID())
     await db.insert(user).values({

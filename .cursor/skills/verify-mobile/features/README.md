@@ -21,7 +21,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 ## Proof and skip reporting
 
 - Capture the user-visible tree after the render, not only a pass/fail.
-- UI proof includes a host-tree dump (`tree.txt`) that shows the `header` named `Coffee Companion` and the welcome `testID`s.
+- UI proof includes a host-tree dump (`tree.txt`) that shows the `header` named `Coffee Companion`. A welcome tree must include `welcome-screen` and `welcome-heading`. A sign-in tree must include `sign-in-screen` and `sign-in-heading`.
 - This harness cannot take a device screenshot. On a Mac or Android Studio machine, a Simulator/`adb` screenshot may be added under `artifacts/` (gitignored) and posted on the PR — it is extra evidence, not a substitute for the tree dump.
 - Record the feature ID, harness (`rntl`), and entry point with every artifact.
 - Report an unreachable path with the attempted command and the unmet precondition.

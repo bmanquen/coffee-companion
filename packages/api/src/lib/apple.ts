@@ -8,6 +8,7 @@ import {
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { account, session, user } from '../db/schema'
+import { isPgUniqueViolation } from './pg-error'
 import type { JWK, JWTPayload, JWTVerifyGetKey } from 'jose'
 
 export const APPLE_ISSUER = 'https://appleid.apple.com'
@@ -18,6 +19,7 @@ export const APPLE_AUTHORIZATION_CODE_GRANT = 'authorization_code'
 export const APPLE_CLIENT_SECRET_TTL_SECONDS = 180 * 24 * 60 * 60
 export const APPLE_SESSION_MS = 7 * 24 * 60 * 60 * 1000
 export const APPLE_FALLBACK_NAME = 'Apple user'
+export const APPLE_SIGN_IN_ATTEMPTS = 2
 
 const APPLE_SIGNING_ALG = 'ES256'
 const EMAIL_VERIFIED_TRUE = 'true'
@@ -240,106 +242,123 @@ export async function signInWithAppleNative(
     deps,
   )
 
-  const verifiedEmail = identity.email
+  const tokenEmail = identity.email
   const clientEmail = input.email?.trim() || null
-  const name = displayName(input.fullName, verifiedEmail ?? clientEmail)
+  const name = displayName(input.fullName, tokenEmail ?? clientEmail)
 
-  const existingAccount = await db.query.account.findFirst({
-    where: {
-      providerId: APPLE_PROVIDER_ID,
-      accountId: identity.subject,
-    },
-  })
-
-  let userId: string
-  if (existingAccount) {
-    userId = existingAccount.userId
-    const current = await db.query.user.findFirst({
-      where: { id: userId },
-    })
-    if (!current) throw new AppleSignInRefused('This Apple account is gone.')
-
-    const updates: {
-      refreshToken?: string
-      accessToken?: string
-      idToken?: string
-    } = {}
-    if (tokens.refreshToken) updates.refreshToken = tokens.refreshToken
-    if (tokens.accessToken) updates.accessToken = tokens.accessToken
-    if (tokens.idToken) updates.idToken = tokens.idToken
-    if (Object.keys(updates).length) {
-      await db
-        .update(account)
-        .set(updates)
-        .where(eq(account.id, existingAccount.id))
-    }
-  } else {
-    // Only a verified token email may attach this Apple subject to an
-    // existing user. A client-supplied address is stored on a new user
-    // (Apple sends email once, sometimes only in the credential).
-    const already = verifiedEmail
-      ? await db.query.user.findFirst({
-          where: { email: verifiedEmail },
+  let lastErr: unknown
+  for (let attempt = 0; attempt < APPLE_SIGN_IN_ATTEMPTS; attempt++) {
+    try {
+      return await db.transaction(async (tx) => {
+        const existingAccount = await tx.query.account.findFirst({
+          where: {
+            providerId: APPLE_PROVIDER_ID,
+            accountId: identity.subject,
+          },
         })
-      : undefined
 
-    if (already) {
-      userId = already.id
-    } else {
-      const email = verifiedEmail ?? clientEmail
-      if (!email) {
-        throw new AppleSignInRefused(
-          'Apple did not send an email. Sign in again and share your email.',
-        )
-      }
-      if (!verifiedEmail) {
-        const collision = await db.query.user.findFirst({
-          where: { email },
-        })
-        if (collision) {
-          throw new AppleSignInRefused(
-            'Apple did not send an email. Sign in again and share your email.',
-          )
+        let userId: string
+        if (existingAccount) {
+          userId = existingAccount.userId
+          const current = await tx.query.user.findFirst({
+            where: { id: userId },
+          })
+          if (!current) {
+            throw new AppleSignInRefused('This Apple account is gone.')
+          }
+
+          const updates: {
+            refreshToken?: string
+            accessToken?: string
+            idToken?: string
+          } = {}
+          if (tokens.refreshToken) updates.refreshToken = tokens.refreshToken
+          if (tokens.accessToken) updates.accessToken = tokens.accessToken
+          if (tokens.idToken) updates.idToken = tokens.idToken
+          if (Object.keys(updates).length) {
+            await tx
+              .update(account)
+              .set(updates)
+              .where(eq(account.id, existingAccount.id))
+          }
+        } else {
+          // Only a verified token email may attach this Apple subject to an
+          // existing user. A client-supplied address is stored on a new user
+          // (Apple sends email once, sometimes only in the credential).
+          const already =
+            identity.emailVerified && tokenEmail
+              ? await tx.query.user.findFirst({
+                  where: { email: tokenEmail },
+                })
+              : undefined
+
+          if (already) {
+            userId = already.id
+          } else {
+            const email = tokenEmail ?? clientEmail
+            if (!email) {
+              throw new AppleSignInRefused(
+                'Apple did not send an email. Sign in again and share your email.',
+              )
+            }
+            if (!identity.emailVerified || !tokenEmail) {
+              const collision = await tx.query.user.findFirst({
+                where: { email },
+              })
+              if (collision) {
+                throw new AppleSignInRefused(
+                  'Apple did not send an email. Sign in again and share your email.',
+                )
+              }
+            }
+
+            userId = globalThis.crypto.randomUUID()
+            await tx.insert(user).values({
+              id: userId,
+              name,
+              email,
+              emailVerified: identity.emailVerified,
+            })
+          }
+
+          await tx.insert(account).values({
+            id: globalThis.crypto.randomUUID(),
+            accountId: identity.subject,
+            providerId: APPLE_PROVIDER_ID,
+            userId,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            idToken: tokens.idToken ?? input.identityToken,
+          })
         }
-      }
 
-      userId = globalThis.crypto.randomUUID()
-      await db.insert(user).values({
-        id: userId,
-        name,
-        email,
-        emailVerified: identity.emailVerified,
+        const row = await tx.query.user.findFirst({ where: { id: userId } })
+        if (!row) throw new AppleSignInRefused('This Apple account is gone.')
+
+        const created = {
+          id: globalThis.crypto.randomUUID(),
+          token: Buffer.from(
+            globalThis.crypto.getRandomValues(new Uint8Array(32)),
+          ).toString('hex'),
+          userId,
+          expiresAt: new Date(
+            (deps.now ? deps.now() : Date.now()) + APPLE_SESSION_MS,
+          ),
+        }
+        await tx.insert(session).values(created)
+
+        return {
+          user: { id: row.id, name: row.name, email: row.email },
+          session: created,
+        }
       })
+    } catch (err) {
+      lastErr = err
+      if (err instanceof AppleSignInRefused) throw err
+      if (!isPgUniqueViolation(err)) throw err
     }
-
-    await db.insert(account).values({
-      id: globalThis.crypto.randomUUID(),
-      accountId: identity.subject,
-      providerId: APPLE_PROVIDER_ID,
-      userId,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      idToken: tokens.idToken ?? input.identityToken,
-    })
   }
-
-  const row = await db.query.user.findFirst({ where: { id: userId } })
-  if (!row) throw new AppleSignInRefused('This Apple account is gone.')
-
-  const created = {
-    id: globalThis.crypto.randomUUID(),
-    token: Buffer.from(
-      globalThis.crypto.getRandomValues(new Uint8Array(32)),
-    ).toString('hex'),
-    userId,
-    expiresAt: new Date((deps.now ? deps.now() : Date.now()) + APPLE_SESSION_MS),
-  }
-  await db.insert(session).values(created)
-
-  return {
-    user: { id: row.id, name: row.name, email: row.email },
-    session: created,
-  }
+  throw lastErr
 }
 
 export function appleAccountOf(userId: string) {
