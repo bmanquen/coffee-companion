@@ -8,7 +8,7 @@ import {
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { account, session, user } from '../db/schema'
-import { isPgUniqueViolation } from './pg-error'
+import { PG_UNIQUE_VIOLATION, pgErrorIn } from './pg-error'
 import type { JWK, JWTPayload, JWTVerifyGetKey } from 'jose'
 
 export const APPLE_ISSUER = 'https://appleid.apple.com'
@@ -355,7 +355,7 @@ export async function signInWithAppleNative(
     } catch (err) {
       lastErr = err
       if (err instanceof AppleSignInRefused) throw err
-      if (!isPgUniqueViolation(err)) throw err
+      if (!pgErrorIn(err, PG_UNIQUE_VIOLATION)) throw err
     }
   }
   throw lastErr

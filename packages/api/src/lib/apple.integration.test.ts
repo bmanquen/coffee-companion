@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest'
-import { inArray } from 'drizzle-orm'
+import { inArray, sql } from 'drizzle-orm'
 import { SignJWT, exportJWK, exportPKCS8, generateKeyPair } from 'jose'
 import { db } from '../db'
 import { session, user } from '../db/schema'
@@ -331,6 +331,63 @@ describe('signInWithAppleNative', () => {
     })
     expect(rows).toHaveLength(1)
     expect(rows[0]?.userId).toBe(first.user.id)
+  })
+
+  it('leaves no user when the account insert fails', async () => {
+    const email = 'rollback@privaterelay.appleid.com'
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION apple_fail_account_rollback()
+      RETURNS trigger LANGUAGE plpgsql AS $apple_fail_account_rollback$
+      BEGIN
+        IF NEW.account_id = 'apple.sub.rollback' THEN
+          RAISE EXCEPTION 'account insert failed';
+        END IF;
+        RETURN NEW;
+      END
+      $apple_fail_account_rollback$
+    `)
+    await db.execute(sql`
+      DROP TRIGGER IF EXISTS apple_fail_account_rollback ON "account"
+    `)
+    await db.execute(sql`
+      CREATE TRIGGER apple_fail_account_rollback
+      BEFORE INSERT ON "account"
+      FOR EACH ROW EXECUTE FUNCTION apple_fail_account_rollback()
+    `)
+
+    const { config, identityToken, tokens } = await fixture()
+    try {
+      await expect(
+        signInWithAppleNative(
+          {
+            identityToken: await identityToken('apple.sub.rollback', { email }),
+            authorizationCode: 'auth-rollback',
+            fullName: { givenName: 'Ada', familyName: 'Lovelace' },
+          },
+          config,
+          tokens(),
+        ),
+      ).rejects.toThrow()
+
+      expect(
+        await db.query.user.findFirst({ where: { email } }),
+      ).toBeUndefined()
+      expect(
+        await db.query.account.findFirst({
+          where: {
+            providerId: APPLE_PROVIDER_ID,
+            accountId: 'apple.sub.rollback',
+          },
+        }),
+      ).toBeUndefined()
+    } finally {
+      await db.execute(sql`
+        DROP TRIGGER IF EXISTS apple_fail_account_rollback ON "account"
+      `)
+      await db.execute(sql`
+        DROP FUNCTION IF EXISTS apple_fail_account_rollback()
+      `)
+    }
   })
 
   it('does not attach Apple to an existing user from a client-supplied email', async () => {
