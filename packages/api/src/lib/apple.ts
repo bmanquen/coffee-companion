@@ -242,8 +242,8 @@ export async function signInWithAppleNative(
     deps,
   )
 
-  const tokenEmail = identity.email
-  const clientEmail = input.email?.trim() || null
+  const tokenEmail = identity.email?.trim().toLowerCase() || null
+  const clientEmail = input.email?.trim().toLowerCase() || null
   const name = displayName(input.fullName, tokenEmail ?? clientEmail)
 
   let lastErr: unknown

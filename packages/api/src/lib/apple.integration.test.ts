@@ -190,6 +190,49 @@ describe('signInWithAppleNative', () => {
     expect(row?.refreshToken).toBe('rt_link')
   })
 
+  it('links Apple to the existing account when the token email differs only by case', async () => {
+    const linkedId = remember(globalThis.crypto.randomUUID())
+    await db.insert(user).values({
+      id: linkedId,
+      name: 'Already Here',
+      email: `${linkedId}@example.com`,
+    })
+    const { config, identityToken, tokens } = await fixture()
+
+    const result = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.case', {
+          email: `${linkedId}@Example.COM`,
+        }),
+        authorizationCode: 'auth-case',
+      },
+      config,
+      tokens({ refresh_token: 'rt_case' }),
+    )
+
+    expect(result.user.id).toBe(linkedId)
+    expect(result.user.email).toBe(`${linkedId}@example.com`)
+    const row = await appleAccountOf(linkedId)
+    expect(row?.accountId).toBe('apple.sub.case')
+  })
+
+  it('stores a first-sign-in email in lowercase', async () => {
+    const { config, identityToken, tokens } = await fixture()
+    const result = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.case-create', {
+          email: 'Create@PrivateRelay.Appleid.com',
+        }),
+        authorizationCode: 'auth-case-create',
+      },
+      config,
+      tokens({ refresh_token: 'rt_case_create' }),
+    )
+    remember(result.user.id)
+
+    expect(result.user.email).toBe('create@privaterelay.appleid.com')
+  })
+
   it('does not create a session when the identity token fails verification', async () => {
     const { config, tokens } = await fixture()
     const before = await db.select().from(session)

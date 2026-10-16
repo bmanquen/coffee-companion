@@ -1,0 +1,124 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { Pool } from 'pg'
+import type { PoolClient } from 'pg'
+
+const MIGRATION_SQL = readFileSync(
+  join(
+    dirname(fileURLToPath(import.meta.url)),
+    '../../drizzle/20261016213625_account_provider_account_unique/migration.sql',
+  ),
+  'utf8',
+)
+
+const [refuseCrossUser, deleteSameUser, createUniqueIndex] =
+  MIGRATION_SQL.split('--> statement-breakpoint').map((statement) =>
+    statement.trim(),
+  )
+
+if (!refuseCrossUser || !deleteSameUser || !createUniqueIndex) {
+  throw new Error(
+    'expected the account uniqueness migration to refuse cross-user duplicates, delete same-user duplicates, then create the index',
+  )
+}
+
+const KEEPER_ID = 'acct-keeper'
+const DUPE_ID = 'acct-dupe'
+const OTHER_USER = 'acct-other-user'
+
+let pool: Pool
+
+beforeAll(() => {
+  pool = new Pool()
+})
+
+afterAll(async () => {
+  await pool.end()
+})
+
+async function withLegacyAccounts(
+  seeds: Array<{
+    id: string
+    userId: string
+    createdAt: string
+  }>,
+  run: (client: PoolClient) => Promise<void>,
+) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(`
+      CREATE TEMP TABLE account (
+        id text PRIMARY KEY,
+        account_id text NOT NULL,
+        provider_id text NOT NULL,
+        user_id text NOT NULL,
+        created_at timestamp NOT NULL
+      ) ON COMMIT DROP
+    `)
+    for (const seed of seeds) {
+      await client.query(
+        `INSERT INTO account (id, account_id, provider_id, user_id, created_at)
+         VALUES ($1, 'apple.sub.legacy', 'apple', $2, $3::timestamp)`,
+        [seed.id, seed.userId, seed.createdAt],
+      )
+    }
+    await run(client)
+  } finally {
+    await client.query('ROLLBACK')
+    client.release()
+  }
+}
+
+describe('account provider and account id uniqueness migration', () => {
+  it('keeps the oldest same-user duplicate, then creates the unique index', async () => {
+    await withLegacyAccounts(
+      [
+        {
+          id: KEEPER_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-01 00:00:00',
+        },
+        {
+          id: DUPE_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-02 00:00:00',
+        },
+      ],
+      async (client) => {
+        await client.query(refuseCrossUser)
+        await client.query(deleteSameUser)
+        await client.query(createUniqueIndex)
+
+        const { rows } = await client.query<{ id: string }>(
+          'SELECT id FROM account ORDER BY created_at',
+        )
+        expect(rows.map((row) => row.id)).toEqual([KEEPER_ID])
+      },
+    )
+  })
+
+  it('refuses when the same provider account is linked to two users', async () => {
+    await withLegacyAccounts(
+      [
+        {
+          id: KEEPER_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-01 00:00:00',
+        },
+        {
+          id: DUPE_ID,
+          userId: OTHER_USER,
+          createdAt: '2026-01-02 00:00:00',
+        },
+      ],
+      async (client) => {
+        await expect(client.query(refuseCrossUser)).rejects.toThrow(
+          /same provider_id and account_id on more than one user/,
+        )
+      },
+    )
+  })
+})
