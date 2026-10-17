@@ -105,7 +105,7 @@ export const recipients: Array<Recipient> = [
       'Any further contact after sign-in. We do not read your mail, your contacts, or your calendar.',
     ],
     retention:
-      'Apple keeps its own record of the sign-in under its policy. We keep your name and the address it returned — including a Hide My Email relay — for as long as you have an account, and we keep Apple’s refresh token while your account exists.',
+      'Apple keeps its own record of the sign-in under its policy. We keep your name and the address it returned — including a Hide My Email relay — and Apple’s refresh token for as long as the account exists, and for 30 days after you delete it so you can restore it.',
     lawfulBasis: CONTRACT_BASIS,
     policyUrl: 'https://www.apple.com/legal/privacy/',
   },
