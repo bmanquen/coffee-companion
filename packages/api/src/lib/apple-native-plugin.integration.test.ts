@@ -49,6 +49,16 @@ describe('POST /api/auth/sign-in/apple-native', () => {
     expect(response.status).toBe(503)
   })
 
+  it('is unavailable when only APPLE_BUNDLE_ID is set', async () => {
+    for (const name of vars) delete process.env[name]
+    process.env.APPLE_BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
+    const response = await post({
+      identityToken: 'not-a-jwt',
+      authorizationCode: 'code',
+    })
+    expect(response.status).toBe(503)
+  })
+
   it('refuses a token the server cannot verify', async () => {
     process.env.APPLE_BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
     process.env.APPLE_TEAM_ID = 'TEAM123456'

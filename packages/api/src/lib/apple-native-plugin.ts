@@ -50,14 +50,14 @@ export const appleNativeSignIn = () =>
           body: appleNativeBody,
         },
         async (ctx) => {
-          const config = appleNativeConfig()
-          if (!config) {
-            throw new APIError('SERVICE_UNAVAILABLE', {
-              message: 'Apple Sign In is not configured.',
-            })
-          }
-
           try {
+            const config = appleNativeConfig()
+            if (!config) {
+              throw new APIError('SERVICE_UNAVAILABLE', {
+                message: 'Apple Sign In is not configured.',
+              })
+            }
+
             const signedIn = await signInWithAppleNative(ctx.body, config)
             const session = {
               session: {
