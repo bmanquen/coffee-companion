@@ -31,6 +31,7 @@ if (
 
 const KEEPER_ID = 'acct-keeper'
 const DUPE_ID = 'acct-dupe'
+const THIRD_ID = 'acct-third'
 const OTHER_USER = 'acct-other-user'
 
 let pool: Pool
@@ -144,6 +145,43 @@ describe('account provider and account id uniqueness migration', () => {
         expect(rows).toEqual([
           { id: KEEPER_ID, refresh_token: 'rt_later' },
         ])
+      },
+    )
+  })
+
+  it('copies a refresh token from one of three same-user rows onto the oldest', async () => {
+    await withLegacyAccounts(
+      [
+        {
+          id: KEEPER_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-01 00:00:00',
+          refreshToken: null,
+        },
+        {
+          id: DUPE_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-02 00:00:00',
+          refreshToken: null,
+        },
+        {
+          id: THIRD_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-03 00:00:00',
+          refreshToken: 'rt_only',
+        },
+      ],
+      async (client) => {
+        await client.query(refuseCrossUser)
+        await client.query(copyCredentials)
+        await client.query(deleteSameUser)
+        await client.query(createUniqueIndex)
+
+        const { rows } = await client.query<{
+          id: string
+          refresh_token: string | null
+        }>('SELECT id, refresh_token FROM account')
+        expect(rows).toEqual([{ id: KEEPER_ID, refresh_token: 'rt_only' }])
       },
     )
   })

@@ -16,15 +16,31 @@ $$;
 --> statement-breakpoint
 UPDATE "account" AS keeper
 SET
-  "refresh_token" = COALESCE(keeper."refresh_token", newer."refresh_token"),
-  "access_token" = COALESCE(keeper."access_token", newer."access_token"),
-  "id_token" = COALESCE(keeper."id_token", newer."id_token")
-FROM "account" AS newer
-WHERE keeper."provider_id" = newer."provider_id"
-  AND keeper."account_id" = newer."account_id"
-  AND keeper."user_id" = newer."user_id"
-  AND keeper."id" <> newer."id"
-  AND (keeper."created_at", keeper."id") < (newer."created_at", newer."id");
+  "refresh_token" = COALESCE(keeper."refresh_token", src.refresh_token),
+  "access_token" = COALESCE(keeper."access_token", src.access_token),
+  "id_token" = COALESCE(keeper."id_token", src.id_token)
+FROM (
+  SELECT
+    "provider_id",
+    "account_id",
+    "user_id",
+    (ARRAY_AGG("refresh_token" ORDER BY ("refresh_token" IS NULL), "created_at" DESC, "id" DESC))[1] AS refresh_token,
+    (ARRAY_AGG("access_token" ORDER BY ("access_token" IS NULL), "created_at" DESC, "id" DESC))[1] AS access_token,
+    (ARRAY_AGG("id_token" ORDER BY ("id_token" IS NULL), "created_at" DESC, "id" DESC))[1] AS id_token
+  FROM "account"
+  GROUP BY "provider_id", "account_id", "user_id"
+) AS src
+WHERE keeper."provider_id" = src."provider_id"
+  AND keeper."account_id" = src."account_id"
+  AND keeper."user_id" = src."user_id"
+  AND NOT EXISTS (
+    SELECT 1
+    FROM "account" older
+    WHERE older."provider_id" = keeper."provider_id"
+      AND older."account_id" = keeper."account_id"
+      AND older."user_id" = keeper."user_id"
+      AND (older."created_at", older."id") < (keeper."created_at", keeper."id")
+  );
 --> statement-breakpoint
 DELETE FROM "account" a
 USING "account" b
