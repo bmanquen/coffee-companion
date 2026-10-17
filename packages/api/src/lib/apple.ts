@@ -292,12 +292,13 @@ export async function signInWithAppleNative(
           }
         } else {
           // Only a verified token email may attach this Apple subject to an
-          // existing user. A client-supplied address is stored on a new user
-          // (Apple sends email once, sometimes only in the credential).
+          // existing user whose stored email is already verified. A
+          // client-supplied address is stored on a new user (Apple sends
+          // email once, sometimes only in the credential).
           const already =
             identity.emailVerified && tokenEmail
               ? await tx.query.user.findFirst({
-                  where: { email: tokenEmail },
+                  where: { email: tokenEmail, emailVerified: true },
                 })
               : undefined
 
@@ -310,15 +311,13 @@ export async function signInWithAppleNative(
                 'Apple did not send an email. Sign in again and share your email.',
               )
             }
-            if (!identity.emailVerified || !tokenEmail) {
-              const collision = await tx.query.user.findFirst({
-                where: { email },
-              })
-              if (collision) {
-                throw new AppleSignInRefused(
-                  'Apple did not send an email. Sign in again and share your email.',
-                )
-              }
+            const collision = await tx.query.user.findFirst({
+              where: { email },
+            })
+            if (collision) {
+              throw new AppleSignInRefused(
+                'This email is already associated with another account.',
+              )
             }
 
             userId = globalThis.crypto.randomUUID()
@@ -326,7 +325,7 @@ export async function signInWithAppleNative(
               id: userId,
               name,
               email,
-              emailVerified: identity.emailVerified,
+              emailVerified: Boolean(identity.emailVerified && tokenEmail),
             })
           }
 

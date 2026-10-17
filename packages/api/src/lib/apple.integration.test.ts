@@ -178,6 +178,7 @@ describe('signInWithAppleNative', () => {
       id: linkedId,
       name: 'Already Here',
       email: `${linkedId}@example.com`,
+      emailVerified: true,
     })
     const { config, identityToken, tokens } = await fixture()
 
@@ -205,6 +206,7 @@ describe('signInWithAppleNative', () => {
       id: linkedId,
       name: 'Already Here',
       email: `${linkedId}@example.com`,
+      emailVerified: true,
     })
     const { config, identityToken, tokens } = await fixture()
 
@@ -440,6 +442,50 @@ describe('signInWithAppleNative', () => {
         DROP FUNCTION IF EXISTS apple_fail_account_rollback()
       `)
     }
+  })
+
+  it('does not attach a verified Apple identity to a user seeded with an unverified email', async () => {
+    const { config, identityToken, tokens } = await fixture()
+    const email = `${globalThis.crypto.randomUUID()}@example.com`
+    const seeded = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.seed-unverified'),
+        authorizationCode: 'auth-seed',
+        email,
+      },
+      config,
+      tokens({ subject: 'apple.sub.seed-unverified' }),
+    )
+    remember(seeded.user.id)
+
+    const stored = await db.query.user.findFirst({
+      where: { id: seeded.user.id },
+    })
+    expect(stored?.emailVerified).toBe(false)
+
+    await expect(
+      signInWithAppleNative(
+        {
+          identityToken: await identityToken('apple.sub.verified-later', {
+            email,
+          }),
+          authorizationCode: 'auth-later',
+        },
+        config,
+        tokens({ subject: 'apple.sub.verified-later' }),
+      ),
+    ).rejects.toBeInstanceOf(AppleSignInRefused)
+
+    const row = await appleAccountOf(seeded.user.id)
+    expect(row?.accountId).toBe('apple.sub.seed-unverified')
+    expect(
+      await db.query.account.findFirst({
+        where: {
+          providerId: APPLE_PROVIDER_ID,
+          accountId: 'apple.sub.verified-later',
+        },
+      }),
+    ).toBeUndefined()
   })
 
   it('does not attach Apple to an existing user from a client-supplied email', async () => {
