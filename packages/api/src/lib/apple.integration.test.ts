@@ -67,7 +67,9 @@ async function fixture() {
 
   const tokens = (
     overrides: {
+      subject?: string
       refresh_token?: string | null
+      id_token?: string | null
       status?: number
       now?: () => number
     } = {},
@@ -78,13 +80,20 @@ async function fixture() {
       if (overrides.status && overrides.status >= 400) {
         return new Response('invalid_grant', { status: overrides.status })
       }
+      const idToken =
+        overrides.id_token === null
+          ? undefined
+          : (overrides.id_token ??
+            (overrides.subject
+              ? await identityToken(overrides.subject)
+              : undefined))
       return Response.json({
         refresh_token:
           overrides.refresh_token === null
             ? undefined
             : (overrides.refresh_token ?? 'rt_first'),
         access_token: 'at_1',
-        id_token: 'id_from_apple',
+        id_token: idToken,
       })
     },
   })
@@ -110,7 +119,7 @@ describe('signInWithAppleNative', () => {
         email: 'forged@evil.example',
       },
       config,
-      tokens(),
+      tokens({ subject: 'apple.sub.create' }),
     )
     remember(result.user.id)
 
@@ -140,7 +149,7 @@ describe('signInWithAppleNative', () => {
         fullName: { givenName: 'Ada', familyName: 'Lovelace' },
       },
       config,
-      tokens(),
+      tokens({ subject: 'apple.sub.again' }),
     )
     remember(first.user.id)
 
@@ -151,7 +160,7 @@ describe('signInWithAppleNative', () => {
         fullName: { givenName: null, familyName: null },
       },
       config,
-      tokens({ refresh_token: null }),
+      tokens({ subject: 'apple.sub.again', refresh_token: null }),
     )
 
     expect(again.user.id).toBe(first.user.id)
@@ -180,7 +189,7 @@ describe('signInWithAppleNative', () => {
         authorizationCode: 'auth-link',
       },
       config,
-      tokens({ refresh_token: 'rt_link' }),
+      tokens({ subject: 'apple.sub.link', refresh_token: 'rt_link' }),
     )
 
     expect(result.user.id).toBe(linkedId)
@@ -207,7 +216,7 @@ describe('signInWithAppleNative', () => {
         authorizationCode: 'auth-case',
       },
       config,
-      tokens({ refresh_token: 'rt_case' }),
+      tokens({ subject: 'apple.sub.case', refresh_token: 'rt_case' }),
     )
 
     expect(result.user.id).toBe(linkedId)
@@ -226,7 +235,7 @@ describe('signInWithAppleNative', () => {
         authorizationCode: 'auth-case-create',
       },
       config,
-      tokens({ refresh_token: 'rt_case_create' }),
+      tokens({ subject: 'apple.sub.case-create', refresh_token: 'rt_case_create' }),
     )
     remember(result.user.id)
 
@@ -283,7 +292,7 @@ describe('signInWithAppleNative', () => {
           authorizationCode: 'auth-first',
         },
         config,
-        tokens(),
+        tokens({ subject: 'apple.sub.no-email' }),
       ),
     ).rejects.toBeInstanceOf(AppleSignInRefused)
   })
@@ -298,7 +307,7 @@ describe('signInWithAppleNative', () => {
         fullName: { givenName: 'Ada', familyName: 'Lovelace' },
       },
       config,
-      tokens({ refresh_token: 'rt_once' }),
+      tokens({ subject: 'apple.sub.credential-email', refresh_token: 'rt_once' }),
     )
     remember(result.user.id)
 
@@ -327,7 +336,7 @@ describe('signInWithAppleNative', () => {
           authorizationCode: 'auth-unverified',
         },
         config,
-        tokens(),
+        tokens({ subject: 'apple.sub.unverified-email' }),
       ),
     ).rejects.toBeInstanceOf(AppleSignInRefused)
 
@@ -349,7 +358,7 @@ describe('signInWithAppleNative', () => {
           identityToken: await identityToken('apple.sub.race', { email }),
         },
         config,
-        tokens({ refresh_token: 'rt_race_a' }),
+        tokens({ subject: 'apple.sub.race', refresh_token: 'rt_race_a' }),
       ),
       signInWithAppleNative(
         {
@@ -357,7 +366,7 @@ describe('signInWithAppleNative', () => {
           identityToken: await identityToken('apple.sub.race', { email }),
         },
         config,
-        tokens({ refresh_token: 'rt_race_b' }),
+        tokens({ subject: 'apple.sub.race', refresh_token: 'rt_race_b' }),
       ),
     ])
     remember(first.user.id)
@@ -408,7 +417,7 @@ describe('signInWithAppleNative', () => {
             fullName: { givenName: 'Ada', familyName: 'Lovelace' },
           },
           config,
-          tokens(),
+          tokens({ subject: 'apple.sub.rollback' }),
         ),
       ).rejects.toThrow()
 
@@ -450,7 +459,7 @@ describe('signInWithAppleNative', () => {
           email: `${victimId}@example.com`,
         },
         config,
-        tokens(),
+        tokens({ subject: 'apple.sub.forged-email' }),
       ),
     ).rejects.toBeInstanceOf(AppleSignInRefused)
 
@@ -555,5 +564,43 @@ describe('signInWithAppleNative', () => {
 
     const after = await db.select().from(session)
     expect(after).toHaveLength(before.length)
+  })
+
+  it('rejects an authorization code whose Apple identity does not match the token', async () => {
+    const { config, identityToken, tokens } = await fixture()
+    const before = await db.select().from(session)
+
+    await expect(
+      signInWithAppleNative(
+        {
+          identityToken: await identityToken('apple.sub.owner', {
+            email: 'owner@privaterelay.appleid.com',
+          }),
+          authorizationCode: 'auth-other',
+        },
+        config,
+        tokens({ subject: 'apple.sub.other' }),
+      ),
+    ).rejects.toBeInstanceOf(AppleIdentityInvalid)
+
+    const after = await db.select().from(session)
+    expect(after).toHaveLength(before.length)
+  })
+
+  it('rejects an exchange that does not return an identity token', async () => {
+    const { config, identityToken, tokens } = await fixture()
+
+    await expect(
+      signInWithAppleNative(
+        {
+          identityToken: await identityToken('apple.sub.no-id', {
+            email: 'noid@privaterelay.appleid.com',
+          }),
+          authorizationCode: 'auth-first',
+        },
+        config,
+        tokens({ subject: 'apple.sub.no-id', id_token: null }),
+      ),
+    ).rejects.toBeInstanceOf(AppleTokenExchangeFailed)
   })
 })

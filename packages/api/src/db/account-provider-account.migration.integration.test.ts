@@ -13,14 +13,19 @@ const MIGRATION_SQL = readFileSync(
   'utf8',
 )
 
-const [refuseCrossUser, deleteSameUser, createUniqueIndex] =
+const [refuseCrossUser, copyCredentials, deleteSameUser, createUniqueIndex] =
   MIGRATION_SQL.split('--> statement-breakpoint').map((statement) =>
     statement.trim(),
   )
 
-if (!refuseCrossUser || !deleteSameUser || !createUniqueIndex) {
+if (
+  !refuseCrossUser ||
+  !copyCredentials ||
+  !deleteSameUser ||
+  !createUniqueIndex
+) {
   throw new Error(
-    'expected the account uniqueness migration to refuse cross-user duplicates, delete same-user duplicates, then create the index',
+    'expected the account uniqueness migration to refuse cross-user duplicates, copy credentials, delete same-user duplicates, then create the index',
   )
 }
 
@@ -43,6 +48,7 @@ async function withLegacyAccounts(
     id: string
     userId: string
     createdAt: string
+    refreshToken?: string | null
   }>,
   run: (client: PoolClient) => Promise<void>,
 ) {
@@ -55,14 +61,22 @@ async function withLegacyAccounts(
         account_id text NOT NULL,
         provider_id text NOT NULL,
         user_id text NOT NULL,
+        refresh_token text,
+        access_token text,
+        id_token text,
         created_at timestamp NOT NULL
       ) ON COMMIT DROP
     `)
     for (const seed of seeds) {
       await client.query(
-        `INSERT INTO account (id, account_id, provider_id, user_id, created_at)
-         VALUES ($1, 'apple.sub.legacy', 'apple', $2, $3::timestamp)`,
-        [seed.id, seed.userId, seed.createdAt],
+        `INSERT INTO account (id, account_id, provider_id, user_id, refresh_token, created_at)
+         VALUES ($1, 'apple.sub.legacy', 'apple', $2, $3, $4::timestamp)`,
+        [
+          seed.id,
+          seed.userId,
+          seed.refreshToken === undefined ? null : seed.refreshToken,
+          seed.createdAt,
+        ],
       )
     }
     await run(client)
@@ -89,6 +103,7 @@ describe('account provider and account id uniqueness migration', () => {
       ],
       async (client) => {
         await client.query(refuseCrossUser)
+        await client.query(copyCredentials)
         await client.query(deleteSameUser)
         await client.query(createUniqueIndex)
 
@@ -96,6 +111,39 @@ describe('account provider and account id uniqueness migration', () => {
           'SELECT id FROM account ORDER BY created_at',
         )
         expect(rows.map((row) => row.id)).toEqual([KEEPER_ID])
+      },
+    )
+  })
+
+  it('copies a later refresh token onto the oldest same-user row', async () => {
+    await withLegacyAccounts(
+      [
+        {
+          id: KEEPER_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-01 00:00:00',
+          refreshToken: null,
+        },
+        {
+          id: DUPE_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-02 00:00:00',
+          refreshToken: 'rt_later',
+        },
+      ],
+      async (client) => {
+        await client.query(refuseCrossUser)
+        await client.query(copyCredentials)
+        await client.query(deleteSameUser)
+        await client.query(createUniqueIndex)
+
+        const { rows } = await client.query<{
+          id: string
+          refresh_token: string | null
+        }>('SELECT id, refresh_token FROM account')
+        expect(rows).toEqual([
+          { id: KEEPER_ID, refresh_token: 'rt_later' },
+        ])
       },
     )
   })

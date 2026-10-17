@@ -14,6 +14,18 @@ BEGIN
 END
 $$;
 --> statement-breakpoint
+UPDATE "account" AS keeper
+SET
+  "refresh_token" = COALESCE(keeper."refresh_token", newer."refresh_token"),
+  "access_token" = COALESCE(keeper."access_token", newer."access_token"),
+  "id_token" = COALESCE(keeper."id_token", newer."id_token")
+FROM "account" AS newer
+WHERE keeper."provider_id" = newer."provider_id"
+  AND keeper."account_id" = newer."account_id"
+  AND keeper."user_id" = newer."user_id"
+  AND keeper."id" <> newer."id"
+  AND (keeper."created_at", keeper."id") < (newer."created_at", newer."id");
+--> statement-breakpoint
 DELETE FROM "account" a
 USING "account" b
 WHERE a."provider_id" = b."provider_id"

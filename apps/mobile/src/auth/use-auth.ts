@@ -75,9 +75,12 @@ export function useAuth(): Auth {
     signInGoogle: () => run(signInWithGoogle),
     signInApple: () => run(signInWithApple),
     signOut: async () => {
-      await signOutGoogle()
-      await authClient.signOut()
-      await clearSessionStore()
+      try {
+        await signOutGoogle()
+        await authClient.signOut()
+      } finally {
+        await clearSessionStore()
+      }
     },
   }
 }

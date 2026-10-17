@@ -100,4 +100,15 @@ describe('useAuth', () => {
     expect(mocks.signOut).toHaveBeenCalled()
     expect(mocks.clearSessionStore).toHaveBeenCalled()
   })
+
+  it('clears the secure session when remote sign-out fails', async () => {
+    mocks.signOut.mockRejectedValueOnce(new Error('network'))
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await expect(result.current.signOut()).rejects.toThrow('network')
+    })
+
+    expect(mocks.clearSessionStore).toHaveBeenCalled()
+  })
 })

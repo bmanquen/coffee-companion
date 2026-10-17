@@ -241,6 +241,15 @@ export async function signInWithAppleNative(
     config,
     deps,
   )
+  if (!tokens.idToken) throw new AppleTokenExchangeFailed()
+  const exchanged = await verifyAppleIdentityToken(
+    tokens.idToken,
+    config.bundleId,
+    deps,
+  )
+  if (exchanged.subject !== identity.subject) {
+    throw new AppleIdentityInvalid()
+  }
 
   const tokenEmail = identity.email?.trim().toLowerCase() || null
   const clientEmail = input.email?.trim().toLowerCase() || null
