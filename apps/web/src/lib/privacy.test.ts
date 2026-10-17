@@ -78,4 +78,10 @@ describe('recipients', () => {
       /deleted when those 30 days end/i,
     )
   })
+
+  it('does not promise Apple revocation that account deletion does not perform', () => {
+    const apple = recipients.find((recipient) => recipient.slug === 'apple')!
+    expect(apple.retention).not.toMatch(/revoke/i)
+    expect(apple.retention).toMatch(/refresh token while your account exists/i)
+  })
 })
