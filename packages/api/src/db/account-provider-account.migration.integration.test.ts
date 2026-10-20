@@ -289,6 +289,80 @@ describe('account provider and account id uniqueness migration', () => {
     )
   })
 
+  it('prefers an older refresh-token row over a newer access-token-only row', async () => {
+    await withLegacyAccounts(
+      [
+        {
+          id: KEEPER_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-01 00:00:00',
+        },
+        {
+          id: DUPE_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-02 00:00:00',
+          updatedAt: '2026-01-02 00:00:00',
+          refreshToken: 'rt_keep',
+          accessToken: 'at_keep',
+          idToken: 'id_keep',
+          accessTokenExpiresAt: '2026-04-01 00:00:00',
+          refreshTokenExpiresAt: '2026-05-01 00:00:00',
+          scope: 'keep-scope',
+          password: 'keep-pass',
+        },
+        {
+          id: THIRD_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-03 00:00:00',
+          updatedAt: '2026-01-03 00:00:00',
+          refreshToken: null,
+          accessToken: 'at_newer',
+          idToken: 'id_newer',
+          accessTokenExpiresAt: '2099-01-01 00:00:00',
+          scope: 'newer-scope',
+          password: 'newer-pass',
+        },
+      ],
+      async (client) => {
+        await client.query(refuseCrossUser)
+        await client.query(copyCredentials)
+        await client.query(deleteSameUser)
+        await client.query(createUniqueIndex)
+
+        const { rows } = await client.query<{
+          id: string
+          refresh_token: string | null
+          access_token: string | null
+          id_token: string | null
+          access_token_expires_at: string | null
+          refresh_token_expires_at: string | null
+          scope: string | null
+          password: string | null
+        }>(
+          `SELECT id, refresh_token, access_token, id_token,
+                  to_char(access_token_expires_at, 'YYYY-MM-DD HH24:MI:SS')
+                    AS access_token_expires_at,
+                  to_char(refresh_token_expires_at, 'YYYY-MM-DD HH24:MI:SS')
+                    AS refresh_token_expires_at,
+                  scope, password
+           FROM account`,
+        )
+        expect(rows).toEqual([
+          {
+            id: KEEPER_ID,
+            refresh_token: 'rt_keep',
+            access_token: 'at_keep',
+            id_token: 'id_keep',
+            access_token_expires_at: '2026-04-01 00:00:00',
+            refresh_token_expires_at: '2026-05-01 00:00:00',
+            scope: 'keep-scope',
+            password: 'keep-pass',
+          },
+        ])
+      },
+    )
+  })
+
   it('refuses when the same provider account is linked to two users', async () => {
     await withLegacyAccounts(
       [

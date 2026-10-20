@@ -41,6 +41,7 @@ FROM (
     "provider_id",
     "account_id",
     "user_id",
+    ("refresh_token" IS NULL),
     "updated_at" DESC,
     "created_at" DESC,
     "id" DESC
