@@ -68,7 +68,6 @@ export const appleNativeSignIn = () =>
               },
               user: {
                 ...signedIn.user,
-                emailVerified: true,
                 createdAt: new Date(),
                 updatedAt: new Date(),
               },

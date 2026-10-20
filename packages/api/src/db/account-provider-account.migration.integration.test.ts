@@ -49,7 +49,14 @@ async function withLegacyAccounts(
     id: string
     userId: string
     createdAt: string
+    updatedAt?: string
     refreshToken?: string | null
+    accessToken?: string | null
+    idToken?: string | null
+    accessTokenExpiresAt?: string | null
+    refreshTokenExpiresAt?: string | null
+    scope?: string | null
+    password?: string | null
   }>,
   run: (client: PoolClient) => Promise<void>,
 ) {
@@ -65,18 +72,39 @@ async function withLegacyAccounts(
         refresh_token text,
         access_token text,
         id_token text,
-        created_at timestamp NOT NULL
+        access_token_expires_at timestamp,
+        refresh_token_expires_at timestamp,
+        scope text,
+        password text,
+        created_at timestamp NOT NULL,
+        updated_at timestamp NOT NULL
       ) ON COMMIT DROP
     `)
     for (const seed of seeds) {
       await client.query(
-        `INSERT INTO account (id, account_id, provider_id, user_id, refresh_token, created_at)
-         VALUES ($1, 'apple.sub.legacy', 'apple', $2, $3, $4::timestamp)`,
+        `INSERT INTO account (
+           id, account_id, provider_id, user_id,
+           refresh_token, access_token, id_token,
+           access_token_expires_at, refresh_token_expires_at,
+           scope, password, created_at, updated_at
+         ) VALUES (
+           $1, 'apple.sub.legacy', 'apple', $2,
+           $3, $4, $5,
+           $6::timestamp, $7::timestamp,
+           $8, $9, $10::timestamp, $11::timestamp
+         )`,
         [
           seed.id,
           seed.userId,
           seed.refreshToken === undefined ? null : seed.refreshToken,
+          seed.accessToken === undefined ? null : seed.accessToken,
+          seed.idToken === undefined ? null : seed.idToken,
+          seed.accessTokenExpiresAt ?? null,
+          seed.refreshTokenExpiresAt ?? null,
+          seed.scope === undefined ? null : seed.scope,
+          seed.password === undefined ? null : seed.password,
           seed.createdAt,
+          seed.updatedAt ?? seed.createdAt,
         ],
       )
     }
@@ -182,6 +210,81 @@ describe('account provider and account id uniqueness migration', () => {
           refresh_token: string | null
         }>('SELECT id, refresh_token FROM account')
         expect(rows).toEqual([{ id: KEEPER_ID, refresh_token: 'rt_only' }])
+      },
+    )
+  })
+
+  it('copies one source row’s credentials when the newest token and newest expiry differ', async () => {
+    await withLegacyAccounts(
+      [
+        {
+          id: KEEPER_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-01 00:00:00',
+        },
+        {
+          id: DUPE_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-02 00:00:00',
+          updatedAt: '2026-01-02 00:00:00',
+          refreshToken: 'rt_old',
+          accessToken: 'at_old',
+          idToken: 'id_old',
+          accessTokenExpiresAt: '2099-01-01 00:00:00',
+          refreshTokenExpiresAt: '2099-06-01 00:00:00',
+          scope: 'old-scope',
+          password: 'old-pass',
+        },
+        {
+          id: THIRD_ID,
+          userId: 'acct-same-user',
+          createdAt: '2026-01-03 00:00:00',
+          updatedAt: '2026-01-03 00:00:00',
+          refreshToken: 'rt_src',
+          accessToken: 'at_src',
+          idToken: 'id_src',
+          accessTokenExpiresAt: '2026-02-01 00:00:00',
+          refreshTokenExpiresAt: '2026-03-01 00:00:00',
+          scope: 'src-scope',
+          password: 'src-pass',
+        },
+      ],
+      async (client) => {
+        await client.query(refuseCrossUser)
+        await client.query(copyCredentials)
+        await client.query(deleteSameUser)
+        await client.query(createUniqueIndex)
+
+        const { rows } = await client.query<{
+          id: string
+          refresh_token: string | null
+          access_token: string | null
+          id_token: string | null
+          access_token_expires_at: string | null
+          refresh_token_expires_at: string | null
+          scope: string | null
+          password: string | null
+        }>(
+          `SELECT id, refresh_token, access_token, id_token,
+                  to_char(access_token_expires_at, 'YYYY-MM-DD HH24:MI:SS')
+                    AS access_token_expires_at,
+                  to_char(refresh_token_expires_at, 'YYYY-MM-DD HH24:MI:SS')
+                    AS refresh_token_expires_at,
+                  scope, password
+           FROM account`,
+        )
+        expect(rows).toEqual([
+          {
+            id: KEEPER_ID,
+            refresh_token: 'rt_src',
+            access_token: 'at_src',
+            id_token: 'id_src',
+            access_token_expires_at: '2026-02-01 00:00:00',
+            refresh_token_expires_at: '2026-03-01 00:00:00',
+            scope: 'src-scope',
+            password: 'src-pass',
+          },
+        ])
       },
     )
   })

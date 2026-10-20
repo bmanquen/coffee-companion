@@ -16,19 +16,34 @@ $$;
 --> statement-breakpoint
 UPDATE "account" AS keeper
 SET
-  "refresh_token" = COALESCE(keeper."refresh_token", src.refresh_token),
-  "access_token" = COALESCE(keeper."access_token", src.access_token),
-  "id_token" = COALESCE(keeper."id_token", src.id_token)
+  "access_token" = src.access_token,
+  "refresh_token" = src.refresh_token,
+  "id_token" = src.id_token,
+  "access_token_expires_at" = src.access_token_expires_at,
+  "refresh_token_expires_at" = src.refresh_token_expires_at,
+  "scope" = src.scope,
+  "password" = src.password
 FROM (
-  SELECT
+  SELECT DISTINCT ON ("provider_id", "account_id", "user_id")
     "provider_id",
     "account_id",
     "user_id",
-    (ARRAY_AGG("refresh_token" ORDER BY ("refresh_token" IS NULL), "created_at" DESC, "id" DESC))[1] AS refresh_token,
-    (ARRAY_AGG("access_token" ORDER BY ("access_token" IS NULL), "created_at" DESC, "id" DESC))[1] AS access_token,
-    (ARRAY_AGG("id_token" ORDER BY ("id_token" IS NULL), "created_at" DESC, "id" DESC))[1] AS id_token
+    "access_token",
+    "refresh_token",
+    "id_token",
+    "access_token_expires_at",
+    "refresh_token_expires_at",
+    "scope",
+    "password"
   FROM "account"
-  GROUP BY "provider_id", "account_id", "user_id"
+  WHERE "refresh_token" IS NOT NULL OR "access_token" IS NOT NULL
+  ORDER BY
+    "provider_id",
+    "account_id",
+    "user_id",
+    "updated_at" DESC,
+    "created_at" DESC,
+    "id" DESC
 ) AS src
 WHERE keeper."provider_id" = src."provider_id"
   AND keeper."account_id" = src."account_id"

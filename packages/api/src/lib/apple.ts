@@ -86,7 +86,7 @@ export interface AppleNativeSignInInput {
 }
 
 export interface AppleNativeSession {
-  user: { id: string; name: string; email: string }
+  user: { id: string; name: string; email: string; emailVerified: boolean }
   session: { id: string; token: string; expiresAt: Date }
 }
 
@@ -356,7 +356,12 @@ export async function signInWithAppleNative(
         await tx.insert(session).values(created)
 
         return {
-          user: { id: row.id, name: row.name, email: row.email },
+          user: {
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            emailVerified: row.emailVerified,
+          },
           session: created,
         }
       })

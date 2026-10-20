@@ -125,6 +125,7 @@ describe('signInWithAppleNative', () => {
 
     expect(result.user.email).toBe('create@privaterelay.appleid.com')
     expect(result.user.name).toBe('Ada Lovelace')
+    expect(result.user.emailVerified).toBe(true)
     expect(result.session.token).toMatch(/^[0-9a-f]{64}$/)
 
     const row = await appleAccountOf(result.user.id)
@@ -315,6 +316,7 @@ describe('signInWithAppleNative', () => {
 
     expect(result.user.email).toBe('once@privaterelay.appleid.com')
     expect(result.user.name).toBe('Ada Lovelace')
+    expect(result.user.emailVerified).toBe(false)
     const row = await appleAccountOf(result.user.id)
     expect(row?.refreshToken).toBe('rt_once')
   })
