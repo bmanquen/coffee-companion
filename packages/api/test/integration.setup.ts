@@ -30,6 +30,7 @@ export default async function setup() {
   process.env.STRIPE_WEBHOOK_SECRET = 'whsec_notARealSecret'
   process.env.STRIPE_PRICE_PRO_MONTHLY = 'price_fixtureMonthly'
   process.env.STRIPE_PRICE_PRO_ANNUAL = 'price_fixtureAnnual'
+  process.env.BETTER_AUTH_SECRET = 'test-better-auth-secret-fixture-32b!!'
 
   const pool = new Pool()
   await migrate(drizzle({ client: pool }), { migrationsFolder: './drizzle' })

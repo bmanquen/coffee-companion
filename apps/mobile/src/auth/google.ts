@@ -8,6 +8,7 @@ import {
 import { authClient } from './auth-client'
 import { googleIosClientId, googleWebClientId } from './config'
 import {
+  EmailAlreadyAssociated,
   GOOGLE_PLAY_SERVICES_NOT_AVAILABLE,
   GOOGLE_SIGN_IN_CANCELLED,
   PlayServicesMissing,
@@ -21,6 +22,7 @@ import {
   nativeFailureDetail,
   serverFailureDetail,
 } from './log'
+import { errorFromAuthServer } from './server-error'
 
 let configured = false
 
@@ -70,14 +72,15 @@ export async function signInWithGoogle() {
     })
     if (error) {
       logAuthFailure('google-server', serverFailureDetail(error))
-      throw new SignInFailed()
+      errorFromAuthServer(error)
     }
   } catch (error) {
     if (
       error instanceof SignInCancelled ||
       error instanceof SignInFailed ||
       error instanceof SignInUnavailable ||
-      error instanceof PlayServicesMissing
+      error instanceof PlayServicesMissing ||
+      error instanceof EmailAlreadyAssociated
     ) {
       throw error
     }

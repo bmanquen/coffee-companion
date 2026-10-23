@@ -3,6 +3,7 @@ import { Platform } from 'react-native'
 import { authClient } from './auth-client'
 import {
   APPLE_ERR_REQUEST_CANCELED,
+  EmailAlreadyAssociated,
   SignInCancelled,
   SignInFailed,
   SignInUnavailable,
@@ -13,6 +14,7 @@ import {
   nativeFailureDetail,
   serverFailureDetail,
 } from './log'
+import { errorFromAuthServer } from './server-error'
 
 export function appleSignInAvailable() {
   return Platform.OS === 'ios'
@@ -52,13 +54,14 @@ export async function signInWithApple() {
     })
     if (error) {
       logAuthFailure('apple-server', serverFailureDetail(error))
-      throw new SignInFailed()
+      errorFromAuthServer(error)
     }
   } catch (error) {
     if (
       error instanceof SignInCancelled ||
       error instanceof SignInFailed ||
-      error instanceof SignInUnavailable
+      error instanceof SignInUnavailable ||
+      error instanceof EmailAlreadyAssociated
     ) {
       throw error
     }

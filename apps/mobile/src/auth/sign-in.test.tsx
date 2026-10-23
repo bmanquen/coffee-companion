@@ -3,6 +3,7 @@ import { App } from '../App'
 import { writeHostTreeArtifacts } from '../test/host-tree'
 import {
   APP_NAME,
+  ERROR_EMAIL_ALREADY_ASSOCIATED,
   ERROR_PLAY_SERVICES,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
@@ -163,6 +164,21 @@ describe('sign-in screen', () => {
       />,
     )
     expect(screen.getByRole('alert')).toHaveTextContent(ERROR_PLAY_SERVICES)
+
+    await view.rerender(
+      <SignInScreen
+        mode="sign-in"
+        error={ERROR_EMAIL_ALREADY_ASSOCIATED}
+        busy={false}
+        showApple
+        onGoogle={() => {}}
+        onApple={() => {}}
+        onToggleMode={() => {}}
+      />,
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      ERROR_EMAIL_ALREADY_ASSOCIATED,
+    )
   })
 
   it('presses Google and Apple through to the auth actions', async () => {

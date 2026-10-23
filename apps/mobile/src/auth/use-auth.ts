@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { appleSignInAvailable, signInWithApple } from './apple'
 import { authClient } from './auth-client'
 import {
+  ERROR_EMAIL_ALREADY_ASSOCIATED,
   ERROR_PLAY_SERVICES,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
 } from './copy'
 import {
+  EmailAlreadyAssociated,
   PlayServicesMissing,
   SignInCancelled,
   SignInUnavailable,
@@ -58,6 +60,10 @@ export function useAuth(): Auth {
         setError(ERROR_PLAY_SERVICES)
         return
       }
+      if (caught instanceof EmailAlreadyAssociated) {
+        setError(ERROR_EMAIL_ALREADY_ASSOCIATED)
+        return
+      }
       setError(ERROR_SIGN_IN_FAILED)
     } finally {
       setBusy(false)
@@ -76,7 +82,12 @@ export function useAuth(): Auth {
     signInApple: () => run(signInWithApple),
     signOut: async () => {
       try {
-        await signOutGoogle()
+        try {
+          await signOutGoogle()
+        } catch {
+          // Google's client can throw while offline; the server session
+          // still has to be revoked.
+        }
         await authClient.signOut()
       } finally {
         await clearSessionStore()

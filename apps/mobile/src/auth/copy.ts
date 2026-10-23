@@ -22,3 +22,5 @@ export const ERROR_SIGN_IN_UNAVAILABLE =
   "Sign-in isn't available right now. Try again later."
 export const ERROR_PLAY_SERVICES =
   'To sign in with Google, this phone needs Google Play services.'
+export const ERROR_EMAIL_ALREADY_ASSOCIATED =
+  'This email is already associated with an account.'

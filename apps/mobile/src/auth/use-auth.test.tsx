@@ -1,10 +1,12 @@
 import { act, renderHook } from '@testing-library/react-native'
 import {
+  ERROR_EMAIL_ALREADY_ASSOCIATED,
   ERROR_PLAY_SERVICES,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
 } from './copy'
 import {
+  EmailAlreadyAssociated,
   PlayServicesMissing,
   SignInCancelled,
   SignInFailed,
@@ -67,7 +69,7 @@ describe('useAuth', () => {
     expect(result.current.error).toBeNull()
   })
 
-  it('names the three failures a user can see', async () => {
+  it('names the failures a user can see', async () => {
     const { result } = await renderHook(() => useAuth())
 
     mocks.signInWithGoogle.mockRejectedValueOnce(new SignInUnavailable())
@@ -87,6 +89,12 @@ describe('useAuth', () => {
       await result.current.signInGoogle()
     })
     expect(result.current.error).toBe(ERROR_SIGN_IN_FAILED)
+
+    mocks.signInWithGoogle.mockRejectedValueOnce(new EmailAlreadyAssociated())
+    await act(async () => {
+      await result.current.signInGoogle()
+    })
+    expect(result.current.error).toBe(ERROR_EMAIL_ALREADY_ASSOCIATED)
   })
 
   it('clears the secure session on sign-out', async () => {
@@ -109,6 +117,18 @@ describe('useAuth', () => {
       await expect(result.current.signOut()).rejects.toThrow('network')
     })
 
+    expect(mocks.clearSessionStore).toHaveBeenCalled()
+  })
+
+  it('still revokes the server session when Google sign-out throws', async () => {
+    mocks.signOutGoogle.mockRejectedValueOnce(new Error('offline'))
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signOut()
+    })
+
+    expect(mocks.signOut).toHaveBeenCalled()
     expect(mocks.clearSessionStore).toHaveBeenCalled()
   })
 })

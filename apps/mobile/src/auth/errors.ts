@@ -31,6 +31,13 @@ export class PlayServicesMissing extends Error {
   }
 }
 
+export class EmailAlreadyAssociated extends Error {
+  constructor() {
+    super('email-already-associated')
+    this.name = 'EmailAlreadyAssociated'
+  }
+}
+
 export function errorCode(error: unknown): string | null {
   if (!error || typeof error !== 'object') return null
   if ('code' in error && typeof error.code === 'string') return error.code

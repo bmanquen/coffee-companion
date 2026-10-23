@@ -11,8 +11,10 @@ import {
   AppleTokenExchangeFailed,
   appleAccountOf,
   appleLocalJwks,
+  appleRefreshTokenOf,
   signInWithAppleNative,
 } from './apple'
+import { EMAIL_ALREADY_ASSOCIATED, unverifiedEmailPlaceholder } from './account-email'
 import type { AppleCrypto, AppleNativeConfig } from './apple'
 
 const BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
@@ -131,7 +133,8 @@ describe('signInWithAppleNative', () => {
     const row = await appleAccountOf(result.user.id)
     expect(row?.providerId).toBe(APPLE_PROVIDER_ID)
     expect(row?.accountId).toBe('apple.sub.create')
-    expect(row?.refreshToken).toBe('rt_first')
+    expect(row?.refreshToken).not.toBe('rt_first')
+    expect(await appleRefreshTokenOf(result.user.id)).toBe('rt_first')
 
     const stored = await db.query.session.findFirst({
       where: { token: result.session.token },
@@ -169,8 +172,7 @@ describe('signInWithAppleNative', () => {
     expect(again.user.email).toBe(first.user.email)
     expect(again.session.token).not.toBe(first.session.token)
 
-    const row = await appleAccountOf(first.user.id)
-    expect(row?.refreshToken).toBe('rt_first')
+    expect(await appleRefreshTokenOf(first.user.id)).toBe('rt_first')
   })
 
   it('links Apple to the existing account that already holds that email', async () => {
@@ -198,7 +200,7 @@ describe('signInWithAppleNative', () => {
     expect(result.user.name).toBe('Already Here')
     const row = await appleAccountOf(linkedId)
     expect(row?.accountId).toBe('apple.sub.link')
-    expect(row?.refreshToken).toBe('rt_link')
+    expect(await appleRefreshTokenOf(linkedId)).toBe('rt_link')
   })
 
   it('links Apple to the existing account when the token email differs only by case', async () => {
@@ -318,7 +320,7 @@ describe('signInWithAppleNative', () => {
     expect(result.user.name).toBe('Ada Lovelace')
     expect(result.user.emailVerified).toBe(false)
     const row = await appleAccountOf(result.user.id)
-    expect(row?.refreshToken).toBe('rt_once')
+    expect(await appleRefreshTokenOf(result.user.id)).toBe('rt_once')
   })
 
   it('does not attach Apple to an existing user from an unverified token email', async () => {
@@ -342,7 +344,10 @@ describe('signInWithAppleNative', () => {
         config,
         tokens({ subject: 'apple.sub.unverified-email' }),
       ),
-    ).rejects.toBeInstanceOf(AppleSignInRefused)
+    ).rejects.toMatchObject({
+      name: 'AppleSignInRefused',
+      message: EMAIL_ALREADY_ASSOCIATED,
+    })
 
     expect(await appleAccountOf(victimId)).toBeUndefined()
   })
@@ -446,7 +451,7 @@ describe('signInWithAppleNative', () => {
     }
   })
 
-  it('does not attach a verified Apple identity to a user seeded with an unverified email', async () => {
+  it('lets a later verified Apple identity take an email a client-supplied sign-in reserved', async () => {
     const { config, identityToken, tokens } = await fixture()
     const email = `${globalThis.crypto.randomUUID()}@example.com`
     const seeded = await signInWithAppleNative(
@@ -465,29 +470,32 @@ describe('signInWithAppleNative', () => {
     })
     expect(stored?.emailVerified).toBe(false)
 
-    await expect(
-      signInWithAppleNative(
-        {
-          identityToken: await identityToken('apple.sub.verified-later', {
-            email,
-          }),
-          authorizationCode: 'auth-later',
-        },
-        config,
-        tokens({ subject: 'apple.sub.verified-later' }),
-      ),
-    ).rejects.toBeInstanceOf(AppleSignInRefused)
+    const later = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.verified-later', {
+          email,
+        }),
+        authorizationCode: 'auth-later',
+      },
+      config,
+      tokens({ subject: 'apple.sub.verified-later' }),
+    )
+    remember(later.user.id)
 
-    const row = await appleAccountOf(seeded.user.id)
-    expect(row?.accountId).toBe('apple.sub.seed-unverified')
-    expect(
-      await db.query.account.findFirst({
-        where: {
-          providerId: APPLE_PROVIDER_ID,
-          accountId: 'apple.sub.verified-later',
-        },
-      }),
-    ).toBeUndefined()
+    expect(later.user.id).not.toBe(seeded.user.id)
+    expect(later.user.email).toBe(email)
+    expect(later.user.emailVerified).toBe(true)
+
+    const seededRow = await db.query.user.findFirst({
+      where: { id: seeded.user.id },
+    })
+    expect(seededRow?.email).toBe(unverifiedEmailPlaceholder(seeded.user.id))
+    expect((await appleAccountOf(seeded.user.id))?.accountId).toBe(
+      'apple.sub.seed-unverified',
+    )
+    expect((await appleAccountOf(later.user.id))?.accountId).toBe(
+      'apple.sub.verified-later',
+    )
   })
 
   it('does not attach Apple to an existing user from a client-supplied email', async () => {
@@ -509,7 +517,10 @@ describe('signInWithAppleNative', () => {
         config,
         tokens({ subject: 'apple.sub.forged-email' }),
       ),
-    ).rejects.toBeInstanceOf(AppleSignInRefused)
+    ).rejects.toMatchObject({
+      name: 'AppleSignInRefused',
+      message: EMAIL_ALREADY_ASSOCIATED,
+    })
 
     expect(await appleAccountOf(victimId)).toBeUndefined()
   })
