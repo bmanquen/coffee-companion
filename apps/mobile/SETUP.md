@@ -31,7 +31,7 @@ Never commit `.env` files or the `.p8`, and never paste them into chat. Don't ke
 - Database: `pnpm db:migrate`
 - API and Metro together: `pnpm dev:mobile`. Or run them separately: `pnpm dev` in `apps/web`, then `npx expo start --clear` in `apps/mobile`.
 - Run `--clear` after any `EXPO_PUBLIC_*` change, because those values are read when Metro starts.
-- Testing on a real phone on your Wi-Fi: `pnpm dev:lan`. The default dev server only listens on `127.0.0.1`.
+- Testing on a real phone on your Wi-Fi: `pnpm dev:lan`. The default dev server only listens on `127.0.0.1`. On a physical phone set `EXPO_PUBLIC_API_URL=http://<your-LAN-IP>:3000` and restart Expo with `--clear`. `localhost` is the phone itself; only the Android emulator rewrites `localhost` to `10.0.2.2`.
 - Native Google sign-in needs a dev build, not Expo Go.
 - The Android emulator needs a **Google Play** image (one with the Play Store icon).
 
@@ -49,6 +49,6 @@ Dev builds log the real error as one `[auth]` line. It shows up in the Metro ter
 | Code `10` (`DEVELOPER_ERROR`), no account picker | Package name, SHA-1, or project mismatch | Recheck section 2 |
 | Code `12500` | Emulator has no Play services | Use a Google Play image |
 | Code `7` | Can't reach Google | Check the emulator's network |
-| `Failed to connect to /10.0.2.2:3000` | API not running, or only listening on IPv6 localhost | Run `lsof -iTCP:3000 -sTCP:LISTEN`. `localhost:hbci` means it's bound wrong, so start the API with the repo's dev script |
+| `Failed to connect to /10.0.2.2:3000` | API not running, or only listening on IPv6 localhost | Run `lsof -nP -iTCP:3000 -sTCP:LISTEN`. You want `127.0.0.1:3000`, so start the API with the repo's dev script |
 | Audience error in the API terminal | Web client ID mismatch | Make `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` equal `GOOGLE_CLIENT_ID` |
 | Error says a column such as `deleted_at` is missing | Migrations haven't been run | `pnpm db:migrate` |
