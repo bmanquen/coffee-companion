@@ -22,19 +22,23 @@ The basis we claim, for the two monitoring vendors, is **legitimate interests**.
   recording, no autocapture, no search params, and no contactable identifier. A balancing
   test that starts from that payload is not a close call.
 
-Three other companies receive something, and none of them is a monitoring decision.
+Four other companies receive something, and none of them is a monitoring decision.
 Their basis is **performance of a contract** — the user asked for the thing, and the
 sending is the thing:
 
-- **Google** is sign-in. There is no password of our own, so proving who you are runs
-  through Google or not at all.
+- **Google** is sign-in on the web, iOS, and Android. There is no password of our own, so
+  proving who you are runs through Google or Apple.
+- **Apple** is Sign in with Apple on iPhone. The same account tables, and the same
+  contract basis: the user pressed the button. Hide My Email relay addresses only
+  receive mail if the sending domain is registered in Apple's Private Email Relay
+  settings.
 - **Stripe** is the payment, and by ADR 0006 the merchant of record. A checkout that
   does not reach Stripe is not a checkout.
 - **Resend** delivers the single interest-confirmation email. Registering interest is a
   request to be written to.
 
 They were missing from the first draft of this ADR and of `/privacy`, which claimed the
-app sent data to two companies. It sends to five. A page that undercounts its recipients
+app sent data to two companies. It sends to six. A page that undercounts its recipients
 is worse than no page, so the count is asserted in `privacy.test.ts` rather than left to
 prose.
 

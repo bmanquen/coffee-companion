@@ -1,14 +1,16 @@
 # Welcome screen
 
-Opening the Coffee Companion mobile app shows a single centered heading with the app name. There is no navigation, sign-in, or second screen yet.
+Opening the Coffee Companion mobile app while signed in shows a centered heading with the app name and a Sign Out button. Signed-out users land on [Sign-in](./sign-in.md) instead.
 
 ## Sub-features
 
 - `welcome-name` shows the heading `Coffee Companion` on the welcome screen.
+- `welcome-sign-out` offers `Sign Out`, which returns the user to the sign-in screen.
 
 ## How to get to it (user POV)
 
-- Open the app. This is the only screen; there is nothing to tap first.
+- Open the app with a stored session.
+- Sign in with Google or Apple from the sign-in screen.
 
 ## Driving it with control
 
@@ -19,7 +21,7 @@ Preconditions:
 - `drive welcome` re-checks that Metro is answering before it renders. A state file alone is not enough.
 - Drive is React Native Testing Library in-process. No device is attached.
 
-- **Read the heading.** Run `helpers/control drive welcome`. The host tree contains a `header` whose name is `Coffee Companion`, on a view labelled `Welcome` with `testID=welcome-screen`. The heading node has `testID=welcome-heading`.
+- **Read the heading.** Run `helpers/control drive welcome`. The host tree contains a `header` whose name is `Coffee Companion`, on a view labelled `Welcome` with `testID=welcome-screen`. The heading node has `testID=welcome-heading`. Button `Sign Out` is present.
 - **Proof.** `drive welcome` writes `artifacts/<run>/welcome/tree.txt`, `tree.json`, and `proof.json`. `tree.txt` must show `Coffee Companion`. There is no device screenshot from this harness.
 
 ## Gotchas

@@ -7,7 +7,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Launch with `.cursor/skills/verify-mobile/helpers/control launch`.
 - Require `helpers/control doctor` to report `ok: true`, `baseUrl` `http://localhost:8081` (or the `VERIFY_METRO_PORT` you set), Metro marker `packager-status:running`, and app marker `Coffee Companion`.
 - Never drive an instance that was not started by this verification run. A process already on port 8081 is likely `pnpm --filter @coffee-companion/mobile start`.
-- There is no signed-in identity yet. The only surface is the public welcome screen.
+- Signed-out identity is the sign-in screen. Signed-in identity is the welcome screen with Sign Out. Drive mocks the session; it does not mint a real Google or Apple token.
 - Drive uses React Native Testing Library in-process. It does not attach an iOS simulator or Android emulator.
 - Do not remove proof artifacts during cleanup.
 
@@ -16,12 +16,12 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Start every recipe from the baseline state unless its preconditions say otherwise.
 - Prefer `testID`, `accessibilityRole`, and `accessibilityLabel` over coordinates or tree position.
 - Treat every command as literal. Keep quoted names and flags unchanged.
-- Run screen assertions through `helpers/control drive welcome` (or the same RNTL queries the welcome test uses).
+- Run screen assertions through `helpers/control drive welcome` or `helpers/control drive sign-in` (or the same RNTL queries those tests use).
 
 ## Proof and skip reporting
 
 - Capture the user-visible tree after the render, not only a pass/fail.
-- UI proof includes a host-tree dump (`tree.txt`) that shows the `header` named `Coffee Companion` and the welcome `testID`s.
+- UI proof includes a host-tree dump (`tree.txt`) that shows the `header` named `Coffee Companion`. A welcome tree must include `welcome-screen` and `welcome-heading`. A sign-in tree must include `sign-in-screen` and `sign-in-heading`.
 - This harness cannot take a device screenshot. On a Mac or Android Studio machine, a Simulator/`adb` screenshot may be added under `artifacts/` (gitignored) and posted on the PR — it is extra evidence, not a substitute for the tree dump.
 - Record the feature ID, harness (`rntl`), and entry point with every artifact.
 - Report an unreachable path with the attempted command and the unmet precondition.
@@ -40,4 +40,5 @@ Keep implementation details out of the map. Name only user paths, stable handles
 
 ## Features
 
-- [Welcome screen](./welcome.md) covers the only screen the app ships today: the centered `Coffee Companion` heading. This is the only feature with a `helpers/control drive welcome` shortcut.
+- [Welcome screen](./welcome.md) is the signed-in home: the `Coffee Companion` heading and `Sign Out`. Shortcut: `helpers/control drive welcome`.
+- [Sign-in screen](./sign-in.md) is the signed-out home: Google, Apple on iOS, sign-up, and the error copy. Shortcut: `helpers/control drive sign-in`.

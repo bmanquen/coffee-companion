@@ -7,6 +7,7 @@ describe('recipients', () => {
       'Sentry',
       'PostHog',
       'Google',
+      'Apple',
       'Stripe',
       'Resend',
     ])
@@ -75,6 +76,14 @@ describe('recipients', () => {
   it('says the PostHog profile is deleted at the end of the window when that call will run', () => {
     expect(posthogPersonRetention(true)).toMatch(
       /deleted when those 30 days end/i,
+    )
+  })
+
+  it('does not promise Apple revocation that account deletion does not perform', () => {
+    const apple = recipients.find((recipient) => recipient.slug === 'apple')!
+    expect(apple.retention).not.toMatch(/revoke/i)
+    expect(apple.retention).toMatch(
+      /refresh token for as long as the account exists, and for 30 days after you delete it/i,
     )
   })
 })
