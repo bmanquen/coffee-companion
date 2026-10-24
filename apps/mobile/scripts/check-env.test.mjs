@@ -30,12 +30,18 @@ describe('parseDotenv', () => {
           'EXPO_PUBLIC_API_URL=http://localhost:3000',
           'export GOOGLE_CLIENT_ID=abc',
           "GOOGLE_CLIENT_SECRET='quoted-secret'",
+          'GOOGLE_IOS_CLIENT_ID= # fill later',
+          'GOOGLE_ANDROID_CLIENT_ID=id # leftover',
+          'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME="keep # hash"',
         ].join('\n'),
       ),
       {
         EXPO_PUBLIC_API_URL: 'http://localhost:3000',
         GOOGLE_CLIENT_ID: 'abc',
         GOOGLE_CLIENT_SECRET: 'quoted-secret',
+        GOOGLE_IOS_CLIENT_ID: '',
+        GOOGLE_ANDROID_CLIENT_ID: 'id',
+        EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME: 'keep # hash',
       },
     )
   })
@@ -181,6 +187,113 @@ describe('main', () => {
     const code = main(root, {}, (message) => {
       out = message
     })
+
+    assert.equal(code, 0)
+    assert.equal(out, '')
+  })
+
+  it('does not treat a key in the other app’s env file as set', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mobile-env-wrong-file-'))
+    mkdirSync(join(root, 'apps/mobile'), { recursive: true })
+    mkdirSync(join(root, 'apps/web'), { recursive: true })
+    writeFileSync(
+      join(root, 'apps/mobile/.env'),
+      [
+        'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=web.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123-abc',
+        'GOOGLE_CLIENT_SECRET=secret-only-on-mobile',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/web/.env'),
+      [
+        'GOOGLE_CLIENT_ID=web.apps.googleusercontent.com',
+        'GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'GOOGLE_ANDROID_CLIENT_ID=android.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=should-not-count',
+        '',
+      ].join('\n'),
+    )
+
+    let out = ''
+    const code = main(root, {}, (message) => {
+      out = message
+    })
+
+    assert.equal(code, 1)
+    assert.match(out, /GOOGLE_CLIENT_SECRET \(apps\/web\/\.env\)/)
+    assert.doesNotMatch(out, /secret-only-on-mobile/)
+    assert.doesNotMatch(out, /should-not-count/)
+    assert.doesNotMatch(out, /EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID/)
+  })
+
+  it('treats an unquoted value that is only an inline comment as missing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mobile-env-comment-'))
+    mkdirSync(join(root, 'apps/mobile'), { recursive: true })
+    mkdirSync(join(root, 'apps/web'), { recursive: true })
+    writeFileSync(
+      join(root, 'apps/mobile/.env'),
+      [
+        'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=web.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123-abc',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/web/.env'),
+      [
+        'GOOGLE_CLIENT_ID=web.apps.googleusercontent.com',
+        'GOOGLE_CLIENT_SECRET= # fill later',
+        'GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'GOOGLE_ANDROID_CLIENT_ID=android.apps.googleusercontent.com',
+        '',
+      ].join('\n'),
+    )
+
+    let out = ''
+    const code = main(root, {}, (message) => {
+      out = message
+    })
+
+    assert.equal(code, 1)
+    assert.match(out, /GOOGLE_CLIENT_SECRET \(apps\/web\/\.env\)/)
+    assert.doesNotMatch(out, /fill later/)
+  })
+
+  it('accepts an explicit environment override when the file is empty', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mobile-env-override-'))
+    mkdirSync(join(root, 'apps/mobile'), { recursive: true })
+    mkdirSync(join(root, 'apps/web'), { recursive: true })
+    writeFileSync(
+      join(root, 'apps/mobile/.env'),
+      [
+        'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=web.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123-abc',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/web/.env'),
+      [
+        'GOOGLE_CLIENT_ID=web.apps.googleusercontent.com',
+        'GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'GOOGLE_ANDROID_CLIENT_ID=android.apps.googleusercontent.com',
+        '',
+      ].join('\n'),
+    )
+
+    let out = ''
+    const code = main(
+      root,
+      { GOOGLE_CLIENT_SECRET: 'from-the-environment' },
+      (message) => {
+        out = message
+      },
+    )
 
     assert.equal(code, 0)
     assert.equal(out, '')
