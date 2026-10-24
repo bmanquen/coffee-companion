@@ -32,18 +32,21 @@ export function parseDotenv(text) {
     const eq = body.indexOf('=')
     if (eq <= 0) continue
     const name = body.slice(0, eq).trim()
-    let value = body.slice(eq + 1).trim()
-    const quote = value[0]
-    if (
-      (quote === '"' || quote === "'") &&
-      value.length >= 2 &&
-      value.endsWith(quote)
-    ) {
-      value = value.slice(1, -1)
-    }
-    values[name] = value
+    values[name] = parseDotenvValue(body.slice(eq + 1))
   }
   return values
+}
+
+function parseDotenvValue(raw) {
+  const trimmed = raw.trimStart()
+  const quote = trimmed[0]
+  if (quote === '"' || quote === "'") {
+    const end = trimmed.indexOf(quote, 1)
+    if (end !== -1) return trimmed.slice(1, end)
+  }
+  // dotenv: # starts a comment only when it follows whitespace.
+  const comment = raw.search(/\s+#/)
+  return (comment === -1 ? raw : raw.slice(0, comment)).trim()
 }
 
 function isSet(value) {
@@ -84,19 +87,28 @@ function loadEnvFile(path) {
   return parseDotenv(readFileSync(path, 'utf8'))
 }
 
+function loadAppEnv(root, app) {
+  return {
+    ...loadEnvFile(join(root, app, '.env')),
+    ...loadEnvFile(join(root, app, '.env.local')),
+  }
+}
+
+function pick(name, fileEnv, env) {
+  if (Object.hasOwn(env, name)) return env[name]
+  return fileEnv[name]
+}
+
 export function loadMobileDevEnv(root, env = process.env) {
-  const files = [
-    join(root, 'apps/mobile/.env'),
-    join(root, 'apps/mobile/.env.local'),
-    join(root, 'apps/web/.env'),
-    join(root, 'apps/web/.env.local'),
-  ]
+  const mobile = loadAppEnv(root, 'apps/mobile')
+  const web = loadAppEnv(root, 'apps/web')
   /** @type {Record<string, string | undefined>} */
   const values = {}
-  for (const file of files) {
-    Object.assign(values, loadEnvFile(file))
+  for (const name of GOOGLE_MOBILE) values[name] = pick(name, mobile, env)
+  for (const name of [...GOOGLE_WEB, 'APPLE_BUNDLE_ID', ...APPLE_WEB]) {
+    values[name] = pick(name, web, env)
   }
-  return { ...values, ...env }
+  return values
 }
 
 export function repoRootFrom(scriptDir) {
