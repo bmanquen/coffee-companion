@@ -989,6 +989,7 @@ function usage() {
   browser press --key Enter
   browser expect --role heading --name Dashboard
   browser expect --text Standard --first
+  browser expect --url "[?&]method=espresso"
   browser screenshot --path artifacts/foo.png
   browser snapshot --aria --path artifacts/foo.aria.txt
   browser tab new        Open a second tab in this session (same cookie)
