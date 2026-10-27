@@ -410,7 +410,7 @@ describe('main', () => {
 })
 
 describe('turbo passthrough', () => {
-  it('lists Apple vars so shell-only creds reach the web task', () => {
+  it('lists API/web runtime vars so shell-only values reach the web task', () => {
     const turbo = JSON.parse(
       readFileSync(
         join(repoRootFrom(dirname(fileURLToPath(import.meta.url))), 'turbo.json'),
@@ -418,10 +418,37 @@ describe('turbo passthrough', () => {
       ),
     )
     for (const name of [
+      'GOOGLE_CLIENT_ID',
+      'GOOGLE_CLIENT_SECRET',
+      'GOOGLE_IOS_CLIENT_ID',
+      'GOOGLE_ANDROID_CLIENT_ID',
       'APPLE_BUNDLE_ID',
       'APPLE_TEAM_ID',
       'APPLE_KEY_ID',
       'APPLE_PRIVATE_KEY',
+      'BETTER_AUTH_SECRET',
+      'BETTER_AUTH_URL',
+      'DATABASE_URL',
+      'SITE_URL',
+      'RESEND_API_KEY',
+      'RESEND_FROM',
+      'STRIPE_SECRET_KEY',
+      'STRIPE_WEBHOOK_SECRET',
+      'STRIPE_PRICE_PRO_MONTHLY',
+      'STRIPE_PRICE_PRO_ANNUAL',
+      'SENTRY_DSN',
+      'SENTRY_ENVIRONMENT',
+      'SENTRY_TRACES_SAMPLE_RATE',
+      'SENTRY_AUTH_TOKEN',
+      'SENTRY_ORG',
+      'SENTRY_PROJECT',
+      'LOG_LEVEL',
+      'POSTHOG_PERSONAL_API_KEY',
+      'POSTHOG_PROJECT_ID',
+      'POSTHOG_HOST',
+      'PURGE_SECRET',
+      'E2E_BYPASS_AUTH',
+      'PORT',
     ]) {
       assert.ok(
         turbo.globalPassThroughEnv.includes(name),
