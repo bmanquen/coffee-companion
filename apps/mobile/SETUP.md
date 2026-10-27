@@ -28,7 +28,7 @@ Never commit `.env` files or the `.p8`, and never paste them into chat. Don't ke
 - Changes can take 5–10 minutes to apply.
 
 ## 3. Run it
-- Database: `pnpm db:migrate`
+- Database: `pnpm db:migrate` reads `DATABASE_URL` from `packages/api/.env` (or `.env.local`), not `apps/web/.env`.
 - API and Metro together: `pnpm dev:mobile`. Or run them separately: `pnpm dev` in `apps/web`, then `npx expo start --clear` in `apps/mobile`.
 - Run `--clear` after any `EXPO_PUBLIC_*` change, because those values are read when Metro starts.
 - Testing on a real phone on your Wi-Fi: `pnpm dev:lan`. The default dev server only listens on `127.0.0.1`. On a physical phone set `EXPO_PUBLIC_API_URL=http://<your-LAN-IP>:3000` and restart Expo with `--clear`. `localhost` is the phone itself; only the Android emulator rewrites `localhost` to `10.0.2.2`.
