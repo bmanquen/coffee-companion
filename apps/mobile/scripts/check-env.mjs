@@ -53,6 +53,24 @@ function isSet(value) {
   return typeof value === 'string' && value.trim() !== ''
 }
 
+// dotenv-expand@11 / @expo/env: ${VAR}, $VAR, ${VAR:-default}.
+const DOTENV_SUBSTITUTION_REGEX =
+  /(\\)?(\$)(?!\()(\{?)([\w.]+)(?::?-((?:\$\{(?:\$\{(?:\$\{[^}]*\}|[^}])*}|[^}])*}|[^}])+))?(\}?)/gi
+
+function hasDotenvReference(value) {
+  if (typeof value !== 'string') return false
+  DOTENV_SUBSTITUTION_REGEX.lastIndex = 0
+  let match
+  while ((match = DOTENV_SUBSTITUTION_REGEX.exec(value))) {
+    if (!match[1]) return true
+  }
+  return false
+}
+
+function isUsableGoogleWeb(value) {
+  return isSet(value) && !hasDotenvReference(value)
+}
+
 /**
  * @typedef {{ name: string, file: string, mustMatch?: string, mustMatchFile?: string }} EnvProblem
  */
@@ -68,7 +86,8 @@ export function missingRequiredEnv(env) {
     if (!isSet(env[name])) missing.push({ name, file: MOBILE_ENV })
   }
   for (const name of GOOGLE_WEB) {
-    if (!isSet(env[name])) missing.push({ name, file: WEB_ENV })
+    // API dotenv does not expand; $VAR would be sent to Google as-is.
+    if (!isUsableGoogleWeb(env[name])) missing.push({ name, file: WEB_ENV })
   }
   if (isSet(env.APPLE_BUNDLE_ID)) {
     for (const name of APPLE_WEB) {
@@ -80,7 +99,7 @@ export function missingRequiredEnv(env) {
   const googleClientId = env.GOOGLE_CLIENT_ID
   if (
     isSet(expoWebClientId) &&
-    isSet(googleClientId) &&
+    isUsableGoogleWeb(googleClientId) &&
     expoWebClientId.trim() !== googleClientId.trim()
   ) {
     missing.push({
@@ -117,10 +136,6 @@ function loadEnvFile(path) {
   if (!existsSync(path)) return {}
   return parseDotenv(readFileSync(path, 'utf8'))
 }
-
-// dotenv-expand@11 / @expo/env: ${VAR}, $VAR, ${VAR:-default}.
-const DOTENV_SUBSTITUTION_REGEX =
-  /(\\)?(\$)(?!\()(\{?)([\w.]+)(?::?-((?:\$\{(?:\$\{(?:\$\{[^}]*\}|[^}])*}|[^}])*}|[^}])+))?(\}?)/gi
 
 /**
  * @param {string} value
@@ -177,13 +192,11 @@ const EXPO_DEV_ENV_FILES = [
 ]
 const WEB_ENV_FILES = ['.env', '.env.local']
 
-function loadAppEnv(root, app, files, env) {
-  const parsed = Object.assign(
+function mergeEnvFiles(root, app, files) {
+  return Object.assign(
     {},
     ...files.map((file) => loadEnvFile(join(root, app, file))),
   )
-  // Literal ${GOOGLE_CLIENT_ID} would fail the Web client ID match check.
-  return expandDotenv(parsed, env)
 }
 
 function pick(name, fileEnv, env) {
@@ -192,8 +205,11 @@ function pick(name, fileEnv, env) {
 }
 
 export function loadMobileDevEnv(root, env = process.env) {
-  const mobile = loadAppEnv(root, 'apps/mobile', EXPO_DEV_ENV_FILES, env)
-  const web = loadAppEnv(root, 'apps/web', WEB_ENV_FILES, env)
+  const mobile = expandDotenv(
+    mergeEnvFiles(root, 'apps/mobile', EXPO_DEV_ENV_FILES),
+    env,
+  )
+  const web = mergeEnvFiles(root, 'apps/web', WEB_ENV_FILES)
   /** @type {Record<string, string | undefined>} */
   const values = {}
   for (const name of GOOGLE_MOBILE) values[name] = pick(name, mobile, env)
