@@ -54,11 +54,15 @@ function isSet(value) {
 }
 
 /**
+ * @typedef {{ name: string, file: string, mustMatch?: string, mustMatchFile?: string }} EnvProblem
+ */
+
+/**
  * @param {Record<string, string | undefined>} env
- * @returns {Array<{ name: string, file: string }>}
+ * @returns {Array<EnvProblem>}
  */
 export function missingRequiredEnv(env) {
-  /** @type {Array<{ name: string, file: string }>} */
+  /** @type {Array<EnvProblem>} */
   const missing = []
   for (const name of GOOGLE_MOBILE) {
     if (!isSet(env[name])) missing.push({ name, file: MOBILE_ENV })
@@ -71,15 +75,42 @@ export function missingRequiredEnv(env) {
       if (!isSet(env[name])) missing.push({ name, file: WEB_ENV })
     }
   }
+  // Differing Web client IDs pass presence checks but cause a Google audience error.
+  const expoWebClientId = env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+  const googleClientId = env.GOOGLE_CLIENT_ID
+  if (
+    isSet(expoWebClientId) &&
+    isSet(googleClientId) &&
+    expoWebClientId.trim() !== googleClientId.trim()
+  ) {
+    missing.push({
+      name: 'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+      file: MOBILE_ENV,
+      mustMatch: 'GOOGLE_CLIENT_ID',
+      mustMatchFile: WEB_ENV,
+    })
+  }
   return missing
 }
 
-/** @param {Array<{ name: string, file: string }>} missing */
+/** @param {Array<EnvProblem>} missing */
 export function formatMissingEnv(missing) {
-  return [
-    'Mobile sign-in is missing required environment variables:',
-    ...missing.map((item) => `  - ${item.name} (${item.file})`),
-  ].join('\n')
+  const absent = missing.filter((item) => !item.mustMatch)
+  const mismatched = missing.filter((item) => item.mustMatch)
+  /** @type {string[]} */
+  const lines = []
+  if (absent.length) {
+    lines.push(
+      'Mobile sign-in is missing required environment variables:',
+      ...absent.map((item) => `  - ${item.name} (${item.file})`),
+    )
+  }
+  for (const item of mismatched) {
+    lines.push(
+      `${item.name} (${item.file}) must match ${item.mustMatch} (${item.mustMatchFile}).`,
+    )
+  }
+  return lines.join('\n')
 }
 
 function loadEnvFile(path) {

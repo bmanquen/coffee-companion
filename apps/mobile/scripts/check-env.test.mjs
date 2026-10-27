@@ -96,6 +96,33 @@ describe('missingRequiredEnv', () => {
     assert.deepEqual(missingRequiredEnv({ ...complete, APPLE_BUNDLE_ID: '   ' }), [])
   })
 
+  it('rejects Web client IDs that differ and never prints the values', () => {
+    const expoId = 'mobile-web.apps.googleusercontent.com'
+    const webId = 'api-web.apps.googleusercontent.com'
+    const missing = missingRequiredEnv({
+      ...complete,
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: expoId,
+      GOOGLE_CLIENT_ID: webId,
+    })
+    assert.deepEqual(missing, [
+      {
+        name: 'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+        file: 'apps/mobile/.env',
+        mustMatch: 'GOOGLE_CLIENT_ID',
+        mustMatchFile: 'apps/web/.env',
+      },
+    ])
+    const message = formatMissingEnv(missing)
+    assert.match(
+      message,
+      /EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID \(apps\/mobile\/\.env\) must match GOOGLE_CLIENT_ID \(apps\/web\/\.env\)/,
+    )
+    assert.doesNotMatch(message, /mobile-web/)
+    assert.doesNotMatch(message, /api-web/)
+    assert.doesNotMatch(message, new RegExp(expoId))
+    assert.doesNotMatch(message, new RegExp(webId))
+  })
+
   it('names the missing Apple keys in apps/web/.env once the bundle id is set', () => {
     const missing = missingRequiredEnv({
       ...complete,
@@ -302,6 +329,45 @@ describe('main', () => {
     assert.match(out, /GOOGLE_CLIENT_SECRET \(apps\/web\/\.env\)/)
     assert.doesNotMatch(out, /fill later/)
     assert.doesNotMatch(out, /# fill/)
+  })
+
+  it('rejects env files whose Web client IDs differ and never prints the values', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mobile-env-mismatch-'))
+    mkdirSync(join(root, 'apps/mobile'), { recursive: true })
+    mkdirSync(join(root, 'apps/web'), { recursive: true })
+    writeFileSync(
+      join(root, 'apps/mobile/.env'),
+      [
+        'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=mobile-web.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123-abc',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/web/.env'),
+      [
+        'GOOGLE_CLIENT_ID=api-web.apps.googleusercontent.com',
+        'GOOGLE_CLIENT_SECRET=secret-do-not-print',
+        'GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'GOOGLE_ANDROID_CLIENT_ID=android.apps.googleusercontent.com',
+        '',
+      ].join('\n'),
+    )
+
+    let out = ''
+    const code = main(root, {}, (message) => {
+      out = message
+    })
+
+    assert.equal(code, 1)
+    assert.match(
+      out,
+      /EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID \(apps\/mobile\/\.env\) must match GOOGLE_CLIENT_ID \(apps\/web\/\.env\)/,
+    )
+    assert.doesNotMatch(out, /mobile-web/)
+    assert.doesNotMatch(out, /api-web/)
+    assert.doesNotMatch(out, /secret-do-not-print/)
   })
 
   it('accepts an explicit environment override when the file is empty', () => {
