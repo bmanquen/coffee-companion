@@ -8,6 +8,7 @@ import { unverifiedEmailPlaceholder } from './account-email'
 import {
   releaseUnverifiedEmailFromVerifiedSocial,
   releaseUnverifiedEmailHold,
+  restoreUnverifiedEmailHold,
 } from './account-email-hold'
 import {
   APPLE_ISSUER,
@@ -90,6 +91,67 @@ async function signInGoogle(email: string, accountId: string) {
       accountId,
     },
   })
+}
+
+async function withGoogleSocial(
+  methods: {
+    verifyIdToken: (token: string, nonce?: string) => Promise<boolean>
+    getUserInfo: (token: { idToken: string }) => Promise<{
+      user?: {
+        id?: string
+        email?: string | null
+        emailVerified?: boolean | string
+        name?: string
+      }
+    } | null>
+  },
+  run: () => Promise<void>,
+) {
+  const ctx = await auth.$context
+  const providers = ctx.socialProviders as Array<{
+    id: string
+    verifyIdToken?: typeof methods.verifyIdToken
+    getUserInfo?: typeof methods.getUserInfo
+  }>
+  const google = providers.find((item) => item.id === 'google')
+  if (google) {
+    const saved = {
+      verifyIdToken: google.verifyIdToken,
+      getUserInfo: google.getUserInfo,
+    }
+    google.verifyIdToken = methods.verifyIdToken
+    google.getUserInfo = methods.getUserInfo
+    try {
+      await run()
+    } finally {
+      google.verifyIdToken = saved.verifyIdToken
+      google.getUserInfo = saved.getUserInfo
+    }
+    return
+  }
+  providers.push({ id: 'google', ...methods })
+  try {
+    await run()
+  } finally {
+    const index = providers.findIndex((item) => item.id === 'google')
+    if (index >= 0) providers.splice(index, 1)
+  }
+}
+
+async function postSocialSignIn(email: string) {
+  return auth.handler(
+    new Request(`${baseURL}/api/auth/sign-in/social`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'coffeecompanion://',
+      },
+      body: JSON.stringify({
+        provider: 'google',
+        idToken: { token: jwtWithEmail(email) },
+      }),
+    }),
+  )
 }
 
 const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'
@@ -276,5 +338,124 @@ describe('Google account linking', () => {
         where: { userId: apple.user.id, providerId: 'google' },
       }),
     ).toBeUndefined()
+  })
+
+  it('restores the hold when a verified token is followed by a sign-in failure', async () => {
+    const { config, identityToken, tokens } = await appleFixture()
+    const email = `${globalThis.crypto.randomUUID()}@example.com`
+    const apple = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.google-restore'),
+        authorizationCode: 'auth-apple',
+        email,
+      },
+      config,
+      tokens('apple.sub.google-restore'),
+    )
+    remember(apple.user.id)
+
+    let infoCalls = 0
+    await withGoogleSocial(
+      {
+        verifyIdToken: async () => true,
+        getUserInfo: async () => {
+          infoCalls += 1
+          if (infoCalls === 1) {
+            return { user: { email, emailVerified: true, name: 'Google User' } }
+          }
+          return null
+        },
+      },
+      async () => {
+        const response = await postSocialSignIn(email)
+        expect(response.ok).toBe(false)
+      },
+    )
+
+    const stored = await db.query.user.findFirst({
+      where: { id: apple.user.id },
+    })
+    expect(stored?.email).toBe(email)
+    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id))
+  })
+
+  it('leaves the hold released when sign-in succeeds', async () => {
+    const { config, identityToken, tokens } = await appleFixture()
+    const email = `${globalThis.crypto.randomUUID()}@example.com`
+    const accountId = `google.sub.keep-released.${globalThis.crypto.randomUUID()}`
+    const apple = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.google-keep-released'),
+        authorizationCode: 'auth-apple',
+        email,
+      },
+      config,
+      tokens('apple.sub.google-keep-released'),
+    )
+    remember(apple.user.id)
+
+    await withGoogleSocial(
+      {
+        verifyIdToken: async () => true,
+        getUserInfo: async () => ({
+          user: {
+            id: accountId,
+            email,
+            emailVerified: true,
+            name: 'Google User',
+          },
+        }),
+      },
+      async () => {
+        const response = await postSocialSignIn(email)
+        expect(response.ok).toBe(true)
+        const body = (await response.json()) as { user?: { id?: string } }
+        if (body.user?.id) remember(body.user.id)
+      },
+    )
+
+    const appleRow = await db.query.user.findFirst({
+      where: { id: apple.user.id },
+    })
+    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(apple.user.id))
+    const claimant = await db.query.user.findFirst({ where: { email } })
+    expect(claimant?.id).not.toBe(apple.user.id)
+    expect(claimant?.emailVerified).toBe(true)
+    if (claimant) remember(claimant.id)
+  })
+
+  it('restore is a no-op when the hold is already back or the address is taken', async () => {
+    const { config, identityToken, tokens } = await appleFixture()
+    const email = `${globalThis.crypto.randomUUID()}@example.com`
+    const apple = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.google-restore-idempotent'),
+        authorizationCode: 'auth-apple',
+        email,
+      },
+      config,
+      tokens('apple.sub.google-restore-idempotent'),
+    )
+    remember(apple.user.id)
+
+    const hold = { email, userId: apple.user.id }
+    expect(await restoreUnverifiedEmailHold(hold)).toBe('restored')
+    expect(await restoreUnverifiedEmailHold(hold)).toBe('restored')
+    expect(
+      (await db.query.user.findFirst({ where: { id: apple.user.id } }))?.email,
+    ).toBe(email)
+
+    expect(await releaseUnverifiedEmailHold(email)).toBe('released')
+    const otherId = remember(globalThis.crypto.randomUUID())
+    await db.insert(user).values({
+      id: otherId,
+      name: 'Taken',
+      email,
+      emailVerified: true,
+    })
+    expect(await restoreUnverifiedEmailHold(hold)).toBe('kept')
+    expect(
+      (await db.query.user.findFirst({ where: { id: apple.user.id } }))?.email,
+    ).toBe(unverifiedEmailPlaceholder(apple.user.id))
   })
 })

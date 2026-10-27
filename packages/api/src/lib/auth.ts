@@ -10,7 +10,11 @@ import { stripe } from '@better-auth/stripe'
 import { expo } from '@better-auth/expo'
 import { db } from '../db'
 import * as schema from '../db/auth-schema'
-import { releaseUnverifiedEmailFromVerifiedSocial } from './account-email-hold'
+import {
+  releaseUnverifiedEmailFromVerifiedSocial,
+  rememberReleasedEmailHold,
+  restoreReleasedEmailHoldIfSignInFailed,
+} from './account-email-hold'
 import { accountOptions } from './account-linking'
 import { appleNativeSignIn } from './apple-native-plugin'
 import { trustedAuthOrigins } from './auth-origins'
@@ -63,9 +67,12 @@ export const auth = betterAuth({
       if (ctx.path === '/sign-in/social') {
         // Release only after the provider verifies the id token. An
         // unverified decode would let a forged JWT steal an unused address.
-        await releaseUnverifiedEmailFromVerifiedSocial(
-          ctx.body,
-          ctx.context.socialProviders,
+        rememberReleasedEmailHold(
+          ctx.context,
+          await releaseUnverifiedEmailFromVerifiedSocial(
+            ctx.body,
+            ctx.context.socialProviders,
+          ),
         )
         return
       }
@@ -80,6 +87,12 @@ export const auth = betterAuth({
         message:
           'You already have a subscription. Change it from your account settings.',
       })
+    }),
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== '/sign-in/social') return
+      // hooks.before already committed the release; put the address back if
+      // sign-in then failed so the unverified Apple user keeps it.
+      await restoreReleasedEmailHoldIfSignInFailed(ctx.context)
     }),
   },
   plugins: [
