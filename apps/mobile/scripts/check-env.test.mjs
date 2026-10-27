@@ -33,6 +33,7 @@ describe('parseDotenv', () => {
           'GOOGLE_IOS_CLIENT_ID= # fill later',
           'GOOGLE_ANDROID_CLIENT_ID=id # leftover',
           'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME="keep # hash"',
+          'BARE_HASH=# fill later',
         ].join('\n'),
       ),
       {
@@ -42,6 +43,7 @@ describe('parseDotenv', () => {
         GOOGLE_IOS_CLIENT_ID: '',
         GOOGLE_ANDROID_CLIENT_ID: 'id',
         EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME: 'keep # hash',
+        BARE_HASH: '',
       },
     )
   })
@@ -261,6 +263,41 @@ describe('main', () => {
     assert.equal(code, 1)
     assert.match(out, /GOOGLE_CLIENT_SECRET \(apps\/web\/\.env\)/)
     assert.doesNotMatch(out, /fill later/)
+  })
+
+  it('treats an unquoted value that starts with # as missing and never prints it', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mobile-env-hash-value-'))
+    mkdirSync(join(root, 'apps/mobile'), { recursive: true })
+    mkdirSync(join(root, 'apps/web'), { recursive: true })
+    writeFileSync(
+      join(root, 'apps/mobile/.env'),
+      [
+        'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=web.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123-abc',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/web/.env'),
+      [
+        'GOOGLE_CLIENT_ID=web.apps.googleusercontent.com',
+        'GOOGLE_CLIENT_SECRET=# fill later',
+        'GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'GOOGLE_ANDROID_CLIENT_ID=android.apps.googleusercontent.com',
+        '',
+      ].join('\n'),
+    )
+
+    let out = ''
+    const code = main(root, {}, (message) => {
+      out = message
+    })
+
+    assert.equal(code, 1)
+    assert.match(out, /GOOGLE_CLIENT_SECRET \(apps\/web\/\.env\)/)
+    assert.doesNotMatch(out, /fill later/)
+    assert.doesNotMatch(out, /# fill/)
   })
 
   it('accepts an explicit environment override when the file is empty', () => {

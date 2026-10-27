@@ -44,8 +44,8 @@ function parseDotenvValue(raw) {
     const end = trimmed.indexOf(quote, 1)
     if (end !== -1) return trimmed.slice(1, end)
   }
-  // dotenv: # starts a comment only when it follows whitespace.
-  const comment = raw.search(/\s+#/)
+  // dotenv: unquoted # starts a comment, including as the first character.
+  const comment = raw.search(/(^|\s)#/)
   return (comment === -1 ? raw : raw.slice(0, comment)).trim()
 }
 
