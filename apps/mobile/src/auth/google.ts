@@ -8,11 +8,11 @@ import {
 import { authClient } from './auth-client'
 import { googleIosClientId, googleWebClientId } from './config'
 import {
-  EmailAlreadyAssociated,
   GOOGLE_PLAY_SERVICES_NOT_AVAILABLE,
   GOOGLE_SIGN_IN_CANCELLED,
   PlayServicesMissing,
   SignInCancelled,
+  SignInConflict,
   SignInFailed,
   SignInUnavailable,
   errorCode,
@@ -80,7 +80,7 @@ export async function signInWithGoogle() {
       error instanceof SignInFailed ||
       error instanceof SignInUnavailable ||
       error instanceof PlayServicesMissing ||
-      error instanceof EmailAlreadyAssociated
+      error instanceof SignInConflict
     ) {
       throw error
     }

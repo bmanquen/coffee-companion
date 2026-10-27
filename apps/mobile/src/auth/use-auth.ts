@@ -3,13 +3,15 @@ import { appleSignInAvailable, signInWithApple } from './apple'
 import { authClient } from './auth-client'
 import {
   ERROR_PLAY_SERVICES,
+  ERROR_SIGN_IN_CONFLICT_BODY,
+  ERROR_SIGN_IN_CONFLICT_TITLE,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
 } from './copy'
 import {
-  EmailAlreadyAssociated,
   PlayServicesMissing,
   SignInCancelled,
+  SignInConflict,
   SignInUnavailable,
 } from './errors'
 import { signInWithGoogle, signOutGoogle } from './google'
@@ -21,11 +23,16 @@ export type AuthSession = {
   user: { name: string; email: string }
 }
 
+export type AuthError = {
+  title: string
+  body?: string
+}
+
 export type Auth = {
   session: AuthSession | null
   loading: boolean
   busy: boolean
-  error: string | null
+  error: AuthError | null
   mode: AuthMode
   showApple: boolean
   setMode: (mode: AuthMode) => void
@@ -41,7 +48,7 @@ export function useAuth(): Auth {
     isPending: boolean
   }
   const [mode, setMode] = useState<AuthMode>('sign-in')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<AuthError | null>(null)
   const [busy, setBusy] = useState(false)
 
   const run = async (action: () => Promise<void>) => {
@@ -52,18 +59,21 @@ export function useAuth(): Auth {
     } catch (caught) {
       if (caught instanceof SignInCancelled) return
       if (caught instanceof SignInUnavailable) {
-        setError(ERROR_SIGN_IN_UNAVAILABLE)
+        setError({ title: ERROR_SIGN_IN_UNAVAILABLE })
         return
       }
       if (caught instanceof PlayServicesMissing) {
-        setError(ERROR_PLAY_SERVICES)
+        setError({ title: ERROR_PLAY_SERVICES })
         return
       }
-      if (caught instanceof EmailAlreadyAssociated) {
-        setError(ERROR_SIGN_IN_FAILED)
+      if (caught instanceof SignInConflict) {
+        setError({
+          title: ERROR_SIGN_IN_CONFLICT_TITLE,
+          body: ERROR_SIGN_IN_CONFLICT_BODY,
+        })
         return
       }
-      setError(ERROR_SIGN_IN_FAILED)
+      setError({ title: ERROR_SIGN_IN_FAILED })
     } finally {
       setBusy(false)
     }

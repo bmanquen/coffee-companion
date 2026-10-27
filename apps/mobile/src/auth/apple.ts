@@ -3,8 +3,8 @@ import { Platform } from 'react-native'
 import { authClient } from './auth-client'
 import {
   APPLE_ERR_REQUEST_CANCELED,
-  EmailAlreadyAssociated,
   SignInCancelled,
+  SignInConflict,
   SignInFailed,
   SignInUnavailable,
   errorCode,
@@ -61,7 +61,7 @@ export async function signInWithApple() {
       error instanceof SignInCancelled ||
       error instanceof SignInFailed ||
       error instanceof SignInUnavailable ||
-      error instanceof EmailAlreadyAssociated
+      error instanceof SignInConflict
     ) {
       throw error
     }

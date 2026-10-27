@@ -4,6 +4,8 @@ import { writeHostTreeArtifacts } from '../test/host-tree'
 import {
   APP_NAME,
   ERROR_PLAY_SERVICES,
+  ERROR_SIGN_IN_CONFLICT_BODY,
+  ERROR_SIGN_IN_CONFLICT_TITLE,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
   HAS_ACCOUNT_ACTION,
@@ -124,7 +126,7 @@ describe('sign-in screen', () => {
     const view = await render(
       <SignInScreen
         mode="sign-in"
-        error={ERROR_SIGN_IN_FAILED}
+        error={{ title: ERROR_SIGN_IN_FAILED }}
         busy={false}
         showApple
         onGoogle={() => {}}
@@ -139,7 +141,7 @@ describe('sign-in screen', () => {
     await view.rerender(
       <SignInScreen
         mode="sign-in"
-        error={ERROR_SIGN_IN_UNAVAILABLE}
+        error={{ title: ERROR_SIGN_IN_UNAVAILABLE }}
         busy={false}
         showApple
         onGoogle={() => {}}
@@ -154,7 +156,7 @@ describe('sign-in screen', () => {
     await view.rerender(
       <SignInScreen
         mode="sign-in"
-        error={ERROR_PLAY_SERVICES}
+        error={{ title: ERROR_PLAY_SERVICES }}
         busy={false}
         showApple={false}
         onGoogle={() => {}}
@@ -163,6 +165,27 @@ describe('sign-in screen', () => {
       />,
     )
     expect(screen.getByRole('alert')).toHaveTextContent(ERROR_PLAY_SERVICES)
+  })
+
+  it('shows the same title and body for a sign-in conflict', async () => {
+    await render(
+      <SignInScreen
+        mode="sign-in"
+        error={{
+          title: ERROR_SIGN_IN_CONFLICT_TITLE,
+          body: ERROR_SIGN_IN_CONFLICT_BODY,
+        }}
+        busy={false}
+        showApple
+        onGoogle={() => {}}
+        onApple={() => {}}
+        onToggleMode={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(screen.getByText(ERROR_SIGN_IN_CONFLICT_TITLE)).toBeTruthy()
+    expect(screen.getByText(ERROR_SIGN_IN_CONFLICT_BODY)).toBeTruthy()
   })
 
   it('presses Google and Apple through to the auth actions', async () => {
