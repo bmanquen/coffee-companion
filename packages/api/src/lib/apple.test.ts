@@ -99,6 +99,11 @@ describe('appleNativeConfig', () => {
     expect(appleNativeConfig()).toBe(null)
   })
 
+  it('is off when the bundle id is only whitespace', () => {
+    process.env.APPLE_BUNDLE_ID = '   '
+    expect(appleNativeConfig()).toBe(null)
+  })
+
   it('refuses a half-configured deployment, naming each missing variable', () => {
     process.env.APPLE_BUNDLE_ID = BUNDLE_ID
     expect(() => appleNativeConfig()).toThrow(AppleNotConfigured)
@@ -106,6 +111,15 @@ describe('appleNativeConfig', () => {
       /APPLE_TEAM_ID[\s\S]*APPLE_KEY_ID[\s\S]*APPLE_PRIVATE_KEY/,
     )
     expect(() => appleNativeConfig()).toThrow(/apps\/web\/\.env/)
+  })
+
+  it('treats whitespace-only companion credentials as missing', () => {
+    process.env.APPLE_BUNDLE_ID = BUNDLE_ID
+    process.env.APPLE_TEAM_ID = '   '
+    process.env.APPLE_KEY_ID = KEY_ID
+    process.env.APPLE_PRIVATE_KEY = '   '
+    expect(() => appleNativeConfig()).toThrow(AppleNotConfigured)
+    expect(() => appleNativeConfig()).toThrow(/APPLE_TEAM_ID[\s\S]*APPLE_PRIVATE_KEY/)
   })
 
   it('reads the key material once every field is set', () => {

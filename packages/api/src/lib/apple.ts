@@ -113,9 +113,10 @@ const configVars = [
 
 export function appleNativeConfig(): AppleNativeConfig | null {
   const bundleId = process.env.APPLE_BUNDLE_ID
-  if (!bundleId) return null
+  // Whitespace-only must match the checker's isSet() so leftover blanks do not enable Apple.
+  if (!bundleId?.trim()) return null
 
-  const missing = configVars.filter((name) => !process.env[name])
+  const missing = configVars.filter((name) => !process.env[name]?.trim())
   if (missing.length) {
     throw new AppleNotConfigured(missing)
   }

@@ -92,6 +92,10 @@ describe('missingRequiredEnv', () => {
     assert.deepEqual(missingRequiredEnv(complete), [])
   })
 
+  it('leaves Apple off when the bundle id is only whitespace', () => {
+    assert.deepEqual(missingRequiredEnv({ ...complete, APPLE_BUNDLE_ID: '   ' }), [])
+  })
+
   it('names the missing Apple keys in apps/web/.env once the bundle id is set', () => {
     const missing = missingRequiredEnv({
       ...complete,
