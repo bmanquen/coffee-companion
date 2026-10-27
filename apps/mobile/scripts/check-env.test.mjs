@@ -459,6 +459,47 @@ describe('main', () => {
     assert.doesNotMatch(out, /secret-do-not-print/)
   })
 
+  it('expands ${VAR} after merging env files so matching client IDs are not a false mismatch', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mobile-env-expand-'))
+    mkdirSync(join(root, 'apps/mobile'), { recursive: true })
+    mkdirSync(join(root, 'apps/web'), { recursive: true })
+    const clientId = 'expanded-web.apps.googleusercontent.com'
+    writeFileSync(
+      join(root, 'apps/mobile/.env'),
+      [
+        `GOOGLE_CLIENT_ID=${clientId}`,
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123-abc',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/mobile/.env.local'),
+      'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=${GOOGLE_CLIENT_ID}\n',
+    )
+    writeFileSync(
+      join(root, 'apps/web/.env'),
+      [
+        `GOOGLE_CLIENT_ID=${clientId}`,
+        'GOOGLE_CLIENT_SECRET=secret-do-not-print',
+        'GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'GOOGLE_ANDROID_CLIENT_ID=android.apps.googleusercontent.com',
+        '',
+      ].join('\n'),
+    )
+
+    let out = ''
+    const code = main(root, {}, (message) => {
+      out = message
+    })
+
+    assert.equal(code, 0)
+    assert.equal(out, '')
+    assert.doesNotMatch(out, /expanded-web/)
+    assert.doesNotMatch(out, /secret-do-not-print/)
+    assert.doesNotMatch(out, /GOOGLE_CLIENT_ID/)
+  })
+
   it('accepts an explicit environment override when the file is empty', () => {
     const root = mkdtempSync(join(tmpdir(), 'mobile-env-override-'))
     mkdirSync(join(root, 'apps/mobile'), { recursive: true })

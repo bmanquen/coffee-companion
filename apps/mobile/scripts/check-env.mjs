@@ -118,6 +118,56 @@ function loadEnvFile(path) {
   return parseDotenv(readFileSync(path, 'utf8'))
 }
 
+// dotenv-expand@11 / @expo/env: ${VAR}, $VAR, ${VAR:-default}.
+const DOTENV_SUBSTITUTION_REGEX =
+  /(\\)?(\$)(?!\()(\{?)([\w.]+)(?::?-((?:\$\{(?:\$\{(?:\$\{[^}]*\}|[^}])*}|[^}])*}|[^}])+))?(\}?)/gi
+
+/**
+ * @param {string} value
+ * @param {string} sourceKey
+ * @param {Record<string, string | undefined>} sourceEnv
+ * @param {Record<string, string | undefined>} parsed
+ */
+function interpolateDotenv(value, sourceKey, sourceEnv, parsed) {
+  return value.replace(
+    DOTENV_SUBSTITUTION_REGEX,
+    (match, escaped, _dollar, _open, key, defaultValue) => {
+      if (escaped === '\\') return match.slice(1)
+      if (sourceEnv[key]) {
+        return sourceEnv[key] === parsed[key]
+          ? sourceEnv[key]
+          : interpolateDotenv(sourceEnv[key], key, sourceEnv, parsed)
+      }
+      if (parsed[key] && key !== sourceKey) {
+        return interpolateDotenv(parsed[key], key, sourceEnv, parsed)
+      }
+      if (defaultValue) {
+        return defaultValue.startsWith('$')
+          ? interpolateDotenv(defaultValue, key, sourceEnv, parsed)
+          : defaultValue
+      }
+      return ''
+    },
+  )
+}
+
+/**
+ * @param {Record<string, string>} parsed
+ * @param {Record<string, string | undefined>} sourceEnv
+ */
+function expandDotenv(parsed, sourceEnv) {
+  /** @type {Record<string, string>} */
+  const output = { ...parsed }
+  for (const key of Object.keys(output)) {
+    const value = output[key]
+    output[key] = interpolateDotenv(value, key, sourceEnv, output).replace(
+      /\\\$/g,
+      '$',
+    )
+  }
+  return output
+}
+
 // Expo development priority (lowest first): @expo/env getEnvFiles('development').
 const EXPO_DEV_ENV_FILES = [
   '.env',
@@ -127,11 +177,13 @@ const EXPO_DEV_ENV_FILES = [
 ]
 const WEB_ENV_FILES = ['.env', '.env.local']
 
-function loadAppEnv(root, app, files) {
-  return Object.assign(
+function loadAppEnv(root, app, files, env) {
+  const parsed = Object.assign(
     {},
     ...files.map((file) => loadEnvFile(join(root, app, file))),
   )
+  // Literal ${GOOGLE_CLIENT_ID} would fail the Web client ID match check.
+  return expandDotenv(parsed, env)
 }
 
 function pick(name, fileEnv, env) {
@@ -140,8 +192,8 @@ function pick(name, fileEnv, env) {
 }
 
 export function loadMobileDevEnv(root, env = process.env) {
-  const mobile = loadAppEnv(root, 'apps/mobile', EXPO_DEV_ENV_FILES)
-  const web = loadAppEnv(root, 'apps/web', WEB_ENV_FILES)
+  const mobile = loadAppEnv(root, 'apps/mobile', EXPO_DEV_ENV_FILES, env)
+  const web = loadAppEnv(root, 'apps/web', WEB_ENV_FILES, env)
   /** @type {Record<string, string | undefined>} */
   const values = {}
   for (const name of GOOGLE_MOBILE) values[name] = pick(name, mobile, env)
