@@ -118,11 +118,20 @@ function loadEnvFile(path) {
   return parseDotenv(readFileSync(path, 'utf8'))
 }
 
-function loadAppEnv(root, app) {
-  return {
-    ...loadEnvFile(join(root, app, '.env')),
-    ...loadEnvFile(join(root, app, '.env.local')),
-  }
+// Expo development priority (lowest first): @expo/env getEnvFiles('development').
+const EXPO_DEV_ENV_FILES = [
+  '.env',
+  '.env.development',
+  '.env.local',
+  '.env.development.local',
+]
+const WEB_ENV_FILES = ['.env', '.env.local']
+
+function loadAppEnv(root, app, files) {
+  return Object.assign(
+    {},
+    ...files.map((file) => loadEnvFile(join(root, app, file))),
+  )
 }
 
 function pick(name, fileEnv, env) {
@@ -131,8 +140,8 @@ function pick(name, fileEnv, env) {
 }
 
 export function loadMobileDevEnv(root, env = process.env) {
-  const mobile = loadAppEnv(root, 'apps/mobile')
-  const web = loadAppEnv(root, 'apps/web')
+  const mobile = loadAppEnv(root, 'apps/mobile', EXPO_DEV_ENV_FILES)
+  const web = loadAppEnv(root, 'apps/web', WEB_ENV_FILES)
   /** @type {Record<string, string | undefined>} */
   const values = {}
   for (const name of GOOGLE_MOBILE) values[name] = pick(name, mobile, env)
