@@ -372,6 +372,93 @@ describe('main', () => {
     assert.doesNotMatch(out, /secret-do-not-print/)
   })
 
+  it('accepts required mobile values that exist only in Expo development env files', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mobile-env-dev-override-'))
+    mkdirSync(join(root, 'apps/mobile'), { recursive: true })
+    mkdirSync(join(root, 'apps/web'), { recursive: true })
+    writeFileSync(join(root, 'apps/mobile/.env'), '')
+    writeFileSync(
+      join(root, 'apps/mobile/.env.development'),
+      [
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123-abc',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/mobile/.env.development.local'),
+      [
+        'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=web.apps.googleusercontent.com',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/web/.env'),
+      [
+        'GOOGLE_CLIENT_ID=web.apps.googleusercontent.com',
+        'GOOGLE_CLIENT_SECRET=secret-do-not-print',
+        'GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'GOOGLE_ANDROID_CLIENT_ID=android.apps.googleusercontent.com',
+        '',
+      ].join('\n'),
+    )
+
+    let out = ''
+    const code = main(root, {}, (message) => {
+      out = message
+    })
+
+    assert.equal(code, 0)
+    assert.equal(out, '')
+  })
+
+  it('rejects a mismatch hidden in Expo development env files and never prints the values', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mobile-env-dev-mismatch-'))
+    mkdirSync(join(root, 'apps/mobile'), { recursive: true })
+    mkdirSync(join(root, 'apps/web'), { recursive: true })
+    const matchingId = 'matching-web.apps.googleusercontent.com'
+    const overriddenId = 'overridden-web.apps.googleusercontent.com'
+    writeFileSync(
+      join(root, 'apps/mobile/.env'),
+      [
+        `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=${matchingId}`,
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123-abc',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/mobile/.env.development.local'),
+      `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=${overriddenId}\n`,
+    )
+    writeFileSync(
+      join(root, 'apps/web/.env'),
+      [
+        `GOOGLE_CLIENT_ID=${matchingId}`,
+        'GOOGLE_CLIENT_SECRET=secret-do-not-print',
+        'GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'GOOGLE_ANDROID_CLIENT_ID=android.apps.googleusercontent.com',
+        '',
+      ].join('\n'),
+    )
+
+    let out = ''
+    const code = main(root, {}, (message) => {
+      out = message
+    })
+
+    assert.equal(code, 1)
+    assert.match(
+      out,
+      /EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID \(apps\/mobile\/\.env\) must match GOOGLE_CLIENT_ID \(apps\/web\/\.env\)/,
+    )
+    assert.doesNotMatch(out, /matching-web/)
+    assert.doesNotMatch(out, /overridden-web/)
+    assert.doesNotMatch(out, new RegExp(matchingId))
+    assert.doesNotMatch(out, new RegExp(overriddenId))
+    assert.doesNotMatch(out, /secret-do-not-print/)
+  })
+
   it('accepts an explicit environment override when the file is empty', () => {
     const root = mkdtempSync(join(tmpdir(), 'mobile-env-override-'))
     mkdirSync(join(root, 'apps/mobile'), { recursive: true })
