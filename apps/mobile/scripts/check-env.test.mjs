@@ -125,6 +125,34 @@ describe('missingRequiredEnv', () => {
     assert.doesNotMatch(message, new RegExp(webId))
   })
 
+  it('treats unescaped $VAR in Google web creds as unset and never prints them', () => {
+    const missing = missingRequiredEnv({
+      ...complete,
+      GOOGLE_CLIENT_ID: '${WEB_CLIENT}',
+      GOOGLE_CLIENT_SECRET: '$WEB_SECRET',
+    })
+    assert.deepEqual(missing, [
+      { name: 'GOOGLE_CLIENT_ID', file: 'apps/web/.env' },
+      { name: 'GOOGLE_CLIENT_SECRET', file: 'apps/web/.env' },
+    ])
+    const message = formatMissingEnv(missing)
+    assert.match(message, /GOOGLE_CLIENT_ID \(apps\/web\/\.env\)/)
+    assert.match(message, /GOOGLE_CLIENT_SECRET \(apps\/web\/\.env\)/)
+    assert.doesNotMatch(message, /must match/)
+    assert.doesNotMatch(message, /WEB_CLIENT/)
+    assert.doesNotMatch(message, /WEB_SECRET/)
+  })
+
+  it('accepts a literal $ that is not a dotenv reference', () => {
+    assert.deepEqual(
+      missingRequiredEnv({
+        ...complete,
+        GOOGLE_CLIENT_SECRET: 'pass$',
+      }),
+      [],
+    )
+  })
+
   it('names the missing Apple keys in apps/web/.env once the bundle id is set', () => {
     const missing = missingRequiredEnv({
       ...complete,
@@ -498,6 +526,80 @@ describe('main', () => {
     assert.doesNotMatch(out, /expanded-web/)
     assert.doesNotMatch(out, /secret-do-not-print/)
     assert.doesNotMatch(out, /GOOGLE_CLIENT_ID/)
+  })
+
+  it('does not expand web $VAR creds even when the referenced key is set, and never prints them', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mobile-env-web-ref-'))
+    mkdirSync(join(root, 'apps/mobile'), { recursive: true })
+    mkdirSync(join(root, 'apps/web'), { recursive: true })
+    writeFileSync(
+      join(root, 'apps/mobile/.env'),
+      [
+        'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=web.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123-abc',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/web/.env'),
+      [
+        'GOOGLE_CLIENT_ID=web.apps.googleusercontent.com',
+        'WEB_SECRET=secret-do-not-print',
+        'GOOGLE_CLIENT_SECRET=$WEB_SECRET',
+        'GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'GOOGLE_ANDROID_CLIENT_ID=${ANDROID_ID}',
+        'ANDROID_ID=android.apps.googleusercontent.com',
+        '',
+      ].join('\n'),
+    )
+
+    let out = ''
+    const code = main(root, {}, (message) => {
+      out = message
+    })
+
+    assert.equal(code, 1)
+    assert.match(out, /GOOGLE_CLIENT_SECRET \(apps\/web\/\.env\)/)
+    assert.match(out, /GOOGLE_ANDROID_CLIENT_ID \(apps\/web\/\.env\)/)
+    assert.doesNotMatch(out, /secret-do-not-print/)
+    assert.doesNotMatch(out, /WEB_SECRET/)
+    assert.doesNotMatch(out, /ANDROID_ID/)
+    assert.doesNotMatch(out, /android\.apps/)
+  })
+
+  it('accepts a web secret whose $ is not a dotenv reference', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mobile-env-web-dollar-'))
+    mkdirSync(join(root, 'apps/mobile'), { recursive: true })
+    mkdirSync(join(root, 'apps/web'), { recursive: true })
+    writeFileSync(
+      join(root, 'apps/mobile/.env'),
+      [
+        'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=web.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME=com.googleusercontent.apps.123-abc',
+        '',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'apps/web/.env'),
+      [
+        'GOOGLE_CLIENT_ID=web.apps.googleusercontent.com',
+        'GOOGLE_CLIENT_SECRET=pass$',
+        'GOOGLE_IOS_CLIENT_ID=ios.apps.googleusercontent.com',
+        'GOOGLE_ANDROID_CLIENT_ID=android.apps.googleusercontent.com',
+        '',
+      ].join('\n'),
+    )
+
+    let out = ''
+    const code = main(root, {}, (message) => {
+      out = message
+    })
+
+    assert.equal(code, 0)
+    assert.equal(out, '')
+    assert.doesNotMatch(out, /pass/)
   })
 
   it('accepts an explicit environment override when the file is empty', () => {
