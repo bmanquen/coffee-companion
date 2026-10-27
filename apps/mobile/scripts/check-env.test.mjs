@@ -1,6 +1,7 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
@@ -8,6 +9,7 @@ import {
   main,
   missingRequiredEnv,
   parseDotenv,
+  repoRootFrom,
 } from './check-env.mjs'
 
 const complete = {
@@ -404,5 +406,27 @@ describe('main', () => {
 
     assert.equal(code, 0)
     assert.equal(out, '')
+  })
+})
+
+describe('turbo passthrough', () => {
+  it('lists Apple vars so shell-only creds reach the web task', () => {
+    const turbo = JSON.parse(
+      readFileSync(
+        join(repoRootFrom(dirname(fileURLToPath(import.meta.url))), 'turbo.json'),
+        'utf8',
+      ),
+    )
+    for (const name of [
+      'APPLE_BUNDLE_ID',
+      'APPLE_TEAM_ID',
+      'APPLE_KEY_ID',
+      'APPLE_PRIVATE_KEY',
+    ]) {
+      assert.ok(
+        turbo.globalPassThroughEnv.includes(name),
+        `${name} must be in turbo.json globalPassThroughEnv`,
+      )
+    }
   })
 })

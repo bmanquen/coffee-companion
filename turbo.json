@@ -6,7 +6,11 @@
     "E2E_BASE_URL",
     "BETTER_AUTH_SECRET",
     "GOOGLE_CLIENT_ID",
-    "GOOGLE_CLIENT_SECRET"
+    "GOOGLE_CLIENT_SECRET",
+    "APPLE_BUNDLE_ID",
+    "APPLE_TEAM_ID",
+    "APPLE_KEY_ID",
+    "APPLE_PRIVATE_KEY"
   ],
   "tasks": {
     "build": {
