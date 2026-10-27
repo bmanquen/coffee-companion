@@ -6,7 +6,7 @@ export const OAUTH_TOKEN_SECRET_MISSING =
 // better-auth’s encryptOAuthTokens uses the same envelope. Tokens we write
 // ourselves (Apple native) have to match, or a later decrypt through
 // better-auth would see plaintext.
-function isLikelyEncrypted(token: string) {
+export function isEncryptedOAuthToken(token: string) {
   if (token.startsWith('$ba$')) return true
   return token.length % 2 === 0 && /^[0-9a-f]+$/i.test(token)
 }
@@ -32,7 +32,7 @@ export async function decryptStoredOAuthToken(
   token: string | null | undefined,
 ): Promise<string | null | undefined> {
   if (!token) return token
-  if (!isLikelyEncrypted(token)) return token
+  if (!isEncryptedOAuthToken(token)) return token
   const key = secret()
   if (!key) return token
   try {

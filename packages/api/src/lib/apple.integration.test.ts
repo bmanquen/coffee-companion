@@ -14,7 +14,10 @@ import {
   appleRefreshTokenOf,
   signInWithAppleNative,
 } from './apple'
-import { EMAIL_ALREADY_ASSOCIATED, unverifiedEmailPlaceholder } from './account-email'
+import {
+  EMAIL_ALREADY_ASSOCIATED_CODE,
+  unverifiedEmailPlaceholder,
+} from './account-email'
 import type { AppleCrypto, AppleNativeConfig } from './apple'
 
 const BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
@@ -346,7 +349,7 @@ describe('signInWithAppleNative', () => {
       ),
     ).rejects.toMatchObject({
       name: 'AppleSignInRefused',
-      message: EMAIL_ALREADY_ASSOCIATED,
+      code: EMAIL_ALREADY_ASSOCIATED_CODE,
     })
 
     expect(await appleAccountOf(victimId)).toBeUndefined()
@@ -519,7 +522,7 @@ describe('signInWithAppleNative', () => {
       ),
     ).rejects.toMatchObject({
       name: 'AppleSignInRefused',
-      message: EMAIL_ALREADY_ASSOCIATED,
+      code: EMAIL_ALREADY_ASSOCIATED_CODE,
     })
 
     expect(await appleAccountOf(victimId)).toBeUndefined()

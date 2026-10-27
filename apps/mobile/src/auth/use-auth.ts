@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { appleSignInAvailable, signInWithApple } from './apple'
 import { authClient } from './auth-client'
 import {
-  ERROR_EMAIL_ALREADY_ASSOCIATED,
   ERROR_PLAY_SERVICES,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
@@ -61,7 +60,7 @@ export function useAuth(): Auth {
         return
       }
       if (caught instanceof EmailAlreadyAssociated) {
-        setError(ERROR_EMAIL_ALREADY_ASSOCIATED)
+        setError(ERROR_SIGN_IN_FAILED)
         return
       }
       setError(ERROR_SIGN_IN_FAILED)

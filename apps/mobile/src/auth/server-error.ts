@@ -1,9 +1,12 @@
-import { ERROR_EMAIL_ALREADY_ASSOCIATED } from './copy'
-import { EmailAlreadyAssociated, SignInFailed } from './errors'
-import { authErrorMessage } from './log'
+import {
+  EMAIL_ALREADY_ASSOCIATED_CODE,
+  EmailAlreadyAssociated,
+  SignInFailed,
+} from './errors'
+import { authErrorCode } from './log'
 
 export function errorFromAuthServer(error: unknown): never {
-  if (authErrorMessage(error) === ERROR_EMAIL_ALREADY_ASSOCIATED) {
+  if (authErrorCode(error) === EMAIL_ALREADY_ASSOCIATED_CODE) {
     throw new EmailAlreadyAssociated()
   }
   throw new SignInFailed()

@@ -1,16 +1,26 @@
-import { ERROR_EMAIL_ALREADY_ASSOCIATED } from './copy'
-import { EmailAlreadyAssociated, SignInFailed } from './errors'
+import {
+  EMAIL_ALREADY_ASSOCIATED_CODE,
+  EmailAlreadyAssociated,
+  SignInFailed,
+} from './errors'
 import { errorFromAuthServer } from './server-error'
 
 describe('errorFromAuthServer', () => {
-  it('keeps the email-already-associated copy generic', () => {
+  it('matches the server code, not the message text', () => {
     expect(() =>
       errorFromAuthServer({
         status: 400,
-        message: ERROR_EMAIL_ALREADY_ASSOCIATED,
+        code: EMAIL_ALREADY_ASSOCIATED_CODE,
+        message: "We couldn't sign you in. Try again.",
       }),
     ).toThrow(EmailAlreadyAssociated)
-    expect(ERROR_EMAIL_ALREADY_ASSOCIATED).not.toMatch(/google|apple|another/i)
+
+    expect(() =>
+      errorFromAuthServer({
+        status: 400,
+        message: 'This email is already associated with an account.',
+      }),
+    ).toThrow(SignInFailed)
   })
 
   it('hides every other server failure behind the generic sign-in error', () => {

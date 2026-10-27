@@ -37,6 +37,14 @@ describe('encryptStoredOAuthToken', () => {
     await expect(decryptStoredOAuthToken(REFRESH)).resolves.toBe(REFRESH)
   })
 
+  it('treats a legacy Google refresh token as plaintext', async () => {
+    const google = '1//0g-legacy-google-refresh'
+    await expect(decryptStoredOAuthToken(google)).resolves.toBe(google)
+    const stored = await encryptStoredOAuthToken(google)
+    expect(stored).not.toBe(google)
+    await expect(decryptStoredOAuthToken(stored)).resolves.toBe(google)
+  })
+
   it('refuses to store a token when the secret is missing', async () => {
     delete process.env.BETTER_AUTH_SECRET
     await expect(encryptStoredOAuthToken(REFRESH)).rejects.toThrow(

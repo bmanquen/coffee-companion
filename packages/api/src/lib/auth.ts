@@ -10,7 +10,7 @@ import { stripe } from '@better-auth/stripe'
 import { expo } from '@better-auth/expo'
 import { db } from '../db'
 import * as schema from '../db/auth-schema'
-import { releaseUnverifiedEmailFromSocialBody } from './account-email-hold'
+import { releaseUnverifiedEmailFromVerifiedSocial } from './account-email-hold'
 import { accountOptions } from './account-linking'
 import { appleNativeSignIn } from './apple-native-plugin'
 import { trustedAuthOrigins } from './auth-origins'
@@ -61,9 +61,12 @@ export const auth = betterAuth({
     // portal's job; Checkout only ever sells the first one.
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path === '/sign-in/social') {
-        // Release before better-auth looks the user up, or a verified
-        // Google claimant is blocked by an unverified Apple hold.
-        await releaseUnverifiedEmailFromSocialBody(ctx.body)
+        // Release only after the provider verifies the id token. An
+        // unverified decode would let a forged JWT steal an unused address.
+        await releaseUnverifiedEmailFromVerifiedSocial(
+          ctx.body,
+          ctx.context.socialProviders,
+        )
         return
       }
       if (ctx.path !== '/subscription/upgrade') return

@@ -31,6 +31,8 @@ export class PlayServicesMissing extends Error {
   }
 }
 
+export const EMAIL_ALREADY_ASSOCIATED_CODE = 'EMAIL_ALREADY_ASSOCIATED'
+
 export class EmailAlreadyAssociated extends Error {
   constructor() {
     super('email-already-associated')

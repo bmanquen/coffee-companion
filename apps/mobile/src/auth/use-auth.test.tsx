@@ -1,6 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native'
 import {
-  ERROR_EMAIL_ALREADY_ASSOCIATED,
   ERROR_PLAY_SERVICES,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
@@ -94,7 +93,8 @@ describe('useAuth', () => {
     await act(async () => {
       await result.current.signInGoogle()
     })
-    expect(result.current.error).toBe(ERROR_EMAIL_ALREADY_ASSOCIATED)
+    expect(result.current.error).toBe(ERROR_SIGN_IN_FAILED)
+    expect(result.current.error).not.toMatch(/associated|account/i)
   })
 
   it('clears the secure session on sign-out', async () => {

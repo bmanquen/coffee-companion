@@ -5,7 +5,10 @@ import { SignJWT, exportJWK, exportPKCS8, generateKeyPair } from 'jose'
 import { db } from '../db'
 import { user } from '../db/schema'
 import { unverifiedEmailPlaceholder } from './account-email'
-import { releaseUnverifiedEmailHold } from './account-email-hold'
+import {
+  releaseUnverifiedEmailFromVerifiedSocial,
+  releaseUnverifiedEmailHold,
+} from './account-email-hold'
 import {
   APPLE_ISSUER,
   appleAccountOf,
@@ -97,7 +100,7 @@ function jwtWithEmail(email: string) {
 }
 
 describe('Google account linking', () => {
-  it('releases an unverified Apple email hold before Google sign-in looks the user up', async () => {
+  it('leaves an unverified Apple email hold intact when the social id token is forged', async () => {
     const { config, identityToken, tokens } = await appleFixture()
     const email = `${globalThis.crypto.randomUUID()}@example.com`
     const apple = await signInWithAppleNative(
@@ -128,7 +131,80 @@ describe('Google account linking', () => {
     const stored = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
+    expect(stored?.email).toBe(email)
+    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id))
+  })
+
+  it('releases an unverified hold only after the provider verifies the id token', async () => {
+    const { config, identityToken, tokens } = await appleFixture()
+    const email = `${globalThis.crypto.randomUUID()}@example.com`
+    const apple = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.google-verified-hook'),
+        authorizationCode: 'auth-apple',
+        email,
+      },
+      config,
+      tokens('apple.sub.google-verified-hook'),
+    )
+    remember(apple.user.id)
+
+    await releaseUnverifiedEmailFromVerifiedSocial(
+      {
+        provider: 'google',
+        idToken: { token: jwtWithEmail(email) },
+      },
+      [
+        {
+          id: 'google',
+          verifyIdToken: async () => true,
+          getUserInfo: async () => ({
+            user: { email, emailVerified: true },
+          }),
+        },
+      ],
+    )
+
+    const stored = await db.query.user.findFirst({
+      where: { id: apple.user.id },
+    })
     expect(stored?.email).toBe(unverifiedEmailPlaceholder(apple.user.id))
+  })
+
+  it('leaves the hold intact when a verified token does not claim a verified email', async () => {
+    const { config, identityToken, tokens } = await appleFixture()
+    const email = `${globalThis.crypto.randomUUID()}@example.com`
+    const apple = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.google-unverified-claim'),
+        authorizationCode: 'auth-apple',
+        email,
+      },
+      config,
+      tokens('apple.sub.google-unverified-claim'),
+    )
+    remember(apple.user.id)
+
+    await releaseUnverifiedEmailFromVerifiedSocial(
+      {
+        provider: 'google',
+        idToken: { token: jwtWithEmail(email) },
+      },
+      [
+        {
+          id: 'google',
+          verifyIdToken: async () => true,
+          getUserInfo: async () => ({
+            user: { email, emailVerified: false },
+          }),
+        },
+      ],
+    )
+
+    const stored = await db.query.user.findFirst({
+      where: { id: apple.user.id },
+    })
+    expect(stored?.email).toBe(email)
   })
 
   it('does not join a Google sign-in to an Apple user whose email was only client-supplied', async () => {

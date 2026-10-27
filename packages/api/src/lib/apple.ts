@@ -8,7 +8,10 @@ import {
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { account, session, user } from '../db/schema'
-import { EMAIL_ALREADY_ASSOCIATED } from './account-email'
+import {
+  EMAIL_ALREADY_ASSOCIATED,
+  EMAIL_ALREADY_ASSOCIATED_CODE,
+} from './account-email'
 import { releaseUnverifiedEmailHold } from './account-email-hold'
 import {
   decryptStoredOAuthToken,
@@ -60,9 +63,11 @@ export class AppleNotConfigured extends Error {
 }
 
 export class AppleSignInRefused extends Error {
-  constructor(message: string) {
+  readonly code: string
+  constructor(message: string, code = 'APPLE_SIGN_IN_REFUSED') {
     super(message)
     this.name = 'AppleSignInRefused'
+    this.code = code
   }
 }
 
@@ -343,7 +348,10 @@ export async function signInWithAppleNative(
                   where: { email, emailVerified: true },
                 })
                 if (!holder) {
-                  throw new AppleSignInRefused(EMAIL_ALREADY_ASSOCIATED)
+                  throw new AppleSignInRefused(
+                    EMAIL_ALREADY_ASSOCIATED,
+                    EMAIL_ALREADY_ASSOCIATED_CODE,
+                  )
                 }
                 userId = holder.id
               } else {
@@ -360,7 +368,10 @@ export async function signInWithAppleNative(
                 where: { email },
               })
               if (collision) {
-                throw new AppleSignInRefused(EMAIL_ALREADY_ASSOCIATED)
+                throw new AppleSignInRefused(
+                  EMAIL_ALREADY_ASSOCIATED,
+                  EMAIL_ALREADY_ASSOCIATED_CODE,
+                )
               }
 
               userId = globalThis.crypto.randomUUID()
