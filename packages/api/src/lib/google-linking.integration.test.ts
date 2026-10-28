@@ -162,6 +162,38 @@ function jwtWithEmail(email: string) {
 }
 
 describe('Google account linking', () => {
+  it('does not release an unverified hold on the OAuth redirect branch', async () => {
+    const { config, identityToken, tokens } = await appleFixture()
+    const email = `${globalThis.crypto.randomUUID()}@example.com`
+    const apple = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.google-redirect'),
+        authorizationCode: 'auth-apple',
+        email,
+      },
+      config,
+      tokens('apple.sub.google-redirect'),
+    )
+    remember(apple.user.id)
+
+    await auth.handler(
+      new Request(`${baseURL}/api/auth/sign-in/social`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'coffeecompanion://',
+        },
+        body: JSON.stringify({ provider: 'google' }),
+      }),
+    )
+
+    const stored = await db.query.user.findFirst({
+      where: { id: apple.user.id },
+    })
+    expect(stored?.email).toBe(email)
+    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id))
+  })
+
   it('leaves an unverified Apple email hold intact when the social id token is forged', async () => {
     const { config, identityToken, tokens } = await appleFixture()
     const email = `${globalThis.crypto.randomUUID()}@example.com`

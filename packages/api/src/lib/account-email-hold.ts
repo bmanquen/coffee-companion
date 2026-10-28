@@ -36,7 +36,12 @@ export const RELEASED_EMAIL_HOLD = Symbol.for(
 type HoldContext = {
   [RELEASED_EMAIL_HOLD]?: ReleasedEmailHold
   returned?: unknown
+  responseHeaders?: Headers
 }
+
+// better-auth 1.6.26 /sign-in/social writes this cookie (optionally
+// `__Secure-` prefixed) and returns the session token in the JSON body.
+const SESSION_TOKEN_COOKIE = 'session_token'
 
 export function rememberReleasedEmailHold(
   context: object,
@@ -94,23 +99,53 @@ export async function restoreUnverifiedEmailHold(
   return 'restored'
 }
 
-export function socialSignInFailed(returned: unknown) {
-  if (returned == null) return true
-  if (isAPIError(returned)) return true
-  if (returned instanceof Response) return !returned.ok
-  if (typeof returned !== 'object') return true
-  if ('token' in returned && typeof returned.token === 'string' && returned.token) {
+function sessionTokenFromBody(body: object) {
+  if ('token' in body && typeof body.token === 'string' && body.token) {
+    return true
+  }
+  if (!('session' in body) || body.session == null || typeof body.session !== 'object') {
     return false
   }
-  if ('user' in returned && returned.user) return false
-  if ('session' in returned && returned.session) return false
-  return true
+  const session = body.session as { token?: unknown }
+  return typeof session.token === 'string' && Boolean(session.token)
+}
+
+function headersHaveSessionCookie(headers: Headers) {
+  const lines =
+    typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : []
+  return lines.some((line) =>
+    line.split('=', 1)[0].trim().endsWith(SESSION_TOKEN_COOKIE),
+  )
+}
+
+export async function socialSignInFailed(
+  returned: unknown,
+  headers?: Headers,
+) {
+  if (returned == null) return true
+  if (isAPIError(returned)) return true
+  if (headers && headersHaveSessionCookie(headers)) return false
+  if (returned instanceof Response) {
+    if (headersHaveSessionCookie(returned.headers)) return false
+    try {
+      const body: unknown = await returned.clone().json()
+      if (body && typeof body === 'object' && sessionTokenFromBody(body)) {
+        return false
+      }
+    } catch {
+      return true
+    }
+    return true
+  }
+  if (typeof returned !== 'object') return true
+  return !sessionTokenFromBody(returned)
 }
 
 export async function restoreReleasedEmailHoldIfSignInFailed(context: object) {
   const hold = releasedEmailHoldOf(context)
   if (!hold) return
-  if (!socialSignInFailed((context as HoldContext).returned)) return
+  const ctx = context as HoldContext
+  if (!(await socialSignInFailed(ctx.returned, ctx.responseHeaders))) return
   await restoreUnverifiedEmailHold(hold)
 }
 

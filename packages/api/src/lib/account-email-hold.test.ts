@@ -20,24 +20,63 @@ describe('released email hold context', () => {
 })
 
 describe('socialSignInFailed', () => {
-  it('is true for an APIError or a body without a session', () => {
-    expect(socialSignInFailed(undefined)).toBe(true)
+  it('is true for an APIError, a user-only body, or a redirect without a session', async () => {
+    expect(await socialSignInFailed(undefined)).toBe(true)
     expect(
-      socialSignInFailed(new APIError('UNAUTHORIZED', { message: 'failed' })),
+      await socialSignInFailed(new APIError('UNAUTHORIZED', { message: 'failed' })),
     ).toBe(true)
-    expect(socialSignInFailed(new Response(null, { status: 401 }))).toBe(true)
-    expect(socialSignInFailed({ redirect: true, url: 'https://accounts.google.com' })).toBe(
+    expect(await socialSignInFailed(new Response(null, { status: 401 }))).toBe(
       true,
     )
+    expect(
+      await socialSignInFailed({
+        redirect: true,
+        url: 'https://accounts.google.com',
+      }),
+    ).toBe(true)
+    expect(await socialSignInFailed({ user: { id: 'u1' } })).toBe(true)
+    expect(
+      await socialSignInFailed({ session: { user: { id: 'u1' } } }),
+    ).toBe(true)
+    expect(
+      await socialSignInFailed(
+        new Response(JSON.stringify({ user: { id: 'u1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    ).toBe(true)
   })
 
-  it('is false when sign-in produced a session or linked user', () => {
+  it('is false when sign-in produced a session token', async () => {
     expect(
-      socialSignInFailed({
+      await socialSignInFailed({
         redirect: false,
         token: 'session-token',
         user: { id: 'u1', email: 'ada@example.com' },
       }),
+    ).toBe(false)
+    expect(
+      await socialSignInFailed({ session: { token: 'session-token' } }),
+    ).toBe(false)
+    expect(
+      await socialSignInFailed(
+        new Response(null, {
+          status: 200,
+          headers: {
+            'set-cookie': 'better-auth.session_token=session-token; Path=/',
+          },
+        }),
+      ),
+    ).toBe(false)
+    expect(
+      await socialSignInFailed(
+        { user: { id: 'u1' } },
+        new Headers({
+          'set-cookie':
+            '__Secure-better-auth.session_token=session-token; Path=/; Secure',
+        }),
+      ),
     ).toBe(false)
   })
 })
