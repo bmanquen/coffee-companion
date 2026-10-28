@@ -1,5 +1,5 @@
 import { isAPIError } from 'better-auth/api'
-import { eq } from 'drizzle-orm'
+import { and, eq, like, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { user } from '../db/schema'
 import {
@@ -7,6 +7,7 @@ import {
   isEmailVerifiedClaim,
   socialIdTokenFromBody,
   unverifiedEmailPlaceholder,
+  unverifiedHeldEmailLikePattern,
 } from './account-email'
 import type { EmailHold } from './account-email'
 
@@ -66,6 +67,10 @@ export async function releaseUnverifiedEmailHold(
   return occupant.emailVerified ? 'verified' : 'free'
 }
 
+function addressIsUnowned(email: string) {
+  return sql`not exists (select 1 from "user" occupied where occupied.email = ${email})`
+}
+
 export async function takeUnverifiedEmailHold(
   email: string,
   store: EmailHoldStore = db,
@@ -73,10 +78,20 @@ export async function takeUnverifiedEmailHold(
   const occupant = await store.query.user.findFirst({ where: { email } })
   if (!occupant) return null
   if (occupant.emailVerified) return null
-  await store
+  // Another sign-in can verify this row after the read. The write keeps
+  // the hold only if the occupant is still unverified at that address.
+  const taken = await store
     .update(user)
-    .set({ email: unverifiedEmailPlaceholder(occupant.id) })
-    .where(eq(user.id, occupant.id))
+    .set({ email: unverifiedEmailPlaceholder(occupant.id, email) })
+    .where(
+      and(
+        eq(user.id, occupant.id),
+        eq(user.email, email),
+        eq(user.emailVerified, false),
+      ),
+    )
+    .returning({ id: user.id })
+  if (!taken[0]) return null
   return { email, userId: occupant.id }
 }
 
@@ -87,16 +102,42 @@ export async function restoreUnverifiedEmailHold(
   const holder = await store.query.user.findFirst({ where: { id: hold.userId } })
   if (!holder) return 'kept'
   if (holder.email === hold.email) return 'restored'
-  if (holder.email !== unverifiedEmailPlaceholder(hold.userId)) return 'kept'
+  const placeholder = unverifiedEmailPlaceholder(hold.userId, hold.email)
+  if (holder.email !== placeholder) return 'kept'
 
-  const taken = await store.query.user.findFirst({ where: { email: hold.email } })
-  if (taken && taken.id !== hold.userId) return 'kept'
-
-  await store
+  const restored = await store
     .update(user)
     .set({ email: hold.email })
-    .where(eq(user.id, hold.userId))
-  return 'restored'
+    .where(
+      and(
+        eq(user.id, hold.userId),
+        eq(user.email, placeholder),
+        eq(user.emailVerified, false),
+        addressIsUnowned(hold.email),
+      ),
+    )
+    .returning({ id: user.id })
+  return restored[0] ? 'restored' : 'kept'
+}
+
+export async function restoreOrphanedEmailHoldIfUnowned(
+  email: string,
+  store: EmailHoldStore = db,
+): Promise<'restored' | 'kept'> {
+  // One write: give the address back only while nobody occupies it.
+  // A verified owner, or a claim about to insert that owner, must win.
+  const restored = await store
+    .update(user)
+    .set({ email })
+    .where(
+      and(
+        eq(user.emailVerified, false),
+        like(user.email, unverifiedHeldEmailLikePattern(email)),
+        addressIsUnowned(email),
+      ),
+    )
+    .returning({ id: user.id })
+  return restored[0] ? 'restored' : 'kept'
 }
 
 function sessionTokenFromBody(body: object) {
@@ -141,12 +182,20 @@ export async function socialSignInFailed(
   return !sessionTokenFromBody(returned)
 }
 
-export async function restoreReleasedEmailHoldIfSignInFailed(context: object) {
+export async function restoreReleasedEmailHoldIfSignInFailed(
+  context: object,
+  body?: unknown,
+) {
   const hold = releasedEmailHoldOf(context)
-  if (!hold) return
   const ctx = context as HoldContext
   if (!(await socialSignInFailed(ctx.returned, ctx.responseHeaders))) return
-  await restoreUnverifiedEmailHold(hold)
+  if (hold) {
+    await restoreUnverifiedEmailHold(hold)
+    return
+  }
+  const parsed = socialIdTokenFromBody(body)
+  const email = parsed ? identityFromVerifiedJwt(parsed.token)?.email : null
+  if (email) await restoreOrphanedEmailHoldIfUnowned(email)
 }
 
 export async function releaseUnverifiedEmailFromVerifiedSocial(
@@ -157,7 +206,13 @@ export async function releaseUnverifiedEmailFromVerifiedSocial(
   if (!parsed) return null
   const provider = providers.find((item) => item.id === parsed.provider)
   if (!provider?.verifyIdToken) return null
-  if (!(await provider.verifyIdToken(parsed.token, parsed.nonce))) return null
+  if (!(await provider.verifyIdToken(parsed.token, parsed.nonce))) {
+    const identity = identityFromVerifiedJwt(parsed.token)
+    // Claims are untrusted here; restore still no-ops unless the address
+    // is free and a placeholder encodes it.
+    if (identity?.email) await restoreOrphanedEmailHoldIfUnowned(identity.email)
+    return null
+  }
 
   const info = await provider.getUserInfo?.({ idToken: parsed.token })
   const fromProvider = info?.user?.email?.trim().toLowerCase()
@@ -165,6 +220,7 @@ export async function releaseUnverifiedEmailFromVerifiedSocial(
     ? isEmailVerifiedClaim(info.user.emailVerified)
     : false
   if (fromProvider && emailVerified) {
+    // Do not restore first: this request is about to claim the address.
     return takeUnverifiedEmailHold(fromProvider)
   }
 
@@ -172,5 +228,7 @@ export async function releaseUnverifiedEmailFromVerifiedSocial(
   // provider does not expose getUserInfo.
   const identity = identityFromVerifiedJwt(parsed.token)
   if (identity?.emailVerified) return takeUnverifiedEmailHold(identity.email)
+  const email = fromProvider ?? identity?.email
+  if (email) await restoreOrphanedEmailHoldIfUnowned(email)
   return null
 }

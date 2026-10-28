@@ -92,7 +92,7 @@ export const auth = betterAuth({
       if (ctx.path !== '/sign-in/social') return
       // hooks.before already committed the release; put the address back if
       // sign-in then failed so the unverified Apple user keeps it.
-      await restoreReleasedEmailHoldIfSignInFailed(ctx.context)
+      await restoreReleasedEmailHoldIfSignInFailed(ctx.context, ctx.body)
     }),
   },
   plugins: [

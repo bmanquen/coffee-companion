@@ -191,7 +191,7 @@ describe('Google account linking', () => {
       where: { id: apple.user.id },
     })
     expect(stored?.email).toBe(email)
-    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id))
+    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id, email))
   })
 
   it('leaves an unverified Apple email hold intact when the social id token is forged', async () => {
@@ -226,7 +226,7 @@ describe('Google account linking', () => {
       where: { id: apple.user.id },
     })
     expect(stored?.email).toBe(email)
-    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id))
+    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id, email))
   })
 
   it('releases an unverified hold only after the provider verifies the id token', async () => {
@@ -262,7 +262,7 @@ describe('Google account linking', () => {
     const stored = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
-    expect(stored?.email).toBe(unverifiedEmailPlaceholder(apple.user.id))
+    expect(stored?.email).toBe(unverifiedEmailPlaceholder(apple.user.id, email))
   })
 
   it('leaves the hold intact when a verified token does not claim a verified email', async () => {
@@ -361,7 +361,7 @@ describe('Google account linking', () => {
     const appleRow = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
-    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(apple.user.id))
+    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(apple.user.id, email))
     expect((await appleAccountOf(apple.user.id))?.accountId).toBe(
       'apple.sub.google-claim',
     )
@@ -408,7 +408,7 @@ describe('Google account linking', () => {
       where: { id: apple.user.id },
     })
     expect(stored?.email).toBe(email)
-    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id))
+    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id, email))
   })
 
   it('leaves the hold released when sign-in succeeds', async () => {
@@ -449,7 +449,7 @@ describe('Google account linking', () => {
     const appleRow = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
-    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(apple.user.id))
+    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(apple.user.id, email))
     const claimant = await db.query.user.findFirst({ where: { email } })
     expect(claimant?.id).not.toBe(apple.user.id)
     expect(claimant?.emailVerified).toBe(true)
@@ -488,6 +488,6 @@ describe('Google account linking', () => {
     expect(await restoreUnverifiedEmailHold(hold)).toBe('kept')
     expect(
       (await db.query.user.findFirst({ where: { id: apple.user.id } }))?.email,
-    ).toBe(unverifiedEmailPlaceholder(apple.user.id))
+    ).toBe(unverifiedEmailPlaceholder(apple.user.id, email))
   })
 })

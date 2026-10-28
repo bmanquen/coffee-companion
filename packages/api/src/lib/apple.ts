@@ -12,7 +12,10 @@ import {
   EMAIL_ALREADY_ASSOCIATED,
   EMAIL_ALREADY_ASSOCIATED_CODE,
 } from './account-email'
-import { releaseUnverifiedEmailHold } from './account-email-hold'
+import {
+  releaseUnverifiedEmailHold,
+  restoreOrphanedEmailHoldIfUnowned,
+} from './account-email-hold'
 import {
   decryptStoredOAuthToken,
   encryptStoredOAuthToken,
@@ -364,6 +367,9 @@ export async function signInWithAppleNative(
                 })
               }
             } else {
+              // An unverified retry is not a claim. Put a crashed hold
+              // back so this client email collides with its owner.
+              await restoreOrphanedEmailHoldIfUnowned(email, tx)
               const collision = await tx.query.user.findFirst({
                 where: { email },
               })

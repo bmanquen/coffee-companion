@@ -27,8 +27,8 @@ describe('EMAIL_ALREADY_ASSOCIATED', () => {
 
 describe('unverifiedEmailPlaceholder', () => {
   it('keeps the released address off the public email unique key', () => {
-    expect(unverifiedEmailPlaceholder('user-1')).toBe(
-      `user-1@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`,
+    expect(unverifiedEmailPlaceholder('user-1', 'ada@example.com')).toBe(
+      `user-1+YWRhQGV4YW1wbGUuY29t@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`,
     )
   })
 })
