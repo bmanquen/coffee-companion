@@ -7,6 +7,7 @@ import { GOOGLE_PROVIDER_ID } from './account-linking'
 import { auth } from './auth'
 import { decryptStoredOAuthToken, isEncryptedOAuthToken } from './oauth-token'
 import { encryptLegacyOAuthTokens } from './oauth-token-legacy'
+import type { TokenStore } from './oauth-token-legacy'
 
 const PLAIN_REFRESH = '1//0g-legacy-google-refresh'
 const PLAIN_ACCESS = 'ya29.legacy-google-access'
@@ -61,6 +62,70 @@ describe('encryptLegacyOAuthTokens', () => {
       )
 
       expect(await encryptLegacyOAuthTokens()).toBe(0)
+    } finally {
+      await db.delete(user).where(eq(user.id, userId))
+    }
+  })
+
+  it('leaves a row untouched when tokens change between read and write', async () => {
+    const userId = globalThis.crypto.randomUUID()
+    const accountId = globalThis.crypto.randomUUID()
+    const freshAccess = 'ya29.fresh-from-sign-in'
+    const freshRefresh = '1//0g-fresh-from-sign-in'
+    await db.insert(user).values({
+      id: userId,
+      name: 'Legacy Google race',
+      email: `${userId}@example.com`,
+      emailVerified: true,
+    })
+
+    try {
+      await db.insert(account).values({
+        id: accountId,
+        accountId: `google.${userId}`,
+        providerId: GOOGLE_PROVIDER_ID,
+        userId,
+        accessToken: PLAIN_ACCESS,
+        refreshToken: PLAIN_REFRESH,
+      })
+
+      const racing = {
+        query: {
+          account: {
+            findMany: async () => {
+              const snapshot = await db.query.account.findFirst({
+                where: { id: accountId },
+              })
+              await db
+                .update(account)
+                .set({
+                  accessToken: freshAccess,
+                  refreshToken: freshRefresh,
+                })
+                .where(eq(account.id, accountId))
+              return snapshot ? [snapshot] : []
+            },
+          },
+        },
+        update: (table: typeof account) => db.update(table),
+      }
+
+      expect(await encryptLegacyOAuthTokens(racing as TokenStore)).toBe(0)
+
+      const raced = await db.query.account.findFirst({
+        where: { id: accountId },
+      })
+      expect(raced?.accessToken).toBe(freshAccess)
+      expect(raced?.refreshToken).toBe(freshRefresh)
+
+      expect(await encryptLegacyOAuthTokens()).toBeGreaterThanOrEqual(1)
+      const later = await db.query.account.findFirst({
+        where: { id: accountId },
+      })
+      expect(isEncryptedOAuthToken(later?.refreshToken ?? '')).toBe(true)
+      await expect(decryptStoredOAuthToken(later?.refreshToken)).resolves.toBe(
+        freshRefresh,
+      )
     } finally {
       await db.delete(user).where(eq(user.id, userId))
     }

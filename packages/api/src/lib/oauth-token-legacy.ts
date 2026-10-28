@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../db'
 import { account } from '../db/schema'
 import {
@@ -6,7 +6,7 @@ import {
   isEncryptedOAuthToken,
 } from './oauth-token'
 
-type TokenStore = Pick<typeof db, 'query' | 'update'>
+export type TokenStore = Pick<typeof db, 'query' | 'update'>
 
 async function encryptIfPlain(
   token: string | null,
@@ -30,15 +30,33 @@ export async function encryptLegacyOAuthTokens(
     const refresh = await encryptIfPlain(row.refreshToken)
     const idToken = await encryptIfPlain(row.idToken)
     if (!access.changed && !refresh.changed && !idToken.changed) continue
-    await store
+
+    const set: {
+      accessToken?: string | null
+      refreshToken?: string | null
+      idToken?: string | null
+    } = {}
+    const predicates = [eq(account.id, row.id)]
+    if (access.changed && row.accessToken) {
+      set.accessToken = access.value
+      predicates.push(eq(account.accessToken, row.accessToken))
+    }
+    if (refresh.changed && row.refreshToken) {
+      set.refreshToken = refresh.value
+      predicates.push(eq(account.refreshToken, row.refreshToken))
+    }
+    if (idToken.changed && row.idToken) {
+      set.idToken = idToken.value
+      predicates.push(eq(account.idToken, row.idToken))
+    }
+    if (Object.keys(set).length === 0) continue
+
+    const result = await store
       .update(account)
-      .set({
-        accessToken: access.value,
-        refreshToken: refresh.value,
-        idToken: idToken.value,
-      })
-      .where(eq(account.id, row.id))
-    updated += 1
+      .set(set)
+      .where(and(...predicates))
+      .returning({ id: account.id })
+    updated += result.length
   }
   return updated
 }

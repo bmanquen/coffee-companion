@@ -1,3 +1,4 @@
+import '../db/load-env'
 import { db } from '../db'
 import {
   encryptLegacyOAuthTokens,
