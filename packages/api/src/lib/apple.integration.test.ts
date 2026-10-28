@@ -493,7 +493,7 @@ describe('signInWithAppleNative', () => {
       where: { id: seeded.user.id },
     })
     expect(seededRow?.email).toBe(
-      unverifiedEmailPlaceholder(seeded.user.id, email),
+      unverifiedEmailPlaceholder(email),
     )
     expect((await appleAccountOf(seeded.user.id))?.accountId).toBe(
       'apple.sub.seed-unverified',

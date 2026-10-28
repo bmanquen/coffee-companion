@@ -1,5 +1,5 @@
 import { isAPIError } from 'better-auth/api'
-import { and, eq, like, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { user } from '../db/schema'
 import {
@@ -7,7 +7,6 @@ import {
   isEmailVerifiedClaim,
   socialIdTokenFromBody,
   unverifiedEmailPlaceholder,
-  unverifiedHeldEmailLikePattern,
 } from './account-email'
 import type { EmailHold } from './account-email'
 
@@ -71,6 +70,14 @@ function addressIsUnowned(email: string) {
   return sql`not exists (select 1 from "user" occupied where occupied.email = ${email})`
 }
 
+// Forged tokens hit this path on every failed verify. A hold released
+// seconds ago belongs to an in-flight claim, not a crash.
+export const ORPHANED_EMAIL_HOLD_STALE_AFTER = '5 minutes'
+
+function holdPlaceholderIsStale() {
+  return sql`${user.updatedAt} < now() - ${ORPHANED_EMAIL_HOLD_STALE_AFTER}::interval`
+}
+
 export async function takeUnverifiedEmailHold(
   email: string,
   store: EmailHoldStore = db,
@@ -82,7 +89,7 @@ export async function takeUnverifiedEmailHold(
   // the hold only if the occupant is still unverified at that address.
   const taken = await store
     .update(user)
-    .set({ email: unverifiedEmailPlaceholder(occupant.id, email) })
+    .set({ email: unverifiedEmailPlaceholder(email) })
     .where(
       and(
         eq(user.id, occupant.id),
@@ -102,7 +109,7 @@ export async function restoreUnverifiedEmailHold(
   const holder = await store.query.user.findFirst({ where: { id: hold.userId } })
   if (!holder) return 'kept'
   if (holder.email === hold.email) return 'restored'
-  const placeholder = unverifiedEmailPlaceholder(hold.userId, hold.email)
+  const placeholder = unverifiedEmailPlaceholder(hold.email)
   if (holder.email !== placeholder) return 'kept'
 
   const restored = await store
@@ -124,15 +131,16 @@ export async function restoreOrphanedEmailHoldIfUnowned(
   email: string,
   store: EmailHoldStore = db,
 ): Promise<'restored' | 'kept'> {
-  // One write: give the address back only while nobody occupies it.
-  // A verified owner, or a claim about to insert that owner, must win.
+  // Exact placeholder match uses the email unique index. Fresh rows stay
+  // put so a forged token cannot undo an in-flight claim.
   const restored = await store
     .update(user)
     .set({ email })
     .where(
       and(
+        eq(user.email, unverifiedEmailPlaceholder(email)),
         eq(user.emailVerified, false),
-        like(user.email, unverifiedHeldEmailLikePattern(email)),
+        holdPlaceholderIsStale(),
         addressIsUnowned(email),
       ),
     )

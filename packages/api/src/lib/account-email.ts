@@ -6,11 +6,6 @@ export const EMAIL_ALREADY_ASSOCIATED = "We couldn't sign you in. Try again."
 
 export const UNVERIFIED_EMAIL_HOLDER_DOMAIN = 'unverified.invalid'
 
-// Separates the holder id from the original address in the placeholder.
-// The original address has to live on that row: a crash between release
-// and sign-in drops the in-memory hold, and this is what restore reads.
-export const HELD_EMAIL_SEPARATOR = '+'
-
 export type EmailHold = 'free' | 'verified' | 'released'
 
 export type SocialIdToken = {
@@ -28,15 +23,10 @@ function encodeHeldEmail(email: string) {
   return Buffer.from(email, 'utf8').toString('base64url')
 }
 
-export function unverifiedEmailPlaceholder(
-  userId: string,
-  heldEmail: string,
-): string {
-  return `${userId}${HELD_EMAIL_SEPARATOR}${encodeHeldEmail(heldEmail)}@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
-}
-
-export function unverifiedHeldEmailLikePattern(heldEmail: string) {
-  return `%${HELD_EMAIL_SEPARATOR}${encodeHeldEmail(heldEmail)}@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
+export function unverifiedEmailPlaceholder(heldEmail: string): string {
+  // Deterministic from the held address so restore can look it up by the
+  // unique email key instead of scanning.
+  return `${encodeHeldEmail(heldEmail)}@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
 }
 
 export function isEmailVerifiedClaim(value: unknown): boolean {

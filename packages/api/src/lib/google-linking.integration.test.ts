@@ -138,7 +138,7 @@ async function withGoogleSocial(
   }
 }
 
-async function postSocialSignIn(email: string) {
+async function postSocialSignIn(email: string, token = jwtWithEmail(email)) {
   return auth.handler(
     new Request(`${baseURL}/api/auth/sign-in/social`, {
       method: 'POST',
@@ -148,7 +148,7 @@ async function postSocialSignIn(email: string) {
       },
       body: JSON.stringify({
         provider: 'google',
-        idToken: { token: jwtWithEmail(email) },
+        idToken: { token },
       }),
     }),
   )
@@ -156,8 +156,10 @@ async function postSocialSignIn(email: string) {
 
 const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'
 
-function jwtWithEmail(email: string) {
-  const payload = Buffer.from(JSON.stringify({ email })).toString('base64url')
+function jwtWithEmail(email: string, claims: Record<string, unknown> = {}) {
+  const payload = Buffer.from(
+    JSON.stringify({ email, ...claims }),
+  ).toString('base64url')
   return `header.${payload}.sig`
 }
 
@@ -191,7 +193,7 @@ describe('Google account linking', () => {
       where: { id: apple.user.id },
     })
     expect(stored?.email).toBe(email)
-    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id, email))
+    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(email))
   })
 
   it('leaves an unverified Apple email hold intact when the social id token is forged', async () => {
@@ -226,7 +228,7 @@ describe('Google account linking', () => {
       where: { id: apple.user.id },
     })
     expect(stored?.email).toBe(email)
-    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id, email))
+    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(email))
   })
 
   it('releases an unverified hold only after the provider verifies the id token', async () => {
@@ -262,7 +264,7 @@ describe('Google account linking', () => {
     const stored = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
-    expect(stored?.email).toBe(unverifiedEmailPlaceholder(apple.user.id, email))
+    expect(stored?.email).toBe(unverifiedEmailPlaceholder(email))
   })
 
   it('leaves the hold intact when a verified token does not claim a verified email', async () => {
@@ -361,7 +363,7 @@ describe('Google account linking', () => {
     const appleRow = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
-    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(apple.user.id, email))
+    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(email))
     expect((await appleAccountOf(apple.user.id))?.accountId).toBe(
       'apple.sub.google-claim',
     )
@@ -408,7 +410,7 @@ describe('Google account linking', () => {
       where: { id: apple.user.id },
     })
     expect(stored?.email).toBe(email)
-    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(apple.user.id, email))
+    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(email))
   })
 
   it('leaves the hold released when sign-in succeeds', async () => {
@@ -449,7 +451,70 @@ describe('Google account linking', () => {
     const appleRow = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
-    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(apple.user.id, email))
+    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(email))
+    const claimant = await db.query.user.findFirst({ where: { email } })
+    expect(claimant?.id).not.toBe(apple.user.id)
+    expect(claimant?.emailVerified).toBe(true)
+    if (claimant) remember(claimant.id)
+  })
+
+  it('keeps a real verified claim when a forged restore overlaps', async () => {
+    const { config, identityToken, tokens } = await appleFixture()
+    const email = `${globalThis.crypto.randomUUID()}@example.com`
+    const accountId = `google.sub.forged-overlap.${globalThis.crypto.randomUUID()}`
+    const realToken = jwtWithEmail(email, { nonce: 'real' })
+    const forgedToken = jwtWithEmail(email, { nonce: 'forged' })
+    const apple = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.google-forged-overlap'),
+        authorizationCode: 'auth-apple',
+        email,
+      },
+      config,
+      tokens('apple.sub.google-forged-overlap'),
+    )
+    remember(apple.user.id)
+
+    await withGoogleSocial(
+      {
+        verifyIdToken: async (token) => {
+          const encoded = token.split('.')[1]
+          if (!encoded) return false
+          const payload: unknown = JSON.parse(
+            Buffer.from(encoded, 'base64url').toString('utf8'),
+          )
+          return (
+            !!payload &&
+            typeof payload === 'object' &&
+            'nonce' in payload &&
+            payload.nonce === 'real'
+          )
+        },
+        getUserInfo: async () => {
+          const forged = await postSocialSignIn(email, forgedToken)
+          expect(forged.ok).toBe(false)
+          return {
+            user: {
+              id: accountId,
+              email,
+              emailVerified: true,
+              name: 'Google User',
+            },
+          }
+        },
+      },
+      async () => {
+        const response = await postSocialSignIn(email, realToken)
+        expect(response.ok).toBe(true)
+        const body = (await response.json()) as { user?: { id?: string } }
+        if (body.user?.id) remember(body.user.id)
+      },
+    )
+
+    const appleRow = await db.query.user.findFirst({
+      where: { id: apple.user.id },
+    })
+    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(email))
     const claimant = await db.query.user.findFirst({ where: { email } })
     expect(claimant?.id).not.toBe(apple.user.id)
     expect(claimant?.emailVerified).toBe(true)
@@ -488,6 +553,6 @@ describe('Google account linking', () => {
     expect(await restoreUnverifiedEmailHold(hold)).toBe('kept')
     expect(
       (await db.query.user.findFirst({ where: { id: apple.user.id } }))?.email,
-    ).toBe(unverifiedEmailPlaceholder(apple.user.id, email))
+    ).toBe(unverifiedEmailPlaceholder(email))
   })
 })
