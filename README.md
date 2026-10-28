@@ -80,11 +80,12 @@ never passes from taking traffic.
 `pnpm db:migrate` applies Drizzle migrations, then encrypts leftover plaintext
 OAuth tokens (rows written before `encryptOAuthTokens`). The encrypt pass reads
 `DATABASE_URL` and `BETTER_AUTH_SECRET` from `packages/api/.env` / `.env.local`
-(or the process environment), skips already-encrypted rows, and logs only how
-many account rows changed — never token or secret values. Railway's release
-command should stay `pnpm db:migrate` so a deploy wraps legacy tokens before
-the new process takes traffic. `pnpm db:encrypt-oauth-tokens` runs that pass
-on its own.
+(or the process environment), skips already-encrypted rows and bare-hex values
+the current secret cannot decrypt, and logs only how many account rows changed
+plus a `skipped_undecryptable` count — never token or secret values. Railway's
+release command should stay `pnpm db:migrate` so a deploy wraps legacy tokens
+before the new process takes traffic. `pnpm db:encrypt-oauth-tokens` runs that
+pass on its own.
 
 ### Purging deleted accounts
 

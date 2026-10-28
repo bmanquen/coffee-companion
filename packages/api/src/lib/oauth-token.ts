@@ -3,14 +3,18 @@ import { symmetricDecrypt, symmetricEncrypt } from 'better-auth/crypto'
 export const OAUTH_TOKEN_SECRET_MISSING =
   'BETTER_AUTH_SECRET is required to store OAuth tokens.'
 
+export function isBareHexOAuthToken(token: string) {
+  return token.length % 2 === 0 && /^[0-9a-f]+$/i.test(token)
+}
+
 // better-auth’s encryptOAuthTokens uses the same envelope. Tokens we write
 // ourselves (Apple native) have to match, or a later decrypt through
-// better-auth would see plaintext. String-key encrypt is bare hex, so a
-// shape-only check would skip a plaintext hex token; decrypt with the current
-// secret is the distinguisher. $ba$ is already versioned ciphertext.
+// better-auth would see plaintext. String-key encrypt is bare hex; decrypt
+// with the current secret distinguishes live ciphertext from leftover hex.
+// $ba$ is already versioned ciphertext.
 export async function isEncryptedOAuthToken(token: string) {
   if (token.startsWith('$ba$')) return true
-  if (token.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(token)) return false
+  if (!isBareHexOAuthToken(token)) return false
   const key = secret()
   if (!key) return false
   try {

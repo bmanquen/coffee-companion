@@ -3,18 +3,39 @@ import { db } from '../db'
 import { account } from '../db/schema'
 import {
   encryptStoredOAuthToken,
+  isBareHexOAuthToken,
   isEncryptedOAuthToken,
 } from './oauth-token'
 
 export type TokenStore = Pick<typeof db, 'query' | 'update'>
 
+export type LegacyOAuthEncryptionResult = {
+  updated: number
+  skippedUndecryptable: number
+}
+
 async function encryptIfPlain(
   token: string | null,
-): Promise<{ value: string | null; changed: boolean }> {
+): Promise<{
+  value: string | null
+  changed: boolean
+  skippedUndecryptable: boolean
+}> {
   if (!token || (await isEncryptedOAuthToken(token))) {
-    return { value: token, changed: false }
+    return { value: token, changed: false, skippedUndecryptable: false }
   }
-  return { value: await encryptStoredOAuthToken(token), changed: true }
+  // Bare hex that the current secret cannot decrypt is either leftover
+  // ciphertext from another key or ambiguous plaintext. Google/Apple tokens
+  // are not pure hex, so leaving it unchanged is safe; wrapping it would
+  // destroy a rotated-secret row on every migrate.
+  if (isBareHexOAuthToken(token)) {
+    return { value: token, changed: false, skippedUndecryptable: true }
+  }
+  return {
+    value: await encryptStoredOAuthToken(token),
+    changed: true,
+    skippedUndecryptable: false,
+  }
 }
 
 // Rows written before encryptOAuthTokens stay readable as plaintext. A write
@@ -22,13 +43,17 @@ async function encryptIfPlain(
 // provider credentials.
 export async function encryptLegacyOAuthTokens(
   store: TokenStore = db,
-): Promise<number> {
+): Promise<LegacyOAuthEncryptionResult> {
   const rows = await store.query.account.findMany()
   let updated = 0
+  let skippedUndecryptable = 0
   for (const row of rows) {
     const access = await encryptIfPlain(row.accessToken)
     const refresh = await encryptIfPlain(row.refreshToken)
     const idToken = await encryptIfPlain(row.idToken)
+    skippedUndecryptable += Number(access.skippedUndecryptable)
+    skippedUndecryptable += Number(refresh.skippedUndecryptable)
+    skippedUndecryptable += Number(idToken.skippedUndecryptable)
     if (!access.changed && !refresh.changed && !idToken.changed) continue
 
     const set: {
@@ -58,10 +83,19 @@ export async function encryptLegacyOAuthTokens(
       .returning({ id: account.id })
     updated += result.length
   }
-  return updated
+  return { updated, skippedUndecryptable }
 }
 
-export function legacyOAuthEncryptionReport(updated: number) {
-  if (updated === 0) return 'No plaintext OAuth tokens to encrypt.'
-  return `Encrypted ${updated} legacy OAuth account row(s).`
+export function legacyOAuthEncryptionReport(
+  result: LegacyOAuthEncryptionResult,
+) {
+  const parts = [
+    result.updated === 0
+      ? 'No plaintext OAuth tokens to encrypt.'
+      : `Encrypted ${result.updated} legacy OAuth account row(s).`,
+  ]
+  if (result.skippedUndecryptable > 0) {
+    parts.push(`skipped_undecryptable=${result.skippedUndecryptable}`)
+  }
+  return parts.join(' ')
 }

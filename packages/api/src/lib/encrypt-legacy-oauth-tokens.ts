@@ -6,8 +6,8 @@ import {
 } from './oauth-token-legacy'
 
 try {
-  const updated = await encryptLegacyOAuthTokens()
-  console.log(legacyOAuthEncryptionReport(updated))
+  const result = await encryptLegacyOAuthTokens()
+  console.log(legacyOAuthEncryptionReport(result))
 } catch {
   // The encrypt helper never includes token values; keep the failure line
   // the same so a deploy log cannot leak a row that failed mid-write.
