@@ -41,7 +41,9 @@ describe('encryptLegacyOAuthTokens', () => {
         where: { id: accountId },
       })
       expect(before?.refreshToken).toBe(PLAIN_REFRESH)
-      expect(isEncryptedOAuthToken(before?.refreshToken ?? '')).toBe(false)
+      await expect(
+        isEncryptedOAuthToken(before?.refreshToken ?? ''),
+      ).resolves.toBe(false)
       await expect(decryptStoredOAuthToken(before?.refreshToken)).resolves.toBe(
         PLAIN_REFRESH,
       )
@@ -53,7 +55,9 @@ describe('encryptLegacyOAuthTokens', () => {
       })
       expect(after?.refreshToken).not.toBe(PLAIN_REFRESH)
       expect(after?.accessToken).not.toBe(PLAIN_ACCESS)
-      expect(isEncryptedOAuthToken(after?.refreshToken ?? '')).toBe(true)
+      await expect(
+        isEncryptedOAuthToken(after?.refreshToken ?? ''),
+      ).resolves.toBe(true)
       await expect(decryptStoredOAuthToken(after?.refreshToken)).resolves.toBe(
         PLAIN_REFRESH,
       )
@@ -61,6 +65,50 @@ describe('encryptLegacyOAuthTokens', () => {
         PLAIN_ACCESS,
       )
 
+      expect(await encryptLegacyOAuthTokens()).toBe(0)
+    } finally {
+      await db.delete(user).where(eq(user.id, userId))
+    }
+  })
+
+  it('encrypts a plaintext hex token that looks like ciphertext', async () => {
+    const userId = globalThis.crypto.randomUUID()
+    const accountId = globalThis.crypto.randomUUID()
+    const plaintextHex = '0123456789abcdef'
+    await db.insert(user).values({
+      id: userId,
+      name: 'Legacy hex Google',
+      email: `${userId}@example.com`,
+      emailVerified: true,
+    })
+
+    try {
+      await db.insert(account).values({
+        id: accountId,
+        accountId: `google.${userId}`,
+        providerId: GOOGLE_PROVIDER_ID,
+        userId,
+        accessToken: plaintextHex,
+        refreshToken: plaintextHex,
+      })
+
+      await expect(isEncryptedOAuthToken(plaintextHex)).resolves.toBe(false)
+      expect(await encryptLegacyOAuthTokens()).toBeGreaterThanOrEqual(1)
+
+      const after = await db.query.account.findFirst({
+        where: { id: accountId },
+      })
+      expect(after?.refreshToken).not.toBe(plaintextHex)
+      expect(after?.accessToken).not.toBe(plaintextHex)
+      await expect(
+        isEncryptedOAuthToken(after?.refreshToken ?? ''),
+      ).resolves.toBe(true)
+      await expect(decryptStoredOAuthToken(after?.refreshToken)).resolves.toBe(
+        plaintextHex,
+      )
+      await expect(decryptStoredOAuthToken(after?.accessToken)).resolves.toBe(
+        plaintextHex,
+      )
       expect(await encryptLegacyOAuthTokens()).toBe(0)
     } finally {
       await db.delete(user).where(eq(user.id, userId))
@@ -122,7 +170,9 @@ describe('encryptLegacyOAuthTokens', () => {
       const later = await db.query.account.findFirst({
         where: { id: accountId },
       })
-      expect(isEncryptedOAuthToken(later?.refreshToken ?? '')).toBe(true)
+      await expect(
+        isEncryptedOAuthToken(later?.refreshToken ?? ''),
+      ).resolves.toBe(true)
       await expect(decryptStoredOAuthToken(later?.refreshToken)).resolves.toBe(
         freshRefresh,
       )
@@ -163,7 +213,9 @@ describe('better-auth decryptOAuthToken', () => {
         where: { id: accountId },
       })
       expect(row?.refreshToken).toBe(PLAIN_REFRESH)
-      expect(isEncryptedOAuthToken(row?.refreshToken ?? '')).toBe(false)
+      await expect(
+        isEncryptedOAuthToken(row?.refreshToken ?? ''),
+      ).resolves.toBe(false)
 
       expect(await decryptOAuthToken(row?.refreshToken ?? '', decryptCtx)).toBe(
         PLAIN_REFRESH,

@@ -11,7 +11,7 @@ export type TokenStore = Pick<typeof db, 'query' | 'update'>
 async function encryptIfPlain(
   token: string | null,
 ): Promise<{ value: string | null; changed: boolean }> {
-  if (!token || isEncryptedOAuthToken(token)) {
+  if (!token || (await isEncryptedOAuthToken(token))) {
     return { value: token, changed: false }
   }
   return { value: await encryptStoredOAuthToken(token), changed: true }

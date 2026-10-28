@@ -5,10 +5,20 @@ export const OAUTH_TOKEN_SECRET_MISSING =
 
 // better-auth’s encryptOAuthTokens uses the same envelope. Tokens we write
 // ourselves (Apple native) have to match, or a later decrypt through
-// better-auth would see plaintext.
-export function isEncryptedOAuthToken(token: string) {
+// better-auth would see plaintext. String-key encrypt is bare hex, so a
+// shape-only check would skip a plaintext hex token; decrypt with the current
+// secret is the distinguisher. $ba$ is already versioned ciphertext.
+export async function isEncryptedOAuthToken(token: string) {
   if (token.startsWith('$ba$')) return true
-  return token.length % 2 === 0 && /^[0-9a-f]+$/i.test(token)
+  if (token.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(token)) return false
+  const key = secret()
+  if (!key) return false
+  try {
+    await symmetricDecrypt({ key, data: token })
+    return true
+  } catch {
+    return false
+  }
 }
 
 function secret() {
@@ -32,7 +42,7 @@ export async function decryptStoredOAuthToken(
   token: string | null | undefined,
 ): Promise<string | null | undefined> {
   if (!token) return token
-  if (!isEncryptedOAuthToken(token)) return token
+  if (!(await isEncryptedOAuthToken(token))) return token
   const key = secret()
   if (!key) return token
   try {
