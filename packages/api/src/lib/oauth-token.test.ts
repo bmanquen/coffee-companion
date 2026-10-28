@@ -52,3 +52,16 @@ describe('encryptStoredOAuthToken', () => {
     )
   })
 })
+
+describe('decryptStoredOAuthToken', () => {
+  it('throws for ciphertext when the secret is missing, and returns plaintext', async () => {
+    const stored = await encryptStoredOAuthToken(REFRESH)
+    const google = '1//0g-legacy-google-refresh'
+    delete process.env.BETTER_AUTH_SECRET
+    await expect(decryptStoredOAuthToken(stored)).rejects.toThrow(
+      OAUTH_TOKEN_SECRET_MISSING,
+    )
+    await expect(decryptStoredOAuthToken(google)).resolves.toBe(google)
+    await expect(decryptStoredOAuthToken(null)).resolves.toBeNull()
+  })
+})

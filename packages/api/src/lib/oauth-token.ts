@@ -34,7 +34,9 @@ export async function decryptStoredOAuthToken(
   if (!token) return token
   if (!isEncryptedOAuthToken(token)) return token
   const key = secret()
-  if (!key) return token
+  // Ciphertext is not a usable refresh token; appleRefreshTokenOf would
+  // otherwise hand the envelope to Apple.
+  if (!key) throw new Error(OAUTH_TOKEN_SECRET_MISSING)
   try {
     return await symmetricDecrypt({ key, data: token })
   } catch {
