@@ -3,11 +3,16 @@ import { symmetricDecrypt, symmetricEncrypt } from 'better-auth/crypto'
 export const OAUTH_TOKEN_SECRET_MISSING =
   'BETTER_AUTH_SECRET is required to store OAuth tokens.'
 
+export const OAUTH_TOKEN_ENVELOPE_PREFIX = '$ba$'
+
+export const OAUTH_TOKEN_DECRYPT_FAILED =
+  'Stored OAuth token could not be decrypted.'
+
 // better-auth’s encryptOAuthTokens uses the same envelope. Tokens we write
 // ourselves (Apple native) have to match, or a later decrypt through
 // better-auth would see plaintext.
 export function isEncryptedOAuthToken(token: string) {
-  if (token.startsWith('$ba$')) return true
+  if (token.startsWith(OAUTH_TOKEN_ENVELOPE_PREFIX)) return true
   return token.length % 2 === 0 && /^[0-9a-f]+$/i.test(token)
 }
 
@@ -40,6 +45,10 @@ export async function decryptStoredOAuthToken(
   try {
     return await symmetricDecrypt({ key, data: token })
   } catch {
+    // Hex can be a false positive for legacy plaintext. `$ba$` is ciphertext.
+    if (token.startsWith(OAUTH_TOKEN_ENVELOPE_PREFIX)) {
+      throw new Error(OAUTH_TOKEN_DECRYPT_FAILED)
+    }
     return token
   }
 }

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  OAUTH_TOKEN_DECRYPT_FAILED,
+  OAUTH_TOKEN_ENVELOPE_PREFIX,
   OAUTH_TOKEN_SECRET_MISSING,
   decryptStoredOAuthToken,
   encryptStoredOAuthToken,
@@ -63,5 +65,14 @@ describe('decryptStoredOAuthToken', () => {
     )
     await expect(decryptStoredOAuthToken(google)).resolves.toBe(google)
     await expect(decryptStoredOAuthToken(null)).resolves.toBeNull()
+  })
+
+  it('throws for a $ba$ envelope encrypted under a different secret', async () => {
+    const ciphertext = await encryptStoredOAuthToken(REFRESH)
+    const stored = `${OAUTH_TOKEN_ENVELOPE_PREFIX}1$${ciphertext}`
+    process.env.BETTER_AUTH_SECRET = 'wrong-oauth-token-secret-fixture-32b!'
+    await expect(decryptStoredOAuthToken(stored)).rejects.toThrow(
+      OAUTH_TOKEN_DECRYPT_FAILED,
+    )
   })
 })
