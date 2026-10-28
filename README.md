@@ -75,6 +75,15 @@ Health Check Path, set to `/api/health` — not from a file in this repo, so eac
 new environment needs it set once. Railway keeps a deploy whose health check
 never passes from taking traffic.
 
+### Database migrations
+
+`pnpm db:migrate` applies Drizzle migrations, then encrypts leftover plaintext
+OAuth tokens (rows written before `encryptOAuthTokens`). The encrypt pass skips
+already-encrypted rows and logs only how many account rows changed — never
+token values. Railway's release command should stay `pnpm db:migrate` so a
+deploy wraps legacy tokens before the new process takes traffic. `pnpm
+db:encrypt-oauth-tokens` runs that pass on its own.
+
 ### Purging deleted accounts
 
 Accounts marked deleted are hard-erased after 30 days by `POST

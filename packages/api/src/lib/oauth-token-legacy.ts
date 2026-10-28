@@ -42,3 +42,8 @@ export async function encryptLegacyOAuthTokens(
   }
   return updated
 }
+
+export function legacyOAuthEncryptionReport(updated: number) {
+  if (updated === 0) return 'No plaintext OAuth tokens to encrypt.'
+  return `Encrypted ${updated} legacy OAuth account row(s).`
+}

@@ -16,7 +16,7 @@ afterAll(async () => {
 })
 
 describe('encryptLegacyOAuthTokens', () => {
-  it('reads a legacy plaintext Google token and encrypts it on write', async () => {
+  it('encrypts a plaintext Google row and is a no-op on the second run', async () => {
     const userId = globalThis.crypto.randomUUID()
     const accountId = globalThis.crypto.randomUUID()
     await db.insert(user).values({
