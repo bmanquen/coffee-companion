@@ -17,7 +17,6 @@
     "test:e2e": "turbo test:e2e",
     "db:generate": "pnpm --filter @coffee-companion/api exec drizzle-kit generate",
     "db:migrate": "pnpm --filter @coffee-companion/api db:migrate",
-    "db:encrypt-oauth-tokens": "pnpm --filter @coffee-companion/api db:encrypt-oauth-tokens",
     "db:push": "pnpm --filter @coffee-companion/api exec drizzle-kit push",
     "db:pull": "pnpm --filter @coffee-companion/api exec drizzle-kit pull",
     "db:studio": "pnpm --filter @coffee-companion/api exec drizzle-kit studio",

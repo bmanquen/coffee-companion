@@ -3,7 +3,6 @@ import {
   OAUTH_TOKEN_SECRET_MISSING,
   decryptStoredOAuthToken,
   encryptStoredOAuthToken,
-  isEncryptedOAuthToken,
 } from './oauth-token'
 
 const SECRET = 'test-oauth-token-secret-fixture-32b!'
@@ -51,28 +50,5 @@ describe('encryptStoredOAuthToken', () => {
     await expect(encryptStoredOAuthToken(REFRESH)).rejects.toThrow(
       OAUTH_TOKEN_SECRET_MISSING,
     )
-  })
-})
-
-describe('isEncryptedOAuthToken', () => {
-  it('does not treat plaintext hex as ciphertext', async () => {
-    await expect(isEncryptedOAuthToken('0123456789abcdef')).resolves.toBe(false)
-  })
-
-  it('recognizes real bare-hex ciphertext and decrypts it', async () => {
-    const stored = await encryptStoredOAuthToken(REFRESH)
-    expect(stored).toMatch(/^[0-9a-f]+$/i)
-    await expect(isEncryptedOAuthToken(stored)).resolves.toBe(true)
-    await expect(decryptStoredOAuthToken(stored)).resolves.toBe(REFRESH)
-  })
-
-  it('still treats a $ba$ envelope as encrypted', async () => {
-    await expect(isEncryptedOAuthToken('$ba$1$deadbeef')).resolves.toBe(true)
-  })
-
-  it('does not treat bare hex as encrypted when the secret is missing', async () => {
-    const stored = await encryptStoredOAuthToken(REFRESH)
-    delete process.env.BETTER_AUTH_SECRET
-    await expect(isEncryptedOAuthToken(stored)).resolves.toBe(false)
   })
 })
