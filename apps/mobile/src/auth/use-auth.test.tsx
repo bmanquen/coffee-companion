@@ -1,12 +1,15 @@
 import { act, renderHook } from '@testing-library/react-native'
 import {
   ERROR_PLAY_SERVICES,
+  ERROR_SIGN_IN_CONFLICT_BODY,
+  ERROR_SIGN_IN_CONFLICT_TITLE,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
 } from './copy'
 import {
   PlayServicesMissing,
   SignInCancelled,
+  SignInConflict,
   SignInFailed,
   SignInUnavailable,
 } from './errors'
@@ -67,26 +70,44 @@ describe('useAuth', () => {
     expect(result.current.error).toBeNull()
   })
 
-  it('names the three failures a user can see', async () => {
+  it('names the failures a user can see', async () => {
     const { result } = await renderHook(() => useAuth())
 
     mocks.signInWithGoogle.mockRejectedValueOnce(new SignInUnavailable())
     await act(async () => {
       await result.current.signInGoogle()
     })
-    expect(result.current.error).toBe(ERROR_SIGN_IN_UNAVAILABLE)
+    expect(result.current.error).toEqual({ title: ERROR_SIGN_IN_UNAVAILABLE })
 
     mocks.signInWithGoogle.mockRejectedValueOnce(new PlayServicesMissing())
     await act(async () => {
       await result.current.signInGoogle()
     })
-    expect(result.current.error).toBe(ERROR_PLAY_SERVICES)
+    expect(result.current.error).toEqual({ title: ERROR_PLAY_SERVICES })
 
     mocks.signInWithGoogle.mockRejectedValueOnce(new SignInFailed())
     await act(async () => {
       await result.current.signInGoogle()
     })
-    expect(result.current.error).toBe(ERROR_SIGN_IN_FAILED)
+    expect(result.current.error).toEqual({ title: ERROR_SIGN_IN_FAILED })
+
+    mocks.signInWithGoogle.mockRejectedValueOnce(new SignInConflict())
+    await act(async () => {
+      await result.current.signInGoogle()
+    })
+    expect(result.current.error).toEqual({
+      title: ERROR_SIGN_IN_CONFLICT_TITLE,
+      body: ERROR_SIGN_IN_CONFLICT_BODY,
+    })
+
+    mocks.signInWithApple.mockRejectedValueOnce(new SignInConflict())
+    await act(async () => {
+      await result.current.signInApple()
+    })
+    expect(result.current.error).toEqual({
+      title: ERROR_SIGN_IN_CONFLICT_TITLE,
+      body: ERROR_SIGN_IN_CONFLICT_BODY,
+    })
   })
 
   it('clears the secure session on sign-out', async () => {
@@ -109,6 +130,18 @@ describe('useAuth', () => {
       await expect(result.current.signOut()).rejects.toThrow('network')
     })
 
+    expect(mocks.clearSessionStore).toHaveBeenCalled()
+  })
+
+  it('still revokes the server session when Google sign-out throws', async () => {
+    mocks.signOutGoogle.mockRejectedValueOnce(new Error('offline'))
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signOut()
+    })
+
+    expect(mocks.signOut).toHaveBeenCalled()
     expect(mocks.clearSessionStore).toHaveBeenCalled()
   })
 })

@@ -8,6 +8,18 @@ import {
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { account, session, user } from '../db/schema'
+import {
+  EMAIL_ALREADY_ASSOCIATED,
+  EMAIL_ALREADY_ASSOCIATED_CODE,
+} from './account-email'
+import {
+  releaseUnverifiedEmailHold,
+  restoreOrphanedEmailHoldIfUnowned,
+} from './account-email-hold'
+import {
+  decryptStoredOAuthToken,
+  encryptStoredOAuthToken,
+} from './oauth-token'
 import { PG_UNIQUE_VIOLATION, pgErrorIn } from './pg-error'
 import type { JWK, JWTPayload, JWTVerifyGetKey } from 'jose'
 
@@ -54,9 +66,11 @@ export class AppleNotConfigured extends Error {
 }
 
 export class AppleSignInRefused extends Error {
-  constructor(message: string) {
+  readonly code: string
+  constructor(message: string, code = 'APPLE_SIGN_IN_REFUSED') {
     super(message)
     this.name = 'AppleSignInRefused'
+    this.code = code
   }
 }
 
@@ -288,9 +302,19 @@ export async function signInWithAppleNative(
             accessToken?: string
             idToken?: string
           } = {}
-          if (tokens.refreshToken) updates.refreshToken = tokens.refreshToken
-          if (tokens.accessToken) updates.accessToken = tokens.accessToken
-          if (tokens.idToken) updates.idToken = tokens.idToken
+          if (tokens.refreshToken) {
+            updates.refreshToken = await encryptStoredOAuthToken(
+              tokens.refreshToken,
+            )
+          }
+          if (tokens.accessToken) {
+            updates.accessToken = await encryptStoredOAuthToken(
+              tokens.accessToken,
+            )
+          }
+          if (tokens.idToken) {
+            updates.idToken = await encryptStoredOAuthToken(tokens.idToken)
+          }
           if (Object.keys(updates).length) {
             await tx
               .update(account)
@@ -302,6 +326,7 @@ export async function signInWithAppleNative(
           // existing user whose stored email is already verified. A
           // client-supplied address is stored on a new user (Apple sends
           // email once, sometimes only in the credential).
+          const tokenVerified = Boolean(identity.emailVerified && tokenEmail)
           const already =
             identity.emailVerified && tokenEmail
               ? await tx.query.user.findFirst({
@@ -318,22 +343,51 @@ export async function signInWithAppleNative(
                 'Apple did not send an email. Sign in again and share your email.',
               )
             }
-            const collision = await tx.query.user.findFirst({
-              where: { email },
-            })
-            if (collision) {
-              throw new AppleSignInRefused(
-                'This email is already associated with another account.',
-              )
-            }
 
-            userId = globalThis.crypto.randomUUID()
-            await tx.insert(user).values({
-              id: userId,
-              name,
-              email,
-              emailVerified: Boolean(identity.emailVerified && tokenEmail),
-            })
+            if (tokenVerified) {
+              const hold = await releaseUnverifiedEmailHold(email, tx)
+              if (hold === 'verified') {
+                const holder = await tx.query.user.findFirst({
+                  where: { email, emailVerified: true },
+                })
+                if (!holder) {
+                  throw new AppleSignInRefused(
+                    EMAIL_ALREADY_ASSOCIATED,
+                    EMAIL_ALREADY_ASSOCIATED_CODE,
+                  )
+                }
+                userId = holder.id
+              } else {
+                userId = globalThis.crypto.randomUUID()
+                await tx.insert(user).values({
+                  id: userId,
+                  name,
+                  email,
+                  emailVerified: true,
+                })
+              }
+            } else {
+              // An unverified retry is not a claim. Put a crashed hold
+              // back so this client email collides with its owner.
+              await restoreOrphanedEmailHoldIfUnowned(email, tx)
+              const collision = await tx.query.user.findFirst({
+                where: { email },
+              })
+              if (collision) {
+                throw new AppleSignInRefused(
+                  EMAIL_ALREADY_ASSOCIATED,
+                  EMAIL_ALREADY_ASSOCIATED_CODE,
+                )
+              }
+
+              userId = globalThis.crypto.randomUUID()
+              await tx.insert(user).values({
+                id: userId,
+                name,
+                email,
+                emailVerified: false,
+              })
+            }
           }
 
           await tx.insert(account).values({
@@ -341,9 +395,11 @@ export async function signInWithAppleNative(
             accountId: identity.subject,
             providerId: APPLE_PROVIDER_ID,
             userId,
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
-            idToken: tokens.idToken ?? input.identityToken,
+            accessToken: await encryptStoredOAuthToken(tokens.accessToken),
+            refreshToken: await encryptStoredOAuthToken(tokens.refreshToken),
+            idToken: await encryptStoredOAuthToken(
+              tokens.idToken ?? input.identityToken,
+            ),
           })
         }
 
@@ -385,4 +441,9 @@ export function appleAccountOf(userId: string) {
   return db.query.account.findFirst({
     where: { userId, providerId: APPLE_PROVIDER_ID },
   })
+}
+
+export async function appleRefreshTokenOf(userId: string) {
+  const row = await appleAccountOf(userId)
+  return decryptStoredOAuthToken(row?.refreshToken)
 }

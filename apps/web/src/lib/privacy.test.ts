@@ -79,7 +79,7 @@ describe('recipients', () => {
     )
   })
 
-  it('does not promise Apple revocation that account deletion does not perform', () => {
+  it('does not promise Apple revocation that account deletion does not perform (#178)', () => {
     const apple = recipients.find((recipient) => recipient.slug === 'apple')!
     expect(apple.retention).not.toMatch(/revoke/i)
     expect(apple.retention).toMatch(

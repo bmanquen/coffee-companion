@@ -16,7 +16,7 @@
     "test:integration": "turbo test:integration",
     "test:e2e": "turbo test:e2e",
     "db:generate": "pnpm --filter @coffee-companion/api exec drizzle-kit generate",
-    "db:migrate": "pnpm --filter @coffee-companion/api exec drizzle-kit migrate",
+    "db:migrate": "pnpm --filter @coffee-companion/api db:migrate",
     "db:push": "pnpm --filter @coffee-companion/api exec drizzle-kit push",
     "db:pull": "pnpm --filter @coffee-companion/api exec drizzle-kit pull",
     "db:studio": "pnpm --filter @coffee-companion/api exec drizzle-kit studio",

@@ -31,6 +31,30 @@ export class PlayServicesMissing extends Error {
   }
 }
 
+export const EMAIL_ALREADY_ASSOCIATED_CODE = 'EMAIL_ALREADY_ASSOCIATED'
+export const OAUTH_LINK_ERROR_CODE = 'OAUTH_LINK_ERROR'
+
+export const SIGN_IN_CONFLICT_CODES = [
+  EMAIL_ALREADY_ASSOCIATED_CODE,
+  OAUTH_LINK_ERROR_CODE,
+] as const
+
+export class SignInConflict extends Error {
+  constructor() {
+    super('sign-in-conflict')
+    this.name = 'SignInConflict'
+  }
+}
+
+export function isSignInConflictCode(
+  code: string | null,
+): code is (typeof SIGN_IN_CONFLICT_CODES)[number] {
+  return (
+    code !== null &&
+    (SIGN_IN_CONFLICT_CODES as ReadonlyArray<string>).includes(code)
+  )
+}
+
 export function errorCode(error: unknown): string | null {
   if (!error || typeof error !== 'object') return null
   if ('code' in error && typeof error.code === 'string') return error.code

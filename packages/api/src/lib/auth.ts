@@ -10,7 +10,14 @@ import { stripe } from '@better-auth/stripe'
 import { expo } from '@better-auth/expo'
 import { db } from '../db'
 import * as schema from '../db/auth-schema'
+import {
+  releaseUnverifiedEmailFromVerifiedSocial,
+  rememberReleasedEmailHold,
+  restoreReleasedEmailHoldIfSignInFailed,
+} from './account-email-hold'
+import { accountOptions } from './account-linking'
 import { appleNativeSignIn } from './apple-native-plugin'
+import { trustedAuthOrigins } from './auth-origins'
 import {
   billingConfig,
   hasLiveSubscription,
@@ -18,9 +25,6 @@ import {
 } from './billing'
 
 const baseURL = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'
-
-const APP_SCHEME_ORIGIN = 'coffeecompanion://'
-const EXPO_ORIGIN = 'exp://'
 
 const googleClientIds = [
   process.env.GOOGLE_CLIENT_ID,
@@ -35,8 +39,9 @@ const billing = billingConfig()
 
 export const auth = betterAuth({
   baseURL,
-  trustedOrigins: [baseURL, APP_SCHEME_ORIGIN, EXPO_ORIGIN],
+  trustedOrigins: trustedAuthOrigins(baseURL),
   database: drizzleAdapter(db, { provider: 'pg', schema }),
+  account: accountOptions,
   user: {
     additionalFields: {
       deletedAt: {
@@ -59,6 +64,18 @@ export const auth = betterAuth({
     // A user holds one Subscription at a time. Changing it is the billing
     // portal's job; Checkout only ever sells the first one.
     before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === '/sign-in/social') {
+        // Release only after the provider verifies the id token. An
+        // unverified decode would let a forged JWT steal an unused address.
+        rememberReleasedEmailHold(
+          ctx.context,
+          await releaseUnverifiedEmailFromVerifiedSocial(
+            ctx.body,
+            ctx.context.socialProviders,
+          ),
+        )
+        return
+      }
       if (ctx.path !== '/subscription/upgrade') return
       const found = await getSessionFromCtx<{
         stripeCustomerId?: string | null
@@ -70,6 +87,12 @@ export const auth = betterAuth({
         message:
           'You already have a subscription. Change it from your account settings.',
       })
+    }),
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== '/sign-in/social') return
+      // hooks.before already committed the release; put the address back if
+      // sign-in then failed so the unverified Apple user keeps it.
+      await restoreReleasedEmailHoldIfSignInFailed(ctx.context, ctx.body)
     }),
   },
   plugins: [

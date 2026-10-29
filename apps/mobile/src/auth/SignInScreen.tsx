@@ -18,7 +18,7 @@ import {
   SIGN_UP_WITH_APPLE,
   SIGN_UP_WITH_GOOGLE,
 } from './copy'
-import type { AuthMode } from './use-auth'
+import type { AuthError, AuthMode } from './use-auth'
 
 export const SIGN_IN_SCREEN_TEST_ID = 'sign-in-screen'
 export const SIGN_IN_HEADING_TEST_ID = 'sign-in-heading'
@@ -36,7 +36,7 @@ export function SignInScreen({
   onToggleMode,
 }: {
   mode: AuthMode
-  error: string | null
+  error: AuthError | null
   busy: boolean
   showApple: boolean
   onGoogle: () => void
@@ -95,13 +95,15 @@ export function SignInScreen({
         </Pressable>
       </View>
       {error ? (
-        <Text
+        <View
+          accessible
           accessibilityRole="alert"
           testID={SIGN_IN_ERROR_TEST_ID}
-          style={styles.error}
+          style={styles.errorBlock}
         >
-          {error}
-        </Text>
+          <Text style={styles.errorTitle}>{error.title}</Text>
+          {error.body ? <Text style={styles.errorBody}>{error.body}</Text> : null}
+        </View>
       ) : null}
       {busy ? <ActivityIndicator /> : null}
     </View>
@@ -145,9 +147,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
-  error: {
+  errorBlock: {
+    marginTop: 8,
+    gap: 4,
+  },
+  errorTitle: {
     color: '#b00020',
     textAlign: 'center',
-    marginTop: 8,
+    fontWeight: '600',
+  },
+  errorBody: {
+    color: '#b00020',
+    textAlign: 'center',
   },
 })

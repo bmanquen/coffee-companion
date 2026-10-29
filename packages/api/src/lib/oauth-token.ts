@@ -1,0 +1,54 @@
+import { symmetricDecrypt, symmetricEncrypt } from 'better-auth/crypto'
+
+export const OAUTH_TOKEN_SECRET_MISSING =
+  'BETTER_AUTH_SECRET is required to store OAuth tokens.'
+
+export const OAUTH_TOKEN_ENVELOPE_PREFIX = '$ba$'
+
+export const OAUTH_TOKEN_DECRYPT_FAILED =
+  'Stored OAuth token could not be decrypted.'
+
+// better-auth’s encryptOAuthTokens uses the same envelope. Tokens we write
+// ourselves (Apple native) have to match, or a later decrypt through
+// better-auth would see plaintext.
+export function isEncryptedOAuthToken(token: string) {
+  if (token.startsWith(OAUTH_TOKEN_ENVELOPE_PREFIX)) return true
+  return token.length % 2 === 0 && /^[0-9a-f]+$/i.test(token)
+}
+
+function secret() {
+  return process.env.BETTER_AUTH_SECRET
+}
+
+export async function encryptStoredOAuthToken(token: string): Promise<string>
+export async function encryptStoredOAuthToken(
+  token: string | null | undefined,
+): Promise<string | null | undefined>
+export async function encryptStoredOAuthToken(
+  token: string | null | undefined,
+): Promise<string | null | undefined> {
+  if (!token) return token
+  const key = secret()
+  if (!key) throw new Error(OAUTH_TOKEN_SECRET_MISSING)
+  return symmetricEncrypt({ key, data: token })
+}
+
+export async function decryptStoredOAuthToken(
+  token: string | null | undefined,
+): Promise<string | null | undefined> {
+  if (!token) return token
+  if (!isEncryptedOAuthToken(token)) return token
+  const key = secret()
+  // Ciphertext is not a usable refresh token; appleRefreshTokenOf would
+  // otherwise hand the envelope to Apple.
+  if (!key) throw new Error(OAUTH_TOKEN_SECRET_MISSING)
+  try {
+    return await symmetricDecrypt({ key, data: token })
+  } catch {
+    // Hex can be a false positive for legacy plaintext. `$ba$` is ciphertext.
+    if (token.startsWith(OAUTH_TOKEN_ENVELOPE_PREFIX)) {
+      throw new Error(OAUTH_TOKEN_DECRYPT_FAILED)
+    }
+    return token
+  }
+}

@@ -34,7 +34,10 @@ function asApiError(error: unknown): never {
     throw new APIError('UNAUTHORIZED', { message: error.message })
   }
   if (error instanceof AppleSignInRefused) {
-    throw new APIError('BAD_REQUEST', { message: error.message })
+    throw new APIError('BAD_REQUEST', {
+      code: error.code,
+      message: error.message,
+    })
   }
   throw error
 }

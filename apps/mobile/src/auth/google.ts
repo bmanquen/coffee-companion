@@ -12,6 +12,7 @@ import {
   GOOGLE_SIGN_IN_CANCELLED,
   PlayServicesMissing,
   SignInCancelled,
+  SignInConflict,
   SignInFailed,
   SignInUnavailable,
   errorCode,
@@ -21,6 +22,7 @@ import {
   nativeFailureDetail,
   serverFailureDetail,
 } from './log'
+import { errorFromAuthServer } from './server-error'
 
 let configured = false
 
@@ -70,14 +72,15 @@ export async function signInWithGoogle() {
     })
     if (error) {
       logAuthFailure('google-server', serverFailureDetail(error))
-      throw new SignInFailed()
+      errorFromAuthServer(error)
     }
   } catch (error) {
     if (
       error instanceof SignInCancelled ||
       error instanceof SignInFailed ||
       error instanceof SignInUnavailable ||
-      error instanceof PlayServicesMissing
+      error instanceof PlayServicesMissing ||
+      error instanceof SignInConflict
     ) {
       throw error
     }
