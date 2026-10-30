@@ -5,6 +5,7 @@ import { user } from '../db/schema'
 import {
   identityFromVerifiedJwt,
   isEmailVerifiedClaim,
+  legacyUnverifiedEmailPlaceholder,
   socialIdTokenFromBody,
   unverifiedEmailPlaceholder,
 } from './account-email'
@@ -89,7 +90,7 @@ export async function takeUnverifiedEmailHold(
   // the hold only if the occupant is still unverified at that address.
   const taken = await store
     .update(user)
-    .set({ email: unverifiedEmailPlaceholder(email) })
+    .set({ email: unverifiedEmailPlaceholder(email, occupant.id) })
     .where(
       and(
         eq(user.id, occupant.id),
@@ -109,7 +110,7 @@ export async function restoreUnverifiedEmailHold(
   const holder = await store.query.user.findFirst({ where: { id: hold.userId } })
   if (!holder) return 'kept'
   if (holder.email === hold.email) return 'restored'
-  const placeholder = unverifiedEmailPlaceholder(hold.email)
+  const placeholder = unverifiedEmailPlaceholder(hold.email, hold.userId)
   if (holder.email !== placeholder) return 'kept'
 
   const restored = await store
@@ -132,13 +133,14 @@ export async function restoreOrphanedEmailHoldIfUnowned(
   store: EmailHoldStore = db,
 ): Promise<'restored' | 'kept'> {
   // Exact placeholder match uses the email unique index. Fresh rows stay
-  // put so a forged token cannot undo an in-flight claim.
+  // put so a forged token cannot undo an in-flight claim. Per-holder
+  // stand-ins are restored by restoreUnverifiedEmailHold, which has the id.
   const restored = await store
     .update(user)
     .set({ email })
     .where(
       and(
-        eq(user.email, unverifiedEmailPlaceholder(email)),
+        eq(user.email, legacyUnverifiedEmailPlaceholder(email)),
         eq(user.emailVerified, false),
         holdPlaceholderIsStale(),
         addressIsUnowned(email),
