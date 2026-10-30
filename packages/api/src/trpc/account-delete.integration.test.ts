@@ -13,6 +13,7 @@ import {
 import {
   APPLE_PROVIDER_ID,
   APPLE_REFRESH_TOKEN_HINT,
+  APPLE_REVOKE_TIMEOUT_MS,
   APPLE_REVOKE_URL,
 } from '../lib/apple'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
@@ -84,6 +85,7 @@ const APPLE_REFRESH_TOKEN = 'rt_apple_delete'
 const UNDECRYPTABLE_APPLE_ENVELOPE = `${OAUTH_TOKEN_ENVELOPE_PREFIX}1$not-a-ciphertext`
 const APPLE_REVOKE_OK_STATUS = 200
 const APPLE_REVOKE_REFUSED_STATUS = 400
+const APPLE_REVOKE_TEST_TIMEOUT_MS = 1
 const APPLE_REFRESH_TOKEN_NOT_REVOKED = 'Apple refresh token was not revoked'
 const APPLE_REFRESH_TOKEN_REVOKE_FAILED = 'Apple refresh token revoke failed'
 const lines = captureLogLines()
@@ -237,6 +239,26 @@ function appleRevokeCalls(fetchMock: ReturnType<typeof vi.fn>) {
   return fetchMock.mock.calls.filter(
     ([url]) => String(url) === APPLE_REVOKE_URL,
   )
+}
+
+function hangingFetchUntilAborted(
+  _url: Parameters<typeof fetch>[0],
+  init?: Parameters<typeof fetch>[1],
+) {
+  const signal = init?.signal
+  if (!signal) return new Promise<Response>(() => {})
+  return new Promise<Response>((_resolve, reject) => {
+    const fail = () =>
+      reject(
+        signal.reason ??
+          new DOMException('This operation was aborted', 'AbortError'),
+      )
+    if (signal.aborted) {
+      fail()
+      return
+    }
+    signal.addEventListener('abort', fail, { once: true })
+  })
 }
 
 function enableAppleSignIn() {
@@ -844,6 +866,61 @@ describe('purge of deleted accounts', () => {
         },
       ])
     } finally {
+      await db.delete(user).where(eq(user.id, stale))
+    }
+  })
+
+  it('still purges when the Apple revoke request times out', async () => {
+    const stale = 'delete-account-apple-purge-revoke-timeout'
+    await insertUser(stale)
+    await insertAppleAccount(
+      stale,
+      await encryptStoredOAuthToken(APPLE_REFRESH_TOKEN),
+    )
+    await db
+      .update(user)
+      .set({ deletedAt: new Date('2026-01-01T00:00:00.000Z') })
+      .where(eq(user.id, stale))
+    enableAppleSignIn()
+    const abortTimeout = AbortSignal.timeout.bind(AbortSignal)
+    const timeout = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockImplementation(() => abortTimeout(APPLE_REVOKE_TEST_TIMEOUT_MS))
+    const fetchMock = vi.fn(hangingFetchUntilAborted)
+    vi.stubGlobal('fetch', fetchMock)
+    const erase = vi.fn().mockResolvedValue(undefined)
+    setPersonErasure(erase)
+
+    try {
+      const result = await purgeExpiredDeletedAccounts(
+        new Date('2026-01-31T00:00:00.000Z'),
+      )
+
+      expect(timeout).toHaveBeenCalledWith(APPLE_REVOKE_TIMEOUT_MS)
+      expect(result).toEqual({ purged: 1 })
+      expect(erase).toHaveBeenCalledWith(stale)
+      expect(
+        await db.query.user.findFirst({ where: { id: stale } }),
+      ).toBeUndefined()
+      expect(appleRevokeCalls(fetchMock)).toHaveLength(1)
+      expect(
+        lines.filter(
+          (line) => line.message === APPLE_REFRESH_TOKEN_REVOKE_FAILED,
+        ),
+      ).toEqual([
+        {
+          level: 'warn',
+          message: APPLE_REFRESH_TOKEN_REVOKE_FAILED,
+          fields: {
+            userId: stale,
+            reason: expect.any(String),
+          },
+        },
+      ])
+      const logged = JSON.stringify(lines)
+      expect(logged).not.toContain(APPLE_REFRESH_TOKEN)
+    } finally {
+      timeout.mockRestore()
       await db.delete(user).where(eq(user.id, stale))
     }
   })
