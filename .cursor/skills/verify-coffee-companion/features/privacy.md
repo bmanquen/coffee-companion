@@ -24,7 +24,7 @@ Preconditions:
 
 - **Footer.** Run `helpers/control browser as public` and `helpers/control browser goto --path /`. Click link `Privacy`. The URL ends with `/privacy` and the heading matches `/what we collect/i`.
 - **Recipients.** Every recipient heading is visible. Run `helpers/control browser expect --role heading --name Sentry --exact`, then the same for `PostHog`, `Google`, `Apple`, `Stripe`, and `Resend`. Under Apple, text matching `/refresh token for as long as the account exists/i` and `/30 days after you delete it so you can restore it/i` is visible. Text matching `/revoke/i` has count `0`.
-- **Own data.** Text matching `/exported from your account page/i` is visible. Text matching `/delete the account from that same page/i` is visible. Text matching `/keep your account data for 30 days so you can restore it/i` is visible. Text matching `/Deleting cancels a live Subscription immediately/i` is visible. Text matching `/unused prepaid time is not refunded/i` is visible. Heading `Your own data` is visible.
+- **Own data.** Text matching `/exported from your account page/i` is visible. Text matching `/delete the account from that same page/i` is visible. Text matching `/keep your account data for 30 days so you can restore it/i` is visible. Text matching `/Deleting cancels a live Subscription immediately/i` is visible. Text matching `/unused prepaid time is not refunded/i` is visible. Text matching `/no expiry until it is deleted in PostHog/i` is visible (`expect --first` — the PostHog recipient retention and this paragraph both contain that phrase). Heading `Your own data` is visible.
 - **Direct.** Run `helpers/control browser goto --path /privacy`. The same heading is visible. Both screenshots show the marketing header `Coffee Companion`.
 - **Proof.** Run `helpers/control browser screenshot --path artifacts/<run>/privacy/page.png` and `helpers/control browser snapshot --aria --path artifacts/<run>/privacy/page.aria.txt` on `/privacy`.
 
@@ -34,4 +34,5 @@ Preconditions:
 - `Privacy` lives in the footer, not the marketing header. The header's links are `Pricing` and `Sign in`.
 - A bare `expect --text Sentry` matches the heading, the retention sentence, the policy link, and session-replay copy. Address recipients as headings (`--role heading --name Sentry --exact`).
 - Apple token copy lives under the Apple recipient, not under `Your own data`. Account delete on `/account` does not mention Apple or revoke — that proof stays here. A match for `/revoke/i` is a product regression, not a missing sentence to add.
+- A bare `expect --text "/no expiry until it is deleted in PostHog/i"` matches the PostHog recipient retention and the Your own data paragraph. Use `--first`.
 - Canonical/social tags and `/sitemap.xml` (which lists `/privacy`) are not this feature's user path.
