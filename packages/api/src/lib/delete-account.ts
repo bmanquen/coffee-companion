@@ -101,16 +101,10 @@ export async function deleteAccount(userId: string, now = new Date()) {
     }
   }
 
-  const appleRefreshToken = await appleRefreshTokenForRevoke(userId)
-
   await db.transaction(async (tx) => {
     await tx.update(user).set({ deletedAt: now }).where(eq(user.id, userId))
     await tx.delete(session).where(eq(session.userId, userId))
   })
-
-  if (appleRefreshToken) {
-    await revokeAppleRefreshToken(userId, appleRefreshToken)
-  }
 }
 
 export async function restoreAccount(userId: string, now = new Date()) {
