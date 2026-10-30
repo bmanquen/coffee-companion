@@ -157,6 +157,8 @@ reviews:
   tools:
     github-checks:
       enabled: true
+      # Default 90s is shorter than our CI; 15 minutes is the maximum.
+      timeout_ms: 900000
 
 knowledge_base:
   learnings:
