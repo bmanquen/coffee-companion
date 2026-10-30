@@ -30,20 +30,24 @@ reviews:
     says an approach was intentionally dropped, that is not a missing
     requirement.
 
-    Score only the code. Never deduct because you cannot independently re-run
-    tests, coverage, lint, or typecheck that the author reports. GitHub status
-    checks are the verification: failing checks lower the score and must be
-    named; passing or pending checks do not. 5/5 is required when there are no
-    concrete code issues and no failing GitHub checks.
+    Score only the code. Always print **Confidence: X/5** with an integer 1-5.
+    Never print N/A, unknown, or withhold the score.
+
+    Never deduct because you cannot independently re-run tests, coverage, lint,
+    or typecheck that the author reports. Never deduct because GitHub check
+    results were not supplied to you. Missing, pending, queued, or passing
+    checks do not lower the score. Only a failing GitHub check that you can
+    see, cited by check name, lowers the score. 5/5 is required when there are
+    no concrete cited code issues; unavailable check data does not block 5/5.
 
     Deduct only for (a) a concrete issue cited as file:line, or (b) a failing
-    GitHub check cited by check name. Every point below 5 must name what cost
-    it. "Worth a human look" never changes the score.
+    GitHub check you can see, cited by check name. Every point below 5 must
+    name what cost it. "Worth a human look" never changes the score.
 
     Format the summary exactly like this:
 
     **Confidence: X/5**, followed by one sentence that names every deduction
-    (or says there are none).
+    (or says there are none). Never write N/A.
       5 = safe to merge, no concrete code issues
       4 = safe to merge, minor non-blocking cited notes
       3 = needs a closer human look at specific cited areas
