@@ -12,11 +12,11 @@ reviews:
   # into the review summary. This is the biggest single lever toward Greptile's feel.
   profile: quiet
 
-  # Sign-off: Request changes when issues are found, auto-approve once
-  # CodeRabbit's threads are resolved and no pre-merge checks are failing.
-  request_changes_workflow: true
-  # Stop authors from self-approving with @coderabbitai approve/resolve.
-  allow_author_approval: false
+  # Canonical replacements for the deprecated reviews.request_changes_workflow
+  # and reviews.allow_author_approval aliases. Do not set both old and new keys.
+  auto_approvals:
+    enabled: true
+    allow_author_approval: false
 
   # --- Greptile-style summary ---
   high_level_summary: true
@@ -24,22 +24,52 @@ reviews:
   # true here sends it to the walkthrough instead, and that path ignored our format.
   high_level_summary_in_walkthrough: false
   high_level_summary_instructions: |
+    Rewrite this summary from the code at the latest reviewed HEAD commit only.
+    Ignore earlier revisions, dropped commits, and commit-message history as
+    requirements. The current PR description is the source of intent: if it
+    says an approach was intentionally dropped, that is not a missing
+    requirement.
+
+    Score only the code. Never deduct because you cannot independently re-run
+    tests, coverage, lint, or typecheck that the author reports. GitHub status
+    checks are the verification: failing checks lower the score and must be
+    named; passing or pending checks do not. 5/5 is required when there are no
+    concrete code issues and no failing GitHub checks.
+
+    Deduct only for (a) a concrete issue cited as file:line, or (b) a failing
+    GitHub check cited by check name. Every point below 5 must name what cost
+    it. "Worth a human look" never changes the score.
+
     Format the summary exactly like this:
 
-    **Confidence: X/5**, followed by one sentence explaining the score.
-      5 = safe to merge, no concerns
-      4 = safe to merge, minor non-blocking notes
-      3 = needs a closer human look at specific areas
+    **Confidence: X/5**, followed by one sentence that names every deduction
+    (or says there are none).
+      5 = safe to merge, no concrete code issues
+      4 = safe to merge, minor non-blocking cited notes
+      3 = needs a closer human look at specific cited areas
       2 = likely bugs or risky changes, fix before merging
       1 = serious correctness, security, or breaking-change problems
+
+    Last reviewed commit: <short sha of the HEAD commit just reviewed>
 
     **What changed**: 2-4 bullets, behavior-level, not file-level.
 
     **Issues to address before merge**: a numbered list of only blocking
-    problems, each with file:line and one sentence. Write "None" if there are none.
+    problems, each with file:line (or GitHub check name) and one sentence.
+    Write "None" if there are none.
 
     **Worth a human look**: up to 3 bullets for areas where intent or context
-    can't be judged from the diff alone. Omit this section if empty.
+    can't be judged from the diff alone. Omit this section if empty. Do not
+    use it to ask a human to re-verify tests or CI.
+
+    **Per-file confidence**: a markdown table with columns File, Score, Note.
+    One row per file with a non-trivial change (logic, types, or behavior).
+    Score is n/5; Note is one line. Skip generated, vendored, lock, snapshot,
+    and other trivial files (including drizzle snapshot.json). Omit the
+    section if no files qualify.
+
+    **Fixed since last review**: bullets of prior-review findings that this
+    HEAD no longer has. Omit this section when there is no prior review.
 
   # Trim walkthrough noise
   collapse_walkthrough: true
@@ -56,6 +86,10 @@ reviews:
 
   auto_review:
     enabled: true
+    # Closest real key to "refresh the summary on each push"; docs say the
+    # description summary is rewritten on every incremental review. There is
+    # no separate regenerate-summary-on-review key.
+    auto_incremental_review: true
     drafts: false
     ignore_title_keywords: ["wip", "do not review"]
 
@@ -68,6 +102,7 @@ reviews:
     - "!**/build/**"
     - "!**/generated/**"
     - "!**/*.snap"
+    - "!**/drizzle/**/snapshot.json"
 
   # Tell it where to focus (edit the paths to match your repo)
   path_instructions:
@@ -113,6 +148,10 @@ reviews:
       enabled: false
     unit_tests:
       enabled: false
+
+  tools:
+    github-checks:
+      enabled: true
 
 knowledge_base:
   learnings:
