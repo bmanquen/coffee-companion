@@ -34,6 +34,8 @@ export const APPLE_REVOKE_URL = 'https://appleid.apple.com/auth/revoke'
 export const APPLE_PROVIDER_ID = 'apple'
 export const APPLE_AUTHORIZATION_CODE_GRANT = 'authorization_code'
 export const APPLE_REFRESH_TOKEN_HINT = 'refresh_token'
+// Undici waits five minutes for a response; purge must not.
+export const APPLE_REVOKE_TIMEOUT_MS = 10_000
 export const APPLE_CLIENT_SECRET_TTL_SECONDS = 180 * 24 * 60 * 60
 export const APPLE_SESSION_MS = 7 * 24 * 60 * 60 * 1000
 export const APPLE_FALLBACK_NAME = 'Apple user'
@@ -527,6 +529,7 @@ export async function revokeAppleRefreshToken(
         token: refreshToken,
         token_type_hint: APPLE_REFRESH_TOKEN_HINT,
       }),
+      signal: AbortSignal.timeout(APPLE_REVOKE_TIMEOUT_MS),
     })
     if (!response.ok) {
       log('warn', APPLE_REFRESH_TOKEN_REVOKE_FAILED, {
