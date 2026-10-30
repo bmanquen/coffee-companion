@@ -1,15 +1,27 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
+import { exportPKCS8, generateKeyPair } from 'jose'
 import { db } from '../db'
 import {
+  account,
   countries,
   pendingPersonErasure,
   session,
   user,
   verification,
 } from '../db/schema'
+import {
+  APPLE_PROVIDER_ID,
+  APPLE_REFRESH_TOKEN_HINT,
+  APPLE_REVOKE_URL,
+} from '../lib/apple'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import { setPersonErasure } from '../lib/erase-person'
+import {
+  OAUTH_TOKEN_DECRYPT_FAILED,
+  OAUTH_TOKEN_ENVELOPE_PREFIX,
+  encryptStoredOAuthToken,
+} from '../lib/oauth-token'
 import { setErrorCapture } from '../lib/report-error'
 import {
   purgeExpiredDeletedAccounts,
@@ -18,6 +30,7 @@ import {
 import {
   anonCaller,
   callerFor,
+  captureLogLines,
   createCoffeeFor,
   deviceTypes,
   grantPlan,
@@ -57,6 +70,23 @@ seedUsers([USER, OTHER], async () => {
 const CUSTOMER_ID = 'cus_deleteAccount'
 const SHARED_NAME = `Shared land ${USER}`
 const DAY_MS = 24 * 60 * 60 * 1000
+const APPLE_ENV_VARS = [
+  'APPLE_BUNDLE_ID',
+  'APPLE_TEAM_ID',
+  'APPLE_KEY_ID',
+  'APPLE_PRIVATE_KEY',
+] as const
+const APPLE_TEST_BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
+const APPLE_TEST_TEAM_ID = 'TEAMDEL01'
+const APPLE_TEST_KEY_ID = 'DELKEY01'
+const ROTATED_BETTER_AUTH_SECRET = 'rotated-better-auth-secret-fixture-32b!!'
+const APPLE_REFRESH_TOKEN = 'rt_apple_delete'
+const UNDECRYPTABLE_APPLE_ENVELOPE = `${OAUTH_TOKEN_ENVELOPE_PREFIX}1$not-a-ciphertext`
+const APPLE_REVOKE_OK_STATUS = 200
+const APPLE_REVOKE_REFUSED_STATUS = 400
+const APPLE_REFRESH_TOKEN_NOT_REVOKED = 'Apple refresh token was not revoked'
+const APPLE_REFRESH_TOKEN_REVOKE_FAILED = 'Apple refresh token revoke failed'
+const lines = captureLogLines()
 
 let ownedCoffeeId: string
 let ownedShotId: string
@@ -66,6 +96,10 @@ let sharedCountryId: string
 let ownVerificationId: string
 let otherVerificationId: string
 let sessionToken: string
+let applePrivateKey: string
+const savedAppleEnv = Object.fromEntries(
+  APPLE_ENV_VARS.map((name) => [name, process.env[name]]),
+)
 
 beforeAll(async () => {
   mocks.cancelBilledSubscriptions.mockResolvedValue(undefined)
@@ -149,6 +183,9 @@ beforeAll(async () => {
     userId: USER,
     updatedAt: new Date(),
   })
+
+  const pair = await generateKeyPair('ES256', { extractable: true })
+  applePrivateKey = await exportPKCS8(pair.privateKey)
 })
 
 afterEach(() => {
@@ -156,6 +193,11 @@ afterEach(() => {
   mocks.cancelBilledSubscriptions.mockResolvedValue(undefined)
   setPersonErasure(null)
   setErrorCapture(null)
+  vi.unstubAllGlobals()
+  for (const name of APPLE_ENV_VARS) {
+    if (savedAppleEnv[name] === undefined) delete process.env[name]
+    else process.env[name] = savedAppleEnv[name]
+  }
 })
 
 async function insertUser(
@@ -168,6 +210,40 @@ async function insertUser(
     email: `${id}@example.com`,
     ...extras,
   })
+}
+
+async function insertAppleAccount(userId: string, refreshToken: string) {
+  await db.insert(account).values({
+    id: globalThis.crypto.randomUUID(),
+    accountId: `apple.${userId}`,
+    providerId: APPLE_PROVIDER_ID,
+    userId,
+    refreshToken,
+  })
+}
+
+async function encryptUnderRotatedSecret(token: string) {
+  const current = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = ROTATED_BETTER_AUTH_SECRET
+  try {
+    return await encryptStoredOAuthToken(token)
+  } finally {
+    if (current === undefined) delete process.env.BETTER_AUTH_SECRET
+    else process.env.BETTER_AUTH_SECRET = current
+  }
+}
+
+function appleRevokeCalls(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls.filter(
+    ([url]) => String(url) === APPLE_REVOKE_URL,
+  )
+}
+
+function enableAppleSignIn() {
+  process.env.APPLE_BUNDLE_ID = APPLE_TEST_BUNDLE_ID
+  process.env.APPLE_TEAM_ID = APPLE_TEST_TEAM_ID
+  process.env.APPLE_KEY_ID = APPLE_TEST_KEY_ID
+  process.env.APPLE_PRIVATE_KEY = applePrivateKey
 }
 
 describe('account.delete', () => {
@@ -339,6 +415,148 @@ describe('account.delete', () => {
       expect(row?.deletedAt).toBeTruthy()
     } finally {
       await db.delete(user).where(eq(user.id, free))
+    }
+  })
+
+  it('revokes the Apple refresh token when the account is deleted', async () => {
+    const appleUser = 'delete-account-apple-revoke'
+    await insertUser(appleUser)
+    await insertAppleAccount(
+      appleUser,
+      await encryptStoredOAuthToken(APPLE_REFRESH_TOKEN),
+    )
+    enableAppleSignIn()
+    const fetchMock = vi.fn(
+      async () => new Response(null, { status: APPLE_REVOKE_OK_STATUS }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const asApple = callerFor(appleUser)
+
+    try {
+      await asApple.account.delete()
+
+      const row = await db.query.user.findFirst({ where: { id: appleUser } })
+      expect(row?.deletedAt).toBeTruthy()
+      const revokeCalls = appleRevokeCalls(fetchMock)
+      expect(revokeCalls).toHaveLength(1)
+      const body = String(revokeCalls[0]?.[1]?.body)
+      expect(body).toContain(`client_id=${APPLE_TEST_BUNDLE_ID}`)
+      expect(body).toContain(`token=${APPLE_REFRESH_TOKEN}`)
+      expect(body).toContain(
+        `token_type_hint=${APPLE_REFRESH_TOKEN_HINT}`,
+      )
+    } finally {
+      await db.delete(user).where(eq(user.id, appleUser))
+    }
+  })
+
+  it('still deletes when the Apple refresh token cannot be decrypted', async () => {
+    const appleUser = 'delete-account-apple-undecryptable'
+    await insertUser(appleUser)
+    const ciphertext = await encryptUnderRotatedSecret(APPLE_REFRESH_TOKEN)
+    await insertAppleAccount(appleUser, ciphertext)
+    enableAppleSignIn()
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const asApple = callerFor(appleUser)
+
+    try {
+      await asApple.account.delete()
+
+      const row = await db.query.user.findFirst({ where: { id: appleUser } })
+      expect(row?.deletedAt).toBeTruthy()
+      expect(appleRevokeCalls(fetchMock)).toHaveLength(0)
+      expect(
+        lines.filter((line) => line.message === APPLE_REFRESH_TOKEN_NOT_REVOKED),
+      ).toEqual([
+        {
+          level: 'warn',
+          message: APPLE_REFRESH_TOKEN_NOT_REVOKED,
+          fields: {
+            userId: appleUser,
+            reason: OAUTH_TOKEN_DECRYPT_FAILED,
+          },
+        },
+      ])
+      const logged = JSON.stringify(lines)
+      expect(logged).not.toContain(APPLE_REFRESH_TOKEN)
+      expect(logged).not.toContain(ciphertext)
+    } finally {
+      await db.delete(user).where(eq(user.id, appleUser))
+    }
+  })
+
+  it('still deletes when the stored Apple refresh token is an undecryptable envelope', async () => {
+    const appleUser = 'delete-account-apple-undecryptable-envelope'
+    await insertUser(appleUser)
+    await insertAppleAccount(appleUser, UNDECRYPTABLE_APPLE_ENVELOPE)
+    enableAppleSignIn()
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const asApple = callerFor(appleUser)
+
+    try {
+      await asApple.account.delete()
+
+      const row = await db.query.user.findFirst({ where: { id: appleUser } })
+      expect(row?.deletedAt).toBeTruthy()
+      expect(appleRevokeCalls(fetchMock)).toHaveLength(0)
+      expect(
+        lines.filter((line) => line.message === APPLE_REFRESH_TOKEN_NOT_REVOKED),
+      ).toEqual([
+        {
+          level: 'warn',
+          message: APPLE_REFRESH_TOKEN_NOT_REVOKED,
+          fields: {
+            userId: appleUser,
+            reason: OAUTH_TOKEN_DECRYPT_FAILED,
+          },
+        },
+      ])
+      const logged = JSON.stringify(lines)
+      expect(logged).not.toContain(UNDECRYPTABLE_APPLE_ENVELOPE)
+    } finally {
+      await db.delete(user).where(eq(user.id, appleUser))
+    }
+  })
+
+  it('still deletes when Apple refuses the refresh token revoke', async () => {
+    const appleUser = 'delete-account-apple-revoke-refused'
+    await insertUser(appleUser)
+    await insertAppleAccount(
+      appleUser,
+      await encryptStoredOAuthToken(APPLE_REFRESH_TOKEN),
+    )
+    enableAppleSignIn()
+    const fetchMock = vi.fn(
+      async () =>
+        new Response('invalid_grant', { status: APPLE_REVOKE_REFUSED_STATUS }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const asApple = callerFor(appleUser)
+
+    try {
+      await asApple.account.delete()
+
+      const row = await db.query.user.findFirst({ where: { id: appleUser } })
+      expect(row?.deletedAt).toBeTruthy()
+      expect(appleRevokeCalls(fetchMock)).toHaveLength(1)
+      expect(
+        lines.filter(
+          (line) => line.message === APPLE_REFRESH_TOKEN_REVOKE_FAILED,
+        ),
+      ).toEqual([
+        {
+          level: 'warn',
+          message: APPLE_REFRESH_TOKEN_REVOKE_FAILED,
+          fields: {
+            userId: appleUser,
+            reason: `Apple returned ${APPLE_REVOKE_REFUSED_STATUS}`,
+          },
+        },
+      ])
+    } finally {
+      await db.delete(user).where(eq(user.id, appleUser))
     }
   })
 })
@@ -525,6 +743,127 @@ describe('purge of deleted accounts', () => {
         .delete(pendingPersonErasure)
         .where(eq(pendingPersonErasure.accountId, leftover))
       await db.delete(user).where(eq(user.id, leftover))
+    }
+  })
+
+  it('revokes the Apple refresh token when a deleted account is purged', async () => {
+    const stale = 'delete-account-apple-purge-revoke'
+    await insertUser(stale)
+    await insertAppleAccount(
+      stale,
+      await encryptStoredOAuthToken(APPLE_REFRESH_TOKEN),
+    )
+    await db
+      .update(user)
+      .set({ deletedAt: new Date('2026-01-01T00:00:00.000Z') })
+      .where(eq(user.id, stale))
+    enableAppleSignIn()
+    const fetchMock = vi.fn(
+      async () => new Response(null, { status: APPLE_REVOKE_OK_STATUS }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const erase = vi.fn().mockResolvedValue(undefined)
+    setPersonErasure(erase)
+
+    try {
+      const result = await purgeExpiredDeletedAccounts(
+        new Date('2026-01-31T00:00:00.000Z'),
+      )
+
+      expect(result).toEqual({ purged: 1 })
+      expect(erase).toHaveBeenCalledWith(stale)
+      expect(
+        await db.query.user.findFirst({ where: { id: stale } }),
+      ).toBeUndefined()
+      const revokeCalls = appleRevokeCalls(fetchMock)
+      expect(revokeCalls).toHaveLength(1)
+      const body = String(revokeCalls[0]?.[1]?.body)
+      expect(body).toContain(`token=${APPLE_REFRESH_TOKEN}`)
+      expect(body).toContain(
+        `token_type_hint=${APPLE_REFRESH_TOKEN_HINT}`,
+      )
+    } finally {
+      await db.delete(user).where(eq(user.id, stale))
+    }
+  })
+
+  it('does not revoke Apple when a pending account is restored during purge', async () => {
+    const racing = 'delete-account-apple-restore-during-purge'
+    await insertUser(racing)
+    await insertAppleAccount(
+      racing,
+      await encryptStoredOAuthToken(APPLE_REFRESH_TOKEN),
+    )
+    await db
+      .update(user)
+      .set({ deletedAt: new Date('2026-01-01T00:00:00.000Z') })
+      .where(eq(user.id, racing))
+    enableAppleSignIn()
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const erase = vi.fn()
+    setPersonErasure(erase)
+
+    try {
+      const result = await purgeExpiredDeletedAccounts(
+        new Date('2026-01-31T00:00:00.000Z'),
+        () => restoreAccount(racing, new Date('2026-01-15T00:00:00.000Z')),
+      )
+
+      expect(result).toEqual({ purged: 0 })
+      expect(erase).not.toHaveBeenCalled()
+      expect(appleRevokeCalls(fetchMock)).toHaveLength(0)
+      expect(
+        (await db.query.user.findFirst({ where: { id: racing } }))?.deletedAt,
+      ).toBeNull()
+    } finally {
+      await db.delete(user).where(eq(user.id, racing))
+    }
+  })
+
+  it('still purges when the Apple refresh token cannot be decrypted', async () => {
+    const stale = 'delete-account-apple-purge-undecryptable'
+    await insertUser(stale)
+    const ciphertext = await encryptUnderRotatedSecret(APPLE_REFRESH_TOKEN)
+    await insertAppleAccount(stale, ciphertext)
+    await db
+      .update(user)
+      .set({ deletedAt: new Date('2026-01-01T00:00:00.000Z') })
+      .where(eq(user.id, stale))
+    enableAppleSignIn()
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const erase = vi.fn().mockResolvedValue(undefined)
+    setPersonErasure(erase)
+
+    try {
+      const result = await purgeExpiredDeletedAccounts(
+        new Date('2026-01-31T00:00:00.000Z'),
+      )
+
+      expect(result).toEqual({ purged: 1 })
+      expect(erase).toHaveBeenCalledWith(stale)
+      expect(
+        await db.query.user.findFirst({ where: { id: stale } }),
+      ).toBeUndefined()
+      expect(appleRevokeCalls(fetchMock)).toHaveLength(0)
+      expect(
+        lines.filter((line) => line.message === APPLE_REFRESH_TOKEN_NOT_REVOKED),
+      ).toEqual([
+        {
+          level: 'warn',
+          message: APPLE_REFRESH_TOKEN_NOT_REVOKED,
+          fields: {
+            userId: stale,
+            reason: OAUTH_TOKEN_DECRYPT_FAILED,
+          },
+        },
+      ])
+      const logged = JSON.stringify(lines)
+      expect(logged).not.toContain(APPLE_REFRESH_TOKEN)
+      expect(logged).not.toContain(ciphertext)
+    } finally {
+      await db.delete(user).where(eq(user.id, stale))
     }
   })
 

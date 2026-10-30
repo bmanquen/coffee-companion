@@ -2,6 +2,10 @@ import { and, eq, gt, isNotNull, lte } from 'drizzle-orm'
 import { db } from '../db'
 import { pendingPersonErasure, session, user, verification } from '../db/schema'
 import { ACCOUNT_RESTORE_WINDOW_MS, deletedAtOf } from './account-status'
+import {
+  appleRefreshTokenForRevoke,
+  revokeAppleRefreshToken,
+} from './apple'
 import { cancelBilledSubscriptions } from './billing'
 import { erasePerson } from './erase-person'
 import { reportError } from './report-error'
@@ -60,6 +64,7 @@ async function hardDeleteAccount(
   email: string,
   expiredCutoff: Date,
 ): Promise<boolean> {
+  const appleRefreshToken = await appleRefreshTokenForRevoke(userId)
   const removed = await db.transaction(async (tx) => {
     const gone = await tx
       .delete(user)
@@ -69,8 +74,12 @@ async function hardDeleteAccount(
     await tx.delete(verification).where(eq(verification.identifier, email))
     return true
   })
-  if (removed) await erasePersonAfterRow(userId)
-  return removed
+  if (!removed) return false
+  if (appleRefreshToken) {
+    await revokeAppleRefreshToken(userId, appleRefreshToken)
+  }
+  await erasePersonAfterRow(userId)
+  return true
 }
 
 export async function deleteAccount(userId: string, now = new Date()) {
@@ -92,10 +101,16 @@ export async function deleteAccount(userId: string, now = new Date()) {
     }
   }
 
+  const appleRefreshToken = await appleRefreshTokenForRevoke(userId)
+
   await db.transaction(async (tx) => {
     await tx.update(user).set({ deletedAt: now }).where(eq(user.id, userId))
     await tx.delete(session).where(eq(session.userId, userId))
   })
+
+  if (appleRefreshToken) {
+    await revokeAppleRefreshToken(userId, appleRefreshToken)
+  }
 }
 
 export async function restoreAccount(userId: string, now = new Date()) {
