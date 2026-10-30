@@ -458,6 +458,72 @@ describe('Google account linking', () => {
     if (claimant) remember(claimant.id)
   })
 
+  it('lets Google take an address that still has a leftover stand-in row', async () => {
+    const { config, identityToken, tokens } = await appleFixture()
+    const email = `${globalThis.crypto.randomUUID()}@example.com`
+    const accountId = `google.sub.leftover-stand-in.${globalThis.crypto.randomUUID()}`
+    const leftover = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.google-leftover-hold'),
+        authorizationCode: 'auth-apple',
+        email,
+      },
+      config,
+      tokens('apple.sub.google-leftover-hold'),
+    )
+    remember(leftover.user.id)
+    expect(await releaseUnverifiedEmailHold(email)).toBe('released')
+
+    const occupant = await signInWithAppleNative(
+      {
+        identityToken: await identityToken('apple.sub.google-leftover-occupant'),
+        authorizationCode: 'auth-apple-occupant',
+        email,
+      },
+      config,
+      tokens('apple.sub.google-leftover-occupant', 'rt_apple_occupant'),
+    )
+    remember(occupant.user.id)
+    expect(occupant.user.id).not.toBe(leftover.user.id)
+    expect(occupant.user.email).toBe(email)
+
+    await withGoogleSocial(
+      {
+        verifyIdToken: async () => true,
+        getUserInfo: async () => ({
+          user: {
+            id: accountId,
+            email,
+            emailVerified: true,
+            name: 'Google User',
+          },
+        }),
+      },
+      async () => {
+        const response = await postSocialSignIn(email)
+        expect(response.ok).toBe(true)
+        const body = (await response.json()) as { user?: { id?: string } }
+        if (body.user?.id) remember(body.user.id)
+      },
+    )
+
+    const leftoverRow = await db.query.user.findFirst({
+      where: { id: leftover.user.id },
+    })
+    const occupantRow = await db.query.user.findFirst({
+      where: { id: occupant.user.id },
+    })
+    const claimant = await db.query.user.findFirst({ where: { email } })
+    expect(leftoverRow?.email).not.toBe(email)
+    expect(occupantRow?.email).not.toBe(email)
+    expect(leftoverRow?.email).not.toBe(occupantRow?.email)
+    expect(claimant?.id).not.toBe(leftover.user.id)
+    expect(claimant?.id).not.toBe(occupant.user.id)
+    expect(claimant?.email).toBe(email)
+    expect(claimant?.emailVerified).toBe(true)
+    if (claimant) remember(claimant.id)
+  })
+
   it('keeps a real verified claim when a forged restore overlaps', async () => {
     const { config, identityToken, tokens } = await appleFixture()
     const email = `${globalThis.crypto.randomUUID()}@example.com`
