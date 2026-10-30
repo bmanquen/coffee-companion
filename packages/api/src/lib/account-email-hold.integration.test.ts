@@ -142,10 +142,13 @@ describe('orphaned email hold restore', () => {
     })
 
     try {
-      await db
-        .update(user)
-        .set({ email: legacyUnverifiedEmailPlaceholder(email) })
-        .where(eq(user.id, id))
+      expect(await takeUnverifiedEmailHold(email)).toEqual({
+        email,
+        userId: id,
+      })
+      expect((await db.query.user.findFirst({ where: { id } }))?.email).toBe(
+        unverifiedEmailPlaceholder(email, id),
+      )
       await markHoldStale(id)
       await releaseUnverifiedEmailFromVerifiedSocial(
         {
@@ -160,6 +163,76 @@ describe('orphaned email hold restore', () => {
       )
     } finally {
       await db.delete(user).where(eq(user.id, id))
+    }
+  })
+
+  it('restores a leftover address-only stand-in from #191', async () => {
+    const id = globalThis.crypto.randomUUID()
+    const email = `${id}@example.com`
+    await db.insert(user).values({
+      id,
+      name: 'Hold leftover',
+      email,
+      emailVerified: false,
+    })
+
+    try {
+      await db
+        .update(user)
+        .set({ email: legacyUnverifiedEmailPlaceholder(email) })
+        .where(eq(user.id, id))
+      await markHoldStale(id)
+      expect(await restoreOrphanedEmailHoldIfUnowned(email)).toBe('restored')
+      expect((await db.query.user.findFirst({ where: { id } }))?.email).toBe(
+        email,
+      )
+    } finally {
+      await db.delete(user).where(eq(user.id, id))
+    }
+  })
+
+  it('restores the oldest of two stale holders for the same address', async () => {
+    const olderId = globalThis.crypto.randomUUID()
+    const newerId = globalThis.crypto.randomUUID()
+    const email = `${olderId}@example.com`
+    await db.insert(user).values({
+      id: olderId,
+      name: 'Older hold',
+      email,
+      emailVerified: false,
+    })
+
+    try {
+      expect(await takeUnverifiedEmailHold(email)).toEqual({
+        email,
+        userId: olderId,
+      })
+      await db.insert(user).values({
+        id: newerId,
+        name: 'Newer hold',
+        email,
+        emailVerified: false,
+      })
+      expect(await takeUnverifiedEmailHold(email)).toEqual({
+        email,
+        userId: newerId,
+      })
+
+      await db.execute(
+        sql`update "user" set updated_at = now() - ${ORPHANED_EMAIL_HOLD_STALE_AFTER}::interval - interval '2 minutes' where id = ${olderId}`,
+      )
+      await markHoldStale(newerId)
+
+      expect(await restoreOrphanedEmailHoldIfUnowned(email)).toBe('restored')
+      expect(
+        (await db.query.user.findFirst({ where: { id: olderId } }))?.email,
+      ).toBe(email)
+      expect(
+        (await db.query.user.findFirst({ where: { id: newerId } }))?.email,
+      ).toBe(unverifiedEmailPlaceholder(email, newerId))
+    } finally {
+      await db.delete(user).where(eq(user.id, olderId))
+      await db.delete(user).where(eq(user.id, newerId))
     }
   })
 
