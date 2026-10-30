@@ -17,9 +17,12 @@ import {
   releaseUnverifiedEmailHold,
   restoreOrphanedEmailHoldIfUnowned,
 } from './account-email-hold'
+import { log } from './log'
 import {
+  OAUTH_TOKEN_DECRYPT_FAILED,
   decryptStoredOAuthToken,
   encryptStoredOAuthToken,
+  isEncryptedOAuthToken,
 } from './oauth-token'
 import { PG_UNIQUE_VIOLATION, pgErrorIn } from './pg-error'
 import type { JWK, JWTPayload, JWTVerifyGetKey } from 'jose'
@@ -27,8 +30,10 @@ import type { JWK, JWTPayload, JWTVerifyGetKey } from 'jose'
 export const APPLE_ISSUER = 'https://appleid.apple.com'
 export const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys'
 export const APPLE_TOKEN_URL = 'https://appleid.apple.com/auth/token'
+export const APPLE_REVOKE_URL = 'https://appleid.apple.com/auth/revoke'
 export const APPLE_PROVIDER_ID = 'apple'
 export const APPLE_AUTHORIZATION_CODE_GRANT = 'authorization_code'
+export const APPLE_REFRESH_TOKEN_HINT = 'refresh_token'
 export const APPLE_CLIENT_SECRET_TTL_SECONDS = 180 * 24 * 60 * 60
 export const APPLE_SESSION_MS = 7 * 24 * 60 * 60 * 1000
 export const APPLE_FALLBACK_NAME = 'Apple user'
@@ -36,6 +41,12 @@ export const APPLE_SIGN_IN_ATTEMPTS = 2
 
 const APPLE_SIGNING_ALG = 'ES256'
 const EMAIL_VERIFIED_TRUE = 'true'
+const APPLE_FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded'
+const APPLE_REFRESH_TOKEN_NOT_REVOKED = 'Apple refresh token was not revoked'
+const APPLE_REFRESH_TOKEN_REVOKE_FAILED = 'Apple refresh token revoke failed'
+const APPLE_SIGN_IN_NOT_CONFIGURED = 'Apple Sign In is not configured'
+const APPLE_REVOKE_REQUEST_FAILED = 'request failed'
+const APPLE_TOKEN_DECRYPT_FAILED = 'decrypt failed'
 
 export class AppleIdentityInvalid extends Error {
   constructor(message = 'Apple identity token is not valid.') {
@@ -210,7 +221,7 @@ export async function exchangeAppleAuthorizationCode(
   try {
     response = await request(APPLE_TOKEN_URL, {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      headers: { 'content-type': APPLE_FORM_CONTENT_TYPE },
       body,
     })
   } catch {
@@ -453,4 +464,81 @@ export function appleAccountOf(userId: string) {
 export async function appleRefreshTokenOf(userId: string) {
   const row = await appleAccountOf(userId)
   return decryptStoredOAuthToken(row?.refreshToken)
+}
+
+export async function appleRefreshTokenForRevoke(userId: string) {
+  try {
+    const token = await appleRefreshTokenOf(userId)
+    if (!token) return null
+    // String-key encrypt stores bare hex. A wrong secret then fails
+    // decrypt and is returned as leftover plaintext, which is not a
+    // token Apple will revoke.
+    if (isEncryptedOAuthToken(token)) {
+      log('warn', APPLE_REFRESH_TOKEN_NOT_REVOKED, {
+        userId,
+        reason: OAUTH_TOKEN_DECRYPT_FAILED,
+      })
+      return null
+    }
+    return token
+  } catch (error) {
+    log('warn', APPLE_REFRESH_TOKEN_NOT_REVOKED, {
+      userId,
+      reason:
+        error instanceof Error ? error.message : APPLE_TOKEN_DECRYPT_FAILED,
+    })
+    return null
+  }
+}
+
+export async function revokeAppleRefreshToken(
+  userId: string,
+  refreshToken: string,
+) {
+  let config: AppleNativeConfig | null
+  try {
+    config = appleNativeConfig()
+  } catch (error) {
+    log('warn', APPLE_REFRESH_TOKEN_NOT_REVOKED, {
+      userId,
+      reason:
+        error instanceof Error
+          ? error.message
+          : APPLE_SIGN_IN_NOT_CONFIGURED,
+    })
+    return
+  }
+  if (!config) {
+    log('warn', APPLE_REFRESH_TOKEN_NOT_REVOKED, {
+      userId,
+      reason: APPLE_SIGN_IN_NOT_CONFIGURED,
+    })
+    return
+  }
+
+  try {
+    const clientSecret = await appleClientSecret(config)
+    const response = await fetch(APPLE_REVOKE_URL, {
+      method: 'POST',
+      headers: { 'content-type': APPLE_FORM_CONTENT_TYPE },
+      body: new URLSearchParams({
+        client_id: config.bundleId,
+        client_secret: clientSecret,
+        token: refreshToken,
+        token_type_hint: APPLE_REFRESH_TOKEN_HINT,
+      }),
+    })
+    if (!response.ok) {
+      log('warn', APPLE_REFRESH_TOKEN_REVOKE_FAILED, {
+        userId,
+        reason: `Apple returned ${response.status}`,
+      })
+    }
+  } catch (error) {
+    log('warn', APPLE_REFRESH_TOKEN_REVOKE_FAILED, {
+      userId,
+      reason:
+        error instanceof Error ? error.message : APPLE_REVOKE_REQUEST_FAILED,
+    })
+  }
 }
