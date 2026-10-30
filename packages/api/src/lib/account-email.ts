@@ -19,7 +19,7 @@ export type VerifiedSocialIdentity = {
   emailVerified: boolean
 }
 
-function encodeHeldEmail(email: string) {
+export function encodeHeldEmail(email: string) {
   return Buffer.from(email, 'utf8').toString('base64url')
 }
 
@@ -40,6 +40,10 @@ export function unverifiedEmailPlaceholder(
 
 export function unverifiedEmailHoldPrefixPattern(heldEmail: string): string {
   return `${escapeLikeWildcards(encodeHeldEmail(heldEmail))}.%@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
+}
+
+export function emailIsUnverifiedHolderAddress(email: string): boolean {
+  return email.toLowerCase().endsWith(`@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`)
 }
 
 export function isEmailVerifiedClaim(value: unknown): boolean {

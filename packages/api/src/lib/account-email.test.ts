@@ -3,6 +3,7 @@ import {
   EMAIL_ALREADY_ASSOCIATED,
   EMAIL_ALREADY_ASSOCIATED_CODE,
   UNVERIFIED_EMAIL_HOLDER_DOMAIN,
+  emailIsUnverifiedHolderAddress,
   identityFromVerifiedJwt,
   legacyUnverifiedEmailPlaceholder,
   socialIdTokenFromBody,
@@ -40,10 +41,19 @@ describe('unverifiedEmailPlaceholder', () => {
     )
   })
 
-  it('keeps the address-only stand-in from #191 for leftover restore', () => {
+  it('keeps an address-only stand-in off the public email unique key', () => {
     expect(legacyUnverifiedEmailPlaceholder('ada@example.com')).toBe(
       `YWRhQGV4YW1wbGUuY29t@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`,
     )
+  })
+
+  it('recognizes the reserved holder domain', () => {
+    expect(emailIsUnverifiedHolderAddress('ada@example.com')).toBe(false)
+    expect(
+      emailIsUnverifiedHolderAddress(
+        `YWRhQGV4YW1wbGUuY29t.user-1@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`,
+      ),
+    ).toBe(true)
   })
 
   it('escapes LIKE wildcards in the per-holder prefix so _ is literal', () => {

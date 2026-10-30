@@ -5,6 +5,7 @@ import { SignJWT, exportJWK, exportPKCS8, generateKeyPair } from 'jose'
 import { db } from '../db'
 import { user } from '../db/schema'
 import {
+  UNVERIFIED_EMAIL_HOLDER_DOMAIN,
   legacyUnverifiedEmailPlaceholder,
   unverifiedEmailPlaceholder,
 } from './account-email'
@@ -529,6 +530,28 @@ describe('Google account linking', () => {
     expect(claimant?.email).toBe(email)
     expect(claimant?.emailVerified).toBe(true)
     if (claimant) remember(claimant.id)
+  })
+
+  it('refuses Google sign-in when the verified email uses the holder domain', async () => {
+    const email = `forged@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
+    await withGoogleSocial(
+      {
+        verifyIdToken: async () => true,
+        getUserInfo: async () => ({
+          user: {
+            id: 'google.sub.holder-domain',
+            email,
+            emailVerified: true,
+            name: 'Google User',
+          },
+        }),
+      },
+      async () => {
+        const response = await postSocialSignIn(email)
+        expect(response.ok).toBe(false)
+      },
+    )
+    expect(await db.query.user.findFirst({ where: { email } })).toBeUndefined()
   })
 
   it('keeps a real verified claim when a forged restore overlaps', async () => {

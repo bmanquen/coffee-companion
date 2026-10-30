@@ -11,6 +11,7 @@ import { account, session, user } from '../db/schema'
 import {
   EMAIL_ALREADY_ASSOCIATED,
   EMAIL_ALREADY_ASSOCIATED_CODE,
+  emailIsUnverifiedHolderAddress,
 } from './account-email'
 import {
   releaseUnverifiedEmailHold,
@@ -341,6 +342,12 @@ export async function signInWithAppleNative(
             if (!email) {
               throw new AppleSignInRefused(
                 'Apple did not send an email. Sign in again and share your email.',
+              )
+            }
+            if (emailIsUnverifiedHolderAddress(email)) {
+              throw new AppleSignInRefused(
+                EMAIL_ALREADY_ASSOCIATED,
+                EMAIL_ALREADY_ASSOCIATED_CODE,
               )
             }
 
