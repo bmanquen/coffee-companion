@@ -133,8 +133,7 @@ export async function restoreOrphanedEmailHoldIfUnowned(
   store: EmailHoldStore = db,
 ): Promise<'restored' | 'kept'> {
   // Exact placeholder match uses the email unique index. Fresh rows stay
-  // put so a forged token cannot undo an in-flight claim. Per-holder
-  // stand-ins are restored by restoreUnverifiedEmailHold, which has the id.
+  // put so a forged token cannot undo an in-flight claim.
   const restored = await store
     .update(user)
     .set({ email })

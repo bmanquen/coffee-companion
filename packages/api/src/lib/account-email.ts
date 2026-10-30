@@ -23,8 +23,6 @@ function encodeHeldEmail(email: string) {
   return Buffer.from(email, 'utf8').toString('base64url')
 }
 
-// Address-only stand-in from #191. Orphan restore still looks this value up
-// on the unique email key.
 export function legacyUnverifiedEmailPlaceholder(heldEmail: string): string {
   return `${encodeHeldEmail(heldEmail)}@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
 }
