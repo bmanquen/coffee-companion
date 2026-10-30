@@ -23,6 +23,10 @@ function encodeHeldEmail(email: string) {
   return Buffer.from(email, 'utf8').toString('base64url')
 }
 
+function escapeLikeWildcards(value: string) {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
 export function legacyUnverifiedEmailPlaceholder(heldEmail: string): string {
   return `${encodeHeldEmail(heldEmail)}@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
 }
@@ -32,6 +36,10 @@ export function unverifiedEmailPlaceholder(
   holderId: string,
 ): string {
   return `${encodeHeldEmail(heldEmail)}.${holderId}@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
+}
+
+export function unverifiedEmailHoldPrefixPattern(heldEmail: string): string {
+  return `${escapeLikeWildcards(encodeHeldEmail(heldEmail))}.%@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
 }
 
 export function isEmailVerifiedClaim(value: unknown): boolean {

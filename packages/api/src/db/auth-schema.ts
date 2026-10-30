@@ -25,7 +25,15 @@ export const user = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("user_deleted_at_idx").on(table.deletedAt)],
+  (table) => [
+    index("user_deleted_at_idx").on(table.deletedAt),
+    // Prefix LIKE on email (orphaned stand-in restore) cannot use the unique
+    // btree when the database collation is not C; text_pattern_ops can.
+    index("user_email_text_pattern_ops_idx").using(
+      "btree",
+      table.email.op("text_pattern_ops"),
+    ),
+  ],
 );
 
 export const session = pgTable(

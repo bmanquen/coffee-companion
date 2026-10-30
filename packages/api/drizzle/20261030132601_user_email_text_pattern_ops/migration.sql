@@ -1,0 +1,1 @@
+CREATE INDEX "user_email_text_pattern_ops_idx" ON "user" ("email" text_pattern_ops);

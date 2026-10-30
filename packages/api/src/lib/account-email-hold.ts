@@ -7,6 +7,7 @@ import {
   isEmailVerifiedClaim,
   legacyUnverifiedEmailPlaceholder,
   socialIdTokenFromBody,
+  unverifiedEmailHoldPrefixPattern,
   unverifiedEmailPlaceholder,
 } from './account-email'
 import type { EmailHold } from './account-email'
@@ -128,18 +129,34 @@ export async function restoreUnverifiedEmailHold(
   return restored[0] ? 'restored' : 'kept'
 }
 
+function oldestStaleUnverifiedHoldId(email: string) {
+  const legacy = legacyUnverifiedEmailPlaceholder(email)
+  const prefix = unverifiedEmailHoldPrefixPattern(email)
+  return sql`(
+    select holder.id
+    from "user" as holder
+    where (
+      holder.email = ${legacy}
+      or holder.email like ${prefix} escape '\\'
+    )
+    and holder.email_verified = false
+    and holder.updated_at < now() - ${ORPHANED_EMAIL_HOLD_STALE_AFTER}::interval
+    order by holder.updated_at asc, holder.id asc
+    limit 1
+  )`
+}
+
 export async function restoreOrphanedEmailHoldIfUnowned(
   email: string,
   store: EmailHoldStore = db,
 ): Promise<'restored' | 'kept'> {
-  // Exact placeholder match uses the email unique index. Fresh rows stay
-  // put so a forged token cannot undo an in-flight claim.
+  // Fresh rows stay put so a forged token cannot undo an in-flight claim.
   const restored = await store
     .update(user)
     .set({ email })
     .where(
       and(
-        eq(user.email, legacyUnverifiedEmailPlaceholder(email)),
+        eq(user.id, oldestStaleUnverifiedHoldId(email)),
         eq(user.emailVerified, false),
         holdPlaceholderIsStale(),
         addressIsUnowned(email),

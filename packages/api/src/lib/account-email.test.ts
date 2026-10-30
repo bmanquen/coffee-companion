@@ -6,6 +6,7 @@ import {
   identityFromVerifiedJwt,
   legacyUnverifiedEmailPlaceholder,
   socialIdTokenFromBody,
+  unverifiedEmailHoldPrefixPattern,
   unverifiedEmailPlaceholder,
 } from './account-email'
 
@@ -42,6 +43,12 @@ describe('unverifiedEmailPlaceholder', () => {
   it('keeps the address-only stand-in from #191 for leftover restore', () => {
     expect(legacyUnverifiedEmailPlaceholder('ada@example.com')).toBe(
       `YWRhQGV4YW1wbGUuY29t@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`,
+    )
+  })
+
+  it('escapes LIKE wildcards in the per-holder prefix so _ is literal', () => {
+    expect(unverifiedEmailHoldPrefixPattern('???@x.com')).toBe(
+      `Pz8\\_QHguY29t.%@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`,
     )
   })
 })
