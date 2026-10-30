@@ -38,7 +38,8 @@ reviews:
     results were not supplied to you. Missing, pending, queued, or passing
     checks do not lower the score. Only a failing GitHub check that you can
     see, cited by check name, lowers the score. 5/5 is required when there are
-    no concrete cited code issues; unavailable check data does not block 5/5.
+    no concrete cited code issues and no visible failing GitHub checks.
+    Unavailable, pending, or passing checks do not block 5/5.
 
     Deduct only for (a) a concrete issue cited as file:line, or (b) a failing
     GitHub check you can see, cited by check name. Every point below 5 must
