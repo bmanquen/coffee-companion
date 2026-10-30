@@ -23,10 +23,17 @@ function encodeHeldEmail(email: string) {
   return Buffer.from(email, 'utf8').toString('base64url')
 }
 
-export function unverifiedEmailPlaceholder(heldEmail: string): string {
-  // Deterministic from the held address so restore can look it up by the
-  // unique email key instead of scanning.
+// Address-only stand-in from #191. Orphan restore still looks this value up
+// on the unique email key.
+export function legacyUnverifiedEmailPlaceholder(heldEmail: string): string {
   return `${encodeHeldEmail(heldEmail)}@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
+}
+
+export function unverifiedEmailPlaceholder(
+  heldEmail: string,
+  holderId: string,
+): string {
+  return `${encodeHeldEmail(heldEmail)}.${holderId}@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
 }
 
 export function isEmailVerifiedClaim(value: unknown): boolean {

@@ -4,6 +4,7 @@ import {
   EMAIL_ALREADY_ASSOCIATED_CODE,
   UNVERIFIED_EMAIL_HOLDER_DOMAIN,
   identityFromVerifiedJwt,
+  legacyUnverifiedEmailPlaceholder,
   socialIdTokenFromBody,
   unverifiedEmailPlaceholder,
 } from './account-email'
@@ -27,7 +28,19 @@ describe('EMAIL_ALREADY_ASSOCIATED', () => {
 
 describe('unverifiedEmailPlaceholder', () => {
   it('keeps the released address off the public email unique key', () => {
-    expect(unverifiedEmailPlaceholder('ada@example.com')).toBe(
+    expect(unverifiedEmailPlaceholder('ada@example.com', 'user-1')).toBe(
+      `YWRhQGV4YW1wbGUuY29t.user-1@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`,
+    )
+  })
+
+  it('gives each holder of the same address a distinct stand-in', () => {
+    expect(unverifiedEmailPlaceholder('ada@example.com', 'user-1')).not.toBe(
+      unverifiedEmailPlaceholder('ada@example.com', 'user-2'),
+    )
+  })
+
+  it('keeps the address-only stand-in from #191 for leftover restore', () => {
+    expect(legacyUnverifiedEmailPlaceholder('ada@example.com')).toBe(
       `YWRhQGV4YW1wbGUuY29t@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`,
     )
   })

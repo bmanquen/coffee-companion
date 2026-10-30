@@ -2,7 +2,10 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { user } from '../db/schema'
-import { unverifiedEmailPlaceholder } from './account-email'
+import {
+  legacyUnverifiedEmailPlaceholder,
+  unverifiedEmailPlaceholder,
+} from './account-email'
 import {
   ORPHANED_EMAIL_HOLD_STALE_AFTER,
   releaseUnverifiedEmailFromVerifiedSocial,
@@ -82,7 +85,7 @@ describe('restoreReleasedEmailHoldIfSignInFailed', () => {
       await restoreReleasedEmailHoldIfSignInFailed(keepContext)
       expect(
         (await db.query.user.findFirst({ where: { id: keepId } }))?.email,
-      ).toBe(unverifiedEmailPlaceholder(keepEmail))
+      ).toBe(unverifiedEmailPlaceholder(keepEmail, keepId))
     } finally {
       await db.delete(user).where(eq(user.id, restoreId))
       await db.delete(user).where(eq(user.id, keepId))
@@ -139,14 +142,10 @@ describe('orphaned email hold restore', () => {
     })
 
     try {
-      expect(await takeUnverifiedEmailHold(email)).toEqual({
-        email,
-        userId: id,
-      })
-      expect(
-        (await db.query.user.findFirst({ where: { id } }))?.email,
-      ).toBe(unverifiedEmailPlaceholder(email))
-
+      await db
+        .update(user)
+        .set({ email: legacyUnverifiedEmailPlaceholder(email) })
+        .where(eq(user.id, id))
       await markHoldStale(id)
       await releaseUnverifiedEmailFromVerifiedSocial(
         {
@@ -196,7 +195,7 @@ describe('orphaned email hold restore', () => {
       expect(await restoreOrphanedEmailHoldIfUnowned(email)).toBe('kept')
       expect(
         (await db.query.user.findFirst({ where: { id: holderId } }))?.email,
-      ).toBe(unverifiedEmailPlaceholder(email))
+      ).toBe(unverifiedEmailPlaceholder(email, holderId))
       expect(
         (await db.query.user.findFirst({ where: { id: ownerId } }))?.email,
       ).toBe(email)
@@ -241,7 +240,7 @@ describe('orphaned email hold restore', () => {
       ).toBeNull()
 
       expect((await db.query.user.findFirst({ where: { id } }))?.email).toBe(
-        unverifiedEmailPlaceholder(email),
+        unverifiedEmailPlaceholder(email, id),
       )
       expect(await db.query.user.findFirst({ where: { email } })).toBeUndefined()
     } finally {

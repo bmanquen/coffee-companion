@@ -1,10 +1,13 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { handleOAuthUserInfo } from 'better-auth/oauth2'
-import { inArray } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { SignJWT, exportJWK, exportPKCS8, generateKeyPair } from 'jose'
 import { db } from '../db'
 import { user } from '../db/schema'
-import { unverifiedEmailPlaceholder } from './account-email'
+import {
+  legacyUnverifiedEmailPlaceholder,
+  unverifiedEmailPlaceholder,
+} from './account-email'
 import {
   releaseUnverifiedEmailFromVerifiedSocial,
   releaseUnverifiedEmailHold,
@@ -193,7 +196,6 @@ describe('Google account linking', () => {
       where: { id: apple.user.id },
     })
     expect(stored?.email).toBe(email)
-    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(email))
   })
 
   it('leaves an unverified Apple email hold intact when the social id token is forged', async () => {
@@ -228,7 +230,6 @@ describe('Google account linking', () => {
       where: { id: apple.user.id },
     })
     expect(stored?.email).toBe(email)
-    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(email))
   })
 
   it('releases an unverified hold only after the provider verifies the id token', async () => {
@@ -264,7 +265,7 @@ describe('Google account linking', () => {
     const stored = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
-    expect(stored?.email).toBe(unverifiedEmailPlaceholder(email))
+    expect(stored?.email).toBe(unverifiedEmailPlaceholder(email, apple.user.id))
   })
 
   it('leaves the hold intact when a verified token does not claim a verified email', async () => {
@@ -363,7 +364,9 @@ describe('Google account linking', () => {
     const appleRow = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
-    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(email))
+    expect(appleRow?.email).toBe(
+      unverifiedEmailPlaceholder(email, apple.user.id),
+    )
     expect((await appleAccountOf(apple.user.id))?.accountId).toBe(
       'apple.sub.google-claim',
     )
@@ -410,7 +413,6 @@ describe('Google account linking', () => {
       where: { id: apple.user.id },
     })
     expect(stored?.email).toBe(email)
-    expect(stored?.email).not.toBe(unverifiedEmailPlaceholder(email))
   })
 
   it('leaves the hold released when sign-in succeeds', async () => {
@@ -451,7 +453,9 @@ describe('Google account linking', () => {
     const appleRow = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
-    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(email))
+    expect(appleRow?.email).toBe(
+      unverifiedEmailPlaceholder(email, apple.user.id),
+    )
     const claimant = await db.query.user.findFirst({ where: { email } })
     expect(claimant?.id).not.toBe(apple.user.id)
     expect(claimant?.emailVerified).toBe(true)
@@ -472,7 +476,10 @@ describe('Google account linking', () => {
       tokens('apple.sub.google-leftover-hold'),
     )
     remember(leftover.user.id)
-    expect(await releaseUnverifiedEmailHold(email)).toBe('released')
+    await db
+      .update(user)
+      .set({ email: legacyUnverifiedEmailPlaceholder(email) })
+      .where(eq(user.id, leftover.user.id))
 
     const occupant = await signInWithAppleNative(
       {
@@ -580,7 +587,9 @@ describe('Google account linking', () => {
     const appleRow = await db.query.user.findFirst({
       where: { id: apple.user.id },
     })
-    expect(appleRow?.email).toBe(unverifiedEmailPlaceholder(email))
+    expect(appleRow?.email).toBe(
+      unverifiedEmailPlaceholder(email, apple.user.id),
+    )
     const claimant = await db.query.user.findFirst({ where: { email } })
     expect(claimant?.id).not.toBe(apple.user.id)
     expect(claimant?.emailVerified).toBe(true)
@@ -619,6 +628,6 @@ describe('Google account linking', () => {
     expect(await restoreUnverifiedEmailHold(hold)).toBe('kept')
     expect(
       (await db.query.user.findFirst({ where: { id: apple.user.id } }))?.email,
-    ).toBe(unverifiedEmailPlaceholder(email))
+    ).toBe(unverifiedEmailPlaceholder(email, apple.user.id))
   })
 })
