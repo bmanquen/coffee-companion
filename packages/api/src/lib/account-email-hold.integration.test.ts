@@ -2,10 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { user } from '../db/schema'
-import {
-  legacyUnverifiedEmailPlaceholder,
-  unverifiedEmailPlaceholder,
-} from './account-email'
+import { unverifiedEmailPlaceholder } from './account-email'
 import {
   ORPHANED_EMAIL_HOLD_STALE_AFTER,
   releaseUnverifiedEmailFromVerifiedSocial,
@@ -166,28 +163,26 @@ describe('orphaned email hold restore', () => {
     }
   })
 
-  it('restores a leftover address-only stand-in from #191', async () => {
-    const id = globalThis.crypto.randomUUID()
-    const email = `${id}@example.com`
+  it('does not restore a stand-in that names a different holder', async () => {
+    const forgedId = globalThis.crypto.randomUUID()
+    const otherId = globalThis.crypto.randomUUID()
+    const email = `${forgedId}@example.com`
     await db.insert(user).values({
-      id,
-      name: 'Hold leftover',
-      email,
+      id: forgedId,
+      name: 'Forged hold',
+      email: unverifiedEmailPlaceholder(email, otherId),
       emailVerified: false,
     })
 
     try {
-      await db
-        .update(user)
-        .set({ email: legacyUnverifiedEmailPlaceholder(email) })
-        .where(eq(user.id, id))
-      await markHoldStale(id)
-      expect(await restoreOrphanedEmailHoldIfUnowned(email)).toBe('restored')
-      expect((await db.query.user.findFirst({ where: { id } }))?.email).toBe(
-        email,
-      )
+      await markHoldStale(forgedId)
+      expect(await restoreOrphanedEmailHoldIfUnowned(email)).toBe('kept')
+      expect(
+        (await db.query.user.findFirst({ where: { id: forgedId } }))?.email,
+      ).toBe(unverifiedEmailPlaceholder(email, otherId))
+      expect(await db.query.user.findFirst({ where: { email } })).toBeUndefined()
     } finally {
-      await db.delete(user).where(eq(user.id, id))
+      await db.delete(user).where(eq(user.id, forgedId))
     }
   })
 

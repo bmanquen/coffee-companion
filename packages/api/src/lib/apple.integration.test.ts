@@ -16,6 +16,7 @@ import {
 } from './apple'
 import {
   EMAIL_ALREADY_ASSOCIATED_CODE,
+  UNVERIFIED_EMAIL_HOLDER_DOMAIN,
   unverifiedEmailPlaceholder,
 } from './account-email'
 import type { AppleCrypto, AppleNativeConfig } from './apple'
@@ -303,6 +304,28 @@ describe('signInWithAppleNative', () => {
         tokens({ subject: 'apple.sub.no-email' }),
       ),
     ).rejects.toBeInstanceOf(AppleSignInRefused)
+  })
+
+  it('refuses a credential email on the unverified holder domain', async () => {
+    const { config, identityToken, tokens } = await fixture()
+    const usersBefore = await db.select().from(user)
+
+    await expect(
+      signInWithAppleNative(
+        {
+          identityToken: await identityToken('apple.sub.holder-domain'),
+          authorizationCode: 'auth-first',
+          email: `forged@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`,
+        },
+        config,
+        tokens({ subject: 'apple.sub.holder-domain' }),
+      ),
+    ).rejects.toMatchObject({
+      name: 'AppleSignInRefused',
+      code: EMAIL_ALREADY_ASSOCIATED_CODE,
+    })
+
+    expect(await db.select().from(user)).toHaveLength(usersBefore.length)
   })
 
   it('persists the credential email when the token has none and no one holds it', async () => {

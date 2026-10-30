@@ -1,11 +1,15 @@
-import { isAPIError } from 'better-auth/api'
+import { APIError, isAPIError } from 'better-auth/api'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { user } from '../db/schema'
 import {
+  EMAIL_ALREADY_ASSOCIATED,
+  EMAIL_ALREADY_ASSOCIATED_CODE,
+  UNVERIFIED_EMAIL_HOLDER_DOMAIN,
+  emailIsUnverifiedHolderAddress,
+  encodeHeldEmail,
   identityFromVerifiedJwt,
   isEmailVerifiedClaim,
-  legacyUnverifiedEmailPlaceholder,
   socialIdTokenFromBody,
   unverifiedEmailHoldPrefixPattern,
   unverifiedEmailPlaceholder,
@@ -80,10 +84,18 @@ function holdPlaceholderIsStale() {
   return sql`${user.updatedAt} < now() - ${ORPHANED_EMAIL_HOLD_STALE_AFTER}::interval`
 }
 
+function refuseUnverifiedHolderAddress() {
+  throw new APIError('BAD_REQUEST', {
+    code: EMAIL_ALREADY_ASSOCIATED_CODE,
+    message: EMAIL_ALREADY_ASSOCIATED,
+  })
+}
+
 export async function takeUnverifiedEmailHold(
   email: string,
   store: EmailHoldStore = db,
 ): Promise<ReleasedEmailHold | null> {
+  if (emailIsUnverifiedHolderAddress(email)) return null
   const occupant = await store.query.user.findFirst({ where: { email } })
   if (!occupant) return null
   if (occupant.emailVerified) return null
@@ -130,15 +142,14 @@ export async function restoreUnverifiedEmailHold(
 }
 
 function oldestStaleUnverifiedHoldId(email: string) {
-  const legacy = legacyUnverifiedEmailPlaceholder(email)
   const prefix = unverifiedEmailHoldPrefixPattern(email)
+  const encoded = encodeHeldEmail(email)
+  const suffix = `@${UNVERIFIED_EMAIL_HOLDER_DOMAIN}`
   return sql`(
     select holder.id
     from "user" as holder
-    where (
-      holder.email = ${legacy}
-      or holder.email like ${prefix} escape '\\'
-    )
+    where holder.email like ${prefix} escape '\\'
+    and holder.email = ${encoded} || '.' || holder.id || ${suffix}
     and holder.email_verified = false
     and holder.updated_at < now() - ${ORPHANED_EMAIL_HOLD_STALE_AFTER}::interval
     order by holder.updated_at asc, holder.id asc
@@ -150,6 +161,7 @@ export async function restoreOrphanedEmailHoldIfUnowned(
   email: string,
   store: EmailHoldStore = db,
 ): Promise<'restored' | 'kept'> {
+  if (emailIsUnverifiedHolderAddress(email)) return 'kept'
   // Fresh rows stay put so a forged token cannot undo an in-flight claim.
   const restored = await store
     .update(user)
@@ -235,7 +247,7 @@ export async function releaseUnverifiedEmailFromVerifiedSocial(
   if (!(await provider.verifyIdToken(parsed.token, parsed.nonce))) {
     const identity = identityFromVerifiedJwt(parsed.token)
     // Claims are untrusted here; restore still no-ops unless the address
-    // is free and a placeholder encodes it.
+    // is free and a placeholder encodes the holder's own id.
     if (identity?.email) await restoreOrphanedEmailHoldIfUnowned(identity.email)
     return null
   }
@@ -245,6 +257,9 @@ export async function releaseUnverifiedEmailFromVerifiedSocial(
   const emailVerified = info?.user
     ? isEmailVerifiedClaim(info.user.emailVerified)
     : false
+  if (fromProvider && emailIsUnverifiedHolderAddress(fromProvider)) {
+    refuseUnverifiedHolderAddress()
+  }
   if (fromProvider && emailVerified) {
     // Do not restore first: this request is about to claim the address.
     return takeUnverifiedEmailHold(fromProvider)
@@ -253,6 +268,9 @@ export async function releaseUnverifiedEmailFromVerifiedSocial(
   // verifyIdToken already passed; reading claims is safe. Used when the
   // provider does not expose getUserInfo.
   const identity = identityFromVerifiedJwt(parsed.token)
+  if (identity?.email && emailIsUnverifiedHolderAddress(identity.email)) {
+    refuseUnverifiedHolderAddress()
+  }
   if (identity?.emailVerified) return takeUnverifiedEmailHold(identity.email)
   const email = fromProvider ?? identity?.email
   if (email) await restoreOrphanedEmailHoldIfUnowned(email)
