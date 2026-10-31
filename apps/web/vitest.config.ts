@@ -3,6 +3,7 @@ import tsConfigPaths from 'vite-tsconfig-paths'
 
 const roastDateTests = [
   'src/components/form/date-picker.test.tsx',
+  'src/components/form/date-picker-month.test.tsx',
   'src/lib/brew.test.ts',
   'src/routes/_authenticated/espresso/new.test.tsx',
   'src/routes/_authenticated/espresso/$shotId.edit.test.tsx',
