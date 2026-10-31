@@ -1,6 +1,15 @@
 import { expect, test } from '@playwright/test'
 import { clickUntil } from './helpers'
 
+const SELECTED_DAY = 15
+const SELECTED_DAY_NAME = new RegExp(`${SELECTED_DAY}th`)
+const NEXT_MONTH_NAME = /Go to the Next Month/i
+
+function dateInNextMonth(day: number): Date {
+  const today = new Date()
+  return new Date(today.getFullYear(), today.getMonth() + 1, day)
+}
+
 // Covers espresso/new end-to-end: the coffee SearchSelect (seeded), the
 // prefill that fills grinder + device from the coffee's most recent shot, the
 // number fields, and a real create mutation.
@@ -33,9 +42,7 @@ test('log an espresso shot via the new-shot form', async ({ page }) => {
 test('roast-date picker selects a date and closes', async ({ page }) => {
   await page.goto('/espresso/new')
 
-  // Day buttons are labelled by full date (e.g. "Monday, June 15th, 2026");
-  // match the 15th of whatever month is shown.
-  const fifteenth = page.getByRole('button', { name: /15th/ })
+  const fifteenth = page.getByRole('button', { name: SELECTED_DAY_NAME })
   await clickUntil(page.getByText('Pick a date'), fifteenth)
   await fifteenth.click()
 
@@ -47,7 +54,7 @@ test('roast-date picker selects a date and closes', async ({ page }) => {
 test('roast-date picker closes on keyboard select', async ({ page }) => {
   await page.goto('/espresso/new')
 
-  const fifteenth = page.getByRole('button', { name: /15th/ })
+  const fifteenth = page.getByRole('button', { name: SELECTED_DAY_NAME })
   await clickUntil(page.getByText('Pick a date'), fifteenth)
   await fifteenth.press('Space')
 
@@ -59,32 +66,42 @@ test('roast-date picker closes on keyboard select', async ({ page }) => {
 test('roast-date picker stays open when changing months', async ({ page }) => {
   await page.goto('/espresso/new')
 
-  const fifteenth = page.getByRole('button', { name: /15th/ })
+  const fifteenth = page.getByRole('button', { name: SELECTED_DAY_NAME })
   await clickUntil(page.getByText('Pick a date'), fifteenth)
-  await page.getByRole('button', { name: /Go to the Next Month/i }).click()
+  await page.getByRole('button', { name: NEXT_MONTH_NAME }).click()
 
   await expect(page.getByRole('grid')).toBeVisible()
   await expect(page.getByText('Pick a date')).toBeVisible()
 })
 
-test('roast-date picker keeps the date when the selected day is tapped again', async ({
+test('roast-date picker keeps a date from another month when that day is tapped again', async ({
   page,
 }) => {
+  const nextMonthDate = dateInNextMonth(SELECTED_DAY)
+  const expectedMonth = nextMonthDate.toLocaleString('en-US', { month: 'long' })
+  const expectedYear = String(nextMonthDate.getFullYear())
+
   await page.goto('/espresso/new')
 
-  const fifteenth = page.getByRole('button', { name: /15th/ })
-  await clickUntil(page.getByText('Pick a date'), fifteenth)
-  await fifteenth.click()
+  const trigger = page.getByLabel('Roast Date')
+  const day = page.getByRole('button', { name: SELECTED_DAY_NAME })
+  await clickUntil(page.getByText('Pick a date'), day)
+  await page.getByRole('button', { name: NEXT_MONTH_NAME }).click()
+  await day.click()
 
   await expect(page.getByRole('grid')).toHaveCount(0)
-  await expect(page.getByLabel('Roast Date')).toContainText(/15th/)
+  await expect(trigger).toContainText(expectedMonth)
+  await expect(trigger).toContainText(expectedYear)
+  await expect(trigger).toContainText(`${SELECTED_DAY}th`)
 
-  await page.getByLabel('Roast Date').click()
-  const selectedDay = page.getByRole('button', { name: /15th/ })
-  await expect(selectedDay).toBeVisible()
-  await selectedDay.click()
+  await trigger.click()
+  await expect(day).toBeVisible()
+  await expect(page.getByText(`${expectedMonth} ${expectedYear}`)).toBeVisible()
+  await day.click()
 
   await expect(page.getByRole('grid')).toHaveCount(0)
-  await expect(page.getByLabel('Roast Date')).toContainText(/15th/)
-  await expect(page.getByLabel('Roast Date')).toBeFocused()
+  await expect(trigger).toContainText(expectedMonth)
+  await expect(trigger).toContainText(expectedYear)
+  await expect(trigger).toContainText(`${SELECTED_DAY}th`)
+  await expect(trigger).toBeFocused()
 })
