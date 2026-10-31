@@ -23,6 +23,10 @@ type DatePickerProps = {
   showLabel?: boolean
 }
 
+function monthToOpenOn(selected: Date | undefined): Date {
+  return selected ?? new Date()
+}
+
 export function DatePicker({ label, showLabel = true }: DatePickerProps) {
   const field = useFieldContext<string | null>()
   const required = useFieldRequired()
@@ -31,6 +35,7 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
   const selected = field.state.value
     ? localDateFromCalendarDate(field.state.value)
     : undefined
+  const [visibleMonth, setVisibleMonth] = useState(() => monthToOpenOn(selected))
 
   return (
     <Field data-invalid={error.shown || undefined}>
@@ -42,7 +47,13 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
         {label}
       </FormLabel>
       <FieldContent>
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover
+          open={open}
+          onOpenChange={(next) => {
+            if (next) setVisibleMonth(monthToOpenOn(selected))
+            setOpen(next)
+          }}
+        >
           <PopoverTrigger asChild>
             <Button
               id={field.name}
@@ -61,6 +72,8 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
               mode="single"
               required // re-clicking the selected day would otherwise unselect
               selected={selected}
+              month={visibleMonth}
+              onMonthChange={setVisibleMonth}
               onSelect={(date) => {
                 field.handleChange(calendarDateFromLocalDate(date))
                 setOpen(false)
