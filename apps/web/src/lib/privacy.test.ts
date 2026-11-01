@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { posthogPersonRetention, recipients } from './privacy'
 
+const IMMEDIATE_APPLE_REVOKE = /revok(e|es|ed)\b.{0,80}immediately/i
+const ON_DELETE_APPLE_REVOKE =
+  /revok(e|es|ed)\b.{0,80}(on delete|when you delete|as soon as you delete)/i
+
 describe('recipients', () => {
   it('names every third party the app sends data to', () => {
     expect(recipients.map((recipient) => recipient.name)).toEqual([
@@ -79,9 +83,12 @@ describe('recipients', () => {
     )
   })
 
-  it('does not promise Apple revocation that account deletion does not perform (#178)', () => {
+  // Soft-delete keeps the token for the restore window. Immediate or
+  // on-delete wording would be false; purge-after-30-days would not.
+  it('does not claim the Apple token is revoked immediately on delete', () => {
     const apple = recipients.find((recipient) => recipient.slug === 'apple')!
-    expect(apple.retention).not.toMatch(/revoke/i)
+    expect(apple.retention).not.toMatch(IMMEDIATE_APPLE_REVOKE)
+    expect(apple.retention).not.toMatch(ON_DELETE_APPLE_REVOKE)
     expect(apple.retention).toMatch(
       /refresh token for as long as the account exists, and for 30 days after you delete it/i,
     )
