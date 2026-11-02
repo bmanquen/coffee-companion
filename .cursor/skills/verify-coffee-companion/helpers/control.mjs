@@ -720,10 +720,17 @@ function cmdCleanup() {
   )
 }
 
+function regionFrom(page, spec) {
+  const name = coerceName(spec.region)
+  // Substring matching would accept a region named Apple Watch for Apple.
+  return page.getByRole('region', {
+    name,
+    ...(typeof name === 'string' ? { exact: true } : {}),
+  })
+}
+
 function locatorFrom(page, spec) {
-  const root = spec.region
-    ? page.getByRole('region', { name: coerceName(spec.region) })
-    : page
+  const root = spec.region ? regionFrom(page, spec) : page
   if (spec.nav && spec.role) {
     let locator = root
       .getByRole('navigation', { name: coerceName(spec.nav) })
@@ -798,7 +805,7 @@ function assertOneRegion(count, name) {
 
 async function requireUniqueRegion(page, spec, { timeoutMs = 15_000 } = {}) {
   if (!spec.region) return
-  const region = page.getByRole('region', { name: coerceName(spec.region) })
+  const region = regionFrom(page, spec)
   const start = Date.now()
   let n = await region.count()
   while (n === 0 && Date.now() - start < timeoutMs) {
