@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { posthogPersonRetention, recipients } from './privacy'
 
-const IMMEDIATE_APPLE_REVOKE = /revok(e|es|ed)\b.{0,80}immediately/i
+const IMMEDIATE_APPLE_REVOKE =
+  /revok(e|es|ed)\b.{0,80}immediately|immediat(e|ely).{0,80}(revok(e|es|ed)|revocation)/i
 const ON_DELETE_APPLE_REVOKE =
   /revok(e|es|ed)\b.{0,80}(on delete|when you delete|as soon as you delete)/i
+const EARLY_APPLE_DELETE =
+  /(deleted|purged|revoked)\b.{0,40}after ([1-9]|[12]\d)(?!\d) days?/i
+
+const IMMEDIATELY_REVOKED_CLAIM = 'the Apple token is immediately revoked'
+const DELETING_IMMEDIATELY_REVOKES_CLAIM =
+  'deleting immediately revokes the Apple token'
+const IMMEDIATE_REVOCATION_CLAIM = 'immediate revocation'
+const DELETED_AFTER_SEVEN_DAYS_CLAIM = 'the token is deleted after 7 days'
+const REVOKED_AT_PURGE_AFTER_THIRTY_DAYS =
+  'the token is revoked at purge after 30 days'
 
 describe('recipients', () => {
   it('names every third party the app sends data to', () => {
@@ -89,8 +100,21 @@ describe('recipients', () => {
     const apple = recipients.find((recipient) => recipient.slug === 'apple')!
     expect(apple.retention).not.toMatch(IMMEDIATE_APPLE_REVOKE)
     expect(apple.retention).not.toMatch(ON_DELETE_APPLE_REVOKE)
+    expect(apple.retention).not.toMatch(EARLY_APPLE_DELETE)
     expect(apple.retention).toMatch(
       /refresh token for as long as the account exists, and for 30 days after you delete it/i,
     )
+  })
+
+  // Reverse order and the noun form are the same false claim as
+  // "revoked immediately". A hold shorter than 30 days contradicts restore.
+  it('rejects reverse-order, noun-form, and early-delete Apple claims', () => {
+    expect(IMMEDIATELY_REVOKED_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
+    expect(DELETING_IMMEDIATELY_REVOKES_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
+    expect(IMMEDIATE_REVOCATION_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
+    expect(DELETED_AFTER_SEVEN_DAYS_CLAIM).toMatch(EARLY_APPLE_DELETE)
+    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(IMMEDIATE_APPLE_REVOKE)
+    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(ON_DELETE_APPLE_REVOKE)
+    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(EARLY_APPLE_DELETE)
   })
 })
