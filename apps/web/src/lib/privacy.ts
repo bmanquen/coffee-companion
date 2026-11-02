@@ -17,6 +17,13 @@ export function posthogPersonRetention(
 const CONTRACT_BASIS =
   'Performing the contract you asked us for. Without this the feature you pressed cannot happen at all.'
 
+export const APPLE_RETENTION =
+  'Apple keeps its own record of the sign-in under its policy. We keep your name and the address it returned — including a Hide My Email relay — and Apple’s refresh token for as long as the account exists, and for 30 days after you delete it so you can restore it.'
+
+export function normalizePrivacyText(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
+}
+
 export type Recipient = {
   name: string
   slug: string
@@ -104,8 +111,7 @@ export const recipients: Array<Recipient> = [
       'Anything you keep in the app. Sign-in is the whole of the exchange, and it runs on Apple, not here.',
       'Any further contact after sign-in. We do not read your mail, your contacts, or your calendar.',
     ],
-    retention:
-      'Apple keeps its own record of the sign-in under its policy. We keep your name and the address it returned — including a Hide My Email relay — and Apple’s refresh token for as long as the account exists, and for 30 days after you delete it so you can restore it.',
+    retention: APPLE_RETENTION,
     lawfulBasis: CONTRACT_BASIS,
     policyUrl: 'https://www.apple.com/legal/privacy/',
   },
@@ -144,3 +150,29 @@ export const recipients: Array<Recipient> = [
     policyUrl: 'https://resend.com/legal/privacy-policy',
   },
 ]
+
+// Chrome labels from RecipientSection. A copy edit there must update the
+// approved snapshot so an extra sentence cannot pass.
+export function appleRegionText(): string {
+  const apple = recipients.find((recipient) => recipient.slug === 'apple')
+  if (!apple) throw new Error('Apple recipient missing')
+  return normalizePrivacyText(
+    [
+      apple.name,
+      apple.purpose,
+      'What it receives',
+      ...apple.receives,
+      'What it never receives',
+      ...apple.neverReceives,
+      'How long it is kept',
+      apple.retention,
+      'Why we are allowed to send it',
+      apple.lawfulBasis,
+      `${apple.name}'s privacy policy`,
+    ].join(' '),
+  )
+}
+
+// Frozen Apple section copy. An intentional edit updates this string.
+export const APPROVED_APPLE_REGION_TEXT =
+  "Apple Signs you in on iPhone. Coffee Companion has no password of its own, so Apple is the other way to prove who you are. What it receives The fact that you are signing in to Coffee Companion, at the moment you press the button. A name and an email the first time you allow them. Later presses do not send them again, and the email may be a Hide My Email relay that Apple forwards. What it never receives Anything you keep in the app. Sign-in is the whole of the exchange, and it runs on Apple, not here. Any further contact after sign-in. We do not read your mail, your contacts, or your calendar. How long it is kept Apple keeps its own record of the sign-in under its policy. We keep your name and the address it returned — including a Hide My Email relay — and Apple’s refresh token for as long as the account exists, and for 30 days after you delete it so you can restore it. Why we are allowed to send it Performing the contract you asked us for. Without this the feature you pressed cannot happen at all. Apple's privacy policy"
