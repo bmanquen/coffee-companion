@@ -91,7 +91,7 @@ Identities (the `e2e_auth` cookie; server must have `E2E_BYPASS_AUTH=true`):
 .cursor/skills/verify-coffee-companion/helpers/control browser tab --index 0
 ```
 
-Regex names are `/pattern/i` strings. `--first` applies to `click`, `expect`, and `fill` (including `--placeholder`) — use it whenever desktop table and mobile card both render the same name. `--label` is `getByLabel` (the same handle `apps/web/e2e` uses for recipe fields). Number fields are `spinbutton`s; `--label "Dose (g)"` matches them without naming the role. Scope a list-row action with `--row` and the unique name (`click --role button --name "Edit grinder" --row "<unique>"`) — never `--first` or list position when the list sorts by name. Scope a header click with `--nav Marketing` so `Pricing` does not also match the home `See pricing` link and the footer.
+Regex names are `/pattern/i` strings. `--first` applies to `click`, `expect`, and `fill` (including `--placeholder`) — use it whenever desktop table and mobile card both render the same name. `--label` is `getByLabel` (the same handle `apps/web/e2e` uses for recipe fields). Number fields are `spinbutton`s; `--label "Dose (g)"` matches them without naming the role. Scope a list-row action with `--row` and the unique name (`click --role button --name "Edit grinder" --row "<unique>"`) — never `--first` or list position when the list sorts by name. Scope a header click with `--nav Marketing` so `Pricing` does not also match the home `See pricing` link and the footer. Scope a privacy recipient expect with `--region Apple` so page-wide `--text` does not also match other sections.
 
 Stable handles (use these, not CSS or coordinates):
 

@@ -504,6 +504,7 @@ async function cmdBrowser(argv) {
       label: flags.label,
       row: flags.row,
       nav: flags.nav,
+      region: flags.region,
       first: Boolean(flags.first),
     })
     console.log(JSON.stringify(result, null, 2))
@@ -540,6 +541,7 @@ async function cmdBrowser(argv) {
       text: flags.text,
       label: flags.label,
       row: flags.row,
+      region: flags.region,
       url: flags.url,
       count: flags.count !== undefined ? Number(flags.count) : undefined,
       exact: Boolean(flags.exact),
@@ -719,8 +721,11 @@ function cmdCleanup() {
 }
 
 function locatorFrom(page, spec) {
+  const root = spec.region
+    ? page.getByRole('region', { name: coerceName(spec.region) })
+    : page
   if (spec.nav && spec.role) {
-    let locator = page
+    let locator = root
       .getByRole('navigation', { name: coerceName(spec.nav) })
       .getByRole(spec.role, {
         name: coerceName(spec.name),
@@ -730,7 +735,7 @@ function locatorFrom(page, spec) {
     return locator
   }
   if (spec.row && spec.role) {
-    let locator = page
+    let locator = root
       .getByRole('row', { name: coerceName(spec.row) })
       .getByRole(spec.role, {
         name: coerceName(spec.name),
@@ -740,7 +745,7 @@ function locatorFrom(page, spec) {
     return locator
   }
   if (spec.role) {
-    let locator = page.getByRole(spec.role, {
+    let locator = root.getByRole(spec.role, {
       name: coerceName(spec.name),
       exact: Boolean(spec.exact),
     })
@@ -748,21 +753,23 @@ function locatorFrom(page, spec) {
     return locator
   }
   if (spec.label) {
-    let locator = page.getByLabel(coerceName(spec.label), {
+    let locator = root.getByLabel(coerceName(spec.label), {
       exact: Boolean(spec.exact),
     })
     if (spec.first) locator = locator.first()
     return locator
   }
   if (spec.placeholder) {
-    let locator = page.getByPlaceholder(spec.placeholder, {
+    let locator = root.getByPlaceholder(spec.placeholder, {
       exact: Boolean(spec.exact),
     })
     if (spec.first) locator = locator.first()
     return locator
   }
   if (spec.text) {
-    let locator = page.getByText(coerceName(spec.text), { exact: Boolean(spec.exact) })
+    let locator = root.getByText(coerceName(spec.text), {
+      exact: Boolean(spec.exact),
+    })
     if (spec.first) locator = locator.first()
     return locator
   }
@@ -989,6 +996,7 @@ function usage() {
   browser press --key Enter
   browser expect --role heading --name Dashboard
   browser expect --text Standard --first
+  browser expect --region Apple --text "/immediate revocation/i" --count 0
   browser expect --url "[?&]method=espresso"
   browser screenshot --path artifacts/foo.png
   browser snapshot --aria --path artifacts/foo.aria.txt

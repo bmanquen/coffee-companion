@@ -104,4 +104,30 @@ describe('locatorFrom', () => {
       ['getByRole', 'link', { name: /pricing/i, exact: false }],
     ])
   })
+
+  it('scopes text to the named region', () => {
+    const { page, trail } = pageWithTrail()
+    locatorFrom(page, {
+      region: 'Apple',
+      text: '/revoked immediately/i',
+    })
+    assert.deepEqual(trail, [
+      ['getByRole', 'region', { name: 'Apple' }],
+      ['getByText', /revoked immediately/i, { exact: false }],
+    ])
+  })
+
+  it('scopes a role name to the named region', () => {
+    const { page, trail } = pageWithTrail()
+    locatorFrom(page, {
+      region: 'Apple',
+      role: 'heading',
+      name: 'Apple',
+      exact: true,
+    })
+    assert.deepEqual(trail, [
+      ['getByRole', 'region', { name: 'Apple' }],
+      ['getByRole', 'heading', { name: 'Apple', exact: true }],
+    ])
+  })
 })
