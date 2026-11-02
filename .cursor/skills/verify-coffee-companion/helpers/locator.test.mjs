@@ -1,38 +1,53 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { locatorFrom } from './control.mjs'
+import {
+  assertOneRegion,
+  locatorFrom,
+  requireUniqueRegion,
+} from './control.mjs'
 
-function mockLocator(label, trail) {
+function mockLocator(label, trail, { countValue = 1 } = {}) {
   const locator = {
     label,
     trail,
     first() {
       trail.push('first')
-      return mockLocator(`${label}.first()`, trail)
+      return mockLocator(`${label}.first()`, trail, { countValue })
     },
     getByRole(role, opts) {
       trail.push(['getByRole', role, opts])
-      return mockLocator(`${label}.getByRole(${role})`, trail)
+      return mockLocator(`${label}.getByRole(${role})`, trail, { countValue })
     },
     getByPlaceholder(placeholder, opts) {
       trail.push(['getByPlaceholder', placeholder, opts])
-      return mockLocator(`${label}.getByPlaceholder(${placeholder})`, trail)
+      return mockLocator(`${label}.getByPlaceholder(${placeholder})`, trail, {
+        countValue,
+      })
     },
     getByLabel(labelName, opts) {
       trail.push(['getByLabel', labelName, opts])
-      return mockLocator(`${label}.getByLabel(${labelName})`, trail)
+      return mockLocator(`${label}.getByLabel(${labelName})`, trail, {
+        countValue,
+      })
     },
     getByText(text, opts) {
       trail.push(['getByText', text, opts])
-      return mockLocator(`${label}.getByText(${text})`, trail)
+      return mockLocator(`${label}.getByText(${text})`, trail, { countValue })
+    },
+    async count() {
+      trail.push(['count', countValue])
+      return countValue
+    },
+    async waitFor(opts) {
+      trail.push(['waitFor', opts])
     },
   }
   return locator
 }
 
-function pageWithTrail() {
+function pageWithTrail(countValue = 1) {
   const trail = []
-  return { page: mockLocator('page', trail), trail }
+  return { page: mockLocator('page', trail, { countValue }), trail }
 }
 
 describe('locatorFrom', () => {
@@ -129,5 +144,34 @@ describe('locatorFrom', () => {
       ['getByRole', 'region', { name: 'Apple' }],
       ['getByRole', 'heading', { name: 'Apple', exact: true }],
     ])
+  })
+})
+
+describe('requireUniqueRegion', () => {
+  it('accepts a single named region and waits for it', async () => {
+    const { page, trail } = pageWithTrail(1)
+    await requireUniqueRegion(page, { region: 'Apple' })
+    assert.deepEqual(trail, [
+      ['getByRole', 'region', { name: 'Apple' }],
+      ['count', 1],
+      ['waitFor', { state: 'visible', timeout: 15_000 }],
+    ])
+  })
+
+  it('fails when the named region is missing so --count 0 cannot pass', async () => {
+    const { page } = pageWithTrail(0)
+    await assert.rejects(
+      () => requireUniqueRegion(page, { region: 'Apple' }, { timeoutMs: 0 }),
+      /matched 0 times; expected 1/,
+    )
+    assert.throws(() => assertOneRegion(0, 'Apple'), /matched 0 times; expected 1/)
+  })
+
+  it('fails when the named region is not unique', async () => {
+    const { page } = pageWithTrail(2)
+    await assert.rejects(
+      () => requireUniqueRegion(page, { region: 'Apple' }, { timeoutMs: 0 }),
+      /matched 2 times; expected 1/,
+    )
   })
 })

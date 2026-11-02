@@ -788,6 +788,29 @@ function coerceName(value) {
   return value
 }
 
+function assertOneRegion(count, name) {
+  if (count !== 1) {
+    throw new Error(
+      `Region ${JSON.stringify(String(name))} matched ${count} times; expected 1. A missing or renamed region must not pass --count 0.`,
+    )
+  }
+}
+
+async function requireUniqueRegion(page, spec, { timeoutMs = 15_000 } = {}) {
+  if (!spec.region) return
+  const region = page.getByRole('region', { name: coerceName(spec.region) })
+  const start = Date.now()
+  let n = await region.count()
+  while (n === 0 && Date.now() - start < timeoutMs) {
+    await sleep(100)
+    n = await region.count()
+  }
+  assertOneRegion(n, spec.region)
+  if (timeoutMs > 0) {
+    await region.waitFor({ state: 'visible', timeout: timeoutMs })
+  }
+}
+
 async function runDaemon() {
   const { chromium } = await import(
     join(webDir, 'node_modules/@playwright/test/index.mjs')
@@ -939,6 +962,9 @@ async function runDaemon() {
             await sleep(100)
           }
         }
+        if (msg.region) {
+          await requireUniqueRegion(page, msg)
+        }
         if (msg.count !== undefined && (msg.role || msg.text)) {
           const target = locatorFrom(page, msg)
           const n = await target.count()
@@ -1012,7 +1038,7 @@ function usage() {
 `)
 }
 
-export { locatorFrom, coerceName }
+export { locatorFrom, coerceName, assertOneRegion, requireUniqueRegion }
 
 // Importing this file for locator tests must not run launch/doctor/cleanup.
 const invokedAsCli =

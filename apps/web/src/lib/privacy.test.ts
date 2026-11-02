@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { posthogPersonRetention, recipients } from './privacy'
 
 const IMMEDIATE_APPLE_REVOKE =
-  /revok(e|es|ed)\b.{0,80}immediately|immediat(e|ely).{0,80}(revok(e|es|ed)|revocation)/i
+  /(?<!not )revok(e|es|ed)\b.{0,80}(?<!not )immediately|(?<!not )immediat(e|ely).{0,80}(?<!not )(revok(e|es|ed)|revocation)/i
 const ON_DELETE_APPLE_REVOKE =
-  /revok(e|es|ed)\b.{0,80}(?<!not )(on delete|when you delete|as soon as you delete)/i
+  /(?<!not )revok(e|es|ed)\b.{0,80}(?<!not )(on delete|when you delete|as soon as you delete)/i
 const EARLY_APPLE_DELETE =
   /(deleted|purged|revoked)\b.{0,40}after ([1-9]|[12]\d)(?!\d) days?/i
 
@@ -18,6 +18,9 @@ const REVOKED_AT_PURGE_AFTER_THIRTY_DAYS =
 const NEGATED_ON_DELETE_CLAIM =
   'The token is revoked at purge after 30 days, not when you delete your account'
 const AFFIRMATIVE_ON_DELETE_CLAIM = 'revoked when you delete'
+const NOT_IMMEDIATELY_REVOKED_CLAIM = 'not immediately revoked'
+const NOT_REVOKED_IMMEDIATELY_CLAIM = 'not revoked immediately'
+const NOT_REVOKED_WHEN_YOU_DELETE_CLAIM = 'not revoked when you delete'
 
 describe('recipients', () => {
   it('names every third party the app sends data to', () => {
@@ -121,9 +124,13 @@ describe('recipients', () => {
     expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(EARLY_APPLE_DELETE)
   })
 
-  // "not when you delete" is the restore hold, not an on-delete revoke.
-  it('allows a negated on-delete Apple claim and still flags an affirmative one', () => {
+  // Negation before the revoke verb is the restore hold, not a false claim.
+  it('allows negated Apple revoke claims and still flags affirmative ones', () => {
+    expect(NOT_IMMEDIATELY_REVOKED_CLAIM).not.toMatch(IMMEDIATE_APPLE_REVOKE)
+    expect(NOT_REVOKED_IMMEDIATELY_CLAIM).not.toMatch(IMMEDIATE_APPLE_REVOKE)
+    expect(NOT_REVOKED_WHEN_YOU_DELETE_CLAIM).not.toMatch(ON_DELETE_APPLE_REVOKE)
     expect(NEGATED_ON_DELETE_CLAIM).not.toMatch(ON_DELETE_APPLE_REVOKE)
+    expect(IMMEDIATELY_REVOKED_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
     expect(AFFIRMATIVE_ON_DELETE_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
   })
 })
