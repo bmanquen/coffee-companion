@@ -6,13 +6,15 @@ const IMMEDIATE_APPLE_REVOKE =
 const ON_DELETE_APPLE_REVOKE =
   /(?<!not(?: \w+)? )(revok(e|es|ed)|revocation|deleted|purged)\b.{0,80}(?<!not )(on delete|when you delete|as soon as you delete|upon account deletion|upon deletion)|(?<!not )(on delete|when you delete|as soon as you delete|upon account deletion|upon deletion).{0,80}(?<!not(?: \w+)? )(revok(e|es|ed)|revocation|deleted|purged)\b(?! at purge after 30 days)/i
 const EARLY_APPLE_DELETE =
-  /(?<!not )(deleted|purged|revoked)\b.{0,40}after ([1-9]|[12]\d)(?!\d) days?/i
+  /(?<!not )(deleted|purged|revoked)\b.{0,40}(?:after ([1-9]|[12]\d)(?!\d) days?|([1-9]|[12]\d)(?!\d) days? after you delete)/i
 
 const IMMEDIATELY_REVOKED_CLAIM = 'the Apple token is immediately revoked'
 const DELETING_IMMEDIATELY_REVOKES_CLAIM =
   'deleting immediately revokes the Apple token'
 const IMMEDIATE_REVOCATION_CLAIM = 'immediate revocation'
 const DELETED_AFTER_SEVEN_DAYS_CLAIM = 'the token is deleted after 7 days'
+const DELETED_SEVEN_DAYS_AFTER_YOU_DELETE_CLAIM =
+  'The refresh token is deleted 7 days after you delete your account'
 const REVOKED_AT_PURGE_AFTER_THIRTY_DAYS =
   'the token is revoked at purge after 30 days'
 const NEGATED_ON_DELETE_CLAIM =
@@ -214,5 +216,16 @@ describe('recipients', () => {
   it('allows a negated early-delete Apple claim', () => {
     expect(NOT_DELETED_AFTER_SEVEN_DAYS_CLAIM).not.toMatch(EARLY_APPLE_DELETE)
     expect(DELETED_AFTER_SEVEN_DAYS_CLAIM).toMatch(EARLY_APPLE_DELETE)
+  })
+
+  // "7 days after you delete" is the same false claim as "after 7 days".
+  it('rejects day-count-first early Apple deletion claims', () => {
+    expect(DELETED_SEVEN_DAYS_AFTER_YOU_DELETE_CLAIM).not.toMatch(
+      IMMEDIATE_APPLE_REVOKE,
+    )
+    expect(DELETED_SEVEN_DAYS_AFTER_YOU_DELETE_CLAIM).not.toMatch(
+      ON_DELETE_APPLE_REVOKE,
+    )
+    expect(DELETED_SEVEN_DAYS_AFTER_YOU_DELETE_CLAIM).toMatch(EARLY_APPLE_DELETE)
   })
 })
