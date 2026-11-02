@@ -128,7 +128,7 @@ describe('locatorFrom', () => {
       text: '/revoked immediately/i',
     })
     assert.deepEqual(trail, [
-      ['getByRole', 'region', { name: 'Apple' }],
+      ['getByRole', 'region', { name: 'Apple', exact: true }],
       ['getByText', /revoked immediately/i, { exact: false }],
     ])
   })
@@ -142,8 +142,27 @@ describe('locatorFrom', () => {
       exact: true,
     })
     assert.deepEqual(trail, [
-      ['getByRole', 'region', { name: 'Apple' }],
+      ['getByRole', 'region', { name: 'Apple', exact: true }],
       ['getByRole', 'heading', { name: 'Apple', exact: true }],
+    ])
+  })
+
+  it('looks up a string region by exact name so Apple does not match Apple Watch', () => {
+    const { page, trail } = pageWithTrail()
+    locatorFrom(page, { region: 'Apple', text: 'token' })
+    assert.deepEqual(trail[0], [
+      'getByRole',
+      'region',
+      { name: 'Apple', exact: true },
+    ])
+  })
+
+  it('preserves regex region names without exact string matching', () => {
+    const { page, trail } = pageWithTrail()
+    locatorFrom(page, { region: '/Apple/i', text: 'token' })
+    assert.deepEqual(trail, [
+      ['getByRole', 'region', { name: /Apple/i }],
+      ['getByText', 'token', { exact: false }],
     ])
   })
 })
@@ -153,9 +172,19 @@ describe('requireUniqueRegion', () => {
     const { page, trail } = pageWithTrail(1)
     await requireUniqueRegion(page, { region: 'Apple' })
     assert.deepEqual(trail, [
-      ['getByRole', 'region', { name: 'Apple' }],
+      ['getByRole', 'region', { name: 'Apple', exact: true }],
       ['count', 1],
       ['waitFor', { state: 'visible', timeout: 15_000 }],
+    ])
+  })
+
+  it('looks up a string region by exact name so Apple does not match Apple Watch', async () => {
+    const { page, trail } = pageWithTrail(1)
+    await requireUniqueRegion(page, { region: 'Apple' })
+    assert.deepEqual(trail[0], [
+      'getByRole',
+      'region',
+      { name: 'Apple', exact: true },
     ])
   })
 
@@ -186,10 +215,10 @@ describe('resolveClickTarget', () => {
       name: 'Learn more',
     })
     assert.deepEqual(trail, [
-      ['getByRole', 'region', { name: 'Apple' }],
+      ['getByRole', 'region', { name: 'Apple', exact: true }],
       ['count', 1],
       ['waitFor', { state: 'visible', timeout: 15_000 }],
-      ['getByRole', 'region', { name: 'Apple' }],
+      ['getByRole', 'region', { name: 'Apple', exact: true }],
       ['getByRole', 'link', { name: 'Learn more', exact: false }],
     ])
     assert.ok(!trail.includes('first'))
@@ -208,7 +237,7 @@ describe('resolveClickTarget', () => {
       /matched 2 times; expected 1/,
     )
     assert.deepEqual(trail, [
-      ['getByRole', 'region', { name: 'Apple' }],
+      ['getByRole', 'region', { name: 'Apple', exact: true }],
       ['count', 2],
     ])
   })
