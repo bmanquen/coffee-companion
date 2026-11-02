@@ -4024,13 +4024,35 @@ const DRIVES = {
       toggleTestID: 'sign-in-toggle',
     },
   },
+  espresso: {
+    test: 'src/espresso/espresso.test.tsx',
+    identity: 'data',
+    fail: 'espresso drive failed — the RNTL render did not log a shot and show it in the list',
+    required: [
+      'Coffee Companion',
+      'shot-list',
+      'Ethiopia Guji',
+      'verify-grind-7',
+    ],
+    observed: {
+      heading: 'Coffee Companion',
+      listTestID: 'shot-list',
+      formTestID: 'shot-form',
+      coffee: 'Ethiopia Guji',
+      grind: 'verify-grind-7',
+      dose: '18',
+      yield: '36',
+      time: '30',
+      createProcedure: 'espressoShot.create',
+    },
+  },
 }
 
 async function cmdDrive(feature) {
   const recipe = DRIVES[feature]
   if (!recipe) {
     die(
-      `Only \`drive welcome\` and \`drive sign-in\` are implemented as one-shot recipes. ` +
+      `Only \`drive welcome\`, \`drive sign-in\`, and \`drive espresso\` are implemented as one-shot recipes. ` +
         `${feature ? `"${feature}"` : 'That feature'} is mapped under features/ — drive it from its file. ` +
         `Do not treat a missing drive stub as verification.`,
     )
@@ -4214,6 +4236,7 @@ function usage() {
   doctor              Read-only check that this instance is worth driving
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
+  drive espresso      Log an Espresso Shot through the signed-in list and form
   drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}; refuse clearState when ownedPackage is false
   verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); refuse a clearState flow on an attached preexisting install before Expo; the instance stays up if a later step fails
   cleanup             Stop recorded pids, free ports this helper recorded, uninstall a package this run owns; keep artifacts/
