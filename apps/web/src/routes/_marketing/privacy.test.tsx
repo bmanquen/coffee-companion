@@ -1,7 +1,21 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { PrivacyPage } from './privacy'
-import { recipients } from '@/lib/privacy'
+import {
+  APPROVED_APPLE_REGION_TEXT,
+  normalizePrivacyText,
+  recipients,
+} from '@/lib/privacy'
+
+// jsdom textContent concatenates adjacent blocks without spaces.
+function regionPlainText(element: HTMLElement): string {
+  const clone = element.cloneNode(true) as HTMLElement
+  for (const el of clone.querySelectorAll('*')) {
+    el.insertAdjacentText('beforebegin', ' ')
+    el.insertAdjacentText('afterend', ' ')
+  }
+  return normalizePrivacyText(clone.textContent)
+}
 
 describe('PrivacyPage', () => {
   it('gives every recipient a section naming it', () => {
@@ -10,6 +24,12 @@ describe('PrivacyPage', () => {
     for (const { name } of recipients) {
       expect(screen.getByRole('heading', { name, level: 2 })).toBeTruthy()
     }
+  })
+
+  it('renders the Apple section as the approved copy', () => {
+    render(<PrivacyPage />)
+    const region = screen.getByRole('region', { name: 'Apple' })
+    expect(regionPlainText(region)).toBe(APPROVED_APPLE_REGION_TEXT)
   })
 
   it('states what each recipient receives, keeps, and never gets', () => {

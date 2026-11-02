@@ -1,58 +1,25 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { posthogPersonRetention, recipients } from './privacy'
+import {
+  APPLE_RETENTION,
+  APPROVED_APPLE_REGION_TEXT,
+  appleRegionText,
+  normalizePrivacyText,
+  posthogPersonRetention,
+  recipients,
+} from './privacy'
 
-const IMMEDIATE_APPLE_REVOKE =
-  /(?<!not )revok(e|es|ed)\b.{0,80}(?<!not )immediately(?! at purge after 30 days)|(?<!not )immediat(e|ely).{0,80}(?<!not )(revok(e|es|ed)|revocation)\b(?! at purge after 30 days)|(?<!not )revocation\b.{0,80}(?<!not )immediat(e|ely)(?! at purge after 30 days)/i
-const ON_DELETE_APPLE_REVOKE =
-  /(?<!not(?: \w+)? )(revok(e|es|ed)|revocation|deleted|purged)\b.{0,80}(?<!not )(on delete|when you delete|as soon as you delete|upon account deletion|upon deletion)|(?<!not )(on delete|when you delete|as soon as you delete|upon account deletion|upon deletion).{0,80}(?<!not(?: \w+)? )(revok(e|es|ed)|revocation|deleted|purged)\b(?! at purge after 30 days)/i
-const EARLY_APPLE_DELETE =
-  /(?<!not )(revok(e|es|ed)|delet(e|es|ed)|purg(e|es|ed))\b.{0,40}(?:after ([1-9]|[12]\d)(?!\d) days?|([1-9]|[12]\d)(?!\d) days? after you delete)/i
-
-const IMMEDIATELY_REVOKED_CLAIM = 'the Apple token is immediately revoked'
-const DELETING_IMMEDIATELY_REVOKES_CLAIM =
-  'deleting immediately revokes the Apple token'
-const IMMEDIATE_REVOCATION_CLAIM = 'immediate revocation'
-const DELETED_AFTER_SEVEN_DAYS_CLAIM = 'the token is deleted after 7 days'
-const REVOKE_AFTER_SEVEN_DAYS_CLAIM = 'We revoke the Apple token after 7 days'
-const DELETED_SEVEN_DAYS_AFTER_YOU_DELETE_CLAIM =
-  'The refresh token is deleted 7 days after you delete your account'
-const REVOKED_AT_PURGE_AFTER_THIRTY_DAYS =
-  'the token is revoked at purge after 30 days'
-const NEGATED_ON_DELETE_CLAIM =
-  'The token is revoked at purge after 30 days, not when you delete your account'
-const AFFIRMATIVE_ON_DELETE_CLAIM = 'revoked when you delete'
-const NOT_IMMEDIATELY_REVOKED_CLAIM = 'not immediately revoked'
-const NOT_REVOKED_IMMEDIATELY_CLAIM = 'not revoked immediately'
-const NOT_REVOKED_WHEN_YOU_DELETE_CLAIM = 'not revoked when you delete'
-const IMMEDIATE_REVOKE_AT_PURGE_CLAIM =
-  'The token is revoked immediately at purge after 30 days'
-const IMMEDIATE_ON_DELETE_AND_PURGE_CLAIM =
-  'The token is revoked immediately when you delete; it is revoked at purge after 30 days'
-const DELETE_THEN_REVOKE_CLAIM =
-  'When you delete your account, Apple revokes the refresh token'
-const DELETE_THEN_TOKEN_REVOKED_CLAIM =
-  'when you delete your account the token is revoked'
-const DELETE_THEN_REVOKE_AT_PURGE_CLAIM =
-  'When you delete your account we keep the token 30 days; it is revoked at purge after 30 days'
-const NOT_DELETED_AFTER_SEVEN_DAYS_CLAIM = 'not deleted after 7 days'
-const NOT_IMMEDIATELY_REVOKED_WHEN_YOU_DELETE_CLAIM =
-  'The token is not immediately revoked when you delete your account'
-const NOT_IMMEDIATELY_REVOKED_ON_DELETE_CLAIM =
-  'not immediately revoked when you delete'
-const REVOCATION_IS_IMMEDIATE_CLAIM = 'revocation is immediate'
-const APPLE_REVOCATION_IS_IMMEDIATE_CLAIM =
-  "The Apple token's revocation is immediate upon account deletion"
-const REVOKED_UPON_ACCOUNT_DELETION_CLAIM = 'revoked upon account deletion'
-const REVOCATION_UPON_ACCOUNT_DELETION_CLAIM =
-  'revocation upon account deletion'
-const UPON_ACCOUNT_DELETION_THEN_REVOKED_CLAIM =
-  'Upon account deletion, the token is revoked'
-const UPON_DELETION_THEN_REVOKED_CLAIM = 'upon deletion the token is revoked'
-const DELETED_WHEN_YOU_DELETE_CLAIM =
-  'The Apple refresh token is deleted when you delete your account'
-const DELETE_THEN_TOKEN_DELETED_CLAIM =
-  'When you delete your account, the Apple refresh token is deleted'
-const PURGED_WHEN_YOU_DELETE_CLAIM = 'purged when you delete'
+const APPROVED_APPLE_RECIPE_COPY = normalizePrivacyText(
+  readFileSync(
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      '../../../../.cursor/skills/verify-coffee-companion/features/privacy-apple.txt',
+    ),
+    'utf8',
+  ),
+)
 
 describe('recipients', () => {
   it('names every third party the app sends data to', () => {
@@ -132,108 +99,10 @@ describe('recipients', () => {
     )
   })
 
-  // Soft-delete keeps the token for the restore window. Immediate or
-  // on-delete wording would be false; purge-after-30-days would not.
-  it('does not claim the Apple token is revoked immediately on delete', () => {
+  it('states the approved Apple section copy', () => {
     const apple = recipients.find((recipient) => recipient.slug === 'apple')!
-    expect(apple.retention).not.toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(apple.retention).not.toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(apple.retention).not.toMatch(EARLY_APPLE_DELETE)
-    expect(apple.retention).toMatch(
-      /refresh token for as long as the account exists, and for 30 days after you delete it/i,
-    )
-  })
-
-  // Reverse order and the noun form are the same false claim as
-  // "revoked immediately". A hold shorter than 30 days contradicts restore.
-  it('rejects reverse-order, noun-form, and early-delete Apple claims', () => {
-    expect(IMMEDIATELY_REVOKED_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(DELETING_IMMEDIATELY_REVOKES_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(IMMEDIATE_REVOCATION_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(REVOCATION_IS_IMMEDIATE_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(APPLE_REVOCATION_IS_IMMEDIATE_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(DELETED_AFTER_SEVEN_DAYS_CLAIM).toMatch(EARLY_APPLE_DELETE)
-    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(EARLY_APPLE_DELETE)
-  })
-
-  // Negation before the revoke verb is the restore hold, not a false claim.
-  it('allows negated Apple revoke claims and still flags affirmative ones', () => {
-    expect(NOT_IMMEDIATELY_REVOKED_CLAIM).not.toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(NOT_REVOKED_IMMEDIATELY_CLAIM).not.toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(NOT_REVOKED_WHEN_YOU_DELETE_CLAIM).not.toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(NOT_IMMEDIATELY_REVOKED_WHEN_YOU_DELETE_CLAIM).not.toMatch(
-      ON_DELETE_APPLE_REVOKE,
-    )
-    expect(NOT_IMMEDIATELY_REVOKED_ON_DELETE_CLAIM).not.toMatch(
-      ON_DELETE_APPLE_REVOKE,
-    )
-    expect(NEGATED_ON_DELETE_CLAIM).not.toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(IMMEDIATELY_REVOKED_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(AFFIRMATIVE_ON_DELETE_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
-  })
-
-  // Immediate-at-purge is the restore window ending, not an on-delete revoke.
-  it('allows immediate revocation at purge and still flags immediate-on-delete', () => {
-    expect(IMMEDIATE_REVOKE_AT_PURGE_CLAIM).not.toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(IMMEDIATELY_REVOKED_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(IMMEDIATE_ON_DELETE_AND_PURGE_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
-  })
-
-  // Deletion-first wording is the same false claim; revoke-at-purge after
-  // mentioning delete is the restore hold.
-  it('rejects deletion-first Apple revoke claims without treating purge-after-delete as on-delete', () => {
-    expect(DELETE_THEN_REVOKE_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(DELETE_THEN_TOKEN_REVOKED_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(DELETE_THEN_REVOKE_AT_PURGE_CLAIM).not.toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(ON_DELETE_APPLE_REVOKE)
-  })
-
-  // "Upon account deletion" is the same false claim as "when you delete".
-  it('rejects revocation upon account deletion as an on-delete claim', () => {
-    expect(REVOKED_UPON_ACCOUNT_DELETION_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(REVOCATION_UPON_ACCOUNT_DELETION_CLAIM).toMatch(
-      ON_DELETE_APPLE_REVOKE,
-    )
-    expect(UPON_ACCOUNT_DELETION_THEN_REVOKED_CLAIM).toMatch(
-      ON_DELETE_APPLE_REVOKE,
-    )
-    expect(UPON_DELETION_THEN_REVOKED_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(ON_DELETE_APPLE_REVOKE)
-  })
-
-  // Deleted/purged on delete is the same false claim as revoked on delete.
-  it('rejects deletion-triggered Apple token deletion as an on-delete claim', () => {
-    expect(DELETED_WHEN_YOU_DELETE_CLAIM).not.toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(DELETED_WHEN_YOU_DELETE_CLAIM).not.toMatch(EARLY_APPLE_DELETE)
-    expect(DELETED_WHEN_YOU_DELETE_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(DELETE_THEN_TOKEN_DELETED_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(PURGED_WHEN_YOU_DELETE_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(ON_DELETE_APPLE_REVOKE)
-  })
-
-  // Denying an early purge is accurate; "deleted after 7 days" is not.
-  it('allows a negated early-delete Apple claim', () => {
-    expect(NOT_DELETED_AFTER_SEVEN_DAYS_CLAIM).not.toMatch(EARLY_APPLE_DELETE)
-    expect(DELETED_AFTER_SEVEN_DAYS_CLAIM).toMatch(EARLY_APPLE_DELETE)
-  })
-
-  // "7 days after you delete" is the same false claim as "after 7 days".
-  it('rejects day-count-first early Apple deletion claims', () => {
-    expect(DELETED_SEVEN_DAYS_AFTER_YOU_DELETE_CLAIM).not.toMatch(
-      IMMEDIATE_APPLE_REVOKE,
-    )
-    expect(DELETED_SEVEN_DAYS_AFTER_YOU_DELETE_CLAIM).not.toMatch(
-      ON_DELETE_APPLE_REVOKE,
-    )
-    expect(DELETED_SEVEN_DAYS_AFTER_YOU_DELETE_CLAIM).toMatch(EARLY_APPLE_DELETE)
-  })
-
-  // Active-voice "revoke after 7 days" is the same false claim as "revoked after 7 days".
-  it('rejects active-voice early Apple token removal', () => {
-    expect(REVOKE_AFTER_SEVEN_DAYS_CLAIM).not.toMatch(IMMEDIATE_APPLE_REVOKE)
-    expect(REVOKE_AFTER_SEVEN_DAYS_CLAIM).not.toMatch(ON_DELETE_APPLE_REVOKE)
-    expect(REVOKE_AFTER_SEVEN_DAYS_CLAIM).toMatch(EARLY_APPLE_DELETE)
+    expect(apple.retention).toBe(APPLE_RETENTION)
+    expect(appleRegionText()).toBe(APPROVED_APPLE_REGION_TEXT)
+    expect(APPROVED_APPLE_RECIPE_COPY).toBe(APPROVED_APPLE_REGION_TEXT)
   })
 })

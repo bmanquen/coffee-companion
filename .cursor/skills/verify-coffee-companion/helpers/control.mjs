@@ -534,6 +534,13 @@ async function cmdBrowser(argv) {
   }
 
   if (action === 'expect') {
+    let innerText = flags['inner-text']
+    if (flags['inner-text-file']) {
+      const path = isAbsolute(flags['inner-text-file'])
+        ? flags['inner-text-file']
+        : resolve(skillDir, flags['inner-text-file'])
+      innerText = readFileSync(path, 'utf8')
+    }
     const result = await withDaemon({
       op: 'expect',
       role: flags.role,
@@ -543,6 +550,7 @@ async function cmdBrowser(argv) {
       row: flags.row,
       region: flags.region,
       url: flags.url,
+      innerText,
       count: flags.count !== undefined ? Number(flags.count) : undefined,
       exact: Boolean(flags.exact),
       first: Boolean(flags.first),
@@ -979,6 +987,20 @@ async function runDaemon() {
         if (msg.region) {
           await requireUniqueRegion(page, msg)
         }
+        if (msg.innerText != null) {
+          if (!msg.region) {
+            throw new Error('Need --region with --inner-text')
+          }
+          const actual = (await regionFrom(page, msg).innerText()).replace(
+            /\s+/g,
+            ' ',
+          ).trim()
+          const expected = String(msg.innerText).replace(/\s+/g, ' ').trim()
+          if (actual !== expected) {
+            throw new Error('Region text did not match approved copy')
+          }
+          return { url: page.url() }
+        }
         if (msg.count !== undefined && (msg.role || msg.text)) {
           const target = locatorFrom(page, msg)
           const n = await target.count()
@@ -1036,7 +1058,7 @@ function usage() {
   browser press --key Enter
   browser expect --role heading --name Dashboard
   browser expect --text Standard --first
-  browser expect --region Apple --text "/immediate revocation/i" --count 0
+  browser expect --region Apple --inner-text-file features/privacy-apple.txt
   browser expect --url "[?&]method=espresso"
   browser screenshot --path artifacts/foo.png
   browser snapshot --aria --path artifacts/foo.aria.txt

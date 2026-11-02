@@ -110,6 +110,10 @@ reviews:
 
   # Tell it where to focus (edit the paths to match your repo)
   path_instructions:
+    - path: ".cursor/skills/verify-*/**"
+      instructions: |
+        Verify recipes assert exact approved copy. Do not request additional
+        phrasing or paraphrase reject patterns.
     - path: "**/*.{ts,tsx}"
       instructions: |
         Focus on architecture and system design.
