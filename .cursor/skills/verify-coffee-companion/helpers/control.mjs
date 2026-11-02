@@ -811,6 +811,13 @@ async function requireUniqueRegion(page, spec, { timeoutMs = 15_000 } = {}) {
   }
 }
 
+// Two regions with the same name plus --first can click a descendant of the
+// wrong one. Fail uniqueness before resolving the target.
+async function resolveClickTarget(page, msg) {
+  if (msg.region) await requireUniqueRegion(page, msg)
+  return locatorFrom(page, msg)
+}
+
 async function runDaemon() {
   const { chromium } = await import(
     join(webDir, 'node_modules/@playwright/test/index.mjs')
@@ -905,7 +912,7 @@ async function runDaemon() {
         return { url: page.url(), status: response?.status() ?? null }
       }
       case 'click': {
-        const target = locatorFrom(page, msg)
+        const target = await resolveClickTarget(page, msg)
         await target.waitFor({ state: 'visible', timeout: 15_000 })
         // First click after a navigation can land before hydration (see
         // apps/web/e2e/helpers.ts clickUntil). Retry the click itself.
@@ -1038,7 +1045,13 @@ function usage() {
 `)
 }
 
-export { locatorFrom, coerceName, assertOneRegion, requireUniqueRegion }
+export {
+  locatorFrom,
+  coerceName,
+  assertOneRegion,
+  requireUniqueRegion,
+  resolveClickTarget,
+}
 
 // Importing this file for locator tests must not run launch/doctor/cleanup.
 const invokedAsCli =
