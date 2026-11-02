@@ -1,11 +1,12 @@
 # Welcome screen
 
-Opening the Coffee Companion mobile app while signed in shows a centered heading with the app name and a Sign Out button. Signed-out users land on [Sign-in](./sign-in.md) instead.
+Opening the Coffee Companion mobile app while signed in shows the app name, the Espresso shot list, and a Sign Out button. Signed-out users land on [Sign-in](./sign-in.md) instead. Logging a Shot is [Log an Espresso Shot](./espresso.md).
 
 ## Sub-features
 
 - `welcome-name` shows the heading `Coffee Companion` on the welcome screen.
 - `welcome-sign-out` offers `Sign Out`, which returns the user to the sign-in screen.
+- `welcome-shots` shows the Espresso list (`testID=shot-list`) on the same screen.
 
 ## How to get to it (user POV)
 

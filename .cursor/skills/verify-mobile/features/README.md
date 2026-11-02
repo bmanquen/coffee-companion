@@ -18,13 +18,13 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Start every recipe from the baseline state unless its preconditions say otherwise.
 - Prefer `testID`, `accessibilityRole`, and `accessibilityLabel` over coordinates or tree position.
 - Treat every command as literal. Keep quoted names and flags unchanged.
-- Run screen assertions through `helpers/control drive welcome` or `helpers/control drive sign-in` (or the same RNTL queries those tests use).
+- Run screen assertions through `helpers/control drive welcome`, `helpers/control drive sign-in`, or `helpers/control drive espresso` (or the same RNTL queries those tests use).
 - Where an AVD exists, run `helpers/control verify-device` (cleanup → launch-device → doctor → drive-device). The default Maestro flow starts with `clearState`, so `verify-device` refuses it before Expo when the app was already on an attached emulator (`ownedPackage` is false). `drive-device` still refuses that case. Boot an isolated AVD (default `verify-pixel`) instead. Maestro selectors are `testID`s only, except `runFlow when visible` Continue / Close / Back that dismiss Expo developer-menu overlays whenever they appear while waiting for `sign-in-screen` (until a 60s wall-clock deadline).
 
 ## Proof and skip reporting
 
 - Capture the user-visible tree after the render, not only a pass/fail.
-- RNTL proof includes a host-tree dump (`tree.txt`) that shows the `header` named `Coffee Companion`. A welcome tree must include `welcome-screen` and `welcome-heading`. A sign-in tree must include `sign-in-screen` and `sign-in-heading`.
+- RNTL proof includes a host-tree dump (`tree.txt`) that shows the `header` named `Coffee Companion`. A welcome tree must include `welcome-screen` and `welcome-heading`. A sign-in tree must include `sign-in-screen` and `sign-in-heading`. An espresso tree must include `shot-list` and the logged grind marker.
 - Maestro proof from `drive-device` includes screenshots under `artifacts/<runId>/<flow>/` plus `proof.json` with harness `maestro`. RNTL cannot take a device screenshot; Maestro does not write `tree.txt`.
 - Record the feature ID, harness (`rntl` or `maestro`), and entry point with every artifact.
 - Report an unreachable path with the attempted command and the unmet precondition.
@@ -43,5 +43,6 @@ Keep implementation details out of the map. Name only user paths, stable handles
 
 ## Features
 
-- [Welcome screen](./welcome.md) is the signed-in home: the `Coffee Companion` heading and Sign Out. Shortcut: `helpers/control drive welcome`. Device: `helpers/control drive-device sign-in-and-out`.
+- [Welcome screen](./welcome.md) is the signed-in home: the `Coffee Companion` heading, Espresso list, and Sign Out. Shortcut: `helpers/control drive welcome`. Device: `helpers/control drive-device sign-in-and-out`.
 - [Sign-in screen](./sign-in.md) is the signed-out home: Google, Apple on iOS, sign-up, the error copy, and the hidden E2E handle. Shortcut: `helpers/control drive sign-in`. Device: `helpers/control drive-device sign-in-and-out`.
+- [Log an Espresso Shot](./espresso.md) is pick a Coffee, enter Shot settings, save, and see the Shot in the list. Shortcut: `helpers/control drive espresso`.
