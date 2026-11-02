@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { posthogPersonRetention, recipients } from './privacy'
 
 const IMMEDIATE_APPLE_REVOKE =
-  /(?<!not )revok(e|es|ed)\b.{0,80}(?<!not )immediately|(?<!not )immediat(e|ely).{0,80}(?<!not )(revok(e|es|ed)|revocation)/i
+  /(?<!not )revok(e|es|ed)\b.{0,80}(?<!not )immediately(?! at purge after 30 days)|(?<!not )immediat(e|ely).{0,80}(?<!not )(revok(e|es|ed)|revocation)\b(?! at purge after 30 days)/i
 const ON_DELETE_APPLE_REVOKE =
-  /(?<!not )revok(e|es|ed)\b.{0,80}(?<!not )(on delete|when you delete|as soon as you delete)/i
+  /(?<!not )revok(e|es|ed)\b.{0,80}(?<!not )(on delete|when you delete|as soon as you delete)|(?<!not )(on delete|when you delete|as soon as you delete).{0,80}(?<!not )(revok(e|es|ed)|revocation)\b(?! at purge after 30 days)/i
 const EARLY_APPLE_DELETE =
-  /(deleted|purged|revoked)\b.{0,40}after ([1-9]|[12]\d)(?!\d) days?/i
+  /(?<!not )(deleted|purged|revoked)\b.{0,40}after ([1-9]|[12]\d)(?!\d) days?/i
 
 const IMMEDIATELY_REVOKED_CLAIM = 'the Apple token is immediately revoked'
 const DELETING_IMMEDIATELY_REVOKES_CLAIM =
@@ -21,6 +21,17 @@ const AFFIRMATIVE_ON_DELETE_CLAIM = 'revoked when you delete'
 const NOT_IMMEDIATELY_REVOKED_CLAIM = 'not immediately revoked'
 const NOT_REVOKED_IMMEDIATELY_CLAIM = 'not revoked immediately'
 const NOT_REVOKED_WHEN_YOU_DELETE_CLAIM = 'not revoked when you delete'
+const IMMEDIATE_REVOKE_AT_PURGE_CLAIM =
+  'The token is revoked immediately at purge after 30 days'
+const IMMEDIATE_ON_DELETE_AND_PURGE_CLAIM =
+  'The token is revoked immediately when you delete; it is revoked at purge after 30 days'
+const DELETE_THEN_REVOKE_CLAIM =
+  'When you delete your account, Apple revokes the refresh token'
+const DELETE_THEN_TOKEN_REVOKED_CLAIM =
+  'when you delete your account the token is revoked'
+const DELETE_THEN_REVOKE_AT_PURGE_CLAIM =
+  'When you delete your account we keep the token 30 days; it is revoked at purge after 30 days'
+const NOT_DELETED_AFTER_SEVEN_DAYS_CLAIM = 'not deleted after 7 days'
 
 describe('recipients', () => {
   it('names every third party the app sends data to', () => {
@@ -132,5 +143,27 @@ describe('recipients', () => {
     expect(NEGATED_ON_DELETE_CLAIM).not.toMatch(ON_DELETE_APPLE_REVOKE)
     expect(IMMEDIATELY_REVOKED_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
     expect(AFFIRMATIVE_ON_DELETE_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
+  })
+
+  // Immediate-at-purge is the restore window ending, not an on-delete revoke.
+  it('allows immediate revocation at purge and still flags immediate-on-delete', () => {
+    expect(IMMEDIATE_REVOKE_AT_PURGE_CLAIM).not.toMatch(IMMEDIATE_APPLE_REVOKE)
+    expect(IMMEDIATELY_REVOKED_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
+    expect(IMMEDIATE_ON_DELETE_AND_PURGE_CLAIM).toMatch(IMMEDIATE_APPLE_REVOKE)
+  })
+
+  // Deletion-first wording is the same false claim; revoke-at-purge after
+  // mentioning delete is the restore hold.
+  it('rejects deletion-first Apple revoke claims without treating purge-after-delete as on-delete', () => {
+    expect(DELETE_THEN_REVOKE_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
+    expect(DELETE_THEN_TOKEN_REVOKED_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
+    expect(DELETE_THEN_REVOKE_AT_PURGE_CLAIM).not.toMatch(ON_DELETE_APPLE_REVOKE)
+    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(ON_DELETE_APPLE_REVOKE)
+  })
+
+  // Denying an early purge is accurate; "deleted after 7 days" is not.
+  it('allows a negated early-delete Apple claim', () => {
+    expect(NOT_DELETED_AFTER_SEVEN_DAYS_CLAIM).not.toMatch(EARLY_APPLE_DELETE)
+    expect(DELETED_AFTER_SEVEN_DAYS_CLAIM).toMatch(EARLY_APPLE_DELETE)
   })
 })
