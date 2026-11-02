@@ -33,3 +33,13 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
 jest.mock('@better-auth/expo/client', () => ({
   expoClient: () => ({}),
 }))
+
+jest.mock('@trpc/client', () => ({
+  createTRPCClient: () => ({}),
+  httpBatchLink: () => ({}),
+}))
+
+jest.mock('superjson', () => ({
+  __esModule: true,
+  default: {},
+}))

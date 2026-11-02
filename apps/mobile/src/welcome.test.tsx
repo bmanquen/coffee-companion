@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react-native'
 import { App } from './App'
 import { SIGN_OUT } from './auth/copy'
+import { SHOT_LIST_TEST_ID } from './espresso/copy'
 import { writeHostTreeArtifacts } from './test/host-tree'
 import {
   SIGN_OUT_TEST_ID,
@@ -43,6 +44,7 @@ describe('App welcome screen', () => {
     expect(screen.getByText('Ada Lovelace')).toBeTruthy()
     expect(screen.getByRole('button', { name: SIGN_OUT })).toBeTruthy()
     expect(screen.getByTestId(SIGN_OUT_TEST_ID)).toHaveTextContent(SIGN_OUT)
+    expect(screen.getByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
 
     writeHostTreeArtifacts(view.toJSON())
   })
