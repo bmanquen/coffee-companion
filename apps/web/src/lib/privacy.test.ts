@@ -4,7 +4,7 @@ import { posthogPersonRetention, recipients } from './privacy'
 const IMMEDIATE_APPLE_REVOKE =
   /(?<!not )revok(e|es|ed)\b.{0,80}(?<!not )immediately(?! at purge after 30 days)|(?<!not )immediat(e|ely).{0,80}(?<!not )(revok(e|es|ed)|revocation)\b(?! at purge after 30 days)|(?<!not )revocation\b.{0,80}(?<!not )immediat(e|ely)(?! at purge after 30 days)/i
 const ON_DELETE_APPLE_REVOKE =
-  /(?<!not(?: \w+)? )revok(e|es|ed)\b.{0,80}(?<!not )(on delete|when you delete|as soon as you delete)|(?<!not )(on delete|when you delete|as soon as you delete).{0,80}(?<!not(?: \w+)? )(revok(e|es|ed)|revocation)\b(?! at purge after 30 days)/i
+  /(?<!not(?: \w+)? )(revok(e|es|ed)|revocation)\b.{0,80}(?<!not )(on delete|when you delete|as soon as you delete|upon account deletion|upon deletion)|(?<!not )(on delete|when you delete|as soon as you delete|upon account deletion|upon deletion).{0,80}(?<!not(?: \w+)? )(revok(e|es|ed)|revocation)\b(?! at purge after 30 days)/i
 const EARLY_APPLE_DELETE =
   /(?<!not )(deleted|purged|revoked)\b.{0,40}after ([1-9]|[12]\d)(?!\d) days?/i
 
@@ -39,6 +39,12 @@ const NOT_IMMEDIATELY_REVOKED_ON_DELETE_CLAIM =
 const REVOCATION_IS_IMMEDIATE_CLAIM = 'revocation is immediate'
 const APPLE_REVOCATION_IS_IMMEDIATE_CLAIM =
   "The Apple token's revocation is immediate upon account deletion"
+const REVOKED_UPON_ACCOUNT_DELETION_CLAIM = 'revoked upon account deletion'
+const REVOCATION_UPON_ACCOUNT_DELETION_CLAIM =
+  'revocation upon account deletion'
+const UPON_ACCOUNT_DELETION_THEN_REVOKED_CLAIM =
+  'Upon account deletion, the token is revoked'
+const UPON_DELETION_THEN_REVOKED_CLAIM = 'upon deletion the token is revoked'
 
 describe('recipients', () => {
   it('names every third party the app sends data to', () => {
@@ -173,6 +179,19 @@ describe('recipients', () => {
     expect(DELETE_THEN_REVOKE_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
     expect(DELETE_THEN_TOKEN_REVOKED_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
     expect(DELETE_THEN_REVOKE_AT_PURGE_CLAIM).not.toMatch(ON_DELETE_APPLE_REVOKE)
+    expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(ON_DELETE_APPLE_REVOKE)
+  })
+
+  // "Upon account deletion" is the same false claim as "when you delete".
+  it('rejects revocation upon account deletion as an on-delete claim', () => {
+    expect(REVOKED_UPON_ACCOUNT_DELETION_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
+    expect(REVOCATION_UPON_ACCOUNT_DELETION_CLAIM).toMatch(
+      ON_DELETE_APPLE_REVOKE,
+    )
+    expect(UPON_ACCOUNT_DELETION_THEN_REVOKED_CLAIM).toMatch(
+      ON_DELETE_APPLE_REVOKE,
+    )
+    expect(UPON_DELETION_THEN_REVOKED_CLAIM).toMatch(ON_DELETE_APPLE_REVOKE)
     expect(REVOKED_AT_PURGE_AFTER_THIRTY_DAYS).not.toMatch(ON_DELETE_APPLE_REVOKE)
   })
 

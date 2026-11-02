@@ -4,6 +4,7 @@ import {
   assertOneRegion,
   locatorFrom,
   requireUniqueRegion,
+  resolveClickTarget,
 } from './control.mjs'
 
 function mockLocator(label, trail, { countValue = 1 } = {}) {
@@ -173,5 +174,42 @@ describe('requireUniqueRegion', () => {
       () => requireUniqueRegion(page, { region: 'Apple' }, { timeoutMs: 0 }),
       /matched 2 times; expected 1/,
     )
+  })
+})
+
+describe('resolveClickTarget', () => {
+  it('requires a unique region before resolving a scoped click', async () => {
+    const { page, trail } = pageWithTrail(1)
+    await resolveClickTarget(page, {
+      region: 'Apple',
+      role: 'link',
+      name: 'Learn more',
+    })
+    assert.deepEqual(trail, [
+      ['getByRole', 'region', { name: 'Apple' }],
+      ['count', 1],
+      ['waitFor', { state: 'visible', timeout: 15_000 }],
+      ['getByRole', 'region', { name: 'Apple' }],
+      ['getByRole', 'link', { name: 'Learn more', exact: false }],
+    ])
+    assert.ok(!trail.includes('first'))
+  })
+
+  it('fails a scoped click when the named region is not unique, before --first', async () => {
+    const { page, trail } = pageWithTrail(2)
+    await assert.rejects(
+      () =>
+        resolveClickTarget(page, {
+          region: 'Apple',
+          role: 'link',
+          name: 'Learn more',
+          first: true,
+        }),
+      /matched 2 times; expected 1/,
+    )
+    assert.deepEqual(trail, [
+      ['getByRole', 'region', { name: 'Apple' }],
+      ['count', 2],
+    ])
   })
 })
