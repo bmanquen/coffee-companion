@@ -1,26 +1,40 @@
+import { useEffect, useMemo } from 'react'
 import { StatusBar } from 'expo-status-bar'
-import { useEffect } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import { createLiveEspressoApi } from './api'
 import { API_URL_DEV_TAG, apiBaseUrl } from './auth/config'
 import { logApiBaseUrl } from './auth/log'
 import { SignedInHome } from './auth/SignedInHome'
 import { SignInScreen } from './auth/SignInScreen'
 import { useAuth } from './auth/use-auth'
+import { idleEspressoApi } from './espresso/types'
+import type { EspressoApi } from './espresso/types'
 import type { Auth } from './auth/use-auth'
 
-export function App({ auth }: { auth?: Auth }) {
-  return auth ? <Shell auth={auth} /> : <Live />
+export function App({
+  auth,
+  espresso,
+}: {
+  auth?: Auth
+  espresso?: EspressoApi
+}) {
+  return auth ? (
+    <Shell auth={auth} espresso={espresso ?? idleEspressoApi} />
+  ) : (
+    <Live />
+  )
 }
 
 function Live() {
   const auth = useAuth()
+  const espresso = useMemo(() => createLiveEspressoApi(), [])
   useEffect(() => {
     logApiBaseUrl(apiBaseUrl(), API_URL_DEV_TAG)
   }, [])
-  return <Shell auth={auth} />
+  return <Shell auth={auth} espresso={espresso} />
 }
 
-function Shell({ auth }: { auth: Auth }) {
+function Shell({ auth, espresso }: { auth: Auth; espresso: EspressoApi }) {
   return (
     <>
       {auth.loading && !auth.session ? (
@@ -30,6 +44,7 @@ function Shell({ auth }: { auth: Auth }) {
       ) : auth.session ? (
         <SignedInHome
           name={auth.session.user.name}
+          espresso={espresso}
           onSignOut={() => {
             void auth.signOut()
           }}
