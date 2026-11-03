@@ -1,0 +1,17 @@
+appId: dev.offbyonelabs.coffeecompanion
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: sign-in-screen
+- takeScreenshot: signed-out
+- tapOn:
+    id: e2e-sign-in
+- assertVisible:
+    id: welcome-screen
+- takeScreenshot: signed-in
+- tapOn:
+    id: sign-out
+- assertVisible:
+    id: sign-in-screen
+- takeScreenshot: signed-out-again
