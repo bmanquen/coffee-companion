@@ -3,7 +3,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { apiErrorMessage } from '../api-error'
 import { ShotForm } from '../espresso/ShotForm'
 import { ShotList } from '../espresso/ShotList'
-import { ERROR_LOAD_FAILED, ERROR_SAVE_FAILED } from '../espresso/copy'
+import {
+  ERROR_LOAD_FAILED,
+  ERROR_SAVE_FAILED,
+  TRY_AGAIN,
+} from '../espresso/copy'
 import { idleEspressoApi, runMaybePromise } from '../espresso/types'
 import {
   SIGN_OUT_TEST_ID,
@@ -45,6 +49,11 @@ export function SignedInHome({
     setLoading(false)
   }, [])
 
+  const reload = useCallback(() => {
+    setLoading(true)
+    runMaybePromise(() => espresso.load(), showCatalog, failLoad)
+  }, [espresso, showCatalog, failLoad])
+
   useEffect(() => {
     let cancelled = false
     runMaybePromise(
@@ -64,25 +73,18 @@ export function SignedInHome({
   const save = (input: ShotCreate) => {
     setBusy(true)
     setSaveError(null)
-    const failSave = (error: unknown) => {
-      setSaveError(apiErrorMessage(error, ERROR_SAVE_FAILED))
-      setBusy(false)
-    }
     runMaybePromise(
       () => espresso.create(input),
       () => {
-        runMaybePromise(
-          () => espresso.load(),
-          (next) => {
-            showCatalog(next)
-            setSaveError(null)
-            setScreen('list')
-            setBusy(false)
-          },
-          failSave,
-        )
+        setSaveError(null)
+        setScreen('list')
+        setBusy(false)
+        reload()
       },
-      failSave,
+      (error) => {
+        setSaveError(apiErrorMessage(error, ERROR_SAVE_FAILED))
+        setBusy(false)
+      },
     )
   }
 
@@ -110,7 +112,12 @@ export function SignedInHome({
         </Pressable>
       </View>
       {loadError && screen === 'list' ? (
-        <Text accessibilityRole="alert">{loadError}</Text>
+        <View style={styles.loadError}>
+          <Text accessibilityRole="alert">{loadError}</Text>
+          <Pressable accessibilityRole="button" onPress={reload}>
+            <Text>{TRY_AGAIN}</Text>
+          </Pressable>
+        </View>
       ) : null}
       {screen === 'form' && catalog ? (
         <ShotForm
@@ -127,6 +134,7 @@ export function SignedInHome({
         <ShotList
           shots={catalog?.shots ?? null}
           loading={loading}
+          failed={loadError != null}
           onLogShot={() => {
             if (!catalog) return
             setSaveError(null)
@@ -146,6 +154,11 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   top: {
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  loadError: {
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 16,

@@ -4,6 +4,7 @@ import { writeHostTreeArtifacts } from '../test/host-tree'
 import {
   BACK,
   EMPTY_SHOTS,
+  ERROR_LOAD_FAILED,
   LABEL_DOSE,
   LABEL_GRIND,
   LABEL_TIME,
@@ -15,6 +16,7 @@ import {
   SELECT_COFFEE_ERROR,
   SHOT_FORM_TEST_ID,
   SHOT_LIST_TEST_ID,
+  TRY_AGAIN,
 } from './copy'
 import type { EspressoApi, EspressoCatalog, ShotCreate, ShotRow } from './types'
 import type { Auth } from '../auth/use-auth'
@@ -23,6 +25,7 @@ const COFFEE = '00000000-0000-4000-8000-000000000001'
 const GRINDER = '00000000-0000-4000-8000-000000000003'
 const ESP_DEVICE = '00000000-0000-4000-8000-000000000005'
 const GRIND_MARKER = 'verify-grind-7'
+const TRPC_FORBIDDEN = 'FORBIDDEN'
 
 const signedIn: Auth = {
   session: {
@@ -71,12 +74,16 @@ function fakeApi(
   initial: EspressoCatalog,
   hooks: {
     create?: (input: ShotCreate) => void
+    load?: (catalog: EspressoCatalog) => EspressoCatalog
   } = {},
 ): { api: EspressoApi; created: Array<ShotCreate> } {
   const created: Array<ShotCreate> = []
   let shots = [...initial.shots]
   const api: EspressoApi = {
-    load: () => ({ ...initial, shots: [...shots] }),
+    load: () => {
+      const next = { ...initial, shots: [...shots] }
+      return hooks.load ? hooks.load(next) : next
+    },
     create: (input) => {
       if (hooks.create) {
         hooks.create(input)
@@ -220,7 +227,9 @@ describe('log espresso shot', () => {
       'This Brew is Sealed. Subscribe to read and edit it again.'
     const { api } = fakeApi(catalog(), {
       create: () => {
-        throw new Error(message)
+        throw Object.assign(new Error(message), {
+          data: { code: TRPC_FORBIDDEN },
+        })
       },
     })
     await render(<App auth={signedIn} espresso={api} />)
@@ -244,5 +253,48 @@ describe('log espresso shot', () => {
 
     expect(screen.getByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
     expect(created).toHaveLength(0)
+  })
+
+  it('returns to the list after a save even if reload fails', async () => {
+    let loads = 0
+    const { api, created } = fakeApi(catalog(), {
+      load: (next) => {
+        loads += 1
+        if (loads > 1) throw new Error('Network request failed')
+        return next
+      },
+    })
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+
+    expect(created).toHaveLength(1)
+    expect(screen.getByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+    expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
+    expect(screen.queryByTestId(SHOT_FORM_TEST_ID)).toBeNull()
+  })
+
+  it('retries a failed load without showing an empty list', async () => {
+    let fail = true
+    const { api } = fakeApi(catalog({ shots: [] }), {
+      load: (next) => {
+        if (fail) {
+          fail = false
+          throw new Error('Network request failed')
+        }
+        return next
+      },
+    })
+    await render(<App auth={signedIn} espresso={api} />)
+
+    expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
+    expect(screen.queryByText(EMPTY_SHOTS)).toBeNull()
+
+    await press(TRY_AGAIN)
+
+    expect(screen.getByText(EMPTY_SHOTS)).toBeTruthy()
+    expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull()
   })
 })

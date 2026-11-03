@@ -17,7 +17,7 @@
     "@better-auth/expo": "1.6.26",
     "@coffee-companion/api": "workspace:*",
     "@react-native-google-signin/google-signin": "^16.0.0",
-    "@trpc/client": "^11.8.1",
+    "@trpc/client": "^11.12.0",
     "better-auth": "1.6.26",
     "expo": "~57.0.29",
     "expo-apple-authentication": "~57.0.2",

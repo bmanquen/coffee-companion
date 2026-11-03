@@ -23,6 +23,7 @@ export const LABEL_NOTES = 'Notes'
 
 export const ERROR_LOAD_FAILED = "We couldn't load your shots. Try again."
 export const ERROR_SAVE_FAILED = 'Something went wrong. Try again.'
+export const TRY_AGAIN = 'Try again'
 
 export const SELECT_COFFEE_ERROR = 'Select a coffee'
 export const SELECT_GRINDER_ERROR = 'Select a grinder'
