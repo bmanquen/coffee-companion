@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native'
+import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { App } from '../App'
 import { writeHostTreeArtifacts } from '../test/host-tree'
 import {
@@ -9,6 +9,7 @@ import {
   LABEL_GRIND,
   LABEL_TIME,
   LABEL_YIELD,
+  LOADING_SHOTS,
   LOG,
   LOG_ESPRESSO_HEADING,
   LOG_SHOT,
@@ -294,6 +295,58 @@ describe('log espresso shot', () => {
 
     await press(TRY_AGAIN)
 
+    expect(screen.getByText(EMPTY_SHOTS)).toBeTruthy()
+    expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull()
+  })
+
+  it('clears the load error when a retry is in flight', async () => {
+    let resolveRetry: (value: EspressoCatalog) => void = () => {}
+    let loads = 0
+    const empty = catalog({ shots: [] })
+    const api: EspressoApi = {
+      load: () => {
+        loads += 1
+        if (loads === 1) throw new Error('Network request failed')
+        return new Promise<EspressoCatalog>((resolve) => {
+          resolveRetry = resolve
+        })
+      },
+      create: () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+
+    expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
+    await press(TRY_AGAIN)
+
+    expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull()
+    expect(screen.queryByRole('button', { name: TRY_AGAIN })).toBeNull()
+    expect(screen.queryByText(EMPTY_SHOTS)).toBeNull()
+    expect(screen.getByLabelText(LOADING_SHOTS)).toBeTruthy()
+
+    resolveRetry(empty)
+    expect(await screen.findByText(EMPTY_SHOTS)).toBeTruthy()
+    expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull()
+  })
+
+  it('keeps a loaded list when an earlier load fails late', async () => {
+    let rejectFirst: (error: Error) => void = () => {}
+    const first: EspressoApi = {
+      load: () =>
+        new Promise<EspressoCatalog>((_, reject) => {
+          rejectFirst = reject
+        }),
+      create: () => {},
+    }
+    const { api: second } = fakeApi(catalog({ shots: [] }))
+    const view = await render(<App auth={signedIn} espresso={first} />)
+
+    await view.rerender(<App auth={signedIn} espresso={second} />)
+    expect(screen.getByText(EMPTY_SHOTS)).toBeTruthy()
+
+    await act(async () => {
+      rejectFirst(new Error('Network request failed'))
+      await Promise.resolve()
+    })
     expect(screen.getByText(EMPTY_SHOTS)).toBeTruthy()
     expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull()
   })
