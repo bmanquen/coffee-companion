@@ -31,10 +31,8 @@ The RNTL tier is the gate on every machine. If an Android AVD exists, also run t
 
 # Device (only where SDK + an AVD exist; default name is verify-pixel)
 # Dedicated web port is 3910 (VERIFY_PORT) so it does not collide with pnpm dev on 3000.
-VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control launch-device
-.cursor/skills/verify-mobile/helpers/control doctor
-.cursor/skills/verify-mobile/helpers/control drive-device sign-in-and-out
-.cursor/skills/verify-mobile/helpers/control cleanup
+# One command: cleanup → launch-device → doctor → drive-device. Leaves the instance up on failure.
+VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control verify-device
 ```
 
 ## Launch
@@ -83,9 +81,11 @@ VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control launch-device
 
 The device tier starts its own web app on port `3910` so it does not collide with `pnpm dev` on `3000`. Override with `VERIFY_PORT` if that port is taken.
 
+`helpers/control verify-device [flow]` is the one command: `cleanup` → `launch-device` → `doctor` → `drive-device` (default flow `sign-in-and-out`). On failure it leaves the instance up for inspection. Do not insert manual waits between those steps.
+
 `launch-device` does all of this, in order:
 
-1. Refuses if `.run/state.json` already records a live pid, if port 8081 is taken, or if the dedicated web port (`3910`, or `VERIFY_PORT`) is taken. If `emulator-5554` is already `device`, launch attaches to it (and adopts its AVD name unless `VERIFY_AVD` disagrees). It does not refuse a healthy emulator that was started outside the script.
+1. Refuses if `.run/state.json` already records a live pid. Ports 8081 and `3910` (`VERIFY_PORT`) are waited on briefly after cleanup — a leftover listener is not an immediate error. If `emulator-5554` is `offline` / `unauthorized` / otherwise not `device`, launch waits for it to become `device` or leave `adb devices`, and `adb emu kill`s it if it stays stale. It never exits on a transient serial. If the serial is already `device`, launch attaches (and adopts its AVD name unless `VERIFY_AVD` disagrees). It does not refuse a healthy emulator that was started outside the script.
 2. Resolves the Studio SDK (never Homebrew commandlinetools), prints the emulator binary, and requires Java 17–21 (or macOS `java_home -v 17`). When it must boot, it runs `emulator -list-avds` and dies immediately if the chosen AVD is missing, listing the installed names and telling you to set `VERIFY_AVD`. Before booting, compares JS-imported Expo native modules (including `@better-auth/expo`'s `import("expo-network")`) to `expo-modules-autolinking resolve -p android`. A module that JS can import but autolinking omitted fails closed — under pnpm that usually means it is not a direct `apps/mobile` dependency.
 3. Boots that AVD on console port `5554` (serial `emulator-5554`) with `-no-boot-anim` and, on macOS, `-gpu host` (`VERIFY_EMULATOR_GPU` overrides), unless it attached in step 1. Waits up to five minutes (`EMULATOR_BOOT_TIMEOUT_MS`) and prints `booting…` elapsed seconds on stderr. If the emulator process exits early, it fails with the tail of `.run/emulator.log` instead of waiting out the timeout.
 4. Starts the web app on that dedicated port (`VERIFY_PORT` / `BETTER_AUTH_URL` / `SITE_URL` pinned so a leftover `3000` from `pnpm dev` cannot leak through) with `E2E_BYPASS_AUTH=true` (same seed and bypass as `.cursor/skills/verify-coffee-companion`).
@@ -154,11 +154,13 @@ CI runs those same screen tests without Metro (`pnpm --filter @coffee-companion/
 
 ### Drive the Android device tier
 
-Where an AVD exists (default `verify-pixel`, or `VERIFY_AVD`), after `launch-device` and a green `doctor`:
+Where an AVD exists (default `verify-pixel`, or `VERIFY_AVD`), one command:
 
 ```bash
-.cursor/skills/verify-mobile/helpers/control drive-device sign-in-and-out
+VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control verify-device
 ```
+
+That is `cleanup` → `launch-device` → `doctor` → `drive-device sign-in-and-out`. The instance stays up if a later step fails. To drive a launched instance again: `helpers/control drive-device sign-in-and-out`.
 
 That runs `maestro --device emulator-5554 test -e EXPO_DEV_CLIENT_URL=… flows/<flow>.yaml`. Selectors are `testID`s only, except the Expo first-run sheet which is dismissed with optional `tapOn: Continue`. Never use coordinates. The first flow is `flows/sign-in-and-out.yaml`: `launchApp` with `clearState` → `openLink` the expo-development-client URL → optional wait/tap of "This is the developer menu… Continue" → `extendedWaitUntil` `sign-in-screen` → tap `e2e-sign-in` → `welcome-screen` → tap `sign-out` → `sign-in-screen`. Screenshots and `proof.json` (`harness: maestro`) land under `artifacts/<runId>/<flow>/`. On failure, `drive-device` also writes `failure.png` and a uiautomator `window_dump.xml` there.
 
@@ -183,7 +185,7 @@ Standards:
 .cursor/skills/verify-mobile/helpers/control cleanup
 ```
 
-Kills the pids recorded in `.run/state.json` (Metro, expo, web, emulator) and any leftover listeners on `VERIFY_METRO_PORT` (8081) and `VERIFY_PORT` (3910), even when `.run/state.json` is missing. If a serial is recorded, uninstalls `dev.offbyonelabs.coffeecompanion` from that device. Then deletes `.run/`. It does **not** kill by process name, does **not** touch other emulators, and does **not** delete `artifacts/`.
+Kills the pids recorded in `.run/state.json` (Metro, expo, web, emulator) and any leftover listeners on `VERIFY_METRO_PORT` (8081) and `VERIFY_PORT` (3910), even when `.run/state.json` is missing. An emulator this script started is stopped with `adb -s <serial> emu kill` before a process signal, then cleanup waits until that serial leaves `adb devices`. If a serial is recorded, uninstalls `dev.offbyonelabs.coffeecompanion` from that device. Then deletes `.run/`. It does **not** kill by process name, does **not** touch other emulators, and does **not** delete `artifacts/`.
 
 If launch failed part-way, run cleanup anyway so a half-written state file cannot mask a stray pid.
 
@@ -201,7 +203,8 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
 | `helpers/control drive-device <flow>` | Maestro `flows/<flow>.yaml` on `emulator-5554`; copy screenshots to `artifacts/`; on failure write `failure.png` and `window_dump.xml` |
-| `helpers/control cleanup` | Stop recorded pids and leftover listeners on the verify ports; uninstall the package from a recorded serial; keep artifacts |
+| `helpers/control verify-device [flow]` | One shot: cleanup → launch-device → doctor → drive-device. Leaves the instance up on failure. |
+| `helpers/control cleanup` | Stop recorded pids and leftover listeners on the verify ports; `emu kill` then wait for the serial to leave adb; uninstall the package from a recorded serial; keep artifacts |
 | `helpers/metro.test.mjs` | Node tests for the Metro / bundle markers |
 | `helpers/device.test.mjs` | Node tests for adb / dumpsys / AVD list / boot-wait / pid / screenshot helpers |
 
