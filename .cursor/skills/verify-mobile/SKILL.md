@@ -69,7 +69,13 @@ If launch fails after Metro has started (timeout or a bundle that is not this ap
 
 ### Launch the Android device tier
 
-On a machine that already has the Android SDK and an AVD. Default AVD name is `verify-pixel`. If `emulator -list-avds` does not include that name, set `VERIFY_AVD` to one of the listed names (for example `Pixel_7`):
+Mac / Linux prerequisites:
+
+- Android Studio SDK at `~/Library/Android/sdk` (macOS) or `~/Android/Sdk` (Linux). `ANDROID_HOME` / `ANDROID_SDK_ROOT` win when they point at that full SDK. Homebrew `android-commandlinetools` (`/opt/homebrew/share/android-commandlinetools`) is skipped — it has no AVD system images.
+- Create the AVD in Android Studio Device Manager (API 36 / arm64 is fine). Default name is `verify-pixel`.
+- Java 17–21 for the Gradle build. Android Studio's bundled JBR (Java 25) crashes `compileKotlin`. `launch-device` uses `JAVA_HOME` when it is 17–21, otherwise `/usr/libexec/java_home -v 17` on macOS. Install with `brew install --cask temurin@17` if that lookup fails.
+
+On a machine that already has that SDK and an AVD. If `emulator -list-avds` does not include `verify-pixel`, set `VERIFY_AVD` to one of the listed names (for example `Pixel_7`):
 
 ```bash
 VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control launch-device
@@ -80,8 +86,8 @@ The device tier starts its own web app on port `3910` so it does not collide wit
 `launch-device` does all of this, in order:
 
 1. Refuses if `.run/state.json` already records a live pid, if port 8081 is taken, if the dedicated web port (`3910`, or `VERIFY_PORT`) is taken, or if `emulator-5554` is already in use by someone else.
-2. Runs `emulator -list-avds` and dies immediately if the chosen AVD is missing, listing the installed names and telling you to set `VERIFY_AVD`.
-3. Boots that AVD on console port `5554` (serial `emulator-5554`). Waits up to five minutes (`EMULATOR_BOOT_TIMEOUT_MS`) and prints `booting…` elapsed seconds on stderr. If the emulator process exits early, it fails with the tail of `.run/emulator.log` instead of waiting out the timeout.
+2. Resolves the Studio SDK (never Homebrew commandlinetools), prints the emulator binary, and requires Java 17–21 (or macOS `java_home -v 17`). Then runs `emulator -list-avds` and dies immediately if the chosen AVD is missing, listing the installed names and telling you to set `VERIFY_AVD`.
+3. Boots that AVD on console port `5554` (serial `emulator-5554`) with `-no-boot-anim` and, on macOS, `-gpu host` (`VERIFY_EMULATOR_GPU` overrides). Waits up to five minutes (`EMULATOR_BOOT_TIMEOUT_MS`) and prints `booting…` elapsed seconds on stderr. If the emulator process exits early, it fails with the tail of `.run/emulator.log` instead of waiting out the timeout.
 4. Starts the web app on that dedicated port (`VERIFY_PORT` / `BETTER_AUTH_URL` / `SITE_URL` pinned so a leftover `3000` from `pnpm dev` cannot leak through) with `E2E_BYPASS_AUTH=true` (same seed and bypass as `.cursor/skills/verify-coffee-companion`).
 5. Runs `expo run:android --device <AVD name>` (Expo 57 matches `device.name`, not the adb serial). adb and Maestro still use `emulator-5554`. If expo exits before the APK is installed, launch dies with the tail of `.run/expo-android.log`. Env: `EXPO_PUBLIC_E2E_USER=e2e-user-with-data` and `EXPO_PUBLIC_API_URL=http://localhost:<port>`. Metro inlines `EXPO_PUBLIC_*`; the app rewrites `localhost` to `10.0.2.2` on the emulator. Prints `building/installing…` plus the expo log path on stderr. The APK `version` / `extra.gitHead` is the git HEAD short SHA.
 6. Records every started pid, the serial, the actual `avdName`, and `webPort` in `.run/state.json`.
@@ -108,6 +114,7 @@ After `launch-device`, doctor also checks:
 - Recorded emulator / web / expo pids are alive and `emulator-5554` is attached.
 - `GET` on the recorded `webBaseUrl` (default `http://127.0.0.1:3910`) answers.
 - `adb shell dumpsys package dev.offbyonelabs.coffeecompanion` `versionName` matches `git rev-parse --short=7 HEAD`.
+- The Java Gradle will use is 17–21 (same preflight as `launch-device`).
 
 Doctor prints JSON. Exit code `2` means do not drive — relaunch, or stop: something else is on the port or serial.
 
