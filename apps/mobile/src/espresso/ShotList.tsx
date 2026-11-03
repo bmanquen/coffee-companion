@@ -1,4 +1,11 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import {
   EMPTY_SHOTS,
   ESPRESSO_HEADING,
@@ -14,21 +21,30 @@ import type { ShotRow } from './types'
 export function ShotList({
   shots,
   loading,
+  failed,
   onLogShot,
 }: {
   shots: Array<ShotRow> | null
   loading: boolean
+  failed: boolean
   onLogShot: () => void
 }) {
+  const canLog = !loading && !failed && shots != null
+
   return (
-    <View
+    <ScrollView
       accessibilityLabel={SHOT_LIST_A11Y_LABEL}
       testID={SHOT_LIST_TEST_ID}
       style={styles.list}
+      contentContainerStyle={styles.content}
     >
       <View style={styles.header}>
         <Text accessibilityRole="header">{ESPRESSO_HEADING}</Text>
-        <Pressable accessibilityRole="button" onPress={onLogShot}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={!canLog}
+          onPress={onLogShot}
+        >
           <Text>{LOG_SHOT}</Text>
         </Pressable>
       </View>
@@ -36,7 +52,7 @@ export function ShotList({
         <View accessibilityLabel={LOADING_SHOTS}>
           <ActivityIndicator />
         </View>
-      ) : shots == null || shots.length === 0 ? (
+      ) : failed ? null : shots == null || shots.length === 0 ? (
         <Text>{EMPTY_SHOTS}</Text>
       ) : (
         shots.map((shot) => (
@@ -50,15 +66,19 @@ export function ShotList({
           </View>
         ))
       )}
-    </View>
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   list: {
+    flex: 1,
     width: '100%',
+  },
+  content: {
     gap: 12,
     paddingHorizontal: 16,
+    paddingBottom: 32,
   },
   header: {
     flexDirection: 'row',

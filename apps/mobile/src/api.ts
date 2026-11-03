@@ -1,7 +1,7 @@
 import { createTRPCClient, httpBatchLink } from '@trpc/client'
 import superjson from 'superjson'
+import { getSessionCookie } from './auth/auth-client'
 import { apiBaseUrl } from './auth/config'
-import { SESSION_COOKIE_KEY, sessionStore } from './auth/session-store'
 import { espressoDevicesFrom } from './espresso/devices'
 import type {
   EspressoApi,
@@ -38,7 +38,7 @@ type TrpcLike = {
 }
 
 function sessionHeaders(): Record<string, string> {
-  const cookie = sessionStore.getItem(SESSION_COOKIE_KEY)
+  const cookie = getSessionCookie()
   return cookie ? { cookie } : {}
 }
 

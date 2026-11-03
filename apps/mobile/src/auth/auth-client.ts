@@ -85,3 +85,7 @@ export function clearClientSession() {
     refetch: current.refetch,
   })
 }
+
+export function getSessionCookie(): string {
+  return authClient.getCookie()
+}

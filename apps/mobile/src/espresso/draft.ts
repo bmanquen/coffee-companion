@@ -121,7 +121,9 @@ export function applyCoffeePrefill(
 ): ShotDraft {
   const latest = shots.find((shot) => shot.coffeeId === coffeeId && !shot.sealed)
   if (!latest?.grinderId || !latest.brewingDeviceId) {
-    return { ...draft, coffeeId }
+    return coffeeId === draft.coffeeId
+      ? draft
+      : { ...draft, coffeeId, roastDate: '' }
   }
   return {
     ...draft,

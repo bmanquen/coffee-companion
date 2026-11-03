@@ -4043,7 +4043,6 @@ const DRIVES = {
       dose: '18',
       yield: '36',
       time: '30',
-      createProcedure: 'espressoShot.create',
     },
   },
 }

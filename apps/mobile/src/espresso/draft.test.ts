@@ -120,6 +120,18 @@ describe('applyCoffeePrefill', () => {
     expect(next.grinderId).toBe('')
     expect(next.brewingDeviceId).toBe('')
   })
+
+  it('clears the roast date when the next coffee has no unsealed shot', () => {
+    const other = '00000000-0000-4000-8000-000000000009'
+    const draft = {
+      ...emptyShotDraft(),
+      coffeeId: COFFEE,
+      roastDate: '2026-05-01',
+    }
+    const next = applyCoffeePrefill(draft, other, [shot()])
+    expect(next.coffeeId).toBe(other)
+    expect(next.roastDate).toBe('')
+  })
 })
 
 describe('shotSummary', () => {
