@@ -54,6 +54,11 @@ const EXPO_LOG_TAIL_LINES = 40
 const BOOT_PROGRESS_INTERVAL_MS = 15_000
 const INSTALL_PROGRESS_INTERVAL_MS = 15_000
 const EXPO_INSTALL_TIMEOUT_MS = 900_000
+const APP_READY_TIMEOUT_MS = 60_000
+const DEVICE_METRO_WAIT_MS = 60_000
+const SIGN_IN_TEST_ID = 'sign-in-screen'
+const WELCOME_SCREEN_TEST_ID = 'welcome-screen'
+const DEV_LAUNCHER_MARKERS = ['Development servers', 'npx expo start']
 const DEFAULT_MAC_EMULATOR_GPU = 'host'
 const JAVA_MIN_MAJOR = 17
 const JAVA_MAX_MAJOR = 21
@@ -393,9 +398,12 @@ function bootWaitTick({ alive, bootCompleted, logText }) {
   return { status: 'wait' }
 }
 
-function expoAndroidArgs(avdName) {
+function expoAndroidArgs(
+  avdName,
+  { rebuild = false, port = DEFAULT_METRO_PORT } = {},
+) {
   // Expo 57 --device matches device.name (the AVD), not the adb serial.
-  return [
+  const args = [
     '--filter',
     '@coffee-companion/mobile',
     'exec',
@@ -403,7 +411,11 @@ function expoAndroidArgs(avdName) {
     'run:android',
     '--device',
     avdName,
+    '--port',
+    String(port),
   ]
+  if (rebuild) args.push('--no-build-cache')
+  return args
 }
 
 function expoDiedError(logText) {
@@ -414,10 +426,187 @@ function expoDiedError(logText) {
   return `expo run:android exited before the APK was installed. Tail of expo-android.log:\n${tail}`
 }
 
-function installWaitTick({ alive, versionName, logText }) {
+function installWaitTick({
+  alive,
+  versionName,
+  expectedVersion,
+  logText,
+}) {
+  if (versionName && expectedVersion && versionName !== expectedVersion) {
+    if (!alive) {
+      return {
+        status: 'error',
+        error:
+          `expo run:android exited with installed versionName ${versionName}, ` +
+          `expected ${expectedVersion}. Uninstall and rebuild.`,
+      }
+    }
+    return { status: 'wait' }
+  }
   if (versionName) return { status: 'ok' }
   if (!alive) return { status: 'error', error: expoDiedError(logText) }
   return { status: 'wait' }
+}
+
+function shouldRebuildApk({ installedVersion, expectedVersion }) {
+  return !installedVersion || installedVersion !== expectedVersion
+}
+
+function parseAppScheme(source) {
+  if (typeof source !== 'string') return null
+  const ts = source.match(
+    /\bscheme\s*:\s*['"]([a-zA-Z][a-zA-Z0-9+.-]*)['"]/,
+  )
+  if (ts) return ts[1]
+  const json = source.match(/"scheme"\s*:\s*"([a-zA-Z][a-zA-Z0-9+.-]*)"/)
+  return json?.[1] ?? null
+}
+
+function readAppScheme(appDir = mobileDir) {
+  for (const name of ['app.config.ts', 'app.config.js', 'app.json']) {
+    const path = join(appDir, name)
+    if (!existsSync(path)) continue
+    const scheme = parseAppScheme(readFileSync(path, 'utf8'))
+    if (scheme) return scheme
+  }
+  throw new Error(`Could not read Expo scheme from ${appDir} app config`)
+}
+
+function expoDevClientUrl({ scheme, metroPort }) {
+  if (!scheme) {
+    throw new Error('Expo scheme is required to open the dev client')
+  }
+  const metroUrl = `http://127.0.0.1:${metroPort}`
+  return `${scheme}://expo-development-client/?url=${encodeURIComponent(metroUrl)}`
+}
+
+function adbReverseArgs(serial, port) {
+  return ['-s', serial, 'reverse', `tcp:${port}`, `tcp:${port}`]
+}
+
+function adbOpenDevClientArgs({ serial, url, pkg }) {
+  return [
+    '-s',
+    serial,
+    'shell',
+    'am',
+    'start',
+    '-a',
+    'android.intent.action.VIEW',
+    '-d',
+    url,
+    pkg,
+  ]
+}
+
+function parseAdbReverseList(text) {
+  const reversed = []
+  for (const line of `${text ?? ''}`.split('\n')) {
+    const match = line.match(/tcp:(\d+)\s+tcp:(\d+)/)
+    if (match) {
+      reversed.push({ device: Number(match[1]), host: Number(match[2]) })
+    }
+  }
+  return reversed
+}
+
+function missingAdbReverses(reversed, requiredPorts) {
+  return requiredPorts.filter(
+    (port) =>
+      !reversed.some((entry) => entry.device === port && entry.host === port),
+  )
+}
+
+function parseUiDump(xml) {
+  const text = `${xml ?? ''}`
+  const hasSignIn = text.includes(SIGN_IN_TEST_ID)
+  const hasWelcome = text.includes(WELCOME_SCREEN_TEST_ID)
+  return {
+    hasSignIn,
+    hasWelcome,
+    hasAppRoot: hasSignIn || hasWelcome,
+    hasDevLauncher: DEV_LAUNCHER_MARKERS.some((marker) => text.includes(marker)),
+  }
+}
+
+function appForegroundTick({ dump }) {
+  const ui = parseUiDump(dump)
+  if (ui.hasAppRoot) return { status: 'ok', ui }
+  return { status: 'wait', ui }
+}
+
+function devLauncherForegroundMessage() {
+  return (
+    'Expo dev-client launcher is in the foreground (Development servers). ' +
+    'The app is not connected to Metro. Open the expo-development-client deep link.'
+  )
+}
+
+function deviceReadyProblems({
+  reverseList = '',
+  requiredPorts = [],
+  deviceStatusBody = null,
+  checkedDeviceMetro = false,
+  ui = null,
+} = {}) {
+  const problems = []
+  for (const port of missingAdbReverses(
+    parseAdbReverseList(reverseList),
+    requiredPorts,
+  )) {
+    problems.push(
+      `adb reverse does not map tcp:${port} on the device ` +
+        `(host Metro/web will not be reachable at 127.0.0.1:${port})`,
+    )
+  }
+  if (
+    checkedDeviceMetro &&
+    (deviceStatusBody == null || !isMetroReady(deviceStatusBody))
+  ) {
+    problems.push(
+      `Metro is not reachable from the device at 127.0.0.1 (expected ${METRO_READY_MARKER})`,
+    )
+  }
+  if (ui?.hasDevLauncher && !ui.hasAppRoot) {
+    problems.push(devLauncherForegroundMessage())
+  }
+  return problems
+}
+
+function resolveEmulatorAttachment({
+  serial,
+  devices = [],
+  chosenAvd,
+  runningAvd = null,
+  explicitAvd = false,
+} = {}) {
+  const found = devices.find((device) => device.serial === serial)
+  if (!found) return { action: 'boot', avdName: chosenAvd }
+  if (found.state !== 'device') {
+    throw new Error(
+      `${serial} is ${found.state}. Wait until it is device, or stop it.`,
+    )
+  }
+  if (explicitAvd && runningAvd && runningAvd !== chosenAvd) {
+    throw new Error(`${serial} is AVD ${runningAvd}, not ${chosenAvd}`)
+  }
+  return { action: 'attach', avdName: runningAvd || chosenAvd }
+}
+
+function hasExplicitAvd(env = process.env) {
+  return Boolean(`${env?.VERIFY_AVD ?? ''}`.trim())
+}
+
+function maestroDeviceArgs({
+  serial,
+  dest,
+  flowPath,
+  expoDevClientUrl: url,
+}) {
+  const args = ['--device', serial, 'test']
+  if (url) args.push('-e', `EXPO_DEV_CLIENT_URL=${url}`)
+  args.push('--debug-output', dest, flowPath)
+  return args
 }
 
 function listInstalledAvds() {
@@ -491,15 +680,6 @@ function hasLiveRecordedPids(state) {
 function adbDevices() {
   const result = runCapture(adbBin(), ['devices'], { allowFail: true })
   return parseAdbDevices(`${result.stdout ?? ''}\n${result.stderr ?? ''}`)
-}
-
-function refuseIfSerialBusy(serial) {
-  const found = adbDevices().find((device) => device.serial === serial)
-  if (!found) return
-  die(
-    `${serial} is already in use (state ${found.state}). ` +
-      `Do not attach to someone else's emulator. Stop that AVD, or use a different serial.`,
-  )
 }
 
 function installedVersionName(serial, pkg) {
@@ -764,7 +944,12 @@ async function waitForInstalledPackage(serial, pkg, timeoutMs, opts = {}) {
       opts.logPath && existsSync(opts.logPath)
         ? readFileSync(opts.logPath, 'utf8')
         : ''
-    const tick = installWaitTick({ alive, versionName, logText })
+    const tick = installWaitTick({
+      alive,
+      versionName,
+      expectedVersion: opts.expectedVersion,
+      logText,
+    })
     if (tick.status === 'ok') return versionName
     if (tick.status === 'error') throw new Error(tick.error)
     await sleep(2_000)
@@ -795,11 +980,125 @@ function uninstallPackage(serial, pkg) {
   runCapture(adbBin(), ['-s', serial, 'uninstall', pkg], { allowFail: true })
 }
 
+function adbReverse(serial, port) {
+  const result = runCapture(adbBin(), adbReverseArgs(serial, port), {
+    allowFail: true,
+  })
+  if (result.status !== 0) {
+    throw new Error(
+      `adb reverse tcp:${port} failed: ${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
+    )
+  }
+}
+
+function adbClearReverses(serial) {
+  runCapture(adbBin(), ['-s', serial, 'reverse', '--remove-all'], {
+    allowFail: true,
+  })
+}
+
+function adbReverseList(serial) {
+  return runCapture(adbBin(), ['-s', serial, 'reverse', '--list'], {
+    allowFail: true,
+  }).stdout
+}
+
+function adbUiDump(serial) {
+  runCapture(
+    adbBin(),
+    ['-s', serial, 'shell', 'uiautomator', 'dump', '/sdcard/window_dump.xml'],
+    { allowFail: true },
+  )
+  return `${
+    runCapture(
+      adbBin(),
+      ['-s', serial, 'shell', 'cat', '/sdcard/window_dump.xml'],
+      { allowFail: true },
+    ).stdout ?? ''
+  }`
+}
+
+function fetchDeviceMetroStatus(serial, port) {
+  const url = `http://127.0.0.1:${port}/status`
+  const attempts = [
+    ['-s', serial, 'shell', 'wget', '-qO-', url],
+    ['-s', serial, 'shell', 'toybox', 'wget', '-qO-', url],
+    ['-s', serial, 'shell', 'curl', '-s', url],
+  ]
+  for (const args of attempts) {
+    const result = runCapture(adbBin(), args, { allowFail: true })
+    const body = `${result.stdout ?? ''}`.trim()
+    if (body) return { body, checked: true }
+  }
+  return { body: null, checked: false }
+}
+
+function openDevClient(serial, url, pkg) {
+  const result = runCapture(
+    adbBin(),
+    adbOpenDevClientArgs({ serial, url, pkg }),
+    { allowFail: true },
+  )
+  if (result.status !== 0) {
+    throw new Error(
+      `Failed to open expo-development-client deep link: ${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
+    )
+  }
+}
+
+async function waitForAppForeground(serial, timeoutMs) {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const dump = adbUiDump(serial)
+    const tick = appForegroundTick({ dump })
+    if (tick.status === 'ok') return tick.ui
+    await sleep(1_000)
+  }
+  const ui = parseUiDump(adbUiDump(serial))
+  if (ui.hasDevLauncher) throw new Error(devLauncherForegroundMessage())
+  throw new Error(
+    `Timed out waiting for ${SIGN_IN_TEST_ID} or ${WELCOME_SCREEN_TEST_ID} on ${serial}`,
+  )
+}
+
+async function ensureDeviceMetro(port, extraEnv = {}) {
+  const baseUrl = `http://localhost:${port}`
+  try {
+    await waitForMetro(baseUrl, 10_000)
+    return { metroPid: null, reused: true, baseUrl, port }
+  } catch {
+    // expo run:android did not leave Metro up — start one with the device env.
+  }
+  const logPath = join(runDir, 'metro.log')
+  const logFd = openSync(logPath, 'w')
+  const metro = spawn(
+    'pnpm',
+    ['exec', 'expo', 'start', '--port', String(port), '--localhost'],
+    {
+      cwd: mobileDir,
+      env: {
+        ...process.env,
+        CI: '1',
+        EXPO_NO_TELEMETRY: '1',
+        BROWSER: 'none',
+        ...extraEnv,
+      },
+      stdio: ['ignore', logFd, logFd],
+      detached: true,
+    },
+  )
+  metro.unref()
+  await waitForMetro(baseUrl, DEVICE_METRO_WAIT_MS)
+  return { metroPid: metro.pid, reused: false, baseUrl, port, logPath }
+}
+
 function stopLaunchDevice(partial, stopped = []) {
   if (partial.expoPid) stopRecordedPid(partial.expoPid, 'expo', stopped)
+  if (partial.metroPid) stopRecordedPid(partial.metroPid, 'metro', stopped)
   if (partial.serial && partial.androidPackage) {
     uninstallPackage(partial.serial, partial.androidPackage)
   }
+  if (partial.serial) adbClearReverses(partial.serial)
   if (partial.emulatorPid) stopRecordedPid(partial.emulatorPid, 'emulator', stopped)
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
 }
@@ -814,9 +1113,9 @@ async function cmdLaunchDevice() {
   }
 
   const webPort = chosenDeviceWebPort()
-  refuseIfPortBusy(DEFAULT_METRO_PORT)
+  const metroPort = DEFAULT_METRO_PORT
+  refuseIfPortBusy(metroPort)
   refuseIfPortBusy(webPort)
-  refuseIfSerialBusy(DEVICE_SERIAL)
 
   const sdk = resolveSdkRoot()
   if (!sdk) {
@@ -837,11 +1136,35 @@ async function cmdLaunchDevice() {
       : `Using Java ${java.major} from PATH (${java.javaBin})`,
   )
 
-  const avdName = chosenAvdName()
+  const chosenAvd = chosenAvdName()
+  let runningAvd = null
+  const already = adbDevices().find((device) => device.serial === DEVICE_SERIAL)
+  if (already?.state === 'device') {
+    runningAvd = parseAvdName(
+      runCapture(adbBin(), ['-s', DEVICE_SERIAL, 'emu', 'avd', 'name'], {
+        allowFail: true,
+      }).stdout,
+    )
+  }
+  let attachment
   try {
-    requireAvd(avdName, listInstalledAvds())
+    attachment = resolveEmulatorAttachment({
+      serial: DEVICE_SERIAL,
+      devices: adbDevices(),
+      chosenAvd,
+      runningAvd,
+      explicitAvd: hasExplicitAvd(),
+    })
   } catch (error) {
     die(error.message)
+  }
+  const avdName = attachment.avdName
+  if (attachment.action === 'boot') {
+    try {
+      requireAvd(avdName, listInstalledAvds())
+    } catch (error) {
+      die(error.message)
+    }
   }
 
   ensureDir(runDir)
@@ -857,27 +1180,43 @@ async function cmdLaunchDevice() {
     die(autolink.problems.join('\n'))
   }
 
+  let scheme
+  try {
+    scheme = readAppScheme()
+  } catch (error) {
+    die(error.message)
+  }
+
+  const expectedSha = gitHeadShortSha()
   const partial = {
     serial: DEVICE_SERIAL,
     androidPackage: ANDROID_PACKAGE,
     emulatorPid: null,
+    metroPid: null,
     webPid: null,
     expoPid: null,
   }
 
   try {
     const emulatorLog = join(runDir, 'emulator.log')
-    const emulator = spawnLogged(
-      emu,
-      emulatorLaunchArgs(avdName, chosenEmulatorGpu()),
-      emulatorLog,
-      { env: sdkChildEnv(sdk) },
-    )
-    partial.emulatorPid = emulator.pid
-    await waitForBootCompleted(DEVICE_SERIAL, EMULATOR_BOOT_TIMEOUT_MS, {
-      pid: emulator.pid,
-      logPath: emulatorLog,
-    })
+    let emulatorPid = null
+    if (attachment.action === 'attach') {
+      console.error(`Attaching to existing ${DEVICE_SERIAL} (AVD ${avdName})`)
+      await waitForBootCompleted(DEVICE_SERIAL, EMULATOR_BOOT_TIMEOUT_MS)
+    } else {
+      const emulator = spawnLogged(
+        emu,
+        emulatorLaunchArgs(avdName, chosenEmulatorGpu()),
+        emulatorLog,
+        { env: sdkChildEnv(sdk) },
+      )
+      emulatorPid = emulator.pid
+      partial.emulatorPid = emulatorPid
+      await waitForBootCompleted(DEVICE_SERIAL, EMULATOR_BOOT_TIMEOUT_MS, {
+        pid: emulatorPid,
+        logPath: emulatorLog,
+      })
+    }
 
     console.error(
       `Starting the web app on port ${webPort} with E2E_BYPASS_AUTH=true…`,
@@ -885,10 +1224,22 @@ async function cmdLaunchDevice() {
     const web = startWebApp(webPort)
     partial.webPid = web.webPid
 
+    const installed = installedVersionName(DEVICE_SERIAL, ANDROID_PACKAGE)
+    const rebuild = shouldRebuildApk({
+      installedVersion: installed,
+      expectedVersion: expectedSha,
+    })
+    if (rebuild && installed) {
+      console.error(
+        `Installed ${ANDROID_PACKAGE} versionName ${installed} != git HEAD ${expectedSha}; uninstalling and rebuilding`,
+      )
+      uninstallPackage(DEVICE_SERIAL, ANDROID_PACKAGE)
+    }
+
     const expoLog = join(runDir, 'expo-android.log')
     const expo = spawnLogged(
       'pnpm',
-      expoAndroidArgs(avdName),
+      expoAndroidArgs(avdName, { rebuild, port: metroPort }),
       expoLog,
       {
         cwd: repoRoot,
@@ -907,21 +1258,43 @@ async function cmdLaunchDevice() {
       DEVICE_SERIAL,
       ANDROID_PACKAGE,
       EXPO_INSTALL_TIMEOUT_MS,
-      { logPath: expoLog, pid: expo.pid },
+      {
+        logPath: expoLog,
+        pid: expo.pid,
+        expectedVersion: expectedSha,
+      },
     )
+
+    const metro = await ensureDeviceMetro(metroPort, deviceExpoPublicEnv(webPort))
+    if (metro.metroPid) partial.metroPid = metro.metroPid
+
+    console.error(
+      `adb reverse tcp:${metroPort} and tcp:${webPort}; opening expo-development-client`,
+    )
+    adbReverse(DEVICE_SERIAL, metroPort)
+    adbReverse(DEVICE_SERIAL, webPort)
+    const devClientUrl = expoDevClientUrl({ scheme, metroPort })
+    openDevClient(DEVICE_SERIAL, devClientUrl, ANDROID_PACKAGE)
+    await waitForAppForeground(DEVICE_SERIAL, APP_READY_TIMEOUT_MS)
 
     const state = {
       runId: `verify-${new Date().toISOString().replace(/[:.]/g, '-')}`,
       harness: HARNESS_MAESTRO,
       serial: DEVICE_SERIAL,
       avdName,
+      attachedEmulator: attachment.action === 'attach',
       androidPackage: ANDROID_PACKAGE,
-      emulatorPid: emulator.pid,
+      emulatorPid,
+      metroPid: metro.metroPid,
+      port: metroPort,
+      baseUrl: metro.baseUrl,
+      scheme,
+      expoDevClientUrl: devClientUrl,
       webPid: web.webPid,
       webPort: web.webPort,
       webBaseUrl: web.webBaseUrl,
       expoPid: expo.pid,
-      gitHead: gitHeadShortSha(),
+      gitHead: expectedSha,
       versionName,
       logPath: expoLog,
       emulatorLog,
@@ -940,18 +1313,24 @@ async function cmdLaunchDevice() {
           harness: HARNESS_MAESTRO,
           serial: DEVICE_SERIAL,
           avdName,
+          attachedEmulator: state.attachedEmulator,
           androidPackage: ANDROID_PACKAGE,
-          emulatorPid: emulator.pid,
+          emulatorPid,
+          metroPid: metro.metroPid,
+          port: metroPort,
+          baseUrl: metro.baseUrl,
+          scheme,
+          expoDevClientUrl: devClientUrl,
           webPid: web.webPid,
           webPort: web.webPort,
           webBaseUrl: web.webBaseUrl,
           expoPid: expo.pid,
           versionName,
-          gitHead: state.gitHead,
+          gitHead: expectedSha,
           sdkRoot: sdk,
           javaHome: java.javaHome,
           javaMajor: java.major,
-          ready: `${ANDROID_PACKAGE} versionName ${versionName} on ${DEVICE_SERIAL}`,
+          ready: `${ANDROID_PACKAGE} versionName ${versionName} on ${DEVICE_SERIAL} past the Expo launcher`,
         },
         null,
         2,
@@ -999,16 +1378,20 @@ async function cmdDriveDevice(flow) {
   const shotDir = join(runDir, 'maestro', flow)
   ensureDir(shotDir)
 
+  const devClientUrl =
+    state.expoDevClientUrl ??
+    expoDevClientUrl({
+      scheme: state.scheme ?? readAppScheme(),
+      metroPort: state.port ?? DEFAULT_METRO_PORT,
+    })
   const test = run(
     'maestro',
-    [
-      '--device',
-      state.serial,
-      'test',
-      '--debug-output',
+    maestroDeviceArgs({
+      serial: state.serial,
       dest,
       flowPath,
-    ],
+      expoDevClientUrl: devClientUrl,
+    }),
     { cwd: shotDir },
   )
   if (test.status !== 0) {
@@ -1408,16 +1791,56 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     problems.push(error.message)
   }
 
+  const metroPort = state.port ?? DEFAULT_METRO_PORT
+  const hostMetroUrl = state.baseUrl ?? `http://localhost:${metroPort}`
+  let hostMetroReady = false
+  try {
+    const response = await fetchText(`${hostMetroUrl}/status`, timeoutMs)
+    hostMetroReady = isMetroReady(response.body)
+    if (!hostMetroReady) {
+      problems.push(
+        `host Metro at ${hostMetroUrl}/status is not ${METRO_READY_MARKER}`,
+      )
+    }
+  } catch (error) {
+    problems.push(`host Metro at ${hostMetroUrl} is not answering: ${error.message}`)
+  }
+
+  let reverseList = ''
+  let ui = null
+  let deviceMetro = { body: null, checked: false }
+  if (serial && attached?.state === 'device') {
+    reverseList = `${adbReverseList(serial) ?? ''}`
+    ui = parseUiDump(adbUiDump(serial))
+    deviceMetro = fetchDeviceMetroStatus(serial, metroPort)
+    problems.push(
+      ...deviceReadyProblems({
+        reverseList,
+        requiredPorts: [metroPort, state.webPort ?? DEFAULT_DEVICE_WEB_PORT],
+        checkedDeviceMetro: deviceMetro.checked,
+        deviceStatusBody: deviceMetro.body,
+        ui,
+      }),
+    )
+  }
+
   return {
     ok: problems.length === 0,
     serial,
     avdName: state.avdName ?? AVD_NAME,
+    attachedEmulator: Boolean(state.attachedEmulator),
     androidPackage: pkg,
     versionName,
     gitHead: expectedSha,
     webPort: state.webPort,
     webBaseUrl: webUrl,
     webStatus,
+    port: metroPort,
+    baseUrl: hostMetroUrl,
+    hostMetroReady,
+    scheme: state.scheme ?? null,
+    expoDevClientUrl: state.expoDevClientUrl ?? null,
+    foreground: ui,
     sdkRoot: state.sdkRoot ?? resolveSdkRoot(),
     javaHome,
     javaMajor,
@@ -1587,6 +2010,7 @@ function cmdCleanup() {
     if (state.serial && state.androidPackage) {
       uninstallPackage(state.serial, state.androidPackage)
     }
+    if (state.serial) adbClearReverses(state.serial)
     if (state.emulatorPid) stopRecordedPid(state.emulatorPid, 'emulator', stopped)
     if (state.webPid) stopRecordedPid(state.webPid, 'web', stopped)
   }
@@ -1613,7 +2037,7 @@ function usage() {
   console.log(`Usage: helpers/control <launch|launch-device|doctor|drive|drive-device|cleanup>
 
   launch              Start Expo Metro on VERIFY_METRO_PORT (default 8081)
-  launch-device       Boot AVD ${AVD_NAME} (or VERIFY_AVD) on ${DEVICE_SERIAL}, start the web app on VERIFY_PORT (default ${DEFAULT_DEVICE_WEB_PORT}), install the APK
+  launch-device       Attach or boot ${DEVICE_SERIAL}, rebuild if versionName is stale, reverse Metro/web, open the expo-development-client deep link
   doctor              Read-only check that this instance is worth driving
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
@@ -1634,6 +2058,19 @@ export {
   collectImportedExpoPackages,
   inspectExpoAutolinking,
   expoModuleSupportsPlatform,
+  parseAppScheme,
+  readAppScheme,
+  expoDevClientUrl,
+  adbReverseArgs,
+  adbOpenDevClientArgs,
+  parseAdbReverseList,
+  missingAdbReverses,
+  parseUiDump,
+  appForegroundTick,
+  shouldRebuildApk,
+  resolveEmulatorAttachment,
+  deviceReadyProblems,
+  maestroDeviceArgs,
   parseAdbDevices,
   parseDumpsysVersionName,
   parseAvdName,
@@ -1662,6 +2099,8 @@ export {
   DEFAULT_DEVICE_WEB_PORT,
   DEVICE_SERIAL,
   ANDROID_PACKAGE,
+  SIGN_IN_TEST_ID,
+  WELCOME_SCREEN_TEST_ID,
   E2E_USER_WITH_DATA,
   HARNESS_MAESTRO,
   HARNESS_RNTL,

@@ -2,6 +2,13 @@ appId: dev.offbyonelabs.coffeecompanion
 ---
 - launchApp:
     clearState: true
+- openLink:
+    link: ${EXPO_DEV_CLIENT_URL}
+    browser: false
+- extendedWaitUntil:
+    visible:
+      id: sign-in-screen
+    timeout: 60000
 - assertVisible:
     id: sign-in-screen
 - takeScreenshot: signed-out

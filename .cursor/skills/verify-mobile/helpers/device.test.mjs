@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 import {
   parseAdbDevices,
@@ -31,10 +32,25 @@ import {
   collectImportedExpoPackages,
   inspectExpoAutolinking,
   expoModuleSupportsPlatform,
+  parseAppScheme,
+  readAppScheme,
+  expoDevClientUrl,
+  adbReverseArgs,
+  adbOpenDevClientArgs,
+  parseAdbReverseList,
+  missingAdbReverses,
+  parseUiDump,
+  appForegroundTick,
+  shouldRebuildApk,
+  resolveEmulatorAttachment,
+  deviceReadyProblems,
+  maestroDeviceArgs,
   DEVICE_SERIAL,
   AVD_NAME,
   DEFAULT_DEVICE_WEB_PORT,
   E2E_USER_WITH_DATA,
+  ANDROID_PACKAGE,
+  SIGN_IN_TEST_ID,
 } from './control.mjs'
 
 function writeSdkTree(root, { systemImages = true } = {}) {
@@ -162,6 +178,14 @@ describe('expoAndroidArgs', () => {
     assert.equal(args[deviceAt + 1], 'Pixel_7')
     assert.ok(!args.includes(DEVICE_SERIAL))
   })
+
+  it('clears the native build cache when the installed APK is stale', () => {
+    const args = expoAndroidArgs('Pixel_7', { rebuild: true })
+    assert.ok(args.includes('--no-build-cache'))
+    const portAt = args.indexOf('--port')
+    assert.ok(portAt >= 0)
+    assert.equal(args[portAt + 1], '8081')
+  })
 })
 
 describe('installWaitTick', () => {
@@ -190,6 +214,39 @@ describe('installWaitTick', () => {
     const tick = installWaitTick({
       alive: true,
       versionName: 'abc1234',
+      logText: '',
+    })
+    assert.equal(tick.status, 'ok')
+  })
+
+  it('waits when the installed versionName is not git HEAD', () => {
+    const tick = installWaitTick({
+      alive: true,
+      versionName: 'e0543f5',
+      expectedVersion: '4bf1a18',
+      logText: '',
+    })
+    assert.equal(tick.status, 'wait')
+  })
+
+  it('fails when expo exits still serving a stale APK', () => {
+    const tick = installWaitTick({
+      alive: false,
+      versionName: 'e0543f5',
+      expectedVersion: '4bf1a18',
+      logText: '',
+    })
+    assert.equal(tick.status, 'error')
+    assert.match(tick.error, /e0543f5/)
+    assert.match(tick.error, /4bf1a18/)
+    assert.match(tick.error, /rebuild/)
+  })
+
+  it('succeeds when the installed versionName matches git HEAD', () => {
+    const tick = installWaitTick({
+      alive: true,
+      versionName: '4bf1a18',
+      expectedVersion: '4bf1a18',
       logText: '',
     })
     assert.equal(tick.status, 'ok')
@@ -527,5 +584,238 @@ describe('inspectExpoAutolinking', () => {
     )
     assert.deepEqual(report.missing, [])
     assert.deepEqual(report.problems, [])
+  })
+})
+
+describe('parseAppScheme', () => {
+  it('reads scheme from app.config.ts and app.json', () => {
+    assert.equal(parseAppScheme("scheme: 'coffeecompanion',\n"), 'coffeecompanion')
+    assert.equal(parseAppScheme('{ "scheme": "myapp" }'), 'myapp')
+  })
+})
+
+describe('readAppScheme', () => {
+  it('reads the scheme from the mobile app config', () => {
+    assert.equal(readAppScheme(), 'coffeecompanion')
+  })
+})
+
+describe('expoDevClientUrl', () => {
+  it('encodes the Metro loopback URL for the expo-development-client deep link', () => {
+    assert.equal(
+      expoDevClientUrl({ scheme: 'coffeecompanion', metroPort: 8081 }),
+      'coffeecompanion://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081',
+    )
+  })
+})
+
+describe('adbReverseArgs', () => {
+  it('maps a host port onto the emulator loopback', () => {
+    assert.deepEqual(adbReverseArgs(DEVICE_SERIAL, 8081), [
+      '-s',
+      DEVICE_SERIAL,
+      'reverse',
+      'tcp:8081',
+      'tcp:8081',
+    ])
+  })
+})
+
+describe('adbOpenDevClientArgs', () => {
+  it('opens the encoded deep link on the installed package', () => {
+    const url = expoDevClientUrl({ scheme: 'coffeecompanion', metroPort: 8081 })
+    const args = adbOpenDevClientArgs({
+      serial: DEVICE_SERIAL,
+      url,
+      pkg: ANDROID_PACKAGE,
+    })
+    assert.deepEqual(args.slice(0, 6), [
+      '-s',
+      DEVICE_SERIAL,
+      'shell',
+      'am',
+      'start',
+      '-a',
+    ])
+    assert.ok(args.includes('android.intent.action.VIEW'))
+    assert.ok(args.includes('-d'))
+    assert.ok(args.includes(url))
+    assert.equal(args.at(-1), ANDROID_PACKAGE)
+    assert.ok(!args.includes('coffeecompanion://expo-development-client/?url=http://127.0.0.1:8081'))
+  })
+})
+
+describe('parseAdbReverseList', () => {
+  it('reads device-to-host tcp mappings', () => {
+    const reversed = parseAdbReverseList(`UsbFfs tcp:8081 tcp:8081
+host-16 tcp:3910 tcp:3910
+`)
+    assert.deepEqual(reversed, [
+      { device: 8081, host: 8081 },
+      { device: 3910, host: 3910 },
+    ])
+  })
+})
+
+describe('missingAdbReverses', () => {
+  it('names ports that are not reversed', () => {
+    assert.deepEqual(
+      missingAdbReverses(
+        [{ device: 8081, host: 8081 }],
+        [8081, 3910],
+      ),
+      [3910],
+    )
+  })
+})
+
+describe('parseUiDump', () => {
+  it('detects the Expo dev-client launcher', () => {
+    const ui = parseUiDump(
+      '<node text="Development servers"/><node text="npx expo start"/><node text="Connect"/>',
+    )
+    assert.equal(ui.hasDevLauncher, true)
+    assert.equal(ui.hasAppRoot, false)
+  })
+
+  it('detects the signed-out app root', () => {
+    const ui = parseUiDump(
+      `<node resource-id="dev.offbyonelabs.coffeecompanion:id/${SIGN_IN_TEST_ID}"/>`,
+    )
+    assert.equal(ui.hasSignIn, true)
+    assert.equal(ui.hasAppRoot, true)
+    assert.equal(ui.hasDevLauncher, false)
+  })
+})
+
+describe('appForegroundTick', () => {
+  it('waits on the launcher and succeeds on sign-in-screen', () => {
+    assert.equal(
+      appForegroundTick({
+        dump: '<node text="Development servers"/>',
+      }).status,
+      'wait',
+    )
+    assert.equal(
+      appForegroundTick({
+        dump: `<node content-desc="${SIGN_IN_TEST_ID}"/>`,
+      }).status,
+      'ok',
+    )
+  })
+})
+
+describe('shouldRebuildApk', () => {
+  it('rebuilds when the installed versionName is missing or stale', () => {
+    assert.equal(
+      shouldRebuildApk({ installedVersion: null, expectedVersion: '4bf1a18' }),
+      true,
+    )
+    assert.equal(
+      shouldRebuildApk({
+        installedVersion: 'e0543f5',
+        expectedVersion: '4bf1a18',
+      }),
+      true,
+    )
+    assert.equal(
+      shouldRebuildApk({
+        installedVersion: '4bf1a18',
+        expectedVersion: '4bf1a18',
+      }),
+      false,
+    )
+  })
+})
+
+describe('resolveEmulatorAttachment', () => {
+  it('attaches when emulator-5554 is already a device', () => {
+    const resolved = resolveEmulatorAttachment({
+      serial: DEVICE_SERIAL,
+      devices: [{ serial: DEVICE_SERIAL, state: 'device' }],
+      chosenAvd: 'verify-pixel',
+      runningAvd: 'Pixel_7',
+      explicitAvd: false,
+    })
+    assert.deepEqual(resolved, { action: 'attach', avdName: 'Pixel_7' })
+  })
+
+  it('boots when the serial is missing', () => {
+    const resolved = resolveEmulatorAttachment({
+      serial: DEVICE_SERIAL,
+      devices: [],
+      chosenAvd: 'Pixel_7',
+    })
+    assert.deepEqual(resolved, { action: 'boot', avdName: 'Pixel_7' })
+  })
+
+  it('fails when VERIFY_AVD does not match the running AVD', () => {
+    assert.throws(
+      () =>
+        resolveEmulatorAttachment({
+          serial: DEVICE_SERIAL,
+          devices: [{ serial: DEVICE_SERIAL, state: 'device' }],
+          chosenAvd: 'Pixel_6',
+          runningAvd: 'Pixel_7',
+          explicitAvd: true,
+        }),
+      /Pixel_7/,
+    )
+  })
+})
+
+describe('deviceReadyProblems', () => {
+  it('flags a foreground launcher and a missing Metro reverse', () => {
+    const problems = deviceReadyProblems({
+      reverseList: 'UsbFfs tcp:3910 tcp:3910\n',
+      requiredPorts: [8081, 3910],
+      checkedDeviceMetro: true,
+      deviceStatusBody: '',
+      ui: parseUiDump('<node text="Development servers"/>'),
+    })
+    assert.ok(problems.some((problem) => problem.includes('tcp:8081')))
+    assert.ok(problems.some((problem) => /Metro is not reachable/.test(problem)))
+    assert.ok(problems.some((problem) => /dev-client launcher/.test(problem)))
+  })
+
+  it('is empty when reverses, Metro, and the app root are present', () => {
+    const problems = deviceReadyProblems({
+      reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
+      requiredPorts: [8081, 3910],
+      checkedDeviceMetro: true,
+      deviceStatusBody: 'packager-status:running',
+      ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
+    })
+    assert.deepEqual(problems, [])
+  })
+})
+
+describe('maestroDeviceArgs', () => {
+  it('passes the expo-development-client URL into the flow', () => {
+    const url = expoDevClientUrl({ scheme: 'coffeecompanion', metroPort: 8081 })
+    const args = maestroDeviceArgs({
+      serial: DEVICE_SERIAL,
+      dest: '/tmp/out',
+      flowPath: '/tmp/flow.yaml',
+      expoDevClientUrl: url,
+    })
+    const envAt = args.indexOf('-e')
+    assert.ok(envAt >= 0)
+    assert.equal(args[envAt + 1], `EXPO_DEV_CLIENT_URL=${url}`)
+    assert.ok(args.includes('--device'))
+    assert.ok(args.includes(DEVICE_SERIAL))
+  })
+})
+
+describe('sign-in-and-out flow', () => {
+  it('opens the injected deep link after launchApp so clearState cannot leave the launcher', () => {
+    const flow = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../flows/sign-in-and-out.yaml'),
+      'utf8',
+    )
+    assert.match(flow, /launchApp/)
+    assert.match(flow, /openLink/)
+    assert.match(flow, /EXPO_DEV_CLIENT_URL/)
+    assert.match(flow, /sign-in-screen/)
   })
 })
