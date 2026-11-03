@@ -11,10 +11,17 @@ import {
   chosenAvdName,
   requireAvd,
   bootWaitTick,
+  chosenDeviceWebPort,
+  deviceApiUrl,
+  deviceExpoPublicEnv,
+  webLaunchEnv,
+  missingStateMessage,
   recordedPids,
   copyPngFiles,
   DEVICE_SERIAL,
   AVD_NAME,
+  DEFAULT_DEVICE_WEB_PORT,
+  E2E_USER_WITH_DATA,
 } from './control.mjs'
 
 describe('parseAdbDevices', () => {
@@ -123,6 +130,49 @@ describe('bootWaitTick', () => {
       logText: '',
     })
     assert.equal(tick.status, 'ok')
+  })
+})
+
+describe('chosenDeviceWebPort', () => {
+  it('defaults to 3910 so it does not collide with pnpm dev on 3000', () => {
+    assert.equal(chosenDeviceWebPort({}), DEFAULT_DEVICE_WEB_PORT)
+    assert.equal(DEFAULT_DEVICE_WEB_PORT, 3910)
+    assert.notEqual(DEFAULT_DEVICE_WEB_PORT, 3000)
+  })
+
+  it('uses VERIFY_PORT when it is set', () => {
+    assert.equal(chosenDeviceWebPort({ VERIFY_PORT: '4010' }), 4010)
+  })
+})
+
+describe('deviceApiUrl', () => {
+  it('uses localhost so the Android emulator rewrite can map it to 10.0.2.2', () => {
+    assert.equal(deviceApiUrl(3910), 'http://localhost:3910')
+  })
+})
+
+describe('deviceExpoPublicEnv', () => {
+  it('sets EXPO_PUBLIC_API_URL so Metro inlines the dedicated port', () => {
+    const env = deviceExpoPublicEnv(3910)
+    assert.equal(env.EXPO_PUBLIC_API_URL, 'http://localhost:3910')
+    assert.equal(env.EXPO_PUBLIC_E2E_USER, E2E_USER_WITH_DATA)
+  })
+})
+
+describe('webLaunchEnv', () => {
+  it('pins VERIFY_PORT and Better Auth to the dedicated port', () => {
+    const env = webLaunchEnv(3910)
+    assert.equal(env.VERIFY_PORT, '3910')
+    assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
+    assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
+  })
+})
+
+describe('missingStateMessage', () => {
+  it('mentions both the RNTL launch and the device-tier launch', () => {
+    const message = missingStateMessage()
+    assert.match(message, /`helpers\/control launch`/)
+    assert.match(message, /`helpers\/control launch-device`/)
   })
 })
 

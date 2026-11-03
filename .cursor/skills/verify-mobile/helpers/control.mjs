@@ -39,6 +39,7 @@ const BUNDLE_RETRY_SLEEP_MS = 500
 const HARNESS_RNTL = 'rntl'
 const HARNESS_MAESTRO = 'maestro'
 const AVD_NAME = 'verify-pixel'
+const DEFAULT_DEVICE_WEB_PORT = 3910
 const DEVICE_SERIAL = 'emulator-5554'
 const EMULATOR_CONSOLE_PORT = 5554
 const ANDROID_PACKAGE = 'dev.offbyonelabs.coffeecompanion'
@@ -78,10 +79,17 @@ function readState() {
   return JSON.parse(readFileSync(statePath, 'utf8'))
 }
 
+function missingStateMessage() {
+  return (
+    'No verification instance is recorded. ' +
+    'Run `helpers/control launch` (RNTL) or `helpers/control launch-device` (device tier) first.'
+  )
+}
+
 function requireState() {
   const state = readState()
   if (!state) {
-    die('No verification instance is recorded. Run `helpers/control launch` first.')
+    die(missingStateMessage())
   }
   return state
 }
@@ -246,6 +254,43 @@ function bootWaitTick({ alive, bootCompleted, logText }) {
 function listInstalledAvds() {
   const result = runCapture(emulatorBin(), ['-list-avds'], { allowFail: true })
   return parseEmulatorAvdList(`${result.stdout ?? ''}\n${result.stderr ?? ''}`)
+}
+
+function chosenDeviceWebPort(env = process.env) {
+  const raw = `${env?.VERIFY_PORT ?? ''}`.trim()
+  if (!raw) return DEFAULT_DEVICE_WEB_PORT
+  const port = Number(raw)
+  if (!Number.isInteger(port) || port <= 0) {
+    throw new Error(`VERIFY_PORT must be a positive integer, got ${raw}`)
+  }
+  return port
+}
+
+function deviceApiUrl(port) {
+  // localhost so apps/mobile/src/auth/config.ts rewrites it to 10.0.2.2
+  return `http://localhost:${port}`
+}
+
+function deviceExpoPublicEnv(port) {
+  return {
+    EXPO_PUBLIC_API_URL: deviceApiUrl(port),
+    [E2E_USER_ENV]: E2E_USER_WITH_DATA,
+  }
+}
+
+function webLaunchEnv(port) {
+  const baseUrl = `http://127.0.0.1:${port}`
+  return {
+    VERIFY_PORT: String(port),
+    BETTER_AUTH_URL: baseUrl,
+    SITE_URL: baseUrl,
+  }
+}
+
+function webDoctorUrl(state) {
+  if (state?.webBaseUrl) return state.webBaseUrl
+  if (state?.webPort) return `http://127.0.0.1:${state.webPort}`
+  return null
 }
 
 function gitHeadShortSha() {
@@ -551,14 +596,17 @@ async function waitForInstalledPackage(serial, pkg, timeoutMs, opts = {}) {
   throw new Error(`Timed out waiting for ${pkg} to install on ${serial}`)
 }
 
-function startWebApp() {
-  run(WEB_CONTROL, ['launch'])
+function startWebApp(port) {
+  run(WEB_CONTROL, ['launch'], { env: webLaunchEnv(port) })
   if (!existsSync(WEB_STATE_PATH)) {
     throw new Error(`Web launch did not write ${WEB_STATE_PATH}`)
   }
   const web = JSON.parse(readFileSync(WEB_STATE_PATH, 'utf8'))
   if (!web.serverPid || !web.baseUrl) {
     throw new Error('Web launch did not record a server pid and baseUrl')
+  }
+  if (web.port !== port) {
+    throw new Error(`Web launch recorded port ${web.port}, expected ${port}`)
   }
   return {
     webPid: web.serverPid,
@@ -589,7 +637,9 @@ async function cmdLaunchDevice() {
     )
   }
 
+  const webPort = chosenDeviceWebPort()
   refuseIfPortBusy(DEFAULT_METRO_PORT)
+  refuseIfPortBusy(webPort)
   refuseIfSerialBusy(DEVICE_SERIAL)
 
   const emu = emulatorBin()
@@ -644,8 +694,10 @@ async function cmdLaunchDevice() {
       logPath: emulatorLog,
     })
 
-    console.error('Starting the web app with E2E_BYPASS_AUTH=true…')
-    const web = startWebApp()
+    console.error(
+      `Starting the web app on port ${webPort} with E2E_BYPASS_AUTH=true…`,
+    )
+    const web = startWebApp(webPort)
     partial.webPid = web.webPid
 
     const expoLog = join(runDir, 'expo-android.log')
@@ -666,7 +718,7 @@ async function cmdLaunchDevice() {
         env: {
           CI: '1',
           EXPO_NO_TELEMETRY: '1',
-          [E2E_USER_ENV]: E2E_USER_WITH_DATA,
+          ...deviceExpoPublicEnv(webPort),
         },
       },
     )
@@ -709,6 +761,7 @@ async function cmdLaunchDevice() {
           androidPackage: ANDROID_PACKAGE,
           emulatorPid: emulator.pid,
           webPid: web.webPid,
+          webPort: web.webPort,
           webBaseUrl: web.webBaseUrl,
           expoPid: expo.pid,
           versionName,
@@ -725,14 +778,14 @@ async function cmdLaunchDevice() {
   }
 }
 
-function requireDrivableDevice(state) {
+async function requireDrivableDevice(state) {
   if (!state.serial) {
     die(
       'No device is recorded. Run `helpers/control launch-device` first.',
       EXIT_NOT_DRIVABLE,
     )
   }
-  const report = inspectDevice(state)
+  const report = await inspectDevice(state)
   if (report.ok) return report
   console.error(JSON.stringify(report, null, 2))
   die(
@@ -755,7 +808,7 @@ async function cmdDriveDevice(flow) {
   }
 
   const state = requireState()
-  requireDrivableDevice(state)
+  await requireDrivableDevice(state)
   const dest = join(artifactsDir, state.runId, flow)
   ensureDir(dest)
   const shotDir = join(runDir, 'maestro', flow)
@@ -887,7 +940,7 @@ async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   }
 }
 
-function inspectDevice(state) {
+async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   const problems = []
   const serial = state.serial
   const pkg = state.androidPackage ?? ANDROID_PACKAGE
@@ -933,6 +986,22 @@ function inspectDevice(state) {
     )
   }
 
+  const webUrl = webDoctorUrl(state)
+  let webStatus = null
+  if (!webUrl) {
+    problems.push('no web base URL is recorded')
+  } else {
+    try {
+      const response = await fetchText(webUrl, timeoutMs)
+      webStatus = response.status
+      if (webStatus < HTTP_OK_MIN || webStatus >= HTTP_OK_MAX) {
+        problems.push(`GET ${webUrl} returned ${webStatus}`)
+      }
+    } catch (error) {
+      problems.push(`GET ${webUrl} failed: ${error.message}`)
+    }
+  }
+
   return {
     ok: problems.length === 0,
     serial,
@@ -940,6 +1009,9 @@ function inspectDevice(state) {
     androidPackage: pkg,
     versionName,
     gitHead: expectedSha,
+    webPort: state.webPort,
+    webBaseUrl: webUrl,
+    webStatus,
     devices: devices.map((device) => device.serial),
     harness: HARNESS_MAESTRO,
     problems,
@@ -955,7 +1027,7 @@ async function inspectInstance(state) {
     problems.push(...metro.problems)
   }
   if (state.serial) {
-    device = inspectDevice(state)
+    device = await inspectDevice(state)
     problems.push(...device.problems)
   }
   return {
@@ -1127,7 +1199,7 @@ function usage() {
   console.log(`Usage: helpers/control <launch|launch-device|doctor|drive|drive-device|cleanup>
 
   launch              Start Expo Metro on VERIFY_METRO_PORT (default 8081)
-  launch-device       Boot AVD ${AVD_NAME} (or VERIFY_AVD) on ${DEVICE_SERIAL}, start the web app, install the APK
+  launch-device       Boot AVD ${AVD_NAME} (or VERIFY_AVD) on ${DEVICE_SERIAL}, start the web app on VERIFY_PORT (default ${DEFAULT_DEVICE_WEB_PORT}), install the APK
   doctor              Read-only check that this instance is worth driving
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
@@ -1149,12 +1221,18 @@ export {
   chosenAvdName,
   requireAvd,
   bootWaitTick,
+  chosenDeviceWebPort,
+  deviceApiUrl,
+  deviceExpoPublicEnv,
+  webLaunchEnv,
+  missingStateMessage,
   recordedPids,
   copyPngFiles,
   collectPngFiles,
   METRO_READY_MARKER,
   APP_MARKER,
   AVD_NAME,
+  DEFAULT_DEVICE_WEB_PORT,
   DEVICE_SERIAL,
   ANDROID_PACKAGE,
   E2E_USER_WITH_DATA,

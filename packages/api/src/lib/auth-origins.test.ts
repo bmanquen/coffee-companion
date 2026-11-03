@@ -29,4 +29,16 @@ describe('trustedAuthOrigins', () => {
       APP_SCHEME_ORIGIN,
     ])
   })
+
+  it('trusts the Android emulator host for a loopback BETTER_AUTH_URL', () => {
+    expect(trustedAuthOrigins('http://127.0.0.1:3910', 'development')).toEqual([
+      'http://127.0.0.1:3910',
+      APP_SCHEME_ORIGIN,
+      EXPO_DEV_ORIGIN,
+      'http://10.0.2.2:3910',
+    ])
+    expect(
+      trustedAuthOrigins('http://127.0.0.1:3910', 'production'),
+    ).toEqual(['http://127.0.0.1:3910', APP_SCHEME_ORIGIN])
+  })
 })
