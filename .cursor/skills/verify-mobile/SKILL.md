@@ -90,7 +90,7 @@ The device tier starts its own web app on port `3910` so it does not collide wit
 3. Boots that AVD on console port `5554` (serial `emulator-5554`) with `-no-boot-anim` and, on macOS, `-gpu host` (`VERIFY_EMULATOR_GPU` overrides), unless it attached in step 1. Waits up to five minutes (`EMULATOR_BOOT_TIMEOUT_MS`) and prints `booting…` elapsed seconds on stderr. If the emulator process exits early, it fails with the tail of `.run/emulator.log` instead of waiting out the timeout.
 4. Starts the web app on that dedicated port (`VERIFY_PORT` / `BETTER_AUTH_URL` / `SITE_URL` pinned so a leftover `3000` from `pnpm dev` cannot leak through) with `E2E_BYPASS_AUTH=true` (same seed and bypass as `.cursor/skills/verify-coffee-companion`).
 5. Stamps `VERIFY_APK_VERSION=<git SHA>` into `apps/mobile/android/gradle.properties` and `versionName` in `app/build.gradle` (so `processDebugMainManifest` cannot stay UP-TO-DATE on a stale SHA), then runs `expo run:android --device <AVD name>` (Expo 57 matches `device.name`, not the adb serial) with that env. If the installed APK `versionName` is missing or not `git rev-parse --short=7 HEAD`, it uninstalls and passes `--no-build-cache`. The install wait prints why it is still waiting. `BUILD SUCCESSFUL` with a stale `versionName` fails immediately (expo stays alive for Metro, so "still building" is a lie). A timeout names the actual `versionName` versus the expected SHA. adb and Maestro still use `emulator-5554`. Env: `EXPO_PUBLIC_E2E_USER=e2e-user-with-data` and `EXPO_PUBLIC_API_URL=http://localhost:<port>`.
-6. After install: `adb reverse` the Metro port and the web port, then `am start` `exp+<slug>://expo-development-client/?url=<encoded http://127.0.0.1:METRO_PORT>` — the same `exp+coffee-companion` scheme Expo opens, not the auth scheme `coffeecompanion`. The slug is read from app config. Waits until `sign-in-screen` or `welcome-screen` is in the UI dump — the Expo "Development servers" launcher is not ready.
+6. After install: `adb reverse` the Metro port and the web port, then `am start` `exp+<slug>://expo-development-client/?url=<encoded http://127.0.0.1:METRO_PORT>` — the same `exp+coffee-companion` scheme Expo opens, not the auth scheme `coffeecompanion`. The slug is read from app config. A first-run Expo developer-menu sheet ("This is the developer menu… Continue") covers the app; `launch-device` taps Continue via `adb input` and prints why it is still waiting. Ready means `sign-in-screen` / `welcome-screen` or visible Sign in copy — the Expo "Development servers" launcher is not ready. A timeout writes `failure.png` and `window_dump.xml` under `artifacts/launch-wait-*`. Failed launch-device teardown stops pids and clears reverses; it does **not** uninstall the APK.
 7. Records every started pid, the serial, the actual `avdName`, `attachedEmulator`, Metro URL, and `webPort` in `.run/state.json`. Cleanup does not kill an emulator it did not start.
 
 Package id: `dev.offbyonelabs.coffeecompanion`. Do not run `launch-device` on a machine that lacks the SDK or any AVD.
@@ -117,7 +117,7 @@ After `launch-device`, doctor also checks:
 - Recorded emulator / web / expo pids are alive and `emulator-5554` is attached. An attached (not spawned) emulator has no `emulatorPid`.
 - `GET` on the recorded `webBaseUrl` (default `http://127.0.0.1:3910`) answers.
 - Host Metro answers and `adb reverse` maps the Metro port and the web port. A device-side GET of `http://127.0.0.1:<metro>/status` must be `packager-status:running` when wget/curl exists on the image.
-- The UI dump is the app (`sign-in-screen` or `welcome-screen`), not the Expo "Development servers" launcher.
+- The UI dump is the app (`sign-in-screen` or `welcome-screen`), not the Expo "Development servers" launcher and not the first-run developer-menu sheet.
 - `adb shell dumpsys package dev.offbyonelabs.coffeecompanion` `versionName` matches `git rev-parse --short=7 HEAD`.
 - The Java Gradle will use is 17–21 (same preflight as `launch-device`).
 
@@ -160,7 +160,7 @@ Where an AVD exists (default `verify-pixel`, or `VERIFY_AVD`), after `launch-dev
 .cursor/skills/verify-mobile/helpers/control drive-device sign-in-and-out
 ```
 
-That runs `maestro --device emulator-5554 test -e EXPO_DEV_CLIENT_URL=… flows/<flow>.yaml`. Selectors are `testID`s only. Never use coordinates or visible text. The first flow is `flows/sign-in-and-out.yaml`: `launchApp` with `clearState` → `openLink` the expo-development-client URL (so clearState cannot leave the launcher) → `sign-in-screen` → tap `e2e-sign-in` → `welcome-screen` → tap `sign-out` → `sign-in-screen`. Screenshots and `proof.json` (`harness: maestro`) land under `artifacts/<runId>/<flow>/`.
+That runs `maestro --device emulator-5554 test -e EXPO_DEV_CLIENT_URL=… flows/<flow>.yaml`. Selectors are `testID`s only, except the Expo first-run sheet which is dismissed with optional `tapOn: Continue`. Never use coordinates. The first flow is `flows/sign-in-and-out.yaml`: `launchApp` with `clearState` → `openLink` the expo-development-client URL → optional wait/tap of "This is the developer menu… Continue" → `extendedWaitUntil` `sign-in-screen` → tap `e2e-sign-in` → `welcome-screen` → tap `sign-out` → `sign-in-screen`. Screenshots and `proof.json` (`harness: maestro`) land under `artifacts/<runId>/<flow>/`. On failure, `drive-device` also writes `failure.png` and a uiautomator `window_dump.xml` there.
 
 ## Evidence
 
@@ -183,7 +183,7 @@ Standards:
 .cursor/skills/verify-mobile/helpers/control cleanup
 ```
 
-Kills only the pids recorded in `.run/state.json` (Metro, expo, web, emulator). If a serial is recorded, uninstalls `dev.offbyonelabs.coffeecompanion` from that device. Then deletes `.run/`. It does **not** kill by process name, does **not** touch other emulators, and does **not** delete `artifacts/`.
+Kills the pids recorded in `.run/state.json` (Metro, expo, web, emulator) and any leftover listeners on `VERIFY_METRO_PORT` (8081) and `VERIFY_PORT` (3910), even when `.run/state.json` is missing. If a serial is recorded, uninstalls `dev.offbyonelabs.coffeecompanion` from that device. Then deletes `.run/`. It does **not** kill by process name, does **not** touch other emulators, and does **not** delete `artifacts/`.
 
 If launch failed part-way, run cleanup anyway so a half-written state file cannot mask a stray pid.
 
@@ -196,12 +196,12 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | Command | What it does |
 | --- | --- |
 | `helpers/control launch` | Dedicated Expo Metro → wait for `/status` → require `Coffee Companion` in the bundle |
-| `helpers/control launch-device` | Attach or boot `emulator-5554`, start the web app on port `3910` (`VERIFY_PORT`), rebuild if `versionName` ≠ git HEAD, reverse Metro/web, open the expo-development-client deep link, wait for `sign-in-screen` |
-| `helpers/control doctor` | Metro checks after `launch`; after `launch-device` also APK SHA, adb reverse, device Metro, and no Expo launcher in the foreground |
+| `helpers/control launch-device` | Attach or boot `emulator-5554`, start the web app on port `3910` (`VERIFY_PORT`), rebuild if `versionName` ≠ git HEAD, reverse Metro/web, open the expo-development-client deep link, dismiss the first-run developer-menu sheet, wait for `sign-in-screen` |
+| `helpers/control doctor` | Metro checks after `launch`; after `launch-device` also APK SHA, adb reverse, device Metro, and no Expo launcher or developer-menu sheet in the foreground |
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
-| `helpers/control drive-device <flow>` | Maestro `flows/<flow>.yaml` on `emulator-5554`; copy screenshots to `artifacts/` |
-| `helpers/control cleanup` | Stop recorded pids; uninstall the package from the recorded serial; keep artifacts |
+| `helpers/control drive-device <flow>` | Maestro `flows/<flow>.yaml` on `emulator-5554`; copy screenshots to `artifacts/`; on failure write `failure.png` and `window_dump.xml` |
+| `helpers/control cleanup` | Stop recorded pids and leftover listeners on the verify ports; uninstall the package from a recorded serial; keep artifacts |
 | `helpers/metro.test.mjs` | Node tests for the Metro / bundle markers |
 | `helpers/device.test.mjs` | Node tests for adb / dumpsys / AVD list / boot-wait / pid / screenshot helpers |
 
