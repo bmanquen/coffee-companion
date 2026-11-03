@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it } from 'node:test'
@@ -13,6 +13,11 @@ import {
   bootWaitTick,
   expoAndroidArgs,
   installWaitTick,
+  resolveSdkRoot,
+  chosenEmulatorGpu,
+  emulatorLaunchArgs,
+  parseJavaMajor,
+  resolveGradleJava,
   chosenDeviceWebPort,
   deviceApiUrl,
   deviceExpoPublicEnv,
@@ -25,6 +30,14 @@ import {
   DEFAULT_DEVICE_WEB_PORT,
   E2E_USER_WITH_DATA,
 } from './control.mjs'
+
+function writeSdkTree(root, { systemImages = true } = {}) {
+  mkdirSync(join(root, 'emulator'), { recursive: true })
+  writeFileSync(join(root, 'emulator', 'emulator'), '')
+  mkdirSync(join(root, 'platform-tools'), { recursive: true })
+  writeFileSync(join(root, 'platform-tools', 'adb'), '')
+  if (systemImages) mkdirSync(join(root, 'system-images'), { recursive: true })
+}
 
 describe('parseAdbDevices', () => {
   it('reads attached serials and ignores the header', () => {
@@ -174,6 +187,134 @@ describe('installWaitTick', () => {
       logText: '',
     })
     assert.equal(tick.status, 'ok')
+  })
+})
+
+describe('resolveSdkRoot', () => {
+  it('prefers ANDROID_HOME, then ANDROID_SDK_ROOT, then the Studio default, and skips Homebrew commandlinetools', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'verify-sdk-'))
+    const homebrew = join(tmp, 'opt', 'homebrew', 'share', 'android-commandlinetools')
+    const envHome = join(tmp, 'opt', 'android-sdk')
+    const sdkRoot = join(tmp, 'sdk-root')
+    const studioMac = join(tmp, 'Library', 'Android', 'sdk')
+    const studioLinux = join(tmp, 'Android', 'Sdk')
+    try {
+      writeSdkTree(homebrew)
+      writeSdkTree(envHome)
+      writeSdkTree(sdkRoot)
+      writeSdkTree(studioMac)
+      writeSdkTree(studioLinux)
+
+      assert.equal(
+        resolveSdkRoot({
+          env: { ANDROID_HOME: envHome, ANDROID_SDK_ROOT: sdkRoot },
+          home: tmp,
+          platform: 'darwin',
+        }),
+        envHome,
+      )
+      assert.equal(
+        resolveSdkRoot({
+          env: { ANDROID_SDK_ROOT: sdkRoot },
+          home: tmp,
+          platform: 'darwin',
+        }),
+        sdkRoot,
+      )
+      assert.equal(
+        resolveSdkRoot({
+          env: { ANDROID_HOME: homebrew },
+          home: tmp,
+          platform: 'darwin',
+        }),
+        studioMac,
+      )
+      assert.equal(
+        resolveSdkRoot({ env: {}, home: tmp, platform: 'linux' }),
+        studioLinux,
+      )
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('chosenEmulatorGpu', () => {
+  it('defaults to host on macOS and honors VERIFY_EMULATOR_GPU', () => {
+    assert.equal(chosenEmulatorGpu({}, 'darwin'), 'host')
+    assert.equal(
+      chosenEmulatorGpu({ VERIFY_EMULATOR_GPU: 'swiftshader_indirect' }, 'darwin'),
+      'swiftshader_indirect',
+    )
+  })
+})
+
+describe('emulatorLaunchArgs', () => {
+  it('matches Studio-style host GPU and does not force a cold boot', () => {
+    const args = emulatorLaunchArgs('Pixel_7', 'host')
+    assert.deepEqual(args, [
+      '-avd',
+      'Pixel_7',
+      '-port',
+      '5554',
+      '-no-boot-anim',
+      '-gpu',
+      'host',
+    ])
+    assert.ok(!args.includes('-no-snapshot-save'))
+    assert.ok(!args.includes('-no-snapshot-load'))
+    assert.ok(!args.includes('-no-snapshot'))
+  })
+})
+
+describe('parseJavaMajor', () => {
+  it('reads modern and 1.8 version lines', () => {
+    assert.equal(parseJavaMajor('openjdk version "17.0.13" 2024-10-15'), 17)
+    assert.equal(parseJavaMajor('openjdk version "25.0.1" 2025-10-21'), 25)
+    assert.equal(parseJavaMajor('java version "1.8.0_392"'), 8)
+  })
+})
+
+describe('resolveGradleJava', () => {
+  it('keeps a JDK 17 JAVA_HOME', () => {
+    const found = resolveGradleJava({
+      env: { JAVA_HOME: '/opt/java17' },
+      platform: 'darwin',
+      readJavaVersion: () => 'openjdk version "17.0.13"',
+    })
+    assert.equal(found.javaHome, '/opt/java17')
+    assert.equal(found.major, 17)
+  })
+
+  it('falls back to macOS java_home 17 when JAVA_HOME is Java 25', () => {
+    const found = resolveGradleJava({
+      env: { JAVA_HOME: '/opt/jbr-25' },
+      platform: 'darwin',
+      readJavaVersion: () => 'openjdk version "25.0.1"',
+      lookupMacJavaHome: () => '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home',
+    })
+    assert.equal(
+      found.javaHome,
+      '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home',
+    )
+    assert.equal(found.major, 17)
+  })
+
+  it('fails with install guidance when no Java 17 is available', () => {
+    assert.throws(
+      () =>
+        resolveGradleJava({
+          env: { JAVA_HOME: '/opt/jbr-25' },
+          platform: 'darwin',
+          readJavaVersion: () => 'openjdk version "25.0.1"',
+          lookupMacJavaHome: () => '',
+        }),
+      (error) => {
+        assert.match(error.message, /25/)
+        assert.match(error.message, /17/)
+        return true
+      },
+    )
   })
 })
 

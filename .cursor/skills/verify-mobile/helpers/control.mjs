@@ -12,7 +12,8 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { homedir } from 'node:os'
+import { delimiter, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as sleep } from 'node:timers/promises'
 
@@ -52,6 +53,10 @@ const EXPO_LOG_TAIL_LINES = 40
 const BOOT_PROGRESS_INTERVAL_MS = 15_000
 const INSTALL_PROGRESS_INTERVAL_MS = 15_000
 const EXPO_INSTALL_TIMEOUT_MS = 900_000
+const DEFAULT_MAC_EMULATOR_GPU = 'host'
+const JAVA_MIN_MAJOR = 17
+const JAVA_MAX_MAJOR = 21
+const HOMEBREW_SDK_MARKER = 'android-commandlinetools'
 const WEB_CONTROL = join(
   repoRoot,
   '.cursor/skills/verify-coffee-companion/helpers/control',
@@ -169,8 +174,49 @@ function refuseIfPortBusy(port) {
   )
 }
 
+function defaultStudioSdkRoot(home, platform) {
+  if (platform === 'darwin') return join(home, 'Library', 'Android', 'sdk')
+  return join(home, 'Android', 'Sdk')
+}
+
+function sdkLooksComplete(root, exists) {
+  if (!root) return false
+  // Homebrew android-commandlinetools can ship emulator/adb without the AVD images.
+  if (`${root}`.includes(HOMEBREW_SDK_MARKER)) return false
+  return (
+    exists(join(root, 'emulator', 'emulator')) &&
+    exists(join(root, 'platform-tools', 'adb')) &&
+    exists(join(root, 'system-images'))
+  )
+}
+
+function resolveSdkRoot(opts = {}) {
+  const env = opts.env ?? process.env
+  const home = opts.home ?? env.HOME ?? homedir()
+  const platform = opts.platform ?? process.platform
+  const exists = opts.exists ?? existsSync
+  const candidates = [
+    env.ANDROID_HOME,
+    env.ANDROID_SDK_ROOT,
+    defaultStudioSdkRoot(home, platform),
+  ].filter(Boolean)
+  for (const root of candidates) {
+    if (sdkLooksComplete(root, exists)) return root
+  }
+  return null
+}
+
+function missingSdkError(home = process.env.HOME ?? homedir(), platform = process.platform) {
+  const studio = defaultStudioSdkRoot(home, platform)
+  return (
+    `Android SDK not found. Set ANDROID_HOME to Android Studio's SDK (${studio}). ` +
+    'Do not use Homebrew android-commandlinetools — that tree has no AVD system images. ' +
+    'Create the AVD in Android Studio Device Manager.'
+  )
+}
+
 function sdkRoot() {
-  return process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT ?? ''
+  return resolveSdkRoot() ?? ''
 }
 
 function emulatorBin() {
@@ -181,6 +227,100 @@ function emulatorBin() {
 function adbBin() {
   const root = sdkRoot()
   return root ? join(root, 'platform-tools', 'adb') : 'adb'
+}
+
+function sdkChildEnv(root, extra = {}) {
+  return {
+    ANDROID_HOME: root,
+    ANDROID_SDK_ROOT: root,
+    PATH: [join(root, 'emulator'), join(root, 'platform-tools'), process.env.PATH]
+      .filter(Boolean)
+      .join(delimiter),
+    ...extra,
+  }
+}
+
+function chosenEmulatorGpu(env = process.env, platform = process.platform) {
+  const override = `${env?.VERIFY_EMULATOR_GPU ?? ''}`.trim()
+  if (override) return override
+  if (platform === 'darwin') return DEFAULT_MAC_EMULATOR_GPU
+  return null
+}
+
+function emulatorLaunchArgs(avdName, gpu) {
+  const args = [
+    '-avd',
+    avdName,
+    '-port',
+    String(EMULATOR_CONSOLE_PORT),
+    '-no-boot-anim',
+  ]
+  if (gpu) args.push('-gpu', gpu)
+  return args
+}
+
+function parseJavaMajor(text) {
+  const match = `${text ?? ''}`.match(/version "(\d+)(?:\.(\d+))?/)
+  if (!match) return null
+  const major = Number(match[1])
+  if (major === 1 && match[2]) return Number(match[2])
+  return Number.isInteger(major) ? major : null
+}
+
+function javaMajorAcceptable(major) {
+  return (
+    Number.isInteger(major) &&
+    major >= JAVA_MIN_MAJOR &&
+    major <= JAVA_MAX_MAJOR
+  )
+}
+
+function readJavaVersionText(javaBin) {
+  const result = runCapture(javaBin, ['-version'], { allowFail: true })
+  return `${result.stderr ?? ''}\n${result.stdout ?? ''}`
+}
+
+function lookupMacJavaHome17() {
+  const result = runCapture('/usr/libexec/java_home', ['-v', '17'], {
+    allowFail: true,
+  })
+  if (result.status !== 0) return null
+  return `${result.stdout ?? ''}`.trim() || null
+}
+
+function unsupportedJavaError(major, javaBin) {
+  return (
+    `Java ${major ?? 'unknown'} at ${javaBin} cannot compile the React Native Gradle plugin (needs ${JAVA_MIN_MAJOR}–${JAVA_MAX_MAJOR}). ` +
+    'Install Temurin 17 (macOS: `brew install --cask temurin@17`) and set JAVA_HOME to that JDK, ' +
+    'or run `/usr/libexec/java_home -v 17`.'
+  )
+}
+
+function resolveGradleJava(opts = {}) {
+  const env = opts.env ?? process.env
+  const platform = opts.platform ?? process.platform
+  const readJavaVersion = opts.readJavaVersion ?? readJavaVersionText
+  const lookupMacJavaHome = opts.lookupMacJavaHome ?? lookupMacJavaHome17
+
+  const javaHome = `${env.JAVA_HOME ?? ''}`.trim()
+  const javaBin = javaHome ? join(javaHome, 'bin', 'java') : 'java'
+  const major = parseJavaMajor(readJavaVersion(javaBin))
+  if (javaMajorAcceptable(major)) {
+    return { javaHome: javaHome || null, javaBin, major }
+  }
+
+  if (platform === 'darwin') {
+    const home17 = `${lookupMacJavaHome() ?? ''}`.trim()
+    if (home17) {
+      return {
+        javaHome: home17,
+        javaBin: join(home17, 'bin', 'java'),
+        major: JAVA_MIN_MAJOR,
+      }
+    }
+  }
+
+  throw new Error(unsupportedJavaError(major, javaBin))
 }
 
 function parseAdbDevices(text) {
@@ -677,14 +817,24 @@ async function cmdLaunchDevice() {
   refuseIfPortBusy(webPort)
   refuseIfSerialBusy(DEVICE_SERIAL)
 
-  const emu = emulatorBin()
-  if (emu.includes('/') && !existsSync(emu)) {
-    die(
-      `Android emulator binary not found at ${emu}. ` +
-        `launch-device needs the SDK and an AVD (default ${AVD_NAME}, override with VERIFY_AVD). ` +
-        'This machine cannot run the device tier.',
-    )
+  const sdk = resolveSdkRoot()
+  if (!sdk) {
+    die(missingSdkError())
   }
+  const emu = join(sdk, 'emulator', 'emulator')
+  console.error(`Using Android SDK ${sdk} (emulator ${emu})`)
+
+  let java
+  try {
+    java = resolveGradleJava()
+  } catch (error) {
+    die(error.message)
+  }
+  console.error(
+    java.javaHome
+      ? `Using Java ${java.major} at ${java.javaHome}`
+      : `Using Java ${java.major} from PATH (${java.javaBin})`,
+  )
 
   const avdName = chosenAvdName()
   try {
@@ -713,15 +863,9 @@ async function cmdLaunchDevice() {
     const emulatorLog = join(runDir, 'emulator.log')
     const emulator = spawnLogged(
       emu,
-      [
-        '-avd',
-        avdName,
-        '-port',
-        String(EMULATOR_CONSOLE_PORT),
-        '-no-snapshot-save',
-        '-no-boot-anim',
-      ],
+      emulatorLaunchArgs(avdName, chosenEmulatorGpu()),
       emulatorLog,
+      { env: sdkChildEnv(sdk) },
     )
     partial.emulatorPid = emulator.pid
     await waitForBootCompleted(DEVICE_SERIAL, EMULATOR_BOOT_TIMEOUT_MS, {
@@ -743,9 +887,11 @@ async function cmdLaunchDevice() {
       {
         cwd: repoRoot,
         env: {
+          ...sdkChildEnv(sdk),
           CI: '1',
           EXPO_NO_TELEMETRY: '1',
           ...deviceExpoPublicEnv(webPort),
+          ...(java.javaHome ? { JAVA_HOME: java.javaHome } : {}),
         },
       },
     )
@@ -773,6 +919,9 @@ async function cmdLaunchDevice() {
       versionName,
       logPath: expoLog,
       emulatorLog,
+      sdkRoot: sdk,
+      javaHome: java.javaHome,
+      javaMajor: java.major,
       startedAt: new Date().toISOString(),
     }
     writeState(state)
@@ -793,6 +942,9 @@ async function cmdLaunchDevice() {
           expoPid: expo.pid,
           versionName,
           gitHead: state.gitHead,
+          sdkRoot: sdk,
+          javaHome: java.javaHome,
+          javaMajor: java.major,
           ready: `${ANDROID_PACKAGE} versionName ${versionName} on ${DEVICE_SERIAL}`,
         },
         null,
@@ -1029,6 +1181,16 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     }
   }
 
+  let javaHome = state.javaHome ?? null
+  let javaMajor = state.javaMajor ?? null
+  try {
+    const java = resolveGradleJava()
+    javaHome = java.javaHome
+    javaMajor = java.major
+  } catch (error) {
+    problems.push(error.message)
+  }
+
   return {
     ok: problems.length === 0,
     serial,
@@ -1039,6 +1201,9 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     webPort: state.webPort,
     webBaseUrl: webUrl,
     webStatus,
+    sdkRoot: state.sdkRoot ?? resolveSdkRoot(),
+    javaHome,
+    javaMajor,
     devices: devices.map((device) => device.serial),
     harness: HARNESS_MAESTRO,
     problems,
@@ -1250,6 +1415,11 @@ export {
   bootWaitTick,
   expoAndroidArgs,
   installWaitTick,
+  resolveSdkRoot,
+  chosenEmulatorGpu,
+  emulatorLaunchArgs,
+  parseJavaMajor,
+  resolveGradleJava,
   chosenDeviceWebPort,
   deviceApiUrl,
   deviceExpoPublicEnv,
