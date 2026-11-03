@@ -7,6 +7,10 @@ import {
   parseAdbDevices,
   parseDumpsysVersionName,
   parseAvdName,
+  parseEmulatorAvdList,
+  chosenAvdName,
+  requireAvd,
+  bootWaitTick,
   recordedPids,
   copyPngFiles,
   DEVICE_SERIAL,
@@ -44,6 +48,81 @@ describe('parseDumpsysVersionName', () => {
 describe('parseAvdName', () => {
   it('reads the first line from adb emu avd name', () => {
     assert.equal(parseAvdName(`${AVD_NAME}\n`), AVD_NAME)
+  })
+})
+
+describe('parseEmulatorAvdList', () => {
+  it('reads installed AVD names and skips blank and log lines', () => {
+    const names = parseEmulatorAvdList(`INFO    | Storing crashdata in: /tmp/android
+Pixel_10_Pro_XL
+Pixel_6
+Pixel_7
+
+`)
+    assert.deepEqual(names, ['Pixel_10_Pro_XL', 'Pixel_6', 'Pixel_7'])
+  })
+})
+
+describe('chosenAvdName', () => {
+  it('defaults to verify-pixel when VERIFY_AVD is unset', () => {
+    assert.equal(chosenAvdName({}), AVD_NAME)
+  })
+
+  it('uses VERIFY_AVD when it is set', () => {
+    assert.equal(chosenAvdName({ VERIFY_AVD: 'Pixel_7' }), 'Pixel_7')
+  })
+})
+
+describe('requireAvd', () => {
+  it('fails immediately when the chosen AVD is missing, listing what is installed', () => {
+    assert.throws(
+      () =>
+        requireAvd('verify-pixel', ['Pixel_10_Pro_XL', 'Pixel_6', 'Pixel_7']),
+      (error) => {
+        assert.match(error.message, /verify-pixel/)
+        assert.match(error.message, /Pixel_10_Pro_XL, Pixel_6, Pixel_7/)
+        assert.match(error.message, /VERIFY_AVD/)
+        return true
+      },
+    )
+  })
+
+  it('returns the chosen name when it is installed', () => {
+    assert.equal(
+      requireAvd('Pixel_7', ['Pixel_10_Pro_XL', 'Pixel_6', 'Pixel_7']),
+      'Pixel_7',
+    )
+  })
+})
+
+describe('bootWaitTick', () => {
+  it('fails immediately when the emulator process has already exited', () => {
+    const tick = bootWaitTick({
+      alive: false,
+      bootCompleted: false,
+      logText: 'PANIC: Cannot find AVD system path\nINFO    | shutting down\n',
+    })
+    assert.equal(tick.status, 'error')
+    assert.match(tick.error, /exited before boot/)
+    assert.match(tick.error, /PANIC: Cannot find AVD system path/)
+  })
+
+  it('waits while the emulator is alive and not yet booted', () => {
+    const tick = bootWaitTick({
+      alive: true,
+      bootCompleted: false,
+      logText: '',
+    })
+    assert.equal(tick.status, 'wait')
+  })
+
+  it('succeeds when boot_completed is set', () => {
+    const tick = bootWaitTick({
+      alive: true,
+      bootCompleted: true,
+      logText: '',
+    })
+    assert.equal(tick.status, 'ok')
   })
 })
 

@@ -45,7 +45,10 @@ const ANDROID_PACKAGE = 'dev.offbyonelabs.coffeecompanion'
 const E2E_USER_ENV = 'EXPO_PUBLIC_E2E_USER'
 const E2E_USER_WITH_DATA = 'e2e-user-with-data'
 const GIT_SHORT_SHA_DIGITS = 7
-const EMULATOR_BOOT_TIMEOUT_MS = 180_000
+const EMULATOR_BOOT_TIMEOUT_MS = 300_000
+const EMULATOR_LOG_TAIL_LINES = 40
+const BOOT_PROGRESS_INTERVAL_MS = 15_000
+const INSTALL_PROGRESS_INTERVAL_MS = 15_000
 const EXPO_INSTALL_TIMEOUT_MS = 900_000
 const WEB_CONTROL = join(
   repoRoot,
@@ -188,6 +191,61 @@ function parseDumpsysVersionName(text) {
 function parseAvdName(text) {
   const line = `${text ?? ''}`.trim().split('\n')[0] ?? ''
   return line.trim() || null
+}
+
+function parseEmulatorAvdList(text) {
+  const names = []
+  for (const line of `${text ?? ''}`.split('\n')) {
+    const name = line.trim()
+    if (!name) continue
+    // emulator -list-avds can mix INFO/WARNING log lines with the name list
+    if (name.includes('|')) continue
+    names.push(name)
+  }
+  return names
+}
+
+function chosenAvdName(env = process.env) {
+  const override = `${env?.VERIFY_AVD ?? ''}`.trim()
+  return override || AVD_NAME
+}
+
+function missingAvdError(wanted, available) {
+  const listed = available.length > 0 ? available.join(', ') : '(none)'
+  return (
+    `AVD ${wanted} is not installed. Available AVDs: ${listed}. ` +
+    `Set VERIFY_AVD to one of those names, or create ${wanted}.`
+  )
+}
+
+function requireAvd(wanted, available) {
+  if (available.includes(wanted)) return wanted
+  throw new Error(missingAvdError(wanted, available))
+}
+
+function tailText(text, lineCount) {
+  const lines = `${text ?? ''}`.replace(/\s+$/, '').split('\n')
+  if (lines.length === 1 && lines[0] === '') return ''
+  return lines.slice(-lineCount).join('\n')
+}
+
+function emulatorDiedError(logText) {
+  const tail = tailText(logText, EMULATOR_LOG_TAIL_LINES)
+  if (!tail) {
+    return 'Emulator process exited before boot completed. emulator.log is empty.'
+  }
+  return `Emulator process exited before boot completed. Tail of emulator.log:\n${tail}`
+}
+
+function bootWaitTick({ alive, bootCompleted, logText }) {
+  if (bootCompleted) return { status: 'ok' }
+  if (!alive) return { status: 'error', error: emulatorDiedError(logText) }
+  return { status: 'wait' }
+}
+
+function listInstalledAvds() {
+  const result = runCapture(emulatorBin(), ['-list-avds'], { allowFail: true })
+  return parseEmulatorAvdList(`${result.stdout ?? ''}\n${result.stderr ?? ''}`)
 }
 
 function gitHeadShortSha() {
@@ -446,23 +504,46 @@ function spawnLogged(command, args, logPath, opts = {}) {
   return child
 }
 
-async function waitForBootCompleted(serial, timeoutMs) {
+async function waitForBootCompleted(serial, timeoutMs, opts = {}) {
   const start = Date.now()
+  let lastProgressAt = 0
   while (Date.now() - start < timeoutMs) {
+    const now = Date.now()
+    if (now - lastProgressAt >= BOOT_PROGRESS_INTERVAL_MS) {
+      console.error(
+        `booting ${serial}… ${Math.floor((now - start) / 1000)}s elapsed`,
+      )
+      lastProgressAt = now
+    }
     const result = runCapture(
       adbBin(),
       ['-s', serial, 'shell', 'getprop', 'sys.boot_completed'],
       { allowFail: true },
     )
-    if (`${result.stdout ?? ''}`.trim() === '1') return
+    const bootCompleted = `${result.stdout ?? ''}`.trim() === '1'
+    const alive = opts.pid == null ? true : pidAlive(opts.pid)
+    const logText =
+      opts.logPath && existsSync(opts.logPath)
+        ? readFileSync(opts.logPath, 'utf8')
+        : ''
+    const tick = bootWaitTick({ alive, bootCompleted, logText })
+    if (tick.status === 'ok') return
+    if (tick.status === 'error') throw new Error(tick.error)
     await sleep(1_000)
   }
   throw new Error(`Timed out waiting for ${serial} to finish booting`)
 }
 
-async function waitForInstalledPackage(serial, pkg, timeoutMs) {
+async function waitForInstalledPackage(serial, pkg, timeoutMs, opts = {}) {
   const start = Date.now()
+  let lastProgressAt = 0
   while (Date.now() - start < timeoutMs) {
+    const now = Date.now()
+    if (now - lastProgressAt >= INSTALL_PROGRESS_INTERVAL_MS) {
+      const logHint = opts.logPath ? ` See ${opts.logPath}` : ''
+      console.error(`building/installing ${pkg} on ${serial}…${logHint}`)
+      lastProgressAt = now
+    }
     const versionName = installedVersionName(serial, pkg)
     if (versionName) return versionName
     await sleep(2_000)
@@ -515,8 +596,16 @@ async function cmdLaunchDevice() {
   if (emu.includes('/') && !existsSync(emu)) {
     die(
       `Android emulator binary not found at ${emu}. ` +
-        'launch-device needs the SDK and AVD verify-pixel. This machine cannot run the device tier.',
+        `launch-device needs the SDK and an AVD (default ${AVD_NAME}, override with VERIFY_AVD). ` +
+        'This machine cannot run the device tier.',
     )
+  }
+
+  const avdName = chosenAvdName()
+  try {
+    requireAvd(avdName, listInstalledAvds())
+  } catch (error) {
+    die(error.message)
   }
 
   ensureDir(runDir)
@@ -541,7 +630,7 @@ async function cmdLaunchDevice() {
       emu,
       [
         '-avd',
-        AVD_NAME,
+        avdName,
         '-port',
         String(EMULATOR_CONSOLE_PORT),
         '-no-snapshot-save',
@@ -550,7 +639,10 @@ async function cmdLaunchDevice() {
       emulatorLog,
     )
     partial.emulatorPid = emulator.pid
-    await waitForBootCompleted(DEVICE_SERIAL, EMULATOR_BOOT_TIMEOUT_MS)
+    await waitForBootCompleted(DEVICE_SERIAL, EMULATOR_BOOT_TIMEOUT_MS, {
+      pid: emulator.pid,
+      logPath: emulatorLog,
+    })
 
     console.error('Starting the web app with E2E_BYPASS_AUTH=true…')
     const web = startWebApp()
@@ -584,13 +676,14 @@ async function cmdLaunchDevice() {
       DEVICE_SERIAL,
       ANDROID_PACKAGE,
       EXPO_INSTALL_TIMEOUT_MS,
+      { logPath: expoLog },
     )
 
     const state = {
       runId: `verify-${new Date().toISOString().replace(/[:.]/g, '-')}`,
       harness: HARNESS_MAESTRO,
       serial: DEVICE_SERIAL,
-      avdName: AVD_NAME,
+      avdName,
       androidPackage: ANDROID_PACKAGE,
       emulatorPid: emulator.pid,
       webPid: web.webPid,
@@ -612,7 +705,7 @@ async function cmdLaunchDevice() {
           runId: state.runId,
           harness: HARNESS_MAESTRO,
           serial: DEVICE_SERIAL,
-          avdName: AVD_NAME,
+          avdName,
           androidPackage: ANDROID_PACKAGE,
           emulatorPid: emulator.pid,
           webPid: web.webPid,
@@ -1034,7 +1127,7 @@ function usage() {
   console.log(`Usage: helpers/control <launch|launch-device|doctor|drive|drive-device|cleanup>
 
   launch              Start Expo Metro on VERIFY_METRO_PORT (default 8081)
-  launch-device       Boot AVD ${AVD_NAME} on ${DEVICE_SERIAL}, start the web app, install the APK
+  launch-device       Boot AVD ${AVD_NAME} (or VERIFY_AVD) on ${DEVICE_SERIAL}, start the web app, install the APK
   doctor              Read-only check that this instance is worth driving
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
@@ -1052,6 +1145,10 @@ export {
   parseAdbDevices,
   parseDumpsysVersionName,
   parseAvdName,
+  parseEmulatorAvdList,
+  chosenAvdName,
+  requireAvd,
+  bootWaitTick,
   recordedPids,
   copyPngFiles,
   collectPngFiles,
