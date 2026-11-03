@@ -10,11 +10,8 @@ import {
   ERROR_SIGN_IN_UNAVAILABLE,
   HAS_ACCOUNT_ACTION,
   HAS_ACCOUNT_PROMPT,
-  NO_ACCOUNT_ACTION,
   NO_ACCOUNT_PROMPT,
   SIGN_IN_HEADING,
-  SIGN_IN_WITH_APPLE,
-  SIGN_IN_WITH_GOOGLE,
   SIGN_OUT,
   SIGN_UP_HEADING,
   SIGN_UP_WITH_APPLE,
@@ -22,10 +19,13 @@ import {
 } from './copy'
 import {
   SIGN_IN_A11Y_LABEL,
+  SIGN_IN_APPLE_TEST_ID,
   SIGN_IN_ERROR_TEST_ID,
+  SIGN_IN_GOOGLE_TEST_ID,
   SIGN_IN_HEADING_TEST_ID,
   SIGN_IN_NO_ACCOUNT_TEST_ID,
   SIGN_IN_SCREEN_TEST_ID,
+  SIGN_IN_TOGGLE_TEST_ID,
   SignInScreen,
 } from './SignInScreen'
 import type { Auth } from './use-auth'
@@ -55,15 +55,11 @@ describe('sign-in screen', () => {
     expect(screen.getByRole('header', { name: APP_NAME })).toBeTruthy()
     expect(screen.getByRole('header', { name: SIGN_IN_HEADING })).toBeTruthy()
     expect(screen.getByTestId(SIGN_IN_HEADING_TEST_ID)).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: SIGN_IN_WITH_GOOGLE }),
-    ).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: SIGN_IN_WITH_APPLE }),
-    ).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_GOOGLE_TEST_ID)).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_APPLE_TEST_ID)).toBeTruthy()
     expect(screen.getByTestId(SIGN_IN_NO_ACCOUNT_TEST_ID)).toBeTruthy()
     expect(screen.getByText(NO_ACCOUNT_PROMPT)).toBeTruthy()
-    expect(screen.getByRole('button', { name: NO_ACCOUNT_ACTION })).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_TOGGLE_TEST_ID)).toBeTruthy()
     expect(screen.queryByRole('button', { name: SIGN_OUT })).toBeNull()
 
     writeHostTreeArtifacts(view.toJSON())
@@ -72,10 +68,8 @@ describe('sign-in screen', () => {
   it('hides Sign in with Apple on Android', async () => {
     await render(<App auth={signedOut({ showApple: false })} />)
 
-    expect(
-      screen.getByRole('button', { name: SIGN_IN_WITH_GOOGLE }),
-    ).toBeTruthy()
-    expect(screen.queryByRole('button', { name: SIGN_IN_WITH_APPLE })).toBeNull()
+    expect(screen.getByTestId(SIGN_IN_GOOGLE_TEST_ID)).toBeTruthy()
+    expect(screen.queryByTestId(SIGN_IN_APPLE_TEST_ID)).toBeNull()
   })
 
   it('switches to sign-up copy from the no-account line', async () => {
@@ -92,7 +86,7 @@ describe('sign-in screen', () => {
       />,
     )
 
-    fireEvent.press(screen.getByRole('button', { name: NO_ACCOUNT_ACTION }))
+    fireEvent.press(screen.getByTestId(SIGN_IN_TOGGLE_TEST_ID))
     expect(setMode).toHaveBeenCalledWith('sign-up')
   })
 
@@ -110,16 +104,16 @@ describe('sign-in screen', () => {
     )
 
     expect(screen.getByRole('header', { name: SIGN_UP_HEADING })).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: SIGN_UP_WITH_GOOGLE }),
-    ).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: SIGN_UP_WITH_APPLE }),
-    ).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_GOOGLE_TEST_ID)).toHaveTextContent(
+      SIGN_UP_WITH_GOOGLE,
+    )
+    expect(screen.getByTestId(SIGN_IN_APPLE_TEST_ID)).toHaveTextContent(
+      SIGN_UP_WITH_APPLE,
+    )
     expect(screen.getByText(HAS_ACCOUNT_PROMPT)).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: HAS_ACCOUNT_ACTION }),
-    ).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_TOGGLE_TEST_ID)).toHaveTextContent(
+      HAS_ACCOUNT_ACTION,
+    )
   })
 
   it('renders each sign-in error the user can hit', async () => {
@@ -203,8 +197,8 @@ describe('sign-in screen', () => {
       />,
     )
 
-    fireEvent.press(screen.getByRole('button', { name: SIGN_IN_WITH_GOOGLE }))
-    fireEvent.press(screen.getByRole('button', { name: SIGN_IN_WITH_APPLE }))
+    fireEvent.press(screen.getByTestId(SIGN_IN_GOOGLE_TEST_ID))
+    fireEvent.press(screen.getByTestId(SIGN_IN_APPLE_TEST_ID))
     expect(onGoogle).toHaveBeenCalledTimes(1)
     expect(onApple).toHaveBeenCalledTimes(1)
   })

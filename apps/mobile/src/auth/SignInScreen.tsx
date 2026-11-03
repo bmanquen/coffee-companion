@@ -24,6 +24,9 @@ export const SIGN_IN_SCREEN_TEST_ID = 'sign-in-screen'
 export const SIGN_IN_HEADING_TEST_ID = 'sign-in-heading'
 export const SIGN_IN_ERROR_TEST_ID = 'sign-in-error'
 export const SIGN_IN_NO_ACCOUNT_TEST_ID = 'sign-in-no-account'
+export const SIGN_IN_GOOGLE_TEST_ID = 'sign-in-google'
+export const SIGN_IN_APPLE_TEST_ID = 'sign-in-apple'
+export const SIGN_IN_TOGGLE_TEST_ID = 'sign-in-toggle'
 export const SIGN_IN_A11Y_LABEL = 'Sign in'
 
 export function SignInScreen({
@@ -64,6 +67,7 @@ export function SignInScreen({
       </Text>
       <Pressable
         accessibilityRole="button"
+        testID={SIGN_IN_GOOGLE_TEST_ID}
         disabled={busy}
         onPress={onGoogle}
         style={styles.button}
@@ -73,6 +77,7 @@ export function SignInScreen({
       {showApple ? (
         <Pressable
           accessibilityRole="button"
+          testID={SIGN_IN_APPLE_TEST_ID}
           disabled={busy}
           onPress={onApple}
           style={styles.button}
@@ -86,6 +91,7 @@ export function SignInScreen({
         </Text>
         <Pressable
           accessibilityRole="button"
+          testID={SIGN_IN_TOGGLE_TEST_ID}
           disabled={busy}
           onPress={onToggleMode}
         >

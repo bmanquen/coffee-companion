@@ -3,6 +3,7 @@ import { App } from './App'
 import { SIGN_OUT } from './auth/copy'
 import { writeHostTreeArtifacts } from './test/host-tree'
 import {
+  SIGN_OUT_TEST_ID,
   WELCOME_A11Y_LABEL,
   WELCOME_HEADING_ROLE,
   WELCOME_HEADING_TEST_ID,
@@ -37,7 +38,7 @@ describe('App welcome screen', () => {
     ).toBeTruthy()
     expect(screen.getByTestId(WELCOME_HEADING_TEST_ID)).toBeTruthy()
     expect(screen.getByText('Ada Lovelace')).toBeTruthy()
-    expect(screen.getByRole('button', { name: SIGN_OUT })).toBeTruthy()
+    expect(screen.getByTestId(SIGN_OUT_TEST_ID)).toHaveTextContent(SIGN_OUT)
 
     writeHostTreeArtifacts(view.toJSON())
   })
