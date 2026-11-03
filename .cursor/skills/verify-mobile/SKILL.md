@@ -1,6 +1,6 @@
 ---
 name: verify-mobile
-description: Drive the Coffee Companion mobile app (apps/mobile, Expo) the way a user does — launch a dedicated Metro bundler, exercise screens through React Native Testing Library, and on a machine with the Android SDK and AVD verify-pixel, drive the same handles through Maestro. Use when you need to prove a mobile UI change, reproduce a user-facing mobile bug, or verify a mapped mobile feature.
+description: Drive the Coffee Companion mobile app (apps/mobile, Expo) the way a user does — launch a dedicated Metro bundler, exercise screens through React Native Testing Library, and on a machine with the Android SDK and an AVD (default verify-pixel, override with VERIFY_AVD), drive the same handles through Maestro. Use when you need to prove a mobile UI change, reproduce a user-facing mobile bug, or verify a mapped mobile feature.
 ---
 
 # Verify Coffee Companion mobile
@@ -16,10 +16,10 @@ Read `features/README.md` before driving. Use the matching feature file as the r
 | Platform | Where | Proven here? |
 | --- | --- | --- |
 | In-process host tree (React Native Testing Library) | Linux, macOS, CI | Yes. This is the gate everywhere. |
-| Android emulator (`verify-pixel` on `emulator-5554`) | Machine with Android SDK and AVD `verify-pixel`. Linux also needs usable `/dev/kvm` | Only on a machine that has that SDK and AVD. Required wherever the AVD exists. This VM has no Android SDK, so the device tier was not run here. |
+| Android emulator (AVD `verify-pixel` on `emulator-5554`, or `VERIFY_AVD`) | Machine with Android SDK and that AVD. Linux also needs usable `/dev/kvm` | Only on a machine that has that SDK and AVD. Required wherever the AVD exists. This VM has no Android SDK, so the device tier was not run here. |
 | iOS Simulator or device | macOS + Xcode only | No. This is Linux |
 
-The RNTL tier is the gate on every machine. If AVD `verify-pixel` exists, also run the Maestro device tier before you call the change verified. Do not claim an Android device run unless you attached `emulator-5554` and drove it.
+The RNTL tier is the gate on every machine. If an Android AVD exists, also run the Maestro device tier before you call the change verified. Default AVD name is `verify-pixel`; set `VERIFY_AVD` to an installed name from `emulator -list-avds` when that default is missing. Do not claim an Android device run unless you attached `emulator-5554` and drove it.
 
 ```bash
 # RNTL (every machine)
@@ -29,8 +29,8 @@ The RNTL tier is the gate on every machine. If AVD `verify-pixel` exists, also r
 .cursor/skills/verify-mobile/helpers/control drive sign-in
 .cursor/skills/verify-mobile/helpers/control cleanup
 
-# Device (only where SDK + AVD verify-pixel exist)
-.cursor/skills/verify-mobile/helpers/control launch-device
+# Device (only where SDK + an AVD exist; default name is verify-pixel)
+VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control launch-device
 .cursor/skills/verify-mobile/helpers/control doctor
 .cursor/skills/verify-mobile/helpers/control drive-device sign-in-and-out
 .cursor/skills/verify-mobile/helpers/control cleanup
@@ -68,21 +68,22 @@ If launch fails after Metro has started (timeout or a bundle that is not this ap
 
 ### Launch the Android device tier
 
-On a machine that already has the Android SDK and AVD `verify-pixel`:
+On a machine that already has the Android SDK and an AVD. Default AVD name is `verify-pixel`. If `emulator -list-avds` does not include that name, set `VERIFY_AVD` to one of the listed names (for example `Pixel_7`):
 
 ```bash
-.cursor/skills/verify-mobile/helpers/control launch-device
+VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control launch-device
 ```
 
 `launch-device` does all of this, in order:
 
 1. Refuses if `.run/state.json` already records a live pid, if port 8081 is taken, or if `emulator-5554` is already in use by someone else.
-2. Boots AVD `verify-pixel` on console port `5554` (serial `emulator-5554`).
-3. Starts the web app with `E2E_BYPASS_AUTH=true` (same seed and bypass as `.cursor/skills/verify-coffee-companion`).
-4. Runs `expo run:android --device emulator-5554` with `EXPO_PUBLIC_E2E_USER=e2e-user-with-data`. The APK `version` / `extra.gitHead` is the git HEAD short SHA.
-5. Records every started pid and the serial in `.run/state.json`.
+2. Runs `emulator -list-avds` and dies immediately if the chosen AVD is missing, listing the installed names and telling you to set `VERIFY_AVD`.
+3. Boots that AVD on console port `5554` (serial `emulator-5554`). Waits up to five minutes (`EMULATOR_BOOT_TIMEOUT_MS`) and prints `booting…` elapsed seconds on stderr. If the emulator process exits early, it fails with the tail of `.run/emulator.log` instead of waiting out the timeout.
+4. Starts the web app with `E2E_BYPASS_AUTH=true` (same seed and bypass as `.cursor/skills/verify-coffee-companion`).
+5. Runs `expo run:android --device emulator-5554` with `EXPO_PUBLIC_E2E_USER=e2e-user-with-data`. Prints `building/installing…` plus the expo log path on stderr. The APK `version` / `extra.gitHead` is the git HEAD short SHA.
+6. Records every started pid, the serial, and the actual `avdName` in `.run/state.json`.
 
-Package id: `dev.offbyonelabs.coffeecompanion`. Do not run `launch-device` on a machine that lacks the SDK or that AVD.
+Package id: `dev.offbyonelabs.coffeecompanion`. Do not run `launch-device` on a machine that lacks the SDK or any AVD.
 
 ## Doctor
 
@@ -137,7 +138,7 @@ CI runs those same screen tests without Metro (`pnpm --filter @coffee-companion/
 
 ### Drive the Android device tier
 
-Where AVD `verify-pixel` exists, after `launch-device` and a green `doctor`:
+Where an AVD exists (default `verify-pixel`, or `VERIFY_AVD`), after `launch-device` and a green `doctor`:
 
 ```bash
 .cursor/skills/verify-mobile/helpers/control drive-device sign-in-and-out
@@ -179,14 +180,14 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | Command | What it does |
 | --- | --- |
 | `helpers/control launch` | Dedicated Expo Metro → wait for `/status` → require `Coffee Companion` in the bundle |
-| `helpers/control launch-device` | Boot `verify-pixel` on `emulator-5554`, start the web app with the e2e bypass, install the APK |
+| `helpers/control launch-device` | List AVDs, boot `verify-pixel` (or `VERIFY_AVD`) on `emulator-5554`, start the web app with the e2e bypass, install the APK |
 | `helpers/control doctor` | Metro checks after `launch`; plus APK `versionName` == git HEAD short SHA after `launch-device` |
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
 | `helpers/control drive-device <flow>` | Maestro `flows/<flow>.yaml` on `emulator-5554`; copy screenshots to `artifacts/` |
 | `helpers/control cleanup` | Stop recorded pids; uninstall the package from the recorded serial; keep artifacts |
 | `helpers/metro.test.mjs` | Node tests for the Metro / bundle markers |
-| `helpers/device.test.mjs` | Node tests for adb / dumpsys / pid / screenshot helpers |
+| `helpers/device.test.mjs` | Node tests for adb / dumpsys / AVD list / boot-wait / pid / screenshot helpers |
 
 ```bash
 .cursor/skills/verify-mobile/helpers/control launch

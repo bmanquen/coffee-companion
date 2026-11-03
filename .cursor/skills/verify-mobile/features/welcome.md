@@ -24,13 +24,13 @@ Preconditions:
 
 - **Read the heading.** Run `helpers/control drive welcome`. The host tree contains a `header` whose name is `Coffee Companion`, on a view labelled `Welcome` with `testID=welcome-screen`. The heading node has `testID=welcome-heading`. Button `testID=sign-out` is present.
 - **Proof.** `drive welcome` writes `artifacts/<run>/welcome/tree.txt`, `tree.json`, and `proof.json`. `tree.txt` must show `Coffee Companion`.
-- **Device (where `verify-pixel` exists).** After `launch-device`, run `helpers/control drive-device sign-in-and-out`. The flow asserts `welcome-screen` after `e2e-sign-in` and writes screenshots plus `proof.json` (`harness: maestro`).
+- **Device (where an AVD exists).** After `launch-device`, run `helpers/control drive-device sign-in-and-out`. The flow asserts `welcome-screen` after `e2e-sign-in` and writes screenshots plus `proof.json` (`harness: maestro`).
 
 ## Gotchas
 
 - This is not an iOS Simulator or Android emulator run. A green `drive welcome` does not prove pixels on a phone.
 - iOS requires macOS + Xcode. This Linux verification environment cannot start `expo start --ios`.
-- Android needs the SDK and AVD `verify-pixel`. `launch-device` boots that AVD on `emulator-5554`. This skill does not install the SDK.
+- Android needs the SDK and an AVD. `launch-device` boots `verify-pixel` on `emulator-5554` unless `VERIFY_AVD` names another installed AVD. This skill does not install the SDK.
 - `testID` and `accessibilityLabel` live in `apps/mobile/src/welcome.ts`. Drive those handles, not coordinates or visible text.
 - Icon and adaptive-icon files under `apps/mobile/assets/` are Expo template artwork. `android.adaptiveIcon.backgroundColor` is `#FFFFFF` (neutral, same as the welcome screen). Do not treat them as brand. Real artwork comes before any store build.
 - Metro on 8081 that you did not launch is the wrong instance. `launch` refuses a busy port rather than attaching.
