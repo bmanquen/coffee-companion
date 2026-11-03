@@ -24,6 +24,7 @@ const signedIn: Auth = {
   setMode: () => {},
   signInGoogle: async () => {},
   signInApple: async () => {},
+  signInE2E: async () => {},
   signOut: async () => {},
 }
 

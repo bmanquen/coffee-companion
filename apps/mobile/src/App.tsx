@@ -42,6 +42,9 @@ function Shell({ auth }: { auth: Auth }) {
           onToggleMode={() =>
             auth.setMode(auth.mode === 'sign-in' ? 'sign-up' : 'sign-in')
           }
+          onE2ESignIn={() => {
+            void auth.signInE2E()
+          }}
         />
       )}
       <StatusBar style="auto" />

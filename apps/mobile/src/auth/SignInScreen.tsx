@@ -18,6 +18,7 @@ import {
   SIGN_UP_WITH_APPLE,
   SIGN_UP_WITH_GOOGLE,
 } from './copy'
+import { E2E_SIGN_IN, e2eSignInUser } from './e2e'
 import type { AuthError, AuthMode } from './use-auth'
 
 export const SIGN_IN_SCREEN_TEST_ID = 'sign-in-screen'
@@ -27,6 +28,7 @@ export const SIGN_IN_NO_ACCOUNT_TEST_ID = 'sign-in-no-account'
 export const SIGN_IN_GOOGLE_TEST_ID = 'sign-in-google'
 export const SIGN_IN_APPLE_TEST_ID = 'sign-in-apple'
 export const SIGN_IN_TOGGLE_TEST_ID = 'sign-in-toggle'
+export const E2E_SIGN_IN_TEST_ID = 'e2e-sign-in'
 export const SIGN_IN_A11Y_LABEL = 'Sign in'
 
 export function SignInScreen({
@@ -37,6 +39,8 @@ export function SignInScreen({
   onGoogle,
   onApple,
   onToggleMode,
+  onE2ESignIn,
+  showE2ESignIn = Boolean(__DEV__ && e2eSignInUser()),
 }: {
   mode: AuthMode
   error: AuthError | null
@@ -45,6 +49,8 @@ export function SignInScreen({
   onGoogle: () => void
   onApple: () => void
   onToggleMode: () => void
+  onE2ESignIn?: () => void
+  showE2ESignIn?: boolean
 }) {
   const signingUp = mode === 'sign-up'
   const heading = signingUp ? SIGN_UP_HEADING : SIGN_IN_HEADING
@@ -100,6 +106,17 @@ export function SignInScreen({
           </Text>
         </Pressable>
       </View>
+      {showE2ESignIn ? (
+        <Pressable
+          accessibilityRole="button"
+          testID={E2E_SIGN_IN_TEST_ID}
+          disabled={busy}
+          onPress={onE2ESignIn}
+          style={styles.button}
+        >
+          <Text style={styles.buttonLabel}>{E2E_SIGN_IN}</Text>
+        </Pressable>
+      ) : null}
       {error ? (
         <View
           accessible

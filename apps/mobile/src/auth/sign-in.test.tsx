@@ -18,6 +18,7 @@ import {
   SIGN_UP_WITH_GOOGLE,
 } from './copy'
 import {
+  E2E_SIGN_IN_TEST_ID,
   SIGN_IN_A11Y_LABEL,
   SIGN_IN_APPLE_TEST_ID,
   SIGN_IN_ERROR_TEST_ID,
@@ -41,6 +42,7 @@ function signedOut(overrides: Partial<Auth> = {}): Auth {
     setMode: () => {},
     signInGoogle: async () => {},
     signInApple: async () => {},
+    signInE2E: async () => {},
     signOut: async () => {},
     ...overrides,
   }
@@ -61,6 +63,7 @@ describe('sign-in screen', () => {
     expect(screen.getByText(NO_ACCOUNT_PROMPT)).toBeTruthy()
     expect(screen.getByTestId(SIGN_IN_TOGGLE_TEST_ID)).toBeTruthy()
     expect(screen.queryByRole('button', { name: SIGN_OUT })).toBeNull()
+    expect(screen.queryByTestId(E2E_SIGN_IN_TEST_ID)).toBeNull()
 
     writeHostTreeArtifacts(view.toJSON())
   })

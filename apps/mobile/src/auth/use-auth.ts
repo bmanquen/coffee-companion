@@ -15,7 +15,8 @@ import {
   SignInUnavailable,
 } from './errors'
 import { signInWithGoogle, signOutGoogle } from './google'
-import { clearSessionStore } from './session-store'
+import { e2eSignInUser } from './e2e'
+import { clearSessionStore, writeE2EAuthCookie } from './session-store'
 
 export type AuthMode = 'sign-in' | 'sign-up'
 
@@ -38,6 +39,7 @@ export type Auth = {
   setMode: (mode: AuthMode) => void
   signInGoogle: () => Promise<void>
   signInApple: () => Promise<void>
+  signInE2E: () => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -89,6 +91,13 @@ export function useAuth(): Auth {
     setMode,
     signInGoogle: () => run(signInWithGoogle),
     signInApple: () => run(signInWithApple),
+    signInE2E: () =>
+      run(async () => {
+        const user = e2eSignInUser()
+        if (!user) return
+        writeE2EAuthCookie(user)
+        await authClient.getSession()
+      }),
     signOut: async () => {
       try {
         try {

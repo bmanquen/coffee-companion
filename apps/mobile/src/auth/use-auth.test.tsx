@@ -13,6 +13,7 @@ import {
   SignInFailed,
   SignInUnavailable,
 } from './errors'
+import { E2E_USER_ENV, E2E_USER_WITH_DATA } from './e2e'
 import { useAuth } from './use-auth'
 
 const mocks = {
@@ -20,7 +21,9 @@ const mocks = {
   signInWithApple: jest.fn(),
   signOutGoogle: jest.fn(),
   signOut: jest.fn(),
+  getSession: jest.fn(),
   clearSessionStore: jest.fn(),
+  writeE2EAuthCookie: jest.fn(),
   appleAvailable: true,
   session: null as null | { user: { name: string } },
   pending: false,
@@ -38,12 +41,14 @@ jest.mock('./google', () => ({
 
 jest.mock('./session-store', () => ({
   clearSessionStore: () => mocks.clearSessionStore(),
+  writeE2EAuthCookie: (userId: string) => mocks.writeE2EAuthCookie(userId),
 }))
 
 jest.mock('./auth-client', () => ({
   authClient: {
     useSession: () => ({ data: mocks.session, isPending: mocks.pending }),
     signOut: () => mocks.signOut(),
+    getSession: () => mocks.getSession(),
   },
 }))
 
@@ -53,7 +58,9 @@ describe('useAuth', () => {
     mocks.signInWithApple.mockReset()
     mocks.signOutGoogle.mockReset()
     mocks.signOut.mockReset()
+    mocks.getSession.mockReset()
     mocks.clearSessionStore.mockReset()
+    mocks.writeE2EAuthCookie.mockReset()
     mocks.appleAvailable = true
     mocks.session = null
     mocks.pending = false
@@ -143,5 +150,35 @@ describe('useAuth', () => {
 
     expect(mocks.signOut).toHaveBeenCalled()
     expect(mocks.clearSessionStore).toHaveBeenCalled()
+  })
+
+  it('writes the e2e cookie and asks the auth client for the session', async () => {
+    const previous = process.env[E2E_USER_ENV]
+    process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signInE2E()
+    })
+
+    expect(mocks.writeE2EAuthCookie).toHaveBeenCalledWith(E2E_USER_WITH_DATA)
+    expect(mocks.getSession).toHaveBeenCalled()
+    if (previous === undefined) delete process.env[E2E_USER_ENV]
+    else process.env[E2E_USER_ENV] = previous
+  })
+
+  it('does not write a cookie when the e2e persona is unset', async () => {
+    const previous = process.env[E2E_USER_ENV]
+    delete process.env[E2E_USER_ENV]
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signInE2E()
+    })
+
+    expect(mocks.writeE2EAuthCookie).not.toHaveBeenCalled()
+    expect(mocks.getSession).not.toHaveBeenCalled()
+    if (previous === undefined) delete process.env[E2E_USER_ENV]
+    else process.env[E2E_USER_ENV] = previous
   })
 })

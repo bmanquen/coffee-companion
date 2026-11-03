@@ -35,6 +35,7 @@ jest.mock('better-auth/react', () => ({
     useSession: () => ({ data: null, isPending: false }),
     signIn: { social: jest.fn(async () => ({ error: null })) },
     signOut: jest.fn(async () => {}),
+    getSession: jest.fn(async () => ({ data: null })),
     $fetch: jest.fn(async () => ({ error: null })),
   }),
 }))
