@@ -57,6 +57,13 @@ const EXPO_INSTALL_TIMEOUT_MS = 900_000
 const VERIFY_APK_VERSION_ENV = 'VERIFY_APK_VERSION'
 const APP_READY_TIMEOUT_MS = 60_000
 const DEVICE_METRO_WAIT_MS = 60_000
+const EMULATOR_GONE_TIMEOUT_MS = 60_000
+const SERIAL_SETTLE_TIMEOUT_MS = 45_000
+const SERIAL_STALE_KILL_AFTER_MS = 8_000
+const SERIAL_POLL_MS = 1_000
+const PORT_FREE_TIMEOUT_MS = 15_000
+const PORT_FREE_POLL_MS = 500
+const DEFAULT_VERIFY_DEVICE_FLOW = 'sign-in-and-out'
 const SIGN_IN_TEST_ID = 'sign-in-screen'
 const WELCOME_SCREEN_TEST_ID = 'welcome-screen'
 const DEV_LAUNCHER_MARKERS = ['Development servers', 'npx expo start']
@@ -351,10 +358,34 @@ function resolveGradleJava(opts = {}) {
 function parseAdbDevices(text) {
   const devices = []
   for (const line of `${text ?? ''}`.split('\n')) {
-    const match = line.match(/^(\S+)\s+(device|offline|unauthorized|bootloader)\s*$/)
+    if (/list of devices/i.test(line)) continue
+    const match = line.match(/^(\S+)\s+(\S+)\s*$/)
     if (match) devices.push({ serial: match[1], state: match[2] })
   }
   return devices
+}
+
+function serialWaitTick({ serial, devices = [] }) {
+  const found = devices.find((device) => device.serial === serial)
+  if (!found) return { status: 'gone' }
+  if (found.state === 'device') return { status: 'device' }
+  return { status: 'wait', state: found.state }
+}
+
+function adbEmuKillArgs(serial) {
+  return ['-s', serial, 'emu', 'kill']
+}
+
+function portFreeTick(pids) {
+  return pids.length === 0 ? { status: 'ok' } : { status: 'wait', pids }
+}
+
+function verifyDevicePlan(flow) {
+  return {
+    flow: `${flow ?? ''}`.trim() || DEFAULT_VERIFY_DEVICE_FLOW,
+    steps: ['cleanup', 'launch-device', 'doctor', 'drive-device'],
+    leaveUpOnFailure: true,
+  }
 }
 
 function parseDumpsysVersionName(text) {
@@ -813,9 +844,7 @@ function resolveEmulatorAttachment({
   const found = devices.find((device) => device.serial === serial)
   if (!found) return { action: 'boot', avdName: chosenAvd }
   if (found.state !== 'device') {
-    throw new Error(
-      `${serial} is ${found.state}. Wait until it is device, or stop it.`,
-    )
+    return { action: 'wait', state: found.state, avdName: chosenAvd }
   }
   if (explicitAvd && runningAvd && runningAvd !== chosenAvd) {
     throw new Error(`${serial} is AVD ${runningAvd}, not ${chosenAvd}`)
@@ -910,6 +939,89 @@ function hasLiveRecordedPids(state) {
 function adbDevices() {
   const result = runCapture(adbBin(), ['devices'], { allowFail: true })
   return parseAdbDevices(`${result.stdout ?? ''}\n${result.stderr ?? ''}`)
+}
+
+function killEmulatorSerial({
+  serial,
+  pid,
+  stopped = [],
+  run = runCapture,
+  adb = adbBin,
+} = {}) {
+  if (serial) {
+    try {
+      run(adb(), adbEmuKillArgs(serial), { allowFail: true })
+    } catch {
+      // adb missing — fall through to the pid
+    }
+  }
+  if (pid) stopRecordedPid(pid, 'emulator', stopped)
+  return stopped
+}
+
+async function waitForSerialReady(serial, timeoutMs, opts = {}) {
+  const now = opts.now ?? Date.now
+  const sleepFn = opts.sleep ?? sleep
+  const listDevices = opts.listDevices ?? adbDevices
+  const kill = opts.kill ?? ((target) => killEmulatorSerial({ serial: target }))
+  const staleAfter = opts.staleAfterMs ?? SERIAL_STALE_KILL_AFTER_MS
+  const pollMs = opts.pollMs ?? SERIAL_POLL_MS
+  const start = now()
+  let killed = false
+  let lastProgressAt = 0
+  while (now() - start < timeoutMs) {
+    const tick = serialWaitTick({ serial, devices: listDevices() })
+    if (tick.status === 'device') return { action: 'attach', state: 'device' }
+    if (tick.status === 'gone') return { action: 'boot', state: null }
+    const elapsed = now() - start
+    if (!killed && elapsed >= staleAfter) {
+      console.error(
+        `${serial} is still ${tick.state}; killing the stale emulator`,
+      )
+      kill(serial)
+      killed = true
+      lastProgressAt = elapsed
+    } else if (elapsed - lastProgressAt >= INSTALL_PROGRESS_INTERVAL_MS) {
+      console.error(`still waiting: ${serial} is ${tick.state}`)
+      lastProgressAt = elapsed
+    }
+    await sleepFn(pollMs)
+  }
+  const last = serialWaitTick({ serial, devices: listDevices() })
+  if (last.status === 'device') return { action: 'attach', state: 'device' }
+  if (last.status !== 'gone') kill(serial)
+  return { action: 'boot', state: last.state ?? null }
+}
+
+async function waitForSerialGone(serial, timeoutMs, opts = {}) {
+  const now = opts.now ?? Date.now
+  const sleepFn = opts.sleep ?? sleep
+  const listDevices = opts.listDevices ?? adbDevices
+  const pollMs = opts.pollMs ?? SERIAL_POLL_MS
+  const start = now()
+  while (now() - start < timeoutMs) {
+    if (serialWaitTick({ serial, devices: listDevices() }).status === 'gone') {
+      return { status: 'ok' }
+    }
+    await sleepFn(pollMs)
+  }
+  const last = serialWaitTick({ serial, devices: listDevices() })
+  if (last.status === 'gone') return { status: 'ok' }
+  return { status: 'timeout', state: last.state }
+}
+
+async function waitForPortFree(port, timeoutMs, opts = {}) {
+  const now = opts.now ?? Date.now
+  const sleepFn = opts.sleep ?? sleep
+  const listPids = opts.listPids ?? portListenerPids
+  const pollMs = opts.pollMs ?? PORT_FREE_POLL_MS
+  const start = now()
+  while (now() - start < timeoutMs) {
+    const tick = portFreeTick(listPids(port))
+    if (tick.status === 'ok') return tick
+    await sleepFn(pollMs)
+  }
+  return portFreeTick(listPids(port))
 }
 
 function installedVersionName(serial, pkg) {
@@ -1034,7 +1146,10 @@ async function cmdLaunch() {
   }
 
   const port = DEFAULT_METRO_PORT
-  refuseIfPortBusy(port, 'metro')
+  const portFree = await waitForPortFree(port, PORT_FREE_TIMEOUT_MS)
+  if (portFree.status !== 'ok') {
+    die(portBusyMessage(port, portFree.pids, 'metro'))
+  }
 
   ensureDir(runDir)
   ensureDir(artifactsDir)
@@ -1368,7 +1483,13 @@ function stopLaunchDevice(partial, stopped = []) {
   if (partial.metroPid) stopRecordedPid(partial.metroPid, 'metro', stopped)
   // A failed wait still leaves the APK we just installed. Cleanup uninstalls.
   if (plan.clearReverses) adbClearReverses(partial.serial)
-  if (partial.emulatorPid) stopRecordedPid(partial.emulatorPid, 'emulator', stopped)
+  if (partial.emulatorPid) {
+    killEmulatorSerial({
+      serial: partial.serial,
+      pid: partial.emulatorPid,
+      stopped,
+    })
+  }
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
 }
 
@@ -1383,8 +1504,14 @@ async function cmdLaunchDevice() {
 
   const webPort = chosenDeviceWebPort()
   const metroPort = DEFAULT_METRO_PORT
-  refuseIfPortBusy(metroPort, 'metro')
-  refuseIfPortBusy(webPort, 'web')
+  const metroFree = await waitForPortFree(metroPort, PORT_FREE_TIMEOUT_MS)
+  if (metroFree.status !== 'ok') {
+    die(portBusyMessage(metroPort, metroFree.pids, 'metro'))
+  }
+  const webFree = await waitForPortFree(webPort, PORT_FREE_TIMEOUT_MS)
+  if (webFree.status !== 'ok') {
+    die(portBusyMessage(webPort, webFree.pids, 'web'))
+  }
 
   const sdk = resolveSdkRoot()
   if (!sdk) {
@@ -1406,9 +1533,9 @@ async function cmdLaunchDevice() {
   )
 
   const chosenAvd = chosenAvdName()
+  const settled = await waitForSerialReady(DEVICE_SERIAL, SERIAL_SETTLE_TIMEOUT_MS)
   let runningAvd = null
-  const already = adbDevices().find((device) => device.serial === DEVICE_SERIAL)
-  if (already?.state === 'device') {
+  if (settled.action === 'attach') {
     runningAvd = parseAvdName(
       runCapture(adbBin(), ['-s', DEVICE_SERIAL, 'emu', 'avd', 'name'], {
         allowFail: true,
@@ -1419,13 +1546,22 @@ async function cmdLaunchDevice() {
   try {
     attachment = resolveEmulatorAttachment({
       serial: DEVICE_SERIAL,
-      devices: adbDevices(),
+      devices:
+        settled.action === 'attach'
+          ? [{ serial: DEVICE_SERIAL, state: 'device' }]
+          : adbDevices(),
       chosenAvd,
       runningAvd,
       explicitAvd: hasExplicitAvd(),
     })
   } catch (error) {
     die(error.message)
+  }
+  if (attachment.action === 'wait') {
+    console.error(
+      `${DEVICE_SERIAL} is still ${attachment.state}; booting a new emulator`,
+    )
+    attachment = { action: 'boot', avdName: chosenAvd }
   }
   const avdName = attachment.avdName
   if (attachment.action === 'boot') {
@@ -2300,9 +2436,10 @@ function stopListenersOnVerifyPorts(stopped = [], env = process.env) {
   return stopped
 }
 
-function cmdCleanup() {
+async function cmdCleanup() {
   const state = readState()
   const stopped = []
+  let killedSerial = null
   if (state) {
     if (state.expoPid) stopRecordedPid(state.expoPid, 'expo', stopped)
     for (const pid of recordedPids(state)) {
@@ -2314,10 +2451,28 @@ function cmdCleanup() {
       uninstallPackage(state.serial, state.androidPackage)
     }
     if (state.serial) adbClearReverses(state.serial)
-    if (state.emulatorPid) stopRecordedPid(state.emulatorPid, 'emulator', stopped)
+    if (state.emulatorPid) {
+      killEmulatorSerial({
+        serial: state.serial,
+        pid: state.emulatorPid,
+        stopped,
+      })
+      killedSerial = state.serial ?? DEVICE_SERIAL
+    }
     if (state.webPid) stopRecordedPid(state.webPid, 'web', stopped)
   }
   stopListenersOnVerifyPorts(stopped)
+  if (killedSerial) {
+    const gone = await waitForSerialGone(killedSerial, EMULATOR_GONE_TIMEOUT_MS)
+    if (gone.status !== 'ok') {
+      console.error(
+        `Timed out waiting for ${killedSerial} to leave adb devices (still ${gone.state}).`,
+      )
+    }
+  }
+  for (const { port } of verifyListenPorts()) {
+    await waitForPortFree(port, PORT_FREE_TIMEOUT_MS)
+  }
 
   if (existsSync(runDir)) {
     rmSync(runDir, { recursive: true, force: true })
@@ -2337,8 +2492,20 @@ function cmdCleanup() {
   )
 }
 
+async function cmdVerifyDevice(flow) {
+  const plan = verifyDevicePlan(flow)
+  console.error(
+    `verify-device: ${plan.steps.join(' → ')} (${plan.flow}); ` +
+      'the instance stays up if a later step fails',
+  )
+  await cmdCleanup()
+  await cmdLaunchDevice()
+  await cmdDoctor()
+  await cmdDriveDevice(plan.flow)
+}
+
 function usage() {
-  console.log(`Usage: helpers/control <launch|launch-device|doctor|drive|drive-device|cleanup>
+  console.log(`Usage: helpers/control <launch|launch-device|doctor|drive|drive-device|verify-device|cleanup>
 
   launch              Start Expo Metro on VERIFY_METRO_PORT (default 8081)
   launch-device       Attach or boot ${DEVICE_SERIAL}, rebuild if versionName is stale, reverse Metro/web, open the expo-development-client deep link
@@ -2346,6 +2513,7 @@ function usage() {
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
   drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}
+  verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); leave the instance up on failure
   cleanup             Stop recorded pids, free VERIFY_METRO_PORT and VERIFY_PORT, uninstall the package from a recorded serial; keep artifacts/
 
 `)
@@ -2388,6 +2556,14 @@ export {
   deviceFailureArtifactPaths,
   launchDeviceTeardownPlan,
   verifyListenPorts,
+  serialWaitTick,
+  waitForSerialReady,
+  waitForSerialGone,
+  waitForPortFree,
+  adbEmuKillArgs,
+  killEmulatorSerial,
+  portFreeTick,
+  verifyDevicePlan,
   shouldRebuildApk,
   resolveEmulatorAttachment,
   deviceReadyProblems,
@@ -2426,6 +2602,7 @@ export {
   DEV_MENU_CONTINUE_TEXT,
   DEVICE_FAILURE_SCREENSHOT,
   DEVICE_FAILURE_DUMP,
+  DEFAULT_VERIFY_DEVICE_FLOW,
   E2E_USER_WITH_DATA,
   HARNESS_MAESTRO,
   HARNESS_RNTL,
@@ -2455,8 +2632,11 @@ if (invokedAsCli) {
     case 'drive-device':
       await cmdDriveDevice(rest[0])
       break
+    case 'verify-device':
+      await cmdVerifyDevice(rest[0])
+      break
     case 'cleanup':
-      cmdCleanup()
+      await cmdCleanup()
       break
     case '-h':
     case '--help':

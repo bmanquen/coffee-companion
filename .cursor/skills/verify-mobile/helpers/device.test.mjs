@@ -60,6 +60,13 @@ import {
   verifyListenPorts,
   shouldRebuildApk,
   resolveEmulatorAttachment,
+  serialWaitTick,
+  waitForSerialReady,
+  waitForSerialGone,
+  waitForPortFree,
+  adbEmuKillArgs,
+  portFreeTick,
+  verifyDevicePlan,
   deviceReadyProblems,
   maestroDeviceArgs,
   DEVICE_SERIAL,
@@ -71,6 +78,7 @@ import {
   DEV_MENU_CONTINUE_TEXT,
   DEVICE_FAILURE_SCREENSHOT,
   DEVICE_FAILURE_DUMP,
+  DEFAULT_VERIFY_DEVICE_FLOW,
 } from './control.mjs'
 
 function writeSdkTree(root, { systemImages = true } = {}) {
@@ -1020,6 +1028,152 @@ describe('resolveEmulatorAttachment', () => {
         }),
       /Pixel_7/,
     )
+  })
+
+  it('waits on an offline serial instead of failing', () => {
+    assert.deepEqual(
+      resolveEmulatorAttachment({
+        serial: DEVICE_SERIAL,
+        devices: [{ serial: DEVICE_SERIAL, state: 'offline' }],
+        chosenAvd: 'Pixel_7',
+      }),
+      { action: 'wait', state: 'offline', avdName: 'Pixel_7' },
+    )
+  })
+})
+
+describe('serialWaitTick', () => {
+  it('waits while offline, attaches when device, and boots when gone', () => {
+    assert.deepEqual(
+      serialWaitTick({
+        serial: DEVICE_SERIAL,
+        devices: [{ serial: DEVICE_SERIAL, state: 'offline' }],
+      }),
+      { status: 'wait', state: 'offline' },
+    )
+    assert.deepEqual(
+      serialWaitTick({
+        serial: DEVICE_SERIAL,
+        devices: [{ serial: DEVICE_SERIAL, state: 'unauthorized' }],
+      }),
+      { status: 'wait', state: 'unauthorized' },
+    )
+    assert.deepEqual(
+      serialWaitTick({
+        serial: DEVICE_SERIAL,
+        devices: [{ serial: DEVICE_SERIAL, state: 'device' }],
+      }),
+      { status: 'device' },
+    )
+    assert.deepEqual(
+      serialWaitTick({ serial: DEVICE_SERIAL, devices: [] }),
+      { status: 'gone' },
+    )
+  })
+})
+
+describe('waitForSerialReady', () => {
+  it('treats offline-then-gone as boot', async () => {
+    const snapshots = [
+      [{ serial: DEVICE_SERIAL, state: 'offline' }],
+      [],
+    ]
+    let i = 0
+    let t = 0
+    const result = await waitForSerialReady(DEVICE_SERIAL, 5_000, {
+      listDevices: () => snapshots[Math.min(i++, snapshots.length - 1)],
+      sleep: async () => {},
+      now: () => ++t,
+      staleAfterMs: 10_000,
+      kill: () => {
+        throw new Error('should not kill a serial that is about to leave')
+      },
+    })
+    assert.equal(result.action, 'boot')
+  })
+
+  it('treats offline-then-device as attach', async () => {
+    const snapshots = [
+      [{ serial: DEVICE_SERIAL, state: 'offline' }],
+      [{ serial: DEVICE_SERIAL, state: 'device' }],
+    ]
+    let i = 0
+    let t = 0
+    const result = await waitForSerialReady(DEVICE_SERIAL, 5_000, {
+      listDevices: () => snapshots[Math.min(i++, snapshots.length - 1)],
+      sleep: async () => {},
+      now: () => ++t,
+      staleAfterMs: 10_000,
+      kill: () => {
+        throw new Error('should not kill a serial that is becoming device')
+      },
+    })
+    assert.equal(result.action, 'attach')
+    assert.equal(result.state, 'device')
+  })
+})
+
+describe('waitForSerialGone', () => {
+  it('succeeds once the serial leaves adb devices', async () => {
+    const snapshots = [
+      [{ serial: DEVICE_SERIAL, state: 'offline' }],
+      [],
+    ]
+    let i = 0
+    let t = 0
+    const result = await waitForSerialGone(DEVICE_SERIAL, 5_000, {
+      listDevices: () => snapshots[Math.min(i++, snapshots.length - 1)],
+      sleep: async () => {},
+      now: () => ++t,
+    })
+    assert.equal(result.status, 'ok')
+  })
+})
+
+describe('adbEmuKillArgs', () => {
+  it('asks adb to kill the emulator before a process signal', () => {
+    assert.deepEqual(adbEmuKillArgs(DEVICE_SERIAL), [
+      '-s',
+      DEVICE_SERIAL,
+      'emu',
+      'kill',
+    ])
+  })
+})
+
+describe('portFreeTick', () => {
+  it('waits while listeners remain', () => {
+    assert.deepEqual(portFreeTick([11]), { status: 'wait', pids: [11] })
+    assert.deepEqual(portFreeTick([]), { status: 'ok' })
+  })
+})
+
+describe('waitForPortFree', () => {
+  it('succeeds after listeners leave', async () => {
+    const pidSets = [[42], []]
+    let i = 0
+    let t = 0
+    const result = await waitForPortFree(3910, 5_000, {
+      listPids: () => pidSets[Math.min(i++, pidSets.length - 1)],
+      sleep: async () => {},
+      now: () => ++t,
+    })
+    assert.equal(result.status, 'ok')
+  })
+})
+
+describe('verifyDevicePlan', () => {
+  it('runs cleanup, launch-device, doctor, and drive-device and leaves the instance up', () => {
+    const plan = verifyDevicePlan()
+    assert.equal(plan.flow, DEFAULT_VERIFY_DEVICE_FLOW)
+    assert.deepEqual(plan.steps, [
+      'cleanup',
+      'launch-device',
+      'doctor',
+      'drive-device',
+    ])
+    assert.equal(plan.leaveUpOnFailure, true)
+    assert.equal(verifyDevicePlan('sign-in-and-out').flow, 'sign-in-and-out')
   })
 })
 
