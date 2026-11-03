@@ -1,13 +1,13 @@
 ---
 name: verify-mobile
-description: Drive the Coffee Companion mobile app (apps/mobile, Expo) the way a user does — launch a dedicated Metro bundler, exercise the welcome screen through React Native Testing Library, and capture proof. Use when you need to prove a mobile UI change, reproduce a user-facing mobile bug, or verify a mapped mobile feature.
+description: Drive the Coffee Companion mobile app (apps/mobile, Expo) the way a user does — launch a dedicated Metro bundler, exercise screens through React Native Testing Library, and on a machine with the Android SDK and AVD verify-pixel, drive the same handles through Maestro. Use when you need to prove a mobile UI change, reproduce a user-facing mobile bug, or verify a mapped mobile feature.
 ---
 
 # Verify Coffee Companion mobile
 
 Coffee Companion is a personal coffee-brewing tracker. The surface this skill drives is the **Expo mobile app** (`apps/mobile`, SDK 57). iOS and Android only — there is no Expo web target. The web UI has its own skill (`.cursor/skills/verify-coffee-companion`).
 
-This skill is for the next agent, mid-task. Drive the running app. Do not substitute a `welcomeMessage()` unit assertion, a Metro log line, or a source-file read for a screen-tree proof. Native Google and Apple sheets are not this harness — those still need a development build and a real device or simulator.
+This skill is for the next agent, mid-task. Drive the running app. Do not substitute a `welcomeMessage()` unit assertion, a Metro log line, or a source-file read for a screen-tree or device proof. Native Google and Apple sheets are not this harness — those still need a development build and a real device or simulator.
 
 Read `features/README.md` before driving. Use the matching feature file as the recipe.
 
@@ -15,21 +15,26 @@ Read `features/README.md` before driving. Use the matching feature file as the r
 
 | Platform | Where | Proven here? |
 | --- | --- | --- |
-| In-process host tree (React Native Testing Library) | Linux, macOS, CI | Yes — this is the Drive harness |
-| Android emulator or device | Machine with Android SDK + an AVD or USB device. Linux also needs usable `/dev/kvm` | No. This VM had KVM at `/dev/kvm` but no Android SDK, and launch does not install one |
+| In-process host tree (React Native Testing Library) | Linux, macOS, CI | Yes. This is the gate everywhere. |
+| Android emulator (`verify-pixel` on `emulator-5554`) | Machine with Android SDK and AVD `verify-pixel`. Linux also needs usable `/dev/kvm` | Only on a machine that has that SDK and AVD. Required wherever the AVD exists. This VM has no Android SDK, so the device tier was not run here. |
 | iOS Simulator or device | macOS + Xcode only | No. This is Linux |
 
-Do not claim an iOS or Android device run unless you attached one and drove it. The recipe below is what was executed.
-
-Local attach (not run by this skill; for a Mac or Android Studio machine that already has the toolchain):
+The RNTL tier is the gate on every machine. If AVD `verify-pixel` exists, also run the Maestro device tier before you call the change verified. Do not claim an Android device run unless you attached `emulator-5554` and drove it.
 
 ```bash
-# After `helpers/control launch` (Metro on 8081):
-pnpm --filter @coffee-companion/mobile ios      # macOS + Xcode + Simulator
-pnpm --filter @coffee-companion/mobile android  # Android Studio AVD or USB device + adb
-```
+# RNTL (every machine)
+.cursor/skills/verify-mobile/helpers/control launch
+.cursor/skills/verify-mobile/helpers/control doctor
+.cursor/skills/verify-mobile/helpers/control drive welcome
+.cursor/skills/verify-mobile/helpers/control drive sign-in
+.cursor/skills/verify-mobile/helpers/control cleanup
 
-Then open the project from Expo Go or the native run, and confirm the centered heading `Coffee Companion`. A Simulator/`adb` screenshot may go under `artifacts/` (gitignored). Maestro, Detox, and Appium are not wired — they were not installed or executed here.
+# Device (only where SDK + AVD verify-pixel exist)
+.cursor/skills/verify-mobile/helpers/control launch-device
+.cursor/skills/verify-mobile/helpers/control doctor
+.cursor/skills/verify-mobile/helpers/control drive-device sign-in-and-out
+.cursor/skills/verify-mobile/helpers/control cleanup
+```
 
 ## Launch
 
@@ -43,7 +48,7 @@ From the repo root:
 
 Launch does all of this, in order:
 
-1. Refuses if `.run/state.json` already records a live Metro pid, or if `VERIFY_METRO_PORT` (default `8081`) is taken.
+1. Refuses if `.run/state.json` already records a live pid, or if `VERIFY_METRO_PORT` (default `8081`) is taken.
 2. Runs `pnpm install --frozen-lockfile` when `node_modules` is missing.
 3. Starts `pnpm exec expo start --port $PORT --localhost` from `apps/mobile` with `CI=1` (non-interactive). Stdout/stderr go to `.run/metro.log`.
 4. Waits until `GET http://localhost:$PORT/status` is `packager-status:running`.
@@ -54,12 +59,30 @@ Ready signal: launch prints JSON with `ok: true`, `baseUrl`, `metroPid`, and `bu
 
 Isolation:
 
-- One verification Metro at a time on a given port. A second `launch` must fail closed rather than attach to the first.
-- Side-by-side runs need a distinct `VERIFY_METRO_PORT`. Default is to refuse, not to share.
+- One verification instance at a time. A second `launch` or `launch-device` must fail closed rather than attach to the first.
+- Side-by-side Metro runs need a distinct `VERIFY_METRO_PORT`. Default is to refuse, not to share.
 
 Human-facing `pnpm --filter @coffee-companion/mobile start` is the wrong process: interactive, easy to confuse with another checkout.
 
 If launch fails after Metro has started (timeout or a bundle that is not this app), it stops the process it spawned before exiting. Teardown for a recorded instance is `helpers/control cleanup` (see Cleanup). Run cleanup after every failed iteration too.
+
+### Launch the Android device tier
+
+On a machine that already has the Android SDK and AVD `verify-pixel`:
+
+```bash
+.cursor/skills/verify-mobile/helpers/control launch-device
+```
+
+`launch-device` does all of this, in order:
+
+1. Refuses if `.run/state.json` already records a live pid, if port 8081 is taken, or if `emulator-5554` is already in use by someone else.
+2. Boots AVD `verify-pixel` on console port `5554` (serial `emulator-5554`).
+3. Starts the web app with `E2E_BYPASS_AUTH=true` (same seed and bypass as `.cursor/skills/verify-coffee-companion`).
+4. Runs `expo run:android --device emulator-5554` with `EXPO_PUBLIC_E2E_USER=e2e-user-with-data`. The APK `version` / `extra.gitHead` is the git HEAD short SHA.
+5. Records every started pid and the serial in `.run/state.json`.
+
+Package id: `dev.offbyonelabs.coffeecompanion`. Do not run `launch-device` on a machine that lacks the SDK or that AVD.
 
 ## Doctor
 
@@ -69,18 +92,23 @@ Read-only. Run this first whenever anything looks off, and again after a failed 
 .cursor/skills/verify-mobile/helpers/control doctor
 ```
 
-Doctor is green only when all of these hold:
+After `launch`, doctor is green only when all of these hold:
 
 - The recorded `metroPid` in `.run/state.json` is alive.
 - That instance owns `VERIFY_METRO_PORT` (`lsof -t -iTCP:$PORT -sTCP:LISTEN`; `ss` is a fallback). Process-group ownership only identifies the port listener.
 - `GET $baseUrl/status` returns 2xx/3xx and the body is `packager-status:running`.
 - The app bundle mentions `Coffee Companion`.
 
-Doctor prints JSON (`ok`, `baseUrl`, `metroPid`, `portOwners`, `httpStatus`, `metroMarker`, `bundleUrl`, `appMarker`, `problems`). Exit code `2` means do not drive — relaunch, or stop: something else is on the port.
+After `launch-device`, doctor also checks:
+
+- Recorded emulator / web / expo pids are alive and `emulator-5554` is attached.
+- `adb shell dumpsys package dev.offbyonelabs.coffeecompanion` `versionName` matches `git rev-parse --short=7 HEAD`.
+
+Doctor prints JSON. Exit code `2` means do not drive — relaunch, or stop: something else is on the port or serial.
 
 ## Drive
 
-Prefer this repo's React Native Testing Library harness. Selectors below are the same `testID`s, `accessibilityRole`, and `accessibilityLabel` the screen modules export.
+The RNTL harness is the gate on every machine. Selectors below are the same `testID`s, `accessibilityRole`, and `accessibilityLabel` the screen modules export.
 
 ```bash
 .cursor/skills/verify-mobile/helpers/control drive welcome
@@ -89,10 +117,10 @@ Prefer this repo's React Native Testing Library harness. Selectors below are the
 
 Each drive first confirms the recorded Metro is up and answering — the same pid, port-ownership, `/status`, and bundle checks as `doctor`. A dead Metro or a leftover `.run/state.json` fails with exit `2` and does not run the screen test. When that check is green, drive renders the screen in-process and writes the host tree under `artifacts/<runId>/<feature>/`.
 
-Stable handles (use these, not coordinates):
+Stable handles (use these, not coordinates or visible text):
 
-- Welcome (signed in): `testID=welcome-screen`, `accessibilityLabel=Welcome`. Heading `Coffee Companion` (`testID=welcome-heading`). Button `Sign Out`.
-- Sign-in (signed out): `testID=sign-in-screen`, `accessibilityLabel=Sign in`. Brand header `Coffee Companion`. Heading `Sign in` (`testID=sign-in-heading`). Buttons `Sign in with Google`, `Sign in with Apple` (iOS), `Sign up`. Error `testID=sign-in-error`.
+- Welcome (signed in): `testID=welcome-screen`, `accessibilityLabel=Welcome`. Heading `Coffee Companion` (`testID=welcome-heading`). Button `testID=sign-out`.
+- Sign-in (signed out): `testID=sign-in-screen`, `accessibilityLabel=Sign in`. Brand header `Coffee Companion`. Heading `Sign in` (`testID=sign-in-heading`). Buttons `testID=sign-in-google`, `testID=sign-in-apple` (iOS), `testID=sign-in-toggle`. Error `testID=sign-in-error`. Dev-only E2E handle `testID=e2e-sign-in` when `EXPO_PUBLIC_E2E_USER` is set.
 
 The same queries as a raw Jest file. This renders in-process and does not check Metro — only `helpers/control drive <feature>` does:
 
@@ -103,9 +131,19 @@ VERIFY_MOBILE_ARTIFACTS=.cursor/skills/verify-mobile/artifacts/<run>/sign-in \
   pnpm --filter @coffee-companion/mobile exec jest --ci src/auth/sign-in.test.tsx
 ```
 
-One-shot recipes: `drive welcome` and `drive sign-in`. A missing `drive <name>` stub is not a skip and not a pass.
+One-shot RNTL recipes: `drive welcome` and `drive sign-in`. A missing `drive <name>` stub is not a skip and not a pass.
 
-CI runs those same screen tests without Metro (`pnpm --filter @coffee-companion/mobile test`). That is cheap and is wired in the unit job. CI does **not** launch Metro or an emulator: iOS needs macOS, and an Android AVD is not cheap on `ubuntu-latest`. Native Google Sign-In needs a development build and is not exercised in CI.
+CI runs those same screen tests without Metro (`pnpm --filter @coffee-companion/mobile test`). That is cheap and is wired in the unit job. CI does **not** launch Metro or an emulator.
+
+### Drive the Android device tier
+
+Where AVD `verify-pixel` exists, after `launch-device` and a green `doctor`:
+
+```bash
+.cursor/skills/verify-mobile/helpers/control drive-device sign-in-and-out
+```
+
+That runs `maestro --device emulator-5554 test flows/<flow>.yaml`. Selectors are `testID`s only. Never use coordinates or visible text. The first flow is `flows/sign-in-and-out.yaml`: `launchApp` with `clearState` → `sign-in-screen` → tap `e2e-sign-in` → `welcome-screen` → tap `sign-out` → `sign-in-screen`. Screenshots and `proof.json` (`harness: maestro`) land under `artifacts/<runId>/<flow>/`.
 
 ## Evidence
 
@@ -113,12 +151,12 @@ Proof lives under `.cursor/skills/verify-mobile/artifacts/<runId>/`. That direct
 
 Standards:
 
-- Exercise the real user path through the screen tree. Do not assert `welcomeMessage()` in isolation and call it a screen proof.
-- Capture the action and the resulting state. Opening signed-out is the sign-in screen; opening signed-in is the welcome heading plus `Sign Out`. `tree.txt` is that state.
-- Every artifact set includes a host-tree dump that shows `Coffee Companion` and the screen `testID`s. This harness cannot capture a device screenshot.
-- Side effects: session tokens belong in `expo-secure-store` and are cleared on Sign Out. Prove that in the unit tests; this harness mocks SecureStore.
+- Exercise the real user path through the screen tree or the device. Do not assert `welcomeMessage()` in isolation and call it a screen proof.
+- Capture the action and the resulting state. Opening signed-out is the sign-in screen; opening signed-in is the welcome heading plus Sign Out.
+- RNTL artifact sets include a host-tree dump that shows `Coffee Companion` and the screen `testID`s. Maestro artifact sets include screenshots plus `proof.json`.
+- Side effects: session tokens belong in `expo-secure-store` and are cleared on Sign Out. The device tier writes `e2e_auth` through that same cookie store, then `get-session` resolves the persona.
 - Mocks: RNTL uses Test Renderer in Node. Native Google/Apple sheets and the status bar are not a device. Do not mock the heading to "make the tree look right".
-- Record the feature file and harness (`rntl`) with every artifact. `drive welcome` and `drive sign-in` write `proof.json` that does this.
+- Record the feature file and harness (`rntl` or `maestro`) with every artifact.
 
 `artifacts/` is gitignored. Leave it on disk for the human; do not commit binaries.
 
@@ -128,7 +166,7 @@ Standards:
 .cursor/skills/verify-mobile/helpers/control cleanup
 ```
 
-Kills only the Metro pid (and its process group) recorded in `.run/state.json`. Then deletes `.run/`. It does **not** kill by process name, does **not** uninstall anything, and does **not** delete `artifacts/`.
+Kills only the pids recorded in `.run/state.json` (Metro, expo, web, emulator). If a serial is recorded, uninstalls `dev.offbyonelabs.coffeecompanion` from that device. Then deletes `.run/`. It does **not** kill by process name, does **not** touch other emulators, and does **not** delete `artifacts/`.
 
 If launch failed part-way, run cleanup anyway so a half-written state file cannot mask a stray pid.
 
@@ -141,11 +179,14 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | Command | What it does |
 | --- | --- |
 | `helpers/control launch` | Dedicated Expo Metro → wait for `/status` → require `Coffee Companion` in the bundle |
-| `helpers/control doctor` | Pid, port ownership, Metro `/status`, bundle + `Coffee Companion` marker |
+| `helpers/control launch-device` | Boot `verify-pixel` on `emulator-5554`, start the web app with the e2e bypass, install the APK |
+| `helpers/control doctor` | Metro checks after `launch`; plus APK `versionName` == git HEAD short SHA after `launch-device` |
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
-| `helpers/control cleanup` | Stop recorded Metro pid; keep artifacts |
+| `helpers/control drive-device <flow>` | Maestro `flows/<flow>.yaml` on `emulator-5554`; copy screenshots to `artifacts/` |
+| `helpers/control cleanup` | Stop recorded pids; uninstall the package from the recorded serial; keep artifacts |
 | `helpers/metro.test.mjs` | Node tests for the Metro / bundle markers |
+| `helpers/device.test.mjs` | Node tests for adb / dumpsys / pid / screenshot helpers |
 
 ```bash
 .cursor/skills/verify-mobile/helpers/control launch
