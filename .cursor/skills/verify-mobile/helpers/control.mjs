@@ -60,6 +60,12 @@ const DEVICE_METRO_WAIT_MS = 60_000
 const SIGN_IN_TEST_ID = 'sign-in-screen'
 const WELCOME_SCREEN_TEST_ID = 'welcome-screen'
 const DEV_LAUNCHER_MARKERS = ['Development servers', 'npx expo start']
+const DEV_MENU_ONBOARDING_MARKERS = ['This is the developer menu']
+const DEV_MENU_CONTINUE_TEXT = 'Continue'
+const SIGN_IN_VISIBLE_MARKERS = ['Sign in with Google', 'E2E sign in']
+const DEVICE_FAILURE_SCREENSHOT = 'failure.png'
+const DEVICE_FAILURE_DUMP = 'window_dump.xml'
+const APP_READY_PROGRESS_INTERVAL_MS = 15_000
 const DEFAULT_MAC_EMULATOR_GPU = 'host'
 const JAVA_MIN_MAJOR = 17
 const JAVA_MAX_MAJOR = 21
@@ -171,14 +177,26 @@ function portListenerPids(port) {
   return [...pids]
 }
 
-function refuseIfPortBusy(port) {
+function portBusyMessage(port, pids, role = 'metro') {
+  const pidList = pids.join(', ')
+  if (role === 'web') {
+    return (
+      `Port ${port} is already in use (pids ${pidList}). ` +
+      'That is the device-tier web app (VERIFY_PORT), not Metro. ' +
+      'Stop that process, or set VERIFY_PORT to a free port and launch a dedicated instance.'
+    )
+  }
+  return (
+    `Port ${port} is already in use (pids ${pidList}). ` +
+    'Do not drive a shared Metro — that is likely `pnpm --filter @coffee-companion/mobile start`. ' +
+    'Stop that process, or set VERIFY_METRO_PORT to a free port and launch a dedicated instance.'
+  )
+}
+
+function refuseIfPortBusy(port, role = 'metro') {
   const pids = portListenerPids(port)
   if (pids.length === 0) return
-  die(
-    `Port ${port} is already in use (pids ${pids.join(', ')}). ` +
-      'Do not drive a shared Metro — that is likely `pnpm --filter @coffee-companion/mobile start`. ' +
-      'Stop that process, or set VERIFY_METRO_PORT to a free port and launch a dedicated instance.',
-  )
+  die(portBusyMessage(port, pids, role))
 }
 
 function defaultStudioSdkRoot(home, platform) {
@@ -639,24 +657,116 @@ function parseUiDump(xml) {
   const text = `${xml ?? ''}`
   const hasSignIn = text.includes(SIGN_IN_TEST_ID)
   const hasWelcome = text.includes(WELCOME_SCREEN_TEST_ID)
+  const hasSignInCopy = SIGN_IN_VISIBLE_MARKERS.some((marker) =>
+    text.includes(marker),
+  )
+  const hasDevMenuOnboarding = DEV_MENU_ONBOARDING_MARKERS.some((marker) =>
+    text.includes(marker),
+  )
   return {
     hasSignIn,
     hasWelcome,
-    hasAppRoot: hasSignIn || hasWelcome,
+    hasSignInCopy,
+    hasDevMenuOnboarding,
+    hasAppRoot: hasSignIn || hasWelcome || hasSignInCopy,
     hasDevLauncher: DEV_LAUNCHER_MARKERS.some((marker) => text.includes(marker)),
   }
 }
 
+function appForegroundReason(ui) {
+  if (ui.hasDevMenuOnboarding) {
+    return 'Expo developer-menu onboarding is covering the app'
+  }
+  if (ui.hasDevLauncher) return 'Expo launcher is in the foreground'
+  if (!ui.hasAppRoot) {
+    return `${SIGN_IN_TEST_ID} / ${WELCOME_SCREEN_TEST_ID} not in the UI dump`
+  }
+  return 'app root visible'
+}
+
 function appForegroundTick({ dump }) {
   const ui = parseUiDump(dump)
-  if (ui.hasAppRoot) return { status: 'ok', ui }
-  return { status: 'wait', ui }
+  if (ui.hasDevMenuOnboarding) {
+    return { status: 'dismiss', ui, reason: appForegroundReason(ui) }
+  }
+  if (ui.hasAppRoot) return { status: 'ok', ui, reason: appForegroundReason(ui) }
+  return { status: 'wait', ui, reason: appForegroundReason(ui) }
+}
+
+function parseUiNodeCenter(dump, text) {
+  const needle = `${text ?? ''}`
+  if (!needle) return null
+  for (const node of `${dump ?? ''}`.match(/<node\b[^>]*>/g) ?? []) {
+    const quoted = new RegExp(
+      `(?:text|content-desc)="${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`,
+    )
+    if (!quoted.test(node)) continue
+    const bounds = node.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/)
+    if (!bounds) continue
+    return {
+      x: Math.floor((Number(bounds[1]) + Number(bounds[3])) / 2),
+      y: Math.floor((Number(bounds[2]) + Number(bounds[4])) / 2),
+    }
+  }
+  return null
+}
+
+function adbTapArgs(serial, x, y) {
+  return ['-s', serial, 'shell', 'input', 'tap', String(x), String(y)]
+}
+
+function adbScreencapArgs(serial) {
+  return ['-s', serial, 'exec-out', 'screencap', '-p']
+}
+
+function deviceFailureArtifactPaths(dest) {
+  return {
+    screenshotPath: join(dest, DEVICE_FAILURE_SCREENSHOT),
+    dumpPath: join(dest, DEVICE_FAILURE_DUMP),
+  }
+}
+
+function writeAdbScreenshot(serial, destPath) {
+  const result = spawnSync(adbBin(), adbScreencapArgs(serial), {
+    encoding: 'buffer',
+    maxBuffer: 20 * 1024 * 1024,
+  })
+  if (result.status !== 0 || !result.stdout?.length) return null
+  writeFileSync(destPath, result.stdout)
+  return destPath
+}
+
+function captureDeviceFailure({ serial, dest, dump }) {
+  ensureDir(dest)
+  const paths = deviceFailureArtifactPaths(dest)
+  writeFileSync(paths.dumpPath, dump ?? adbUiDump(serial))
+  const screenshotPath = writeAdbScreenshot(serial, paths.screenshotPath)
+  return {
+    dumpPath: paths.dumpPath,
+    screenshotPath,
+  }
+}
+
+function dismissDevMenuOnboarding(serial, dump) {
+  const center = parseUiNodeCenter(dump, DEV_MENU_CONTINUE_TEXT)
+  if (!center) return false
+  runCapture(adbBin(), adbTapArgs(serial, center.x, center.y), {
+    allowFail: true,
+  })
+  return true
 }
 
 function devLauncherForegroundMessage() {
   return (
     'Expo dev-client launcher is in the foreground (Development servers). ' +
     'The app is not connected to Metro. Open the expo-development-client deep link.'
+  )
+}
+
+function devMenuOnboardingMessage() {
+  return (
+    'Expo developer-menu onboarding is covering the app ' +
+    '(This is the developer menu). Tap Continue.'
   )
 }
 
@@ -685,7 +795,9 @@ function deviceReadyProblems({
       `Metro is not reachable from the device at 127.0.0.1 (expected ${METRO_READY_MARKER})`,
     )
   }
-  if (ui?.hasDevLauncher && !ui.hasAppRoot) {
+  if (ui?.hasDevMenuOnboarding) {
+    problems.push(devMenuOnboardingMessage())
+  } else if (ui?.hasDevLauncher && !ui.hasAppRoot) {
     problems.push(devLauncherForegroundMessage())
   }
   return problems
@@ -922,7 +1034,7 @@ async function cmdLaunch() {
   }
 
   const port = DEFAULT_METRO_PORT
-  refuseIfPortBusy(port)
+  refuseIfPortBusy(port, 'metro')
 
   ensureDir(runDir)
   ensureDir(artifactsDir)
@@ -1175,16 +1287,36 @@ function openDevClient(serial, url, pkg) {
 
 async function waitForAppForeground(serial, timeoutMs) {
   const start = Date.now()
+  let lastProgressAt = 0
   while (Date.now() - start < timeoutMs) {
+    const now = Date.now()
     const dump = adbUiDump(serial)
     const tick = appForegroundTick({ dump })
     if (tick.status === 'ok') return tick.ui
+    if (tick.status === 'dismiss') {
+      console.error(
+        `still waiting: ${tick.reason}; tapping ${DEV_MENU_CONTINUE_TEXT}`,
+      )
+      dismissDevMenuOnboarding(serial, dump)
+      lastProgressAt = now
+    } else if (now - lastProgressAt >= APP_READY_PROGRESS_INTERVAL_MS) {
+      console.error(`still waiting: ${tick.reason}`)
+      lastProgressAt = now
+    }
     await sleep(1_000)
   }
-  const ui = parseUiDump(adbUiDump(serial))
+  const dump = adbUiDump(serial)
+  const ui = parseUiDump(dump)
+  const dest = join(
+    artifactsDir,
+    `launch-wait-${new Date().toISOString().replace(/[:.]/g, '-')}`,
+  )
+  captureDeviceFailure({ serial, dest, dump })
+  if (ui.hasDevMenuOnboarding) throw new Error(devMenuOnboardingMessage())
   if (ui.hasDevLauncher) throw new Error(devLauncherForegroundMessage())
   throw new Error(
-    `Timed out waiting for ${SIGN_IN_TEST_ID} or ${WELCOME_SCREEN_TEST_ID} on ${serial}`,
+    `Timed out waiting for ${SIGN_IN_TEST_ID} or ${WELCOME_SCREEN_TEST_ID} on ${serial}. ` +
+      `See ${join(dest, DEVICE_FAILURE_SCREENSHOT)} and ${join(dest, DEVICE_FAILURE_DUMP)}.`,
   )
 }
 
@@ -1219,13 +1351,23 @@ async function ensureDeviceMetro(port, extraEnv = {}) {
   return { metroPid: metro.pid, reused: false, baseUrl, port, logPath }
 }
 
+function launchDeviceTeardownPlan(partial) {
+  return {
+    stopExpo: Boolean(partial.expoPid),
+    stopMetro: Boolean(partial.metroPid),
+    stopEmulator: Boolean(partial.emulatorPid),
+    stopWeb: Boolean(partial.webPid),
+    clearReverses: Boolean(partial.serial),
+    uninstallPackage: false,
+  }
+}
+
 function stopLaunchDevice(partial, stopped = []) {
+  const plan = launchDeviceTeardownPlan(partial)
   if (partial.expoPid) stopRecordedPid(partial.expoPid, 'expo', stopped)
   if (partial.metroPid) stopRecordedPid(partial.metroPid, 'metro', stopped)
-  if (partial.serial && partial.androidPackage) {
-    uninstallPackage(partial.serial, partial.androidPackage)
-  }
-  if (partial.serial) adbClearReverses(partial.serial)
+  // A failed wait still leaves the APK we just installed. Cleanup uninstalls.
+  if (plan.clearReverses) adbClearReverses(partial.serial)
   if (partial.emulatorPid) stopRecordedPid(partial.emulatorPid, 'emulator', stopped)
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
 }
@@ -1241,8 +1383,8 @@ async function cmdLaunchDevice() {
 
   const webPort = chosenDeviceWebPort()
   const metroPort = DEFAULT_METRO_PORT
-  refuseIfPortBusy(metroPort)
-  refuseIfPortBusy(webPort)
+  refuseIfPortBusy(metroPort, 'metro')
+  refuseIfPortBusy(webPort, 'web')
 
   const sdk = resolveSdkRoot()
   if (!sdk) {
@@ -1531,10 +1673,15 @@ async function cmdDriveDevice(flow) {
       flowPath,
       expoDevClientUrl: devClientUrl,
     }),
-    { cwd: shotDir },
+    { cwd: shotDir, allowFail: true },
   )
   if (test.status !== 0) {
-    die(`Maestro flow ${flow} failed`)
+    const captured = captureDeviceFailure({ serial: state.serial, dest })
+    copyPngFiles(shotDir, dest)
+    die(
+      `Maestro flow ${flow} failed. See ${captured.screenshotPath ?? join(dest, DEVICE_FAILURE_SCREENSHOT)} ` +
+        `and ${captured.dumpPath}.`,
+    )
   }
 
   copyPngFiles(shotDir, dest)
@@ -2136,6 +2283,23 @@ function pidKind(pid, state) {
   return 'metro'
 }
 
+function verifyListenPorts(env = process.env) {
+  return [
+    { port: Number(env.VERIFY_METRO_PORT ?? DEFAULT_METRO_PORT), kind: 'metro' },
+    { port: chosenDeviceWebPort(env), kind: 'web' },
+  ]
+}
+
+function stopListenersOnVerifyPorts(stopped = [], env = process.env) {
+  for (const { port, kind } of verifyListenPorts(env)) {
+    if (!Number.isInteger(port) || port <= 0) continue
+    for (const pid of portListenerPids(port)) {
+      stopRecordedPid(pid, kind, stopped)
+    }
+  }
+  return stopped
+}
+
 function cmdCleanup() {
   const state = readState()
   const stopped = []
@@ -2153,6 +2317,7 @@ function cmdCleanup() {
     if (state.emulatorPid) stopRecordedPid(state.emulatorPid, 'emulator', stopped)
     if (state.webPid) stopRecordedPid(state.webPid, 'web', stopped)
   }
+  stopListenersOnVerifyPorts(stopped)
 
   if (existsSync(runDir)) {
     rmSync(runDir, { recursive: true, force: true })
@@ -2181,7 +2346,7 @@ function usage() {
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
   drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}
-  cleanup             Stop recorded pids and uninstall the package from that serial; keep artifacts/
+  cleanup             Stop recorded pids, free VERIFY_METRO_PORT and VERIFY_PORT, uninstall the package from a recorded serial; keep artifacts/
 
 `)
 }
@@ -2214,7 +2379,15 @@ export {
   parseAdbReverseList,
   missingAdbReverses,
   parseUiDump,
+  parseUiNodeCenter,
   appForegroundTick,
+  appForegroundReason,
+  portBusyMessage,
+  adbTapArgs,
+  adbScreencapArgs,
+  deviceFailureArtifactPaths,
+  launchDeviceTeardownPlan,
+  verifyListenPorts,
   shouldRebuildApk,
   resolveEmulatorAttachment,
   deviceReadyProblems,
@@ -2250,6 +2423,9 @@ export {
   VERIFY_APK_VERSION_ENV,
   SIGN_IN_TEST_ID,
   WELCOME_SCREEN_TEST_ID,
+  DEV_MENU_CONTINUE_TEXT,
+  DEVICE_FAILURE_SCREENSHOT,
+  DEVICE_FAILURE_DUMP,
   E2E_USER_WITH_DATA,
   HARNESS_MAESTRO,
   HARNESS_RNTL,

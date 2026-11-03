@@ -7,18 +7,28 @@ appId: dev.offbyonelabs.coffeecompanion
     browser: false
 - extendedWaitUntil:
     visible:
+      text: "This is the developer menu.*"
+    timeout: 15000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- extendedWaitUntil:
+    visible:
       id: sign-in-screen
     timeout: 60000
-- assertVisible:
-    id: sign-in-screen
 - takeScreenshot: signed-out
 - tapOn:
     id: e2e-sign-in
-- assertVisible:
-    id: welcome-screen
+- extendedWaitUntil:
+    visible:
+      id: welcome-screen
+    timeout: 60000
 - takeScreenshot: signed-in
 - tapOn:
     id: sign-out
-- assertVisible:
-    id: sign-in-screen
+- extendedWaitUntil:
+    visible:
+      id: sign-in-screen
+    timeout: 60000
 - takeScreenshot: signed-out-again

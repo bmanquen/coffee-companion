@@ -49,7 +49,15 @@ import {
   parseAdbReverseList,
   missingAdbReverses,
   parseUiDump,
+  parseUiNodeCenter,
   appForegroundTick,
+  appForegroundReason,
+  portBusyMessage,
+  adbTapArgs,
+  adbScreencapArgs,
+  deviceFailureArtifactPaths,
+  launchDeviceTeardownPlan,
+  verifyListenPorts,
   shouldRebuildApk,
   resolveEmulatorAttachment,
   deviceReadyProblems,
@@ -60,6 +68,9 @@ import {
   E2E_USER_WITH_DATA,
   ANDROID_PACKAGE,
   SIGN_IN_TEST_ID,
+  DEV_MENU_CONTINUE_TEXT,
+  DEVICE_FAILURE_SCREENSHOT,
+  DEVICE_FAILURE_DUMP,
 } from './control.mjs'
 
 function writeSdkTree(root, { systemImages = true } = {}) {
@@ -797,6 +808,34 @@ describe('parseUiDump', () => {
     assert.equal(ui.hasAppRoot, true)
     assert.equal(ui.hasDevLauncher, false)
   })
+
+  it('treats visible Sign in with Google copy as the signed-out app', () => {
+    const ui = parseUiDump(
+      '<node text="Sign in"/><node text="Sign in with Google"/><node text="E2E sign in"/>',
+    )
+    assert.equal(ui.hasSignInCopy, true)
+    assert.equal(ui.hasAppRoot, true)
+  })
+
+  it('detects the first-run developer-menu sheet', () => {
+    const ui = parseUiDump(
+      '<node text="This is the developer menu. It gives you access to useful tools in your development builds."/>' +
+        `<node text="${DEV_MENU_CONTINUE_TEXT}" bounds="[100,800][980,920]"/>`,
+    )
+    assert.equal(ui.hasDevMenuOnboarding, true)
+  })
+})
+
+describe('parseUiNodeCenter', () => {
+  it('returns the tap target for the Continue button', () => {
+    assert.deepEqual(
+      parseUiNodeCenter(
+        `<node text="${DEV_MENU_CONTINUE_TEXT}" bounds="[100,800][980,920]"/>`,
+        DEV_MENU_CONTINUE_TEXT,
+      ),
+      { x: 540, y: 860 },
+    )
+  })
 })
 
 describe('appForegroundTick', () => {
@@ -813,6 +852,115 @@ describe('appForegroundTick', () => {
       }).status,
       'ok',
     )
+  })
+
+  it('asks to dismiss the developer-menu sheet even when sign-in copy is visible', () => {
+    const tick = appForegroundTick({
+      dump:
+        '<node text="This is the developer menu. It gives you access to useful tools."/>' +
+        '<node text="Sign in with Google"/>' +
+        `<node text="${DEV_MENU_CONTINUE_TEXT}" bounds="[100,800][980,920]"/>`,
+    })
+    assert.equal(tick.status, 'dismiss')
+    assert.match(tick.reason, /developer-menu/)
+    assert.equal(tick.ui.hasAppRoot, true)
+  })
+})
+
+describe('appForegroundReason', () => {
+  it('names the onboarding sheet', () => {
+    assert.match(
+      appForegroundReason({ hasDevMenuOnboarding: true, hasAppRoot: true }),
+      /developer-menu/,
+    )
+  })
+})
+
+describe('portBusyMessage', () => {
+  it('does not call port 3910 Metro', () => {
+    const message = portBusyMessage(3910, [99], 'web')
+    assert.match(message, /3910/)
+    assert.match(message, /VERIFY_PORT/)
+    assert.match(message, /not Metro/)
+    assert.doesNotMatch(message, /VERIFY_METRO_PORT/)
+  })
+
+  it('names Metro only for the Metro port', () => {
+    const message = portBusyMessage(8081, [42], 'metro')
+    assert.match(message, /Metro/)
+    assert.match(message, /VERIFY_METRO_PORT/)
+  })
+})
+
+describe('adbTapArgs', () => {
+  it('taps the Continue center through adb input', () => {
+    assert.deepEqual(adbTapArgs(DEVICE_SERIAL, 540, 860), [
+      '-s',
+      DEVICE_SERIAL,
+      'shell',
+      'input',
+      'tap',
+      '540',
+      '860',
+    ])
+  })
+})
+
+describe('deviceFailureArtifacts', () => {
+  it('writes screenshot and uiautomator dump names under the dest', () => {
+    const paths = deviceFailureArtifactPaths('/tmp/run/sign-in-and-out')
+    assert.equal(paths.screenshotPath.endsWith(DEVICE_FAILURE_SCREENSHOT), true)
+    assert.equal(paths.dumpPath.endsWith(DEVICE_FAILURE_DUMP), true)
+    assert.deepEqual(adbScreencapArgs(DEVICE_SERIAL), [
+      '-s',
+      DEVICE_SERIAL,
+      'exec-out',
+      'screencap',
+      '-p',
+    ])
+  })
+})
+
+describe('launchDeviceTeardownPlan', () => {
+  it('never uninstalls the APK when launch-device fails', () => {
+    const plan = launchDeviceTeardownPlan({
+      serial: DEVICE_SERIAL,
+      androidPackage: ANDROID_PACKAGE,
+      expoPid: 9,
+    })
+    assert.equal(plan.uninstallPackage, false)
+    assert.equal(plan.clearReverses, true)
+    assert.equal(plan.stopExpo, true)
+  })
+})
+
+describe('verifyListenPorts', () => {
+  it('includes Metro and the dedicated web port', () => {
+    const ports = verifyListenPorts({
+      VERIFY_METRO_PORT: '8081',
+      VERIFY_PORT: '3910',
+    })
+    assert.deepEqual(
+      ports.map((entry) => entry.port).sort((a, b) => a - b),
+      [3910, 8081],
+    )
+    assert.equal(ports.find((entry) => entry.port === 3910).kind, 'web')
+    assert.equal(ports.find((entry) => entry.port === 8081).kind, 'metro')
+  })
+})
+
+describe('screen testID hosts', () => {
+  it('keeps sign-in and welcome roots from collapsing on Android', () => {
+    const mobileSrc = join(
+      dirname(fileURLToPath(import.meta.url)),
+      '../../../../apps/mobile/src',
+    )
+    const signIn = readFileSync(join(mobileSrc, 'auth/SignInScreen.tsx'), 'utf8')
+    const welcome = readFileSync(join(mobileSrc, 'auth/SignedInHome.tsx'), 'utf8')
+    assert.match(signIn, /collapsable=\{false\}/)
+    assert.match(signIn, /testID=\{SIGN_IN_SCREEN_TEST_ID\}/)
+    assert.match(welcome, /collapsable=\{false\}/)
+    assert.match(welcome, /testID=\{WELCOME_SCREEN_TEST_ID\}/)
   })
 })
 
@@ -899,6 +1047,21 @@ describe('deviceReadyProblems', () => {
     })
     assert.deepEqual(problems, [])
   })
+
+  it('flags the first-run developer-menu sheet as covering the app', () => {
+    const problems = deviceReadyProblems({
+      reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
+      requiredPorts: [8081, 3910],
+      checkedDeviceMetro: true,
+      deviceStatusBody: 'packager-status:running',
+      ui: parseUiDump(
+        '<node text="This is the developer menu. It gives you access to useful tools."/>' +
+          '<node text="Sign in with Google"/>',
+      ),
+    })
+    assert.ok(problems.some((problem) => /developer-menu onboarding/.test(problem)))
+    assert.ok(!problems.some((problem) => /dev-client launcher/.test(problem)))
+  })
 })
 
 describe('maestroDeviceArgs', () => {
@@ -928,5 +1091,17 @@ describe('sign-in-and-out flow', () => {
     assert.match(flow, /openLink/)
     assert.match(flow, /EXPO_DEV_CLIENT_URL/)
     assert.match(flow, /sign-in-screen/)
+  })
+
+  it('dismisses the Expo first-run developer menu then waits for sign-in-screen', () => {
+    const flow = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../flows/sign-in-and-out.yaml'),
+      'utf8',
+    )
+    assert.match(flow, /This is the developer menu/)
+    assert.match(flow, /text: "Continue"/)
+    assert.match(flow, /optional: true/)
+    assert.match(flow, /extendedWaitUntil/)
+    assert.doesNotMatch(flow, /assertVisible/)
   })
 })
