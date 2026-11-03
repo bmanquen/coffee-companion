@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { apiErrorMessage } from '../api-error'
 import { ShotForm } from '../espresso/ShotForm'
@@ -37,38 +37,49 @@ export function SignedInHome({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
+  const loadSeq = useRef(0)
+  const loadingRef = useRef(true)
 
   const showCatalog = useCallback((next: EspressoCatalog) => {
+    loadingRef.current = false
     setCatalog(next)
     setLoadError(null)
     setLoading(false)
   }, [])
 
   const failLoad = useCallback((error: unknown) => {
+    loadingRef.current = false
     setLoadError(apiErrorMessage(error, ERROR_LOAD_FAILED))
     setLoading(false)
   }, [])
 
-  const reload = useCallback(() => {
+  const beginLoad = useCallback(() => {
+    const seq = ++loadSeq.current
+    loadingRef.current = true
+    setLoadError(null)
     setLoading(true)
-    runMaybePromise(() => espresso.load(), showCatalog, failLoad)
-  }, [espresso, showCatalog, failLoad])
-
-  useEffect(() => {
-    let cancelled = false
     runMaybePromise(
       () => espresso.load(),
       (next) => {
-        if (!cancelled) showCatalog(next)
+        // A newer load replaces this one; a late failure must not hide that catalog.
+        if (seq !== loadSeq.current) return
+        showCatalog(next)
       },
       (error) => {
-        if (!cancelled) failLoad(error)
+        if (seq !== loadSeq.current) return
+        failLoad(error)
       },
     )
-    return () => {
-      cancelled = true
-    }
   }, [espresso, showCatalog, failLoad])
+
+  const reload = useCallback(() => {
+    if (loadingRef.current) return
+    beginLoad()
+  }, [beginLoad])
+
+  useEffect(() => {
+    beginLoad()
+  }, [beginLoad])
 
   const save = (input: ShotCreate) => {
     setBusy(true)
@@ -114,7 +125,11 @@ export function SignedInHome({
       {loadError && screen === 'list' ? (
         <View style={styles.loadError}>
           <Text accessibilityRole="alert">{loadError}</Text>
-          <Pressable accessibilityRole="button" onPress={reload}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={loading}
+            onPress={reload}
+          >
             <Text>{TRY_AGAIN}</Text>
           </Pressable>
         </View>
