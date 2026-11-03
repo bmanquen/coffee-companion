@@ -20,7 +20,7 @@ A Plan decides how much of the user's own past is readable. Free's Shelf is the 
 - Choose `Account` from `Account menu` or the desktop `Open menu` sheet (`/account`).
 - Confirm `Delete account` as identity `delete`, then land on `/restore-account` (live routes such as `/coffees` redirect here while pending).
 - Open `/brews`, `/dashboard`, or `/coffees` as a Free user and read a Coffee that has fallen off the Shelf.
-- Choose `Unlock` or `See plans` on a Sealed row.
+- Choose `Unlock` on a Sealed row (to `/pricing`). `See plans` is on `/account` for Free, not on the Sealed row.
 
 ## Driving it with control
 
