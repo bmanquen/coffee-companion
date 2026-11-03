@@ -33,8 +33,17 @@ import {
   inspectExpoAutolinking,
   expoModuleSupportsPlatform,
   parseAppScheme,
+  parseAppSlug,
+  expoDevClientScheme,
   readAppScheme,
+  readDevClientScheme,
   expoDevClientUrl,
+  gradleBuildFinished,
+  installWaitReason,
+  installTimeoutError,
+  stampGradleProperties,
+  stampBuildGradleVersionName,
+  stampAndroidVersion,
   adbReverseArgs,
   adbOpenDevClientArgs,
   parseAdbReverseList,
@@ -219,7 +228,7 @@ describe('installWaitTick', () => {
     assert.equal(tick.status, 'ok')
   })
 
-  it('waits when the installed versionName is not git HEAD', () => {
+  it('waits when the installed versionName is stale and Gradle is still running', () => {
     const tick = installWaitTick({
       alive: true,
       versionName: 'e0543f5',
@@ -227,6 +236,21 @@ describe('installWaitTick', () => {
       logText: '',
     })
     assert.equal(tick.status, 'wait')
+    assert.match(tick.reason, /e0543f5/)
+    assert.match(tick.reason, /4bf1a18/)
+  })
+
+  it('fails when BUILD SUCCESSFUL left a stale versionName even if expo is still alive', () => {
+    const tick = installWaitTick({
+      alive: true,
+      versionName: 'e0543f5',
+      expectedVersion: '4bf1a18',
+      logText: 'BUILD SUCCESSFUL in 6s\nOpening exp+coffee-companion://\n',
+    })
+    assert.equal(tick.status, 'error')
+    assert.match(tick.error, /e0543f5/)
+    assert.match(tick.error, /4bf1a18/)
+    assert.match(tick.error, /UP-TO-DATE/)
   })
 
   it('fails when expo exits still serving a stale APK', () => {
@@ -239,7 +263,6 @@ describe('installWaitTick', () => {
     assert.equal(tick.status, 'error')
     assert.match(tick.error, /e0543f5/)
     assert.match(tick.error, /4bf1a18/)
-    assert.match(tick.error, /rebuild/)
   })
 
   it('succeeds when the installed versionName matches git HEAD', () => {
@@ -594,18 +617,106 @@ describe('parseAppScheme', () => {
   })
 })
 
+describe('parseAppSlug', () => {
+  it('reads slug from app.config.ts', () => {
+    assert.equal(parseAppSlug("slug: 'coffee-companion',\n"), 'coffee-companion')
+  })
+})
+
+describe('expoDevClientScheme', () => {
+  it('matches the exp+<slug> scheme Expo opens after install', () => {
+    assert.equal(
+      expoDevClientScheme({ slug: 'coffee-companion', scheme: 'coffeecompanion' }),
+      'exp+coffee-companion',
+    )
+  })
+})
+
 describe('readAppScheme', () => {
   it('reads the scheme from the mobile app config', () => {
     assert.equal(readAppScheme(), 'coffeecompanion')
   })
 })
 
+describe('readDevClientScheme', () => {
+  it('reads exp+<slug> from the mobile app config', () => {
+    assert.equal(readDevClientScheme(), 'exp+coffee-companion')
+  })
+})
+
 describe('expoDevClientUrl', () => {
   it('encodes the Metro loopback URL for the expo-development-client deep link', () => {
     assert.equal(
-      expoDevClientUrl({ scheme: 'coffeecompanion', metroPort: 8081 }),
-      'coffeecompanion://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081',
+      expoDevClientUrl({ scheme: 'exp+coffee-companion', metroPort: 8081 }),
+      'exp+coffee-companion://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081',
     )
+  })
+})
+
+describe('gradleBuildFinished', () => {
+  it('detects BUILD SUCCESSFUL in the expo android log', () => {
+    assert.equal(gradleBuildFinished('BUILD SUCCESSFUL in 6s\n'), true)
+    assert.equal(gradleBuildFinished('> Task :app:packageDebug\n'), false)
+  })
+})
+
+describe('installWaitReason', () => {
+  it('names the actual and expected versionName', () => {
+    assert.match(
+      installWaitReason({
+        versionName: 'e0543f5',
+        expectedVersion: '4bf1a18',
+      }),
+      /e0543f5/,
+    )
+  })
+})
+
+describe('installTimeoutError', () => {
+  it('names the actual versionName versus the expected SHA', () => {
+    const message = installTimeoutError({
+      pkg: ANDROID_PACKAGE,
+      serial: DEVICE_SERIAL,
+      versionName: 'e0543f5',
+      expectedVersion: '4bf1a18',
+    })
+    assert.match(message, /e0543f5/)
+    assert.match(message, /4bf1a18/)
+    assert.match(message, /Timed out/)
+  })
+})
+
+describe('stampAndroidVersion', () => {
+  it('writes VERIFY_APK_VERSION and replaces versionName so Gradle cannot stay UP-TO-DATE', () => {
+    assert.equal(
+      stampGradleProperties('org.gradle.jvmargs=-Xmx2g\n', '4bf1a18'),
+      'org.gradle.jvmargs=-Xmx2g\nVERIFY_APK_VERSION=4bf1a18\n',
+    )
+    assert.match(
+      stampBuildGradleVersionName('versionName "e0543f5"', '4bf1a18'),
+      /versionName "4bf1a18"/,
+    )
+    const root = mkdtempSync(join(tmpdir(), 'verify-android-'))
+    try {
+      mkdirSync(join(root, 'app'), { recursive: true })
+      writeFileSync(join(root, 'gradle.properties'), 'android.useAndroidX=true\n')
+      writeFileSync(
+        join(root, 'app', 'build.gradle'),
+        'defaultConfig { versionName "e0543f5" }\n',
+      )
+      const result = stampAndroidVersion({ androidDir: root, version: '4bf1a18' })
+      assert.deepEqual(result, { stamped: true, gradleStamped: true })
+      assert.match(
+        readFileSync(join(root, 'gradle.properties'), 'utf8'),
+        /VERIFY_APK_VERSION=4bf1a18/,
+      )
+      assert.match(
+        readFileSync(join(root, 'app', 'build.gradle'), 'utf8'),
+        /versionName "4bf1a18"/,
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 
@@ -623,7 +734,7 @@ describe('adbReverseArgs', () => {
 
 describe('adbOpenDevClientArgs', () => {
   it('opens the encoded deep link on the installed package', () => {
-    const url = expoDevClientUrl({ scheme: 'coffeecompanion', metroPort: 8081 })
+    const url = expoDevClientUrl({ scheme: 'exp+coffee-companion', metroPort: 8081 })
     const args = adbOpenDevClientArgs({
       serial: DEVICE_SERIAL,
       url,
@@ -792,7 +903,7 @@ describe('deviceReadyProblems', () => {
 
 describe('maestroDeviceArgs', () => {
   it('passes the expo-development-client URL into the flow', () => {
-    const url = expoDevClientUrl({ scheme: 'coffeecompanion', metroPort: 8081 })
+    const url = expoDevClientUrl({ scheme: 'exp+coffee-companion', metroPort: 8081 })
     const args = maestroDeviceArgs({
       serial: DEVICE_SERIAL,
       dest: '/tmp/out',

@@ -19,7 +19,18 @@ export function gitHeadShortSha(
   }).trim()
 }
 
-const gitHead = gitHeadShortSha()
+export const VERIFY_APK_VERSION_ENV = 'VERIFY_APK_VERSION'
+
+export function resolveApkVersion(
+  env: { readonly [key: string]: string | undefined } = process.env,
+  gitSha: () => string = gitHeadShortSha,
+): string {
+  const fromEnv = `${env[VERIFY_APK_VERSION_ENV] ?? ''}`.trim()
+  if (fromEnv) return fromEnv
+  return gitSha()
+}
+
+const gitHead = resolveApkVersion()
 const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME
 
 const plugins: NonNullable<ExpoConfig['plugins']> = [

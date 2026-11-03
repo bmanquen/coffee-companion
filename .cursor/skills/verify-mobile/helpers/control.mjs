@@ -54,6 +54,7 @@ const EXPO_LOG_TAIL_LINES = 40
 const BOOT_PROGRESS_INTERVAL_MS = 15_000
 const INSTALL_PROGRESS_INTERVAL_MS = 15_000
 const EXPO_INSTALL_TIMEOUT_MS = 900_000
+const VERIFY_APK_VERSION_ENV = 'VERIFY_APK_VERSION'
 const APP_READY_TIMEOUT_MS = 60_000
 const DEVICE_METRO_WAIT_MS = 60_000
 const SIGN_IN_TEST_ID = 'sign-in-screen'
@@ -426,26 +427,115 @@ function expoDiedError(logText) {
   return `expo run:android exited before the APK was installed. Tail of expo-android.log:\n${tail}`
 }
 
+function gradleBuildFinished(logText) {
+  return /\bBUILD SUCCESSFUL\b/.test(`${logText ?? ''}`)
+}
+
+function installWaitReason({
+  versionName,
+  expectedVersion,
+  buildFinished = false,
+}) {
+  if (!versionName) {
+    return buildFinished
+      ? 'BUILD SUCCESSFUL but package not in dumpsys yet'
+      : 'package not installed yet'
+  }
+  if (expectedVersion && versionName !== expectedVersion) {
+    return `installed versionName ${versionName} != expected ${expectedVersion}`
+  }
+  return 'installed versionName matches'
+}
+
+function staleVersionError(versionName, expectedVersion) {
+  return (
+    `installed versionName ${versionName} != expected ${expectedVersion}. ` +
+    'Stamp VERIFY_APK_VERSION into android/gradle.properties and versionName ' +
+    'so processDebugMainManifest is not UP-TO-DATE on a stale SHA.'
+  )
+}
+
+function installTimeoutError({ pkg, serial, versionName, expectedVersion }) {
+  return (
+    `Timed out waiting for ${pkg} on ${serial}: ` +
+    `installed versionName ${versionName ?? 'missing'} != expected ${expectedVersion}.`
+  )
+}
+
 function installWaitTick({
   alive,
   versionName,
   expectedVersion,
   logText,
+  buildFinished,
 }) {
+  const finished = buildFinished ?? gradleBuildFinished(logText)
   if (versionName && expectedVersion && versionName !== expectedVersion) {
-    if (!alive) {
+    if (!alive || finished) {
       return {
         status: 'error',
-        error:
-          `expo run:android exited with installed versionName ${versionName}, ` +
-          `expected ${expectedVersion}. Uninstall and rebuild.`,
+        error: staleVersionError(versionName, expectedVersion),
+        reason: installWaitReason({ versionName, expectedVersion, buildFinished: finished }),
       }
     }
-    return { status: 'wait' }
+    return {
+      status: 'wait',
+      reason: installWaitReason({ versionName, expectedVersion, buildFinished: finished }),
+    }
   }
   if (versionName) return { status: 'ok' }
   if (!alive) return { status: 'error', error: expoDiedError(logText) }
-  return { status: 'wait' }
+  return {
+    status: 'wait',
+    reason: installWaitReason({ versionName, expectedVersion, buildFinished: finished }),
+  }
+}
+
+function stampGradleProperties(contents, version) {
+  const line = `${VERIFY_APK_VERSION_ENV}=${version}`
+  if (/^VERIFY_APK_VERSION=/m.test(`${contents ?? ''}`)) {
+    return `${contents}`.replace(/^VERIFY_APK_VERSION=.*$/m, line)
+  }
+  const body = `${contents ?? ''}`
+  const suffix = body === '' || body.endsWith('\n') ? '' : '\n'
+  return `${body}${suffix}${line}\n`
+}
+
+function stampBuildGradleVersionName(contents, version) {
+  if (!/versionName\s+["'][^"']+["']/.test(`${contents ?? ''}`)) {
+    return contents
+  }
+  return `${contents}`.replace(
+    /versionName\s+["'][^"']+["']/,
+    `versionName "${version}"`,
+  )
+}
+
+function stampAndroidVersion({
+  androidDir,
+  version,
+  exists = existsSync,
+  read = readFileSync,
+  write = writeFileSync,
+  mkdir = mkdirSync,
+} = {}) {
+  if (!version) throw new Error('stampAndroidVersion requires a version')
+  if (!androidDir || !exists(androidDir)) return { stamped: false, gradleStamped: false }
+  mkdir(androidDir, { recursive: true })
+  const propsPath = join(androidDir, 'gradle.properties')
+  const previous = exists(propsPath) ? read(propsPath, 'utf8') : ''
+  write(propsPath, stampGradleProperties(previous, version))
+  const gradlePath = join(androidDir, 'app', 'build.gradle')
+  let gradleStamped = false
+  if (exists(gradlePath)) {
+    const gradle = read(gradlePath, 'utf8')
+    const next = stampBuildGradleVersionName(gradle, version)
+    if (next !== gradle) {
+      write(gradlePath, next)
+      gradleStamped = true
+    }
+  }
+  return { stamped: true, gradleStamped }
 }
 
 function shouldRebuildApk({ installedVersion, expectedVersion }) {
@@ -462,14 +552,42 @@ function parseAppScheme(source) {
   return json?.[1] ?? null
 }
 
-function readAppScheme(appDir = mobileDir) {
+function parseAppSlug(source) {
+  if (typeof source !== 'string') return null
+  const ts = source.match(/\bslug\s*:\s*['"]([a-zA-Z0-9._-]+)['"]/)
+  if (ts) return ts[1]
+  const json = source.match(/"slug"\s*:\s*"([a-zA-Z0-9._-]+)"/)
+  return json?.[1] ?? null
+}
+
+function expoDevClientScheme({ slug, scheme } = {}) {
+  if (slug) return `exp+${slug}`
+  return scheme ?? null
+}
+
+function readAppConfigSource(appDir = mobileDir) {
   for (const name of ['app.config.ts', 'app.config.js', 'app.json']) {
     const path = join(appDir, name)
-    if (!existsSync(path)) continue
-    const scheme = parseAppScheme(readFileSync(path, 'utf8'))
-    if (scheme) return scheme
+    if (existsSync(path)) return readFileSync(path, 'utf8')
   }
+  return null
+}
+
+function readAppScheme(appDir = mobileDir) {
+  const source = readAppConfigSource(appDir)
+  const scheme = parseAppScheme(source ?? '')
+  if (scheme) return scheme
   throw new Error(`Could not read Expo scheme from ${appDir} app config`)
+}
+
+function readDevClientScheme(appDir = mobileDir) {
+  const source = readAppConfigSource(appDir)
+  const scheme = expoDevClientScheme({
+    slug: parseAppSlug(source ?? ''),
+    scheme: parseAppScheme(source ?? ''),
+  })
+  if (scheme) return scheme
+  throw new Error(`Could not read Expo dev-client scheme from ${appDir} app config`)
 }
 
 function expoDevClientUrl({ scheme, metroPort }) {
@@ -933,11 +1051,6 @@ async function waitForInstalledPackage(serial, pkg, timeoutMs, opts = {}) {
   let lastProgressAt = 0
   while (Date.now() - start < timeoutMs) {
     const now = Date.now()
-    if (now - lastProgressAt >= INSTALL_PROGRESS_INTERVAL_MS) {
-      const logHint = opts.logPath ? ` See ${opts.logPath}` : ''
-      console.error(`building/installing ${pkg} on ${serial}…${logHint}`)
-      lastProgressAt = now
-    }
     const versionName = installedVersionName(serial, pkg)
     const alive = opts.pid == null ? true : pidAlive(opts.pid)
     const logText =
@@ -952,9 +1065,23 @@ async function waitForInstalledPackage(serial, pkg, timeoutMs, opts = {}) {
     })
     if (tick.status === 'ok') return versionName
     if (tick.status === 'error') throw new Error(tick.error)
+    if (now - lastProgressAt >= INSTALL_PROGRESS_INTERVAL_MS) {
+      const logHint = opts.logPath ? ` See ${opts.logPath}` : ''
+      const reason = tick.reason ? ` still waiting: ${tick.reason}.` : ''
+      console.error(`building/installing ${pkg} on ${serial}…${reason}${logHint}`)
+      lastProgressAt = now
+    }
     await sleep(2_000)
   }
-  throw new Error(`Timed out waiting for ${pkg} to install on ${serial}`)
+  const versionName = installedVersionName(serial, pkg)
+  throw new Error(
+    installTimeoutError({
+      pkg,
+      serial,
+      versionName,
+      expectedVersion: opts.expectedVersion,
+    }),
+  )
 }
 
 function startWebApp(port) {
@@ -1182,12 +1309,23 @@ async function cmdLaunchDevice() {
 
   let scheme
   try {
-    scheme = readAppScheme()
+    scheme = readDevClientScheme()
   } catch (error) {
     die(error.message)
   }
 
   const expectedSha = gitHeadShortSha()
+  const androidStamp = stampAndroidVersion({
+    androidDir: join(mobileDir, 'android'),
+    version: expectedSha,
+  })
+  if (androidStamp.stamped) {
+    console.error(
+      androidStamp.gradleStamped
+        ? `Stamped ${VERIFY_APK_VERSION_ENV}=${expectedSha} into android/gradle.properties and versionName`
+        : `Stamped ${VERIFY_APK_VERSION_ENV}=${expectedSha} into android/gradle.properties`,
+    )
+  }
   const partial = {
     serial: DEVICE_SERIAL,
     androidPackage: ANDROID_PACKAGE,
@@ -1248,6 +1386,7 @@ async function cmdLaunchDevice() {
           CI: '1',
           EXPO_NO_TELEMETRY: '1',
           ...deviceExpoPublicEnv(webPort),
+          [VERIFY_APK_VERSION_ENV]: expectedSha,
           ...(java.javaHome ? { JAVA_HOME: java.javaHome } : {}),
         },
       },
@@ -1381,7 +1520,7 @@ async function cmdDriveDevice(flow) {
   const devClientUrl =
     state.expoDevClientUrl ??
     expoDevClientUrl({
-      scheme: state.scheme ?? readAppScheme(),
+      scheme: state.scheme ?? readDevClientScheme(),
       metroPort: state.port ?? DEFAULT_METRO_PORT,
     })
   const test = run(
@@ -2059,8 +2198,17 @@ export {
   inspectExpoAutolinking,
   expoModuleSupportsPlatform,
   parseAppScheme,
+  parseAppSlug,
+  expoDevClientScheme,
   readAppScheme,
+  readDevClientScheme,
   expoDevClientUrl,
+  gradleBuildFinished,
+  installWaitReason,
+  installTimeoutError,
+  stampGradleProperties,
+  stampBuildGradleVersionName,
+  stampAndroidVersion,
   adbReverseArgs,
   adbOpenDevClientArgs,
   parseAdbReverseList,
@@ -2099,6 +2247,7 @@ export {
   DEFAULT_DEVICE_WEB_PORT,
   DEVICE_SERIAL,
   ANDROID_PACKAGE,
+  VERIFY_APK_VERSION_ENV,
   SIGN_IN_TEST_ID,
   WELCOME_SCREEN_TEST_ID,
   E2E_USER_WITH_DATA,
