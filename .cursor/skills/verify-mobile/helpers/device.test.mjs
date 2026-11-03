@@ -11,6 +11,8 @@ import {
   chosenAvdName,
   requireAvd,
   bootWaitTick,
+  expoAndroidArgs,
+  installWaitTick,
   chosenDeviceWebPort,
   deviceApiUrl,
   deviceExpoPublicEnv,
@@ -127,6 +129,48 @@ describe('bootWaitTick', () => {
     const tick = bootWaitTick({
       alive: true,
       bootCompleted: true,
+      logText: '',
+    })
+    assert.equal(tick.status, 'ok')
+  })
+})
+
+describe('expoAndroidArgs', () => {
+  it('passes the AVD name to expo --device, not the adb serial', () => {
+    const args = expoAndroidArgs('Pixel_7')
+    const deviceAt = args.indexOf('--device')
+    assert.ok(deviceAt >= 0)
+    assert.equal(args[deviceAt + 1], 'Pixel_7')
+    assert.ok(!args.includes(DEVICE_SERIAL))
+  })
+})
+
+describe('installWaitTick', () => {
+  it('fails immediately when expo has already exited', () => {
+    const tick = installWaitTick({
+      alive: false,
+      versionName: null,
+      logText:
+        'CommandError: Could not find device with name: emulator-5554\n',
+    })
+    assert.equal(tick.status, 'error')
+    assert.match(tick.error, /exited before/)
+    assert.match(tick.error, /Could not find device with name: emulator-5554/)
+  })
+
+  it('waits while expo is alive and the package is not installed', () => {
+    const tick = installWaitTick({
+      alive: true,
+      versionName: null,
+      logText: '',
+    })
+    assert.equal(tick.status, 'wait')
+  })
+
+  it('succeeds when the package versionName is present', () => {
+    const tick = installWaitTick({
+      alive: true,
+      versionName: 'abc1234',
       logText: '',
     })
     assert.equal(tick.status, 'ok')

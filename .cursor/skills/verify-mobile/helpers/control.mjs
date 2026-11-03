@@ -48,6 +48,7 @@ const E2E_USER_WITH_DATA = 'e2e-user-with-data'
 const GIT_SHORT_SHA_DIGITS = 7
 const EMULATOR_BOOT_TIMEOUT_MS = 300_000
 const EMULATOR_LOG_TAIL_LINES = 40
+const EXPO_LOG_TAIL_LINES = 40
 const BOOT_PROGRESS_INTERVAL_MS = 15_000
 const INSTALL_PROGRESS_INTERVAL_MS = 15_000
 const EXPO_INSTALL_TIMEOUT_MS = 900_000
@@ -248,6 +249,33 @@ function emulatorDiedError(logText) {
 function bootWaitTick({ alive, bootCompleted, logText }) {
   if (bootCompleted) return { status: 'ok' }
   if (!alive) return { status: 'error', error: emulatorDiedError(logText) }
+  return { status: 'wait' }
+}
+
+function expoAndroidArgs(avdName) {
+  // Expo 57 --device matches device.name (the AVD), not the adb serial.
+  return [
+    '--filter',
+    '@coffee-companion/mobile',
+    'exec',
+    'expo',
+    'run:android',
+    '--device',
+    avdName,
+  ]
+}
+
+function expoDiedError(logText) {
+  const tail = tailText(logText, EXPO_LOG_TAIL_LINES)
+  if (!tail) {
+    return 'expo run:android exited before the APK was installed. expo-android.log is empty.'
+  }
+  return `expo run:android exited before the APK was installed. Tail of expo-android.log:\n${tail}`
+}
+
+function installWaitTick({ alive, versionName, logText }) {
+  if (versionName) return { status: 'ok' }
+  if (!alive) return { status: 'error', error: expoDiedError(logText) }
   return { status: 'wait' }
 }
 
@@ -590,7 +618,14 @@ async function waitForInstalledPackage(serial, pkg, timeoutMs, opts = {}) {
       lastProgressAt = now
     }
     const versionName = installedVersionName(serial, pkg)
-    if (versionName) return versionName
+    const alive = opts.pid == null ? true : pidAlive(opts.pid)
+    const logText =
+      opts.logPath && existsSync(opts.logPath)
+        ? readFileSync(opts.logPath, 'utf8')
+        : ''
+    const tick = installWaitTick({ alive, versionName, logText })
+    if (tick.status === 'ok') return versionName
+    if (tick.status === 'error') throw new Error(tick.error)
     await sleep(2_000)
   }
   throw new Error(`Timed out waiting for ${pkg} to install on ${serial}`)
@@ -703,15 +738,7 @@ async function cmdLaunchDevice() {
     const expoLog = join(runDir, 'expo-android.log')
     const expo = spawnLogged(
       'pnpm',
-      [
-        '--filter',
-        '@coffee-companion/mobile',
-        'exec',
-        'expo',
-        'run:android',
-        '--device',
-        DEVICE_SERIAL,
-      ],
+      expoAndroidArgs(avdName),
       expoLog,
       {
         cwd: repoRoot,
@@ -728,7 +755,7 @@ async function cmdLaunchDevice() {
       DEVICE_SERIAL,
       ANDROID_PACKAGE,
       EXPO_INSTALL_TIMEOUT_MS,
-      { logPath: expoLog },
+      { logPath: expoLog, pid: expo.pid },
     )
 
     const state = {
@@ -1221,6 +1248,8 @@ export {
   chosenAvdName,
   requireAvd,
   bootWaitTick,
+  expoAndroidArgs,
+  installWaitTick,
   chosenDeviceWebPort,
   deviceApiUrl,
   deviceExpoPublicEnv,
