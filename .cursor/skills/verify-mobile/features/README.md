@@ -9,7 +9,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Never drive an instance that was not started by this verification run. A process already on port 8081 is likely `pnpm --filter @coffee-companion/mobile start`.
 - Signed-out identity is the sign-in screen. Signed-in identity is the welcome screen with Sign Out. Drive mocks the session; it does not mint a real Google or Apple token.
 - Drive uses React Native Testing Library in-process on every machine. That tier is the gate.
-- On a machine that has the Android SDK and an AVD, also run `launch-device` and `drive-device`. Default AVD name is `verify-pixel`; set `VERIFY_AVD` when that name is missing from `emulator -list-avds`. This VM has no SDK, so that tier is not available here.
+- On a machine that has the Android SDK and an AVD, also run `launch-device` and `drive-device`. Default AVD name is `verify-pixel`; set `VERIFY_AVD` when that name is missing from `emulator -list-avds`. The device web app listens on port `3910` (`VERIFY_PORT`) so it does not collide with `pnpm dev` on `3000`. This VM has no SDK, so that tier is not available here.
 - Coffee, brew, equipment, and shelf features are web-only today. Add a mobile feature file here when that surface ships.
 - Do not remove proof artifacts during cleanup.
 

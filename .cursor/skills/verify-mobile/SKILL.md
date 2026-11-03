@@ -30,6 +30,7 @@ The RNTL tier is the gate on every machine. If an Android AVD exists, also run t
 .cursor/skills/verify-mobile/helpers/control cleanup
 
 # Device (only where SDK + an AVD exist; default name is verify-pixel)
+# Dedicated web port is 3910 (VERIFY_PORT) so it does not collide with pnpm dev on 3000.
 VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control launch-device
 .cursor/skills/verify-mobile/helpers/control doctor
 .cursor/skills/verify-mobile/helpers/control drive-device sign-in-and-out
@@ -74,14 +75,16 @@ On a machine that already has the Android SDK and an AVD. Default AVD name is `v
 VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control launch-device
 ```
 
+The device tier starts its own web app on port `3910` so it does not collide with `pnpm dev` on `3000`. Override with `VERIFY_PORT` if that port is taken.
+
 `launch-device` does all of this, in order:
 
-1. Refuses if `.run/state.json` already records a live pid, if port 8081 is taken, or if `emulator-5554` is already in use by someone else.
+1. Refuses if `.run/state.json` already records a live pid, if port 8081 is taken, if the dedicated web port (`3910`, or `VERIFY_PORT`) is taken, or if `emulator-5554` is already in use by someone else.
 2. Runs `emulator -list-avds` and dies immediately if the chosen AVD is missing, listing the installed names and telling you to set `VERIFY_AVD`.
 3. Boots that AVD on console port `5554` (serial `emulator-5554`). Waits up to five minutes (`EMULATOR_BOOT_TIMEOUT_MS`) and prints `booting…` elapsed seconds on stderr. If the emulator process exits early, it fails with the tail of `.run/emulator.log` instead of waiting out the timeout.
-4. Starts the web app with `E2E_BYPASS_AUTH=true` (same seed and bypass as `.cursor/skills/verify-coffee-companion`).
-5. Runs `expo run:android --device emulator-5554` with `EXPO_PUBLIC_E2E_USER=e2e-user-with-data`. Prints `building/installing…` plus the expo log path on stderr. The APK `version` / `extra.gitHead` is the git HEAD short SHA.
-6. Records every started pid, the serial, and the actual `avdName` in `.run/state.json`.
+4. Starts the web app on that dedicated port (`VERIFY_PORT` / `BETTER_AUTH_URL` / `SITE_URL` pinned so a leftover `3000` from `pnpm dev` cannot leak through) with `E2E_BYPASS_AUTH=true` (same seed and bypass as `.cursor/skills/verify-coffee-companion`).
+5. Runs `expo run:android --device emulator-5554` with `EXPO_PUBLIC_E2E_USER=e2e-user-with-data` and `EXPO_PUBLIC_API_URL=http://localhost:<port>`. Metro inlines `EXPO_PUBLIC_*`; the app rewrites `localhost` to `10.0.2.2` on the emulator. Prints `building/installing…` plus the expo log path on stderr. The APK `version` / `extra.gitHead` is the git HEAD short SHA.
+6. Records every started pid, the serial, the actual `avdName`, and `webPort` in `.run/state.json`.
 
 Package id: `dev.offbyonelabs.coffeecompanion`. Do not run `launch-device` on a machine that lacks the SDK or any AVD.
 
@@ -103,6 +106,7 @@ After `launch`, doctor is green only when all of these hold:
 After `launch-device`, doctor also checks:
 
 - Recorded emulator / web / expo pids are alive and `emulator-5554` is attached.
+- `GET` on the recorded `webBaseUrl` (default `http://127.0.0.1:3910`) answers.
 - `adb shell dumpsys package dev.offbyonelabs.coffeecompanion` `versionName` matches `git rev-parse --short=7 HEAD`.
 
 Doctor prints JSON. Exit code `2` means do not drive — relaunch, or stop: something else is on the port or serial.
@@ -180,7 +184,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | Command | What it does |
 | --- | --- |
 | `helpers/control launch` | Dedicated Expo Metro → wait for `/status` → require `Coffee Companion` in the bundle |
-| `helpers/control launch-device` | List AVDs, boot `verify-pixel` (or `VERIFY_AVD`) on `emulator-5554`, start the web app with the e2e bypass, install the APK |
+| `helpers/control launch-device` | List AVDs, boot `verify-pixel` (or `VERIFY_AVD`) on `emulator-5554`, start the web app on port `3910` (`VERIFY_PORT`) with the e2e bypass, install the APK pointed at that URL |
 | `helpers/control doctor` | Metro checks after `launch`; plus APK `versionName` == git HEAD short SHA after `launch-device` |
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
