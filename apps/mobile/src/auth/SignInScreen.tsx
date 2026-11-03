@@ -60,6 +60,7 @@ export function SignInScreen({
   return (
     <View
       accessibilityLabel={SIGN_IN_A11Y_LABEL}
+      collapsable={false}
       testID={SIGN_IN_SCREEN_TEST_ID}
       style={styles.container}
     >

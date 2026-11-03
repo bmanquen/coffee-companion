@@ -19,6 +19,7 @@ export function SignedInHome({
   return (
     <View
       accessibilityLabel={WELCOME_A11Y_LABEL}
+      collapsable={false}
       testID={WELCOME_SCREEN_TEST_ID}
       style={styles.container}
     >
