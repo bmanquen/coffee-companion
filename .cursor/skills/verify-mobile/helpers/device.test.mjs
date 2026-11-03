@@ -25,6 +25,12 @@ import {
   missingStateMessage,
   recordedPids,
   copyPngFiles,
+  parseExpoPackageImports,
+  parseAutolinkedPackageNames,
+  missingAutolinkedExpoModules,
+  collectImportedExpoPackages,
+  inspectExpoAutolinking,
+  expoModuleSupportsPlatform,
   DEVICE_SERIAL,
   AVD_NAME,
   DEFAULT_DEVICE_WEB_PORT,
@@ -392,5 +398,134 @@ describe('copyPngFiles', () => {
       rmSync(from, { recursive: true, force: true })
       rmSync(dest, { recursive: true, force: true })
     }
+  })
+})
+
+describe('parseExpoPackageImports', () => {
+  it('reads static, dynamic, and require specifiers', () => {
+    const source = `
+      import Constants from "expo-constants";
+      import * as Linking from 'expo-linking';
+      import("expo-network").then(({ addNetworkStateListener }) => {});
+      const Browser = require("expo-web-browser");
+    `
+    assert.deepEqual(parseExpoPackageImports(source), [
+      'expo-constants',
+      'expo-linking',
+      'expo-network',
+      'expo-web-browser',
+    ])
+  })
+
+  it('does not treat scoped Expo packages or subpaths as package names', () => {
+    assert.deepEqual(
+      parseExpoPackageImports(`import x from '@expo/vector-icons'; import y from 'expo/fetch'`),
+      [],
+    )
+  })
+})
+
+describe('parseAutolinkedPackageNames', () => {
+  it('reads packageName from expo-modules-autolinking resolve JSON', () => {
+    const names = parseAutolinkedPackageNames({
+      modules: [
+        { packageName: 'expo-constants' },
+        { packageName: 'expo-secure-store' },
+        { packageName: null },
+      ],
+    })
+    assert.deepEqual(names, ['expo-constants', 'expo-secure-store'])
+  })
+})
+
+describe('missingAutolinkedExpoModules', () => {
+  it('flags expo-network when JS imports it but autolinking omitted it', () => {
+    assert.deepEqual(
+      missingAutolinkedExpoModules({
+        imported: ['expo-constants', 'expo-network'],
+        linked: ['expo-constants'],
+        treatAsNative: (name) =>
+          name === 'expo-network' || name === 'expo-constants',
+      }),
+      ['expo-network'],
+    )
+  })
+
+  it('ignores a JS-only package that is not a native module', () => {
+    assert.deepEqual(
+      missingAutolinkedExpoModules({
+        imported: ['expo-something-js'],
+        linked: [],
+        treatAsNative: () => false,
+      }),
+      [],
+    )
+  })
+})
+
+describe('collectImportedExpoPackages', () => {
+  it('walks source files and skips node_modules', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-autolink-'))
+    try {
+      mkdirSync(join(root, 'src'), { recursive: true })
+      mkdirSync(join(root, 'node_modules', 'other'), { recursive: true })
+      writeFileSync(
+        join(root, 'src', 'client.js'),
+        'import("expo-network").then(() => {})\n',
+      )
+      writeFileSync(
+        join(root, 'node_modules', 'other', 'ignored.js'),
+        'import "expo-file-system"\n',
+      )
+      assert.deepEqual(collectImportedExpoPackages([root]), ['expo-network'])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('expoModuleSupportsPlatform', () => {
+  it('does not treat an apple-only module as android-native', () => {
+    assert.equal(
+      expoModuleSupportsPlatform({ platforms: ['apple'] }, 'android'),
+      false,
+    )
+    assert.equal(
+      expoModuleSupportsPlatform(
+        { platforms: ['apple', 'android'] },
+        'android',
+      ),
+      true,
+    )
+  })
+})
+
+describe('inspectExpoAutolinking', () => {
+  it('reports a problem that tells you to expo install the missing module', () => {
+    const report = inspectExpoAutolinking({
+      imported: ['expo-network'],
+      linked: ['expo-constants'],
+      treatAsNative: () => true,
+    })
+    assert.deepEqual(report.missing, ['expo-network'])
+    assert.equal(report.ok, undefined)
+    assert.equal(report.problems.length, 1)
+    assert.match(report.problems[0], /expo-network/)
+    assert.match(report.problems[0], /npx expo install expo-network/)
+    assert.match(report.problems[0], /pnpm/)
+  })
+
+  it('finds expo-network from @better-auth/expo and requires it to be autolinked', () => {
+    const report = inspectExpoAutolinking()
+    assert.ok(
+      report.imported.includes('expo-network'),
+      `imported ${report.imported.join(', ')}`,
+    )
+    assert.ok(
+      report.linked.includes('expo-network'),
+      `linked ${report.linked.join(', ')}; problems: ${report.problems.join('; ')}`,
+    )
+    assert.deepEqual(report.missing, [])
+    assert.deepEqual(report.problems, [])
   })
 })

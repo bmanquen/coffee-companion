@@ -12,8 +12,9 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs'
+import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { delimiter, dirname, join, resolve } from 'node:path'
+import { delimiter, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as sleep } from 'node:timers/promises'
 
@@ -851,6 +852,11 @@ async function cmdLaunchDevice() {
     run('pnpm', ['install', '--frozen-lockfile'])
   }
 
+  const autolink = inspectExpoAutolinking()
+  if (autolink.problems.length > 0) {
+    die(autolink.problems.join('\n'))
+  }
+
   const partial = {
     serial: DEVICE_SERIAL,
     androidPackage: ANDROID_PACKAGE,
@@ -1040,6 +1046,217 @@ async function cmdDriveDevice(flow) {
   console.log(JSON.stringify({ ok: true, ...proof }, null, 2))
 }
 
+const EXPO_PACKAGE_IMPORT_RE =
+  /(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"](expo(?:-[a-z0-9-]+)*)['"]/g
+const AUTOLINK_SOURCE_EXT = new Set([
+  '.js',
+  '.mjs',
+  '.cjs',
+  '.ts',
+  '.tsx',
+  '.jsx',
+])
+
+function parseExpoPackageImports(source) {
+  const names = new Set()
+  if (typeof source !== 'string') return []
+  for (const match of source.matchAll(EXPO_PACKAGE_IMPORT_RE)) {
+    names.add(match[1])
+  }
+  return [...names].sort()
+}
+
+function parseAutolinkedPackageNames(resolveJson) {
+  const parsed =
+    typeof resolveJson === 'string' ? JSON.parse(resolveJson) : resolveJson
+  return (parsed?.modules ?? [])
+    .map((module) => module?.packageName)
+    .filter(Boolean)
+}
+
+function missingAutolinkedExpoModules({
+  imported = [],
+  linked = [],
+  treatAsNative = () => true,
+} = {}) {
+  const linkedSet = new Set(linked)
+  return imported.filter(
+    (name) => !linkedSet.has(name) && treatAsNative(name),
+  )
+}
+
+function shouldScanDependency(name) {
+  if (name === 'react' || name === 'react-native' || name === 'expo') {
+    return false
+  }
+  if (name.startsWith('expo-') || name.startsWith('@expo/')) return false
+  if (name.startsWith('@react-native')) return false
+  return true
+}
+
+function resolvePackageDir(name, fromDir) {
+  try {
+    const req = createRequire(join(fromDir, 'package.json'))
+    try {
+      return dirname(req.resolve(`${name}/package.json`))
+    } catch {
+      const entry = req.resolve(name)
+      let dir = dirname(entry)
+      while (dir !== dirname(dir)) {
+        const pkgPath = join(dir, 'package.json')
+        if (existsSync(pkgPath)) {
+          const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+          if (pkg.name === name) return dir
+        }
+        dir = dirname(dir)
+      }
+      return null
+    }
+  } catch {
+    return null
+  }
+}
+
+function walkSourceFiles(root, onSource) {
+  if (!existsSync(root)) return
+  const entries = readdirSync(root, { withFileTypes: true })
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name === '.git') continue
+    const path = join(root, entry.name)
+    if (entry.isDirectory()) {
+      walkSourceFiles(path, onSource)
+      continue
+    }
+    if (entry.name.endsWith('.d.ts')) continue
+    if (!AUTOLINK_SOURCE_EXT.has(extname(entry.name))) continue
+    onSource(readFileSync(path, 'utf8'))
+  }
+}
+
+function collectImportedExpoPackages(roots) {
+  const names = new Set()
+  for (const root of roots) {
+    walkSourceFiles(root, (source) => {
+      for (const name of parseExpoPackageImports(source)) names.add(name)
+    })
+  }
+  return [...names].sort()
+}
+
+function mobileImportRoots(appDir = mobileDir) {
+  const roots = [join(appDir, 'src')]
+  const pkgPath = join(appDir, 'package.json')
+  if (!existsSync(pkgPath)) return roots
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+  for (const name of Object.keys(pkg.dependencies ?? {})) {
+    if (!shouldScanDependency(name)) continue
+    const dir = resolvePackageDir(name, appDir)
+    if (dir) roots.push(dir)
+  }
+  return roots
+}
+
+function expoModuleSupportsPlatform(config, platform = 'android') {
+  const platforms = config?.platforms ?? []
+  if (platform === 'android') {
+    return platforms.includes('android') || Boolean(config?.android)
+  }
+  if (platform === 'apple' || platform === 'ios') {
+    return (
+      platforms.includes('apple') ||
+      platforms.includes('ios') ||
+      Boolean(config?.apple)
+    )
+  }
+  return platforms.includes(platform)
+}
+
+function isExpoNativeOrMissing(
+  name,
+  fromDir = mobileDir,
+  platform = 'android',
+) {
+  const dir = resolvePackageDir(name, fromDir)
+  // Unresolved: pnpm will not autolink a transitive / optional peer.
+  if (!dir) return true
+  const configPath = join(dir, 'expo-module.config.json')
+  if (!existsSync(configPath)) return false
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf8'))
+    return expoModuleSupportsPlatform(config, platform)
+  } catch {
+    return true
+  }
+}
+
+function readAutolinkedPackageNames({
+  cwd = mobileDir,
+  run = runCapture,
+} = {}) {
+  const result = run(
+    'pnpm',
+    [
+      'exec',
+      'expo-modules-autolinking',
+      'resolve',
+      '-p',
+      'android',
+      '--json',
+      '--project-root',
+      cwd,
+    ],
+    { cwd, allowFail: true },
+  )
+  if (result.status !== 0) {
+    throw new Error(
+      `expo-modules-autolinking resolve failed: ${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
+    )
+  }
+  const stdout = `${result.stdout ?? ''}`
+  const start = stdout.indexOf('{')
+  if (start === -1) {
+    throw new Error('expo-modules-autolinking resolve printed no JSON')
+  }
+  return parseAutolinkedPackageNames(stdout.slice(start))
+}
+
+function missingAutolinkMessage(name) {
+  return (
+    `JS imports ${name} but Expo autolinking did not resolve it. ` +
+    `Add it as a direct apps/mobile dependency (\`npx expo install ${name}\`) ` +
+    'so the native module is in the APK. Under pnpm, transitive Expo modules are not linked.'
+  )
+}
+
+function inspectExpoAutolinking(opts = {}) {
+  try {
+    const imported =
+      opts.imported ??
+      collectImportedExpoPackages(opts.roots ?? mobileImportRoots())
+    const linked = opts.linked ?? readAutolinkedPackageNames({ run: opts.run })
+    const treatAsNative =
+      opts.treatAsNative ?? ((name) => isExpoNativeOrMissing(name))
+    const missing = missingAutolinkedExpoModules({
+      imported,
+      linked,
+      treatAsNative,
+    })
+    return {
+      imported,
+      linked,
+      missing,
+      problems: missing.map((name) => missingAutolinkMessage(name)),
+    }
+  } catch (error) {
+    return {
+      imported: [],
+      linked: [],
+      missing: [],
+      problems: [`expo autolinking check failed: ${error.message}`],
+    }
+  }
+}
+
 async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   const problems = []
 
@@ -1214,6 +1431,8 @@ async function inspectInstance(state) {
   const problems = []
   let metro = null
   let device = null
+  const autolinking = inspectExpoAutolinking()
+  problems.push(...autolinking.problems)
   if (state.metroPid || state.harness === HARNESS_RNTL) {
     metro = await inspectMetro(state)
     problems.push(...metro.problems)
@@ -1225,6 +1444,9 @@ async function inspectInstance(state) {
   return {
     ...(metro ?? {}),
     ...(device ?? {}),
+    importedExpoModules: autolinking.imported,
+    autolinkedExpoModules: autolinking.linked,
+    missingAutolinkedExpoModules: autolinking.missing,
     ok: problems.length === 0,
     harness: state.harness ?? (state.serial ? HARNESS_MAESTRO : HARNESS_RNTL),
     problems,
@@ -1406,6 +1628,12 @@ export {
   bundleHasAppMarker,
   fetchAppBundle,
   inspectMetro,
+  parseExpoPackageImports,
+  parseAutolinkedPackageNames,
+  missingAutolinkedExpoModules,
+  collectImportedExpoPackages,
+  inspectExpoAutolinking,
+  expoModuleSupportsPlatform,
   parseAdbDevices,
   parseDumpsysVersionName,
   parseAvdName,

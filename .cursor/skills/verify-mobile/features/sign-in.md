@@ -39,3 +39,4 @@ Preconditions:
 - Session tokens live in `expo-secure-store`, not AsyncStorage. Sign-out deletes them. RNTL mocks SecureStore.
 - `testID` and `accessibilityLabel` live in `apps/mobile/src/auth/SignInScreen.tsx` and `apps/mobile/src/auth/copy.ts`. Drive those handles, not coordinates or visible text.
 - The E2E handle writes `e2e_auth` through the expoClient cookie store and then calls `get-session`. It is stripped from production builds.
+- `@better-auth/expo` dynamically imports `expo-network`. Under pnpm, Expo autolinking only links direct `apps/mobile` dependencies, so `expo-network` must be listed there. A missing autolink crashes at launch with `Cannot find native module 'ExpoNetwork'`. `expo prebuild --clean` does not add a module that is only a transitive peer.
