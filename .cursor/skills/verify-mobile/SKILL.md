@@ -85,12 +85,13 @@ The device tier starts its own web app on port `3910` so it does not collide wit
 
 `launch-device` does all of this, in order:
 
-1. Refuses if `.run/state.json` already records a live pid, if port 8081 is taken, if the dedicated web port (`3910`, or `VERIFY_PORT`) is taken, or if `emulator-5554` is already in use by someone else.
-2. Resolves the Studio SDK (never Homebrew commandlinetools), prints the emulator binary, and requires Java 17–21 (or macOS `java_home -v 17`). Then runs `emulator -list-avds` and dies immediately if the chosen AVD is missing, listing the installed names and telling you to set `VERIFY_AVD`. Before booting, compares JS-imported Expo native modules (including `@better-auth/expo`'s `import("expo-network")`) to `expo-modules-autolinking resolve -p android`. A module that JS can import but autolinking omitted fails closed — under pnpm that usually means it is not a direct `apps/mobile` dependency.
-3. Boots that AVD on console port `5554` (serial `emulator-5554`) with `-no-boot-anim` and, on macOS, `-gpu host` (`VERIFY_EMULATOR_GPU` overrides). Waits up to five minutes (`EMULATOR_BOOT_TIMEOUT_MS`) and prints `booting…` elapsed seconds on stderr. If the emulator process exits early, it fails with the tail of `.run/emulator.log` instead of waiting out the timeout.
+1. Refuses if `.run/state.json` already records a live pid, if port 8081 is taken, or if the dedicated web port (`3910`, or `VERIFY_PORT`) is taken. If `emulator-5554` is already `device`, launch attaches to it (and adopts its AVD name unless `VERIFY_AVD` disagrees). It does not refuse a healthy emulator that was started outside the script.
+2. Resolves the Studio SDK (never Homebrew commandlinetools), prints the emulator binary, and requires Java 17–21 (or macOS `java_home -v 17`). When it must boot, it runs `emulator -list-avds` and dies immediately if the chosen AVD is missing, listing the installed names and telling you to set `VERIFY_AVD`. Before booting, compares JS-imported Expo native modules (including `@better-auth/expo`'s `import("expo-network")`) to `expo-modules-autolinking resolve -p android`. A module that JS can import but autolinking omitted fails closed — under pnpm that usually means it is not a direct `apps/mobile` dependency.
+3. Boots that AVD on console port `5554` (serial `emulator-5554`) with `-no-boot-anim` and, on macOS, `-gpu host` (`VERIFY_EMULATOR_GPU` overrides), unless it attached in step 1. Waits up to five minutes (`EMULATOR_BOOT_TIMEOUT_MS`) and prints `booting…` elapsed seconds on stderr. If the emulator process exits early, it fails with the tail of `.run/emulator.log` instead of waiting out the timeout.
 4. Starts the web app on that dedicated port (`VERIFY_PORT` / `BETTER_AUTH_URL` / `SITE_URL` pinned so a leftover `3000` from `pnpm dev` cannot leak through) with `E2E_BYPASS_AUTH=true` (same seed and bypass as `.cursor/skills/verify-coffee-companion`).
-5. Runs `expo run:android --device <AVD name>` (Expo 57 matches `device.name`, not the adb serial). adb and Maestro still use `emulator-5554`. If expo exits before the APK is installed, launch dies with the tail of `.run/expo-android.log`. Env: `EXPO_PUBLIC_E2E_USER=e2e-user-with-data` and `EXPO_PUBLIC_API_URL=http://localhost:<port>`. Metro inlines `EXPO_PUBLIC_*`; the app rewrites `localhost` to `10.0.2.2` on the emulator. Prints `building/installing…` plus the expo log path on stderr. The APK `version` / `extra.gitHead` is the git HEAD short SHA.
-6. Records every started pid, the serial, the actual `avdName`, and `webPort` in `.run/state.json`.
+5. Runs `expo run:android --device <AVD name>` (Expo 57 matches `device.name`, not the adb serial). If the installed APK `versionName` is missing or not `git rev-parse --short=7 HEAD`, it uninstalls and passes `--no-build-cache` so gradle cannot reuse a stale APK. adb and Maestro still use `emulator-5554`. If expo exits before the matching APK is installed, launch dies with the tail of `.run/expo-android.log`. Env: `EXPO_PUBLIC_E2E_USER=e2e-user-with-data` and `EXPO_PUBLIC_API_URL=http://localhost:<port>`. Metro inlines `EXPO_PUBLIC_*`; the app rewrites `localhost` to `10.0.2.2` on the emulator. Prints `building/installing…` plus the expo log path on stderr.
+6. After install: `adb reverse` the Metro port and the web port, then `am start` the expo-development-client deep link (`<scheme>://expo-development-client/?url=<encoded http://127.0.0.1:METRO_PORT>`). The scheme is read from `apps/mobile` app config, not hardcoded. Waits until `sign-in-screen` or `welcome-screen` is in the UI dump — the Expo "Development servers" launcher is not ready.
+7. Records every started pid, the serial, the actual `avdName`, `attachedEmulator`, Metro URL, and `webPort` in `.run/state.json`. Cleanup does not kill an emulator it did not start.
 
 Package id: `dev.offbyonelabs.coffeecompanion`. Do not run `launch-device` on a machine that lacks the SDK or any AVD.
 
@@ -113,8 +114,10 @@ After `launch` or `launch-device`, doctor also compares JS-imported Expo native 
 
 After `launch-device`, doctor also checks:
 
-- Recorded emulator / web / expo pids are alive and `emulator-5554` is attached.
+- Recorded emulator / web / expo pids are alive and `emulator-5554` is attached. An attached (not spawned) emulator has no `emulatorPid`.
 - `GET` on the recorded `webBaseUrl` (default `http://127.0.0.1:3910`) answers.
+- Host Metro answers and `adb reverse` maps the Metro port and the web port. A device-side GET of `http://127.0.0.1:<metro>/status` must be `packager-status:running` when wget/curl exists on the image.
+- The UI dump is the app (`sign-in-screen` or `welcome-screen`), not the Expo "Development servers" launcher.
 - `adb shell dumpsys package dev.offbyonelabs.coffeecompanion` `versionName` matches `git rev-parse --short=7 HEAD`.
 - The Java Gradle will use is 17–21 (same preflight as `launch-device`).
 
@@ -157,7 +160,7 @@ Where an AVD exists (default `verify-pixel`, or `VERIFY_AVD`), after `launch-dev
 .cursor/skills/verify-mobile/helpers/control drive-device sign-in-and-out
 ```
 
-That runs `maestro --device emulator-5554 test flows/<flow>.yaml`. Selectors are `testID`s only. Never use coordinates or visible text. The first flow is `flows/sign-in-and-out.yaml`: `launchApp` with `clearState` → `sign-in-screen` → tap `e2e-sign-in` → `welcome-screen` → tap `sign-out` → `sign-in-screen`. Screenshots and `proof.json` (`harness: maestro`) land under `artifacts/<runId>/<flow>/`.
+That runs `maestro --device emulator-5554 test -e EXPO_DEV_CLIENT_URL=… flows/<flow>.yaml`. Selectors are `testID`s only. Never use coordinates or visible text. The first flow is `flows/sign-in-and-out.yaml`: `launchApp` with `clearState` → `openLink` the expo-development-client URL (so clearState cannot leave the launcher) → `sign-in-screen` → tap `e2e-sign-in` → `welcome-screen` → tap `sign-out` → `sign-in-screen`. Screenshots and `proof.json` (`harness: maestro`) land under `artifacts/<runId>/<flow>/`.
 
 ## Evidence
 
@@ -193,8 +196,8 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | Command | What it does |
 | --- | --- |
 | `helpers/control launch` | Dedicated Expo Metro → wait for `/status` → require `Coffee Companion` in the bundle |
-| `helpers/control launch-device` | List AVDs, boot `verify-pixel` (or `VERIFY_AVD`) on `emulator-5554`, start the web app on port `3910` (`VERIFY_PORT`) with the e2e bypass, install the APK pointed at that URL |
-| `helpers/control doctor` | Metro checks after `launch`; plus APK `versionName` == git HEAD short SHA after `launch-device`; plus JS-imported Expo native modules vs autolinking |
+| `helpers/control launch-device` | Attach or boot `emulator-5554`, start the web app on port `3910` (`VERIFY_PORT`), rebuild if `versionName` ≠ git HEAD, reverse Metro/web, open the expo-development-client deep link, wait for `sign-in-screen` |
+| `helpers/control doctor` | Metro checks after `launch`; after `launch-device` also APK SHA, adb reverse, device Metro, and no Expo launcher in the foreground |
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
 | `helpers/control drive-device <flow>` | Maestro `flows/<flow>.yaml` on `emulator-5554`; copy screenshots to `artifacts/` |
