@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 // Control CLI for Coffee Companion mobile verification. See SKILL.md.
-// Agents drive the welcome screen through React Native Testing Library
-// against a dedicated Expo Metro instance. This is not an iOS simulator
-// or Android emulator.
 
 import { spawn, spawnSync } from 'node:child_process'
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -37,6 +36,25 @@ const LAUNCH_BUNDLE_TIMEOUT_MS = 120_000
 const DOCTOR_FETCH_TIMEOUT_MS = 15_000
 const BUNDLE_REQUEST_CAP_MS = 20_000
 const BUNDLE_RETRY_SLEEP_MS = 500
+const HARNESS_RNTL = 'rntl'
+const HARNESS_MAESTRO = 'maestro'
+const AVD_NAME = 'verify-pixel'
+const DEVICE_SERIAL = 'emulator-5554'
+const EMULATOR_CONSOLE_PORT = 5554
+const ANDROID_PACKAGE = 'dev.offbyonelabs.coffeecompanion'
+const E2E_USER_ENV = 'EXPO_PUBLIC_E2E_USER'
+const E2E_USER_WITH_DATA = 'e2e-user-with-data'
+const GIT_SHORT_SHA_DIGITS = 7
+const EMULATOR_BOOT_TIMEOUT_MS = 180_000
+const EXPO_INSTALL_TIMEOUT_MS = 900_000
+const WEB_CONTROL = join(
+  repoRoot,
+  '.cursor/skills/verify-coffee-companion/helpers/control',
+)
+const WEB_STATE_PATH = join(
+  repoRoot,
+  '.cursor/skills/verify-coffee-companion/.run/state.json',
+)
 
 const BUNDLE_PATHS = [
   '/apps/mobile/index.bundle?platform=android&dev=true&minify=false',
@@ -139,6 +157,112 @@ function refuseIfPortBusy(port) {
   )
 }
 
+function sdkRoot() {
+  return process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT ?? ''
+}
+
+function emulatorBin() {
+  const root = sdkRoot()
+  return root ? join(root, 'emulator', 'emulator') : 'emulator'
+}
+
+function adbBin() {
+  const root = sdkRoot()
+  return root ? join(root, 'platform-tools', 'adb') : 'adb'
+}
+
+function parseAdbDevices(text) {
+  const devices = []
+  for (const line of `${text ?? ''}`.split('\n')) {
+    const match = line.match(/^(\S+)\s+(device|offline|unauthorized|bootloader)\s*$/)
+    if (match) devices.push({ serial: match[1], state: match[2] })
+  }
+  return devices
+}
+
+function parseDumpsysVersionName(text) {
+  const match = `${text ?? ''}`.match(/versionName=(\S+)/)
+  return match ? match[1] : null
+}
+
+function parseAvdName(text) {
+  const line = `${text ?? ''}`.trim().split('\n')[0] ?? ''
+  return line.trim() || null
+}
+
+function gitHeadShortSha() {
+  const result = runCapture('git', [
+    'rev-parse',
+    `--short=${GIT_SHORT_SHA_DIGITS}`,
+    'HEAD',
+  ])
+  return `${result.stdout ?? ''}`.trim()
+}
+
+function recordedPids(state) {
+  const pids = new Set()
+  if (!state) return pids
+  for (const key of ['metroPid', 'emulatorPid', 'webPid', 'expoPid']) {
+    if (state[key]) pids.add(state[key])
+  }
+  for (const pid of state.metroPids ?? []) pids.add(pid)
+  return pids
+}
+
+function hasLiveRecordedPids(state) {
+  for (const pid of recordedPids(state)) {
+    if (pidAlive(pid)) return true
+  }
+  return false
+}
+
+function adbDevices() {
+  const result = runCapture(adbBin(), ['devices'], { allowFail: true })
+  return parseAdbDevices(`${result.stdout ?? ''}\n${result.stderr ?? ''}`)
+}
+
+function refuseIfSerialBusy(serial) {
+  const found = adbDevices().find((device) => device.serial === serial)
+  if (!found) return
+  die(
+    `${serial} is already in use (state ${found.state}). ` +
+      `Do not attach to someone else's emulator. Stop that AVD, or use a different serial.`,
+  )
+}
+
+function installedVersionName(serial, pkg) {
+  const result = runCapture(
+    adbBin(),
+    ['-s', serial, 'shell', 'dumpsys', 'package', pkg],
+    { allowFail: true },
+  )
+  return parseDumpsysVersionName(`${result.stdout ?? ''}\n${result.stderr ?? ''}`)
+}
+
+function copyPngFiles(fromDir, destDir) {
+  if (!existsSync(fromDir)) return []
+  const copied = []
+  for (const name of readdirSync(fromDir)) {
+    if (!name.endsWith('.png')) continue
+    const from = join(fromDir, name)
+    const to = join(destDir, name)
+    if (from !== to) copyFileSync(from, to)
+    copied.push(to)
+  }
+  return copied
+}
+
+function collectPngFiles(dir) {
+  if (!existsSync(dir)) return []
+  const found = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) found.push(...collectPngFiles(path))
+    else if (entry.name.endsWith('.png')) found.push(path)
+  }
+  return found
+}
+
 async function fetchText(url, timeoutMs) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -220,9 +344,9 @@ function stopRecordedPid(pid, kind, stopped) {
 
 async function cmdLaunch() {
   const existing = readState()
-  if (existing?.metroPid && pidAlive(existing.metroPid)) {
+  if (hasLiveRecordedPids(existing)) {
     die(
-      `A verification instance is already running (pid ${existing.metroPid} at ${existing.baseUrl}). ` +
+      `A verification instance is already running (pid ${existing.metroPid ?? existing.expoPid} at ${existing.baseUrl ?? existing.serial}). ` +
         'Drive that one, or run `helpers/control cleanup` first. Do not double-drive.',
     )
   }
@@ -279,7 +403,7 @@ async function cmdLaunch() {
       bundleUrl: bundle.url,
       logPath,
       startedAt: new Date().toISOString(),
-      harness: 'rntl',
+      harness: HARNESS_RNTL,
     }
     writeState(state)
 
@@ -292,7 +416,7 @@ async function cmdLaunch() {
           metroPid: metro.pid,
           bundleUrl: bundle.url,
           ready: `GET ${baseUrl}/status is ${METRO_READY_MARKER}; bundle mentions ${APP_MARKER}`,
-          harness: 'rntl',
+          harness: HARNESS_RNTL,
           platformsDriven: [],
           note:
             'Metro is up. Drive uses React Native Testing Library in-process. ' +
@@ -308,6 +432,287 @@ async function cmdLaunch() {
     stopRecordedPid(metro.pid, 'metro', [])
     die(error.message)
   }
+}
+
+function spawnLogged(command, args, logPath, opts = {}) {
+  const logFd = openSync(logPath, 'w')
+  const child = spawn(command, args, {
+    cwd: opts.cwd ?? repoRoot,
+    env: { ...process.env, ...opts.env },
+    stdio: ['ignore', logFd, logFd],
+    detached: true,
+  })
+  child.unref()
+  return child
+}
+
+async function waitForBootCompleted(serial, timeoutMs) {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const result = runCapture(
+      adbBin(),
+      ['-s', serial, 'shell', 'getprop', 'sys.boot_completed'],
+      { allowFail: true },
+    )
+    if (`${result.stdout ?? ''}`.trim() === '1') return
+    await sleep(1_000)
+  }
+  throw new Error(`Timed out waiting for ${serial} to finish booting`)
+}
+
+async function waitForInstalledPackage(serial, pkg, timeoutMs) {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const versionName = installedVersionName(serial, pkg)
+    if (versionName) return versionName
+    await sleep(2_000)
+  }
+  throw new Error(`Timed out waiting for ${pkg} to install on ${serial}`)
+}
+
+function startWebApp() {
+  run(WEB_CONTROL, ['launch'])
+  if (!existsSync(WEB_STATE_PATH)) {
+    throw new Error(`Web launch did not write ${WEB_STATE_PATH}`)
+  }
+  const web = JSON.parse(readFileSync(WEB_STATE_PATH, 'utf8'))
+  if (!web.serverPid || !web.baseUrl) {
+    throw new Error('Web launch did not record a server pid and baseUrl')
+  }
+  return {
+    webPid: web.serverPid,
+    webPort: web.port,
+    webBaseUrl: web.baseUrl,
+  }
+}
+
+function uninstallPackage(serial, pkg) {
+  runCapture(adbBin(), ['-s', serial, 'uninstall', pkg], { allowFail: true })
+}
+
+function stopLaunchDevice(partial, stopped = []) {
+  if (partial.expoPid) stopRecordedPid(partial.expoPid, 'expo', stopped)
+  if (partial.serial && partial.androidPackage) {
+    uninstallPackage(partial.serial, partial.androidPackage)
+  }
+  if (partial.emulatorPid) stopRecordedPid(partial.emulatorPid, 'emulator', stopped)
+  if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
+}
+
+async function cmdLaunchDevice() {
+  const existing = readState()
+  if (hasLiveRecordedPids(existing)) {
+    die(
+      `A verification instance is already running. ` +
+        'Drive that one, or run `helpers/control cleanup` first. Do not double-drive.',
+    )
+  }
+
+  refuseIfPortBusy(DEFAULT_METRO_PORT)
+  refuseIfSerialBusy(DEVICE_SERIAL)
+
+  const emu = emulatorBin()
+  if (emu.includes('/') && !existsSync(emu)) {
+    die(
+      `Android emulator binary not found at ${emu}. ` +
+        'launch-device needs the SDK and AVD verify-pixel. This machine cannot run the device tier.',
+    )
+  }
+
+  ensureDir(runDir)
+  ensureDir(artifactsDir)
+
+  if (!existsSync(join(repoRoot, 'node_modules'))) {
+    console.error('Installing workspace dependencies…')
+    run('pnpm', ['install', '--frozen-lockfile'])
+  }
+
+  const partial = {
+    serial: DEVICE_SERIAL,
+    androidPackage: ANDROID_PACKAGE,
+    emulatorPid: null,
+    webPid: null,
+    expoPid: null,
+  }
+
+  try {
+    const emulatorLog = join(runDir, 'emulator.log')
+    const emulator = spawnLogged(
+      emu,
+      [
+        '-avd',
+        AVD_NAME,
+        '-port',
+        String(EMULATOR_CONSOLE_PORT),
+        '-no-snapshot-save',
+        '-no-boot-anim',
+      ],
+      emulatorLog,
+    )
+    partial.emulatorPid = emulator.pid
+    await waitForBootCompleted(DEVICE_SERIAL, EMULATOR_BOOT_TIMEOUT_MS)
+
+    console.error('Starting the web app with E2E_BYPASS_AUTH=true…')
+    const web = startWebApp()
+    partial.webPid = web.webPid
+
+    const expoLog = join(runDir, 'expo-android.log')
+    const expo = spawnLogged(
+      'pnpm',
+      [
+        '--filter',
+        '@coffee-companion/mobile',
+        'exec',
+        'expo',
+        'run:android',
+        '--device',
+        DEVICE_SERIAL,
+      ],
+      expoLog,
+      {
+        cwd: repoRoot,
+        env: {
+          CI: '1',
+          EXPO_NO_TELEMETRY: '1',
+          [E2E_USER_ENV]: E2E_USER_WITH_DATA,
+        },
+      },
+    )
+    partial.expoPid = expo.pid
+
+    const versionName = await waitForInstalledPackage(
+      DEVICE_SERIAL,
+      ANDROID_PACKAGE,
+      EXPO_INSTALL_TIMEOUT_MS,
+    )
+
+    const state = {
+      runId: `verify-${new Date().toISOString().replace(/[:.]/g, '-')}`,
+      harness: HARNESS_MAESTRO,
+      serial: DEVICE_SERIAL,
+      avdName: AVD_NAME,
+      androidPackage: ANDROID_PACKAGE,
+      emulatorPid: emulator.pid,
+      webPid: web.webPid,
+      webPort: web.webPort,
+      webBaseUrl: web.webBaseUrl,
+      expoPid: expo.pid,
+      gitHead: gitHeadShortSha(),
+      versionName,
+      logPath: expoLog,
+      emulatorLog,
+      startedAt: new Date().toISOString(),
+    }
+    writeState(state)
+
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          runId: state.runId,
+          harness: HARNESS_MAESTRO,
+          serial: DEVICE_SERIAL,
+          avdName: AVD_NAME,
+          androidPackage: ANDROID_PACKAGE,
+          emulatorPid: emulator.pid,
+          webPid: web.webPid,
+          webBaseUrl: web.webBaseUrl,
+          expoPid: expo.pid,
+          versionName,
+          gitHead: state.gitHead,
+          ready: `${ANDROID_PACKAGE} versionName ${versionName} on ${DEVICE_SERIAL}`,
+        },
+        null,
+        2,
+      ),
+    )
+  } catch (error) {
+    stopLaunchDevice(partial)
+    die(error.message)
+  }
+}
+
+function requireDrivableDevice(state) {
+  if (!state.serial) {
+    die(
+      'No device is recorded. Run `helpers/control launch-device` first.',
+      EXIT_NOT_DRIVABLE,
+    )
+  }
+  const report = inspectDevice(state)
+  if (report.ok) return report
+  console.error(JSON.stringify(report, null, 2))
+  die(
+    `Device ${state.serial} is not up or not the build under test. ` +
+      `Problems: ${report.problems.join('; ')}.`,
+    EXIT_NOT_DRIVABLE,
+  )
+}
+
+async function cmdDriveDevice(flow) {
+  if (!flow) {
+    die('Usage: helpers/control drive-device <flow>')
+  }
+  const flowPath = join(skillDir, 'flows', `${flow}.yaml`)
+  if (!existsSync(flowPath)) {
+    die(
+      `No Maestro flow at ${flowPath}. ` +
+        'Do not treat a missing flow as verification.',
+    )
+  }
+
+  const state = requireState()
+  requireDrivableDevice(state)
+  const dest = join(artifactsDir, state.runId, flow)
+  ensureDir(dest)
+  const shotDir = join(runDir, 'maestro', flow)
+  ensureDir(shotDir)
+
+  const test = run(
+    'maestro',
+    [
+      '--device',
+      state.serial,
+      'test',
+      '--debug-output',
+      dest,
+      flowPath,
+    ],
+    { cwd: shotDir },
+  )
+  if (test.status !== 0) {
+    die(`Maestro flow ${flow} failed`)
+  }
+
+  copyPngFiles(shotDir, dest)
+  const uniqueShots = [...new Set(collectPngFiles(dest))]
+  if (uniqueShots.length === 0) {
+    die(`Drive did not copy any screenshots into ${dest}`)
+  }
+
+  const proof = {
+    feature: flow,
+    runId: state.runId,
+    harness: HARNESS_MAESTRO,
+    identity: 'data',
+    serial: state.serial,
+    avdName: state.avdName ?? AVD_NAME,
+    androidPackage: state.androidPackage ?? ANDROID_PACKAGE,
+    platformsDriven: ['android'],
+    capturedAt: new Date().toISOString(),
+    artifacts: [...uniqueShots, join(dest, 'proof.json')],
+    observed: {
+      testIDs: [
+        'sign-in-screen',
+        'e2e-sign-in',
+        'welcome-screen',
+        'sign-out',
+      ],
+    },
+    note: `Maestro on ${state.serial} (${state.avdName ?? AVD_NAME}). Selectors are testIDs only.`,
+  }
+  writeFileSync(join(dest, 'proof.json'), `${JSON.stringify(proof, null, 2)}\n`)
+  console.log(JSON.stringify({ ok: true, ...proof }, null, 2))
 }
 
 async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
@@ -384,7 +789,87 @@ async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     bundleUrl,
     bundleStatus,
     appMarker: appMarker ? APP_MARKER : null,
-    harness: 'rntl',
+    harness: state.harness ?? HARNESS_RNTL,
+    problems,
+  }
+}
+
+function inspectDevice(state) {
+  const problems = []
+  const serial = state.serial
+  const pkg = state.androidPackage ?? ANDROID_PACKAGE
+  const devices = adbDevices()
+  const attached = devices.find((device) => device.serial === serial)
+
+  if (!serial) {
+    problems.push('no device serial is recorded')
+  } else if (!attached) {
+    problems.push(`${serial} is not attached`)
+  } else if (attached.state !== 'device') {
+    problems.push(`${serial} is ${attached.state}`)
+  }
+
+  if (state.emulatorPid && !pidAlive(state.emulatorPid)) {
+    problems.push(`emulator pid ${state.emulatorPid} is not running`)
+  }
+  if (state.webPid && !pidAlive(state.webPid)) {
+    problems.push(`web pid ${state.webPid} is not running`)
+  }
+  if (state.expoPid && !pidAlive(state.expoPid)) {
+    problems.push(`expo pid ${state.expoPid} is not running`)
+  }
+
+  if (serial && attached?.state === 'device') {
+    const avd = parseAvdName(
+      runCapture(adbBin(), ['-s', serial, 'emu', 'avd', 'name'], {
+        allowFail: true,
+      }).stdout,
+    )
+    if (avd && avd !== (state.avdName ?? AVD_NAME)) {
+      problems.push(`${serial} is AVD ${avd}, not ${state.avdName ?? AVD_NAME}`)
+    }
+  }
+
+  const expectedSha = gitHeadShortSha()
+  const versionName = serial ? installedVersionName(serial, pkg) : null
+  if (!versionName) {
+    problems.push(`could not read versionName for ${pkg} on ${serial}`)
+  } else if (versionName !== expectedSha) {
+    problems.push(
+      `installed APK versionName ${versionName} does not match git HEAD ${expectedSha}`,
+    )
+  }
+
+  return {
+    ok: problems.length === 0,
+    serial,
+    avdName: state.avdName ?? AVD_NAME,
+    androidPackage: pkg,
+    versionName,
+    gitHead: expectedSha,
+    devices: devices.map((device) => device.serial),
+    harness: HARNESS_MAESTRO,
+    problems,
+  }
+}
+
+async function inspectInstance(state) {
+  const problems = []
+  let metro = null
+  let device = null
+  if (state.metroPid || state.harness === HARNESS_RNTL) {
+    metro = await inspectMetro(state)
+    problems.push(...metro.problems)
+  }
+  if (state.serial) {
+    device = inspectDevice(state)
+    problems.push(...device.problems)
+  }
+  return {
+    ...(metro ?? {}),
+    ...(device ?? {}),
+    ok: problems.length === 0,
+    harness: state.harness ?? (state.serial ? HARNESS_MAESTRO : HARNESS_RNTL),
     problems,
   }
 }
@@ -403,7 +888,7 @@ async function requireDrivableMetro(state) {
 
 async function cmdDoctor() {
   const state = requireState()
-  const report = await inspectMetro(state)
+  const report = await inspectInstance(state)
   console.log(JSON.stringify(report, null, 2))
   if (!report.ok) process.exit(EXIT_NOT_DRIVABLE)
 }
@@ -413,14 +898,14 @@ const DRIVES = {
     test: 'src/welcome.test.tsx',
     identity: 'data',
     fail: 'welcome screen drive failed — the RNTL render did not show Coffee Companion',
-    required: ['Coffee Companion', 'welcome-screen', 'Sign Out'],
+    required: ['Coffee Companion', 'welcome-screen', 'sign-out'],
     observed: {
       heading: 'Coffee Companion',
       testID: 'welcome-screen',
       headingTestID: 'welcome-heading',
       accessibilityLabel: 'Welcome',
       headingRole: 'header',
-      signOut: 'Sign Out',
+      signOutTestID: 'sign-out',
     },
   },
   'sign-in': {
@@ -430,8 +915,8 @@ const DRIVES = {
     required: [
       'Coffee Companion',
       'Sign in',
-      'Sign in with Google',
-      "Don't have an account?",
+      'sign-in-google',
+      'sign-in-toggle',
     ],
     observed: {
       heading: 'Sign in',
@@ -439,9 +924,9 @@ const DRIVES = {
       testID: 'sign-in-screen',
       headingTestID: 'sign-in-heading',
       accessibilityLabel: 'Sign in',
-      google: 'Sign in with Google',
-      apple: 'Sign in with Apple',
-      noAccount: "Don't have an account? Sign up",
+      googleTestID: 'sign-in-google',
+      appleTestID: 'sign-in-apple',
+      toggleTestID: 'sign-in-toggle',
     },
   },
 }
@@ -503,14 +988,28 @@ async function cmdDrive(feature) {
   console.log(JSON.stringify({ ok: true, ...proof }, null, 2))
 }
 
+function pidKind(pid, state) {
+  if (pid === state?.expoPid) return 'expo'
+  if (pid === state?.webPid) return 'web'
+  if (pid === state?.emulatorPid) return 'emulator'
+  return 'metro'
+}
+
 function cmdCleanup() {
   const state = readState()
   const stopped = []
-  const pids = new Set()
-  if (state?.metroPid) pids.add(state.metroPid)
-  for (const pid of state?.metroPids ?? []) pids.add(pid)
-  for (const pid of pids) {
-    stopRecordedPid(pid, 'metro', stopped)
+  if (state) {
+    if (state.expoPid) stopRecordedPid(state.expoPid, 'expo', stopped)
+    for (const pid of recordedPids(state)) {
+      if (pid === state.expoPid) continue
+      if (pid === state.emulatorPid || pid === state.webPid) continue
+      stopRecordedPid(pid, pidKind(pid, state), stopped)
+    }
+    if (state.serial && state.androidPackage) {
+      uninstallPackage(state.serial, state.androidPackage)
+    }
+    if (state.emulatorPid) stopRecordedPid(state.emulatorPid, 'emulator', stopped)
+    if (state.webPid) stopRecordedPid(state.webPid, 'web', stopped)
   }
 
   if (existsSync(runDir)) {
@@ -532,13 +1031,15 @@ function cmdCleanup() {
 }
 
 function usage() {
-  console.log(`Usage: helpers/control <launch|doctor|drive|cleanup>
+  console.log(`Usage: helpers/control <launch|launch-device|doctor|drive|drive-device|cleanup>
 
-  launch           Start Expo Metro on VERIFY_METRO_PORT (default 8081)
-  doctor           Read-only check that this Metro is worth driving
-  drive welcome    Render the signed-in welcome screen with React Native Testing Library
-  drive sign-in    Render the signed-out sign-in screen with React Native Testing Library
-  cleanup          Stop the recorded Metro pid; keep artifacts/
+  launch              Start Expo Metro on VERIFY_METRO_PORT (default 8081)
+  launch-device       Boot AVD ${AVD_NAME} on ${DEVICE_SERIAL}, start the web app, install the APK
+  doctor              Read-only check that this instance is worth driving
+  drive welcome       Render the signed-in welcome screen with React Native Testing Library
+  drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
+  drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}
+  cleanup             Stop recorded pids and uninstall the package from that serial; keep artifacts/
 
 `)
 }
@@ -548,8 +1049,21 @@ export {
   bundleHasAppMarker,
   fetchAppBundle,
   inspectMetro,
+  parseAdbDevices,
+  parseDumpsysVersionName,
+  parseAvdName,
+  recordedPids,
+  copyPngFiles,
+  collectPngFiles,
   METRO_READY_MARKER,
   APP_MARKER,
+  AVD_NAME,
+  DEVICE_SERIAL,
+  ANDROID_PACKAGE,
+  E2E_USER_WITH_DATA,
+  HARNESS_MAESTRO,
+  HARNESS_RNTL,
+  GIT_SHORT_SHA_DIGITS,
 }
 
 const invokedAsCli =
@@ -563,11 +1077,17 @@ if (invokedAsCli) {
     case 'launch':
       await cmdLaunch()
       break
+    case 'launch-device':
+      await cmdLaunchDevice()
+      break
     case 'doctor':
       await cmdDoctor()
       break
     case 'drive':
       await cmdDrive(rest[0])
+      break
+    case 'drive-device':
+      await cmdDriveDevice(rest[0])
       break
     case 'cleanup':
       cmdCleanup()
