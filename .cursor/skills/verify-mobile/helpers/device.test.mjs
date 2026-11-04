@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -138,6 +140,29 @@ import {
   MAESTRO_LOG_NAME,
   DEFAULT_VERIFY_DEVICE_FLOW,
 } from './control.mjs'
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
+
+function maestroCliAvailable() {
+  const bin = resolveMaestroBin()
+  if (bin !== 'maestro' && !existsSync(bin)) return false
+  const result = spawnSync(bin, ['--version'], { encoding: 'utf8' })
+  return result.error?.code !== 'ENOENT'
+}
+
+function mobileDepsInstalled() {
+  try {
+    createRequire(join(repoRoot, 'apps/mobile/package.json')).resolve(
+      '@better-auth/expo',
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+const hasMaestro = maestroCliAvailable()
+const hasMobileDeps = mobileDepsInstalled()
 
 function writeSdkTree(root, { systemImages = true } = {}) {
   mkdirSync(join(root, 'emulator'), { recursive: true })
@@ -1011,7 +1036,7 @@ describe('inspectExpoAutolinking', () => {
     assert.match(report.problems[0], /pnpm/)
   })
 
-  it('finds expo-network from @better-auth/expo and requires it to be autolinked', () => {
+  it('finds expo-network from @better-auth/expo and requires it to be autolinked', { skip: !hasMobileDeps }, () => {
     const report = inspectExpoAutolinking()
     assert.ok(
       report.imported.includes('expo-network'),
@@ -1971,7 +1996,7 @@ describe('inspectMaestroFlows', () => {
     )
   })
 
-  it('runs maestro check-syntax on every flow', () => {
+  it('runs maestro check-syntax on every flow', { skip: !hasMaestro }, () => {
     const flowsDir = join(dirname(fileURLToPath(import.meta.url)), '../flows')
     const report = inspectMaestroFlows({ flowsDir })
     assert.equal(report.ok, true, report.problems.join('\n'))
@@ -1982,7 +2007,7 @@ describe('inspectMaestroFlows', () => {
     assert.ok(report.flows.some((path) => path.endsWith('sign-in-and-out.yaml')))
   })
 
-  it('fails closed on an unknown tapOn timeout property', () => {
+  it('fails closed on an unknown tapOn timeout property', { skip: !hasMaestro }, () => {
     const root = mkdtempSync(join(tmpdir(), 'maestro-syntax-'))
     try {
       const flowPath = join(root, 'bad.yaml')

@@ -15,8 +15,11 @@ export function e2eAuthCookieStore(userId: string): string {
 export function e2eAuthUserFromCookieStore(raw: string | null): string | null {
   if (!raw) return null
   try {
-    const parsed = JSON.parse(raw) as Record<string, { value?: string }>
-    const value = parsed[E2E_AUTH_COOKIE_NAME].value
+    const parsed = JSON.parse(raw) as Record<
+      string,
+      { value?: unknown } | undefined
+    > | null
+    const value = parsed?.[E2E_AUTH_COOKIE_NAME]?.value
     if (typeof value !== 'string') return null
     const trimmed = value.trim()
     return trimmed ? trimmed : null

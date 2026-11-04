@@ -33,20 +33,30 @@ describe('e2eBypassSession', () => {
   it('returns a session for the user id in the cookie', () => {
     process.env.E2E_BYPASS_AUTH = 'true'
     const session = e2eBypassSession(
-      new Headers({ cookie: 'e2e_auth=user-xyz' }),
+      new Headers({ cookie: `e2e_auth=${E2E_USER_WITH_DATA}` }),
     )
     expect(session).not.toBeNull()
-    expect(session?.user.id).toBe('user-xyz')
-    expect(session?.session.userId).toBe('user-xyz')
+    expect(session?.user.id).toBe(E2E_USER_WITH_DATA)
+    expect(session?.session.userId).toBe(E2E_USER_WITH_DATA)
   })
 
   it('returns a session for the user id in x-e2e-auth when Cookie is absent', () => {
     process.env.E2E_BYPASS_AUTH = 'true'
     const session = e2eBypassSession(
-      new Headers({ [E2E_AUTH_HEADER]: 'user-xyz' }),
+      new Headers({ [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA }),
     )
     expect(session).not.toBeNull()
-    expect(session?.user.id).toBe('user-xyz')
+    expect(session?.user.id).toBe(E2E_USER_WITH_DATA)
+  })
+
+  it('returns null for an unknown user id even when the bypass flag is set', () => {
+    process.env.E2E_BYPASS_AUTH = 'true'
+    expect(
+      e2eBypassSession(new Headers({ cookie: 'e2e_auth=user-xyz' })),
+    ).toBeNull()
+    expect(
+      e2eBypassSession(new Headers({ [E2E_AUTH_HEADER]: 'someone' })),
+    ).toBeNull()
   })
 
   it('ignores x-e2e-auth and the cookie in production even when the bypass flag is set', () => {

@@ -1,3 +1,4 @@
+import { E2E_AUTH_HEADER } from '@coffee-companion/api/lib/e2e-auth'
 import { REQUEST_ID_HEADER } from '@coffee-companion/api/lib/log'
 import { HEALTH_PATH } from './health'
 
@@ -29,7 +30,7 @@ export function requestRecord(
   const expoOrigin = request.headers.get('expo-origin')?.trim()
   const e2eAuth =
     path.endsWith('/get-session')
-      ? Boolean(request.headers.get('x-e2e-auth')?.trim())
+      ? Boolean(request.headers.get(E2E_AUTH_HEADER)?.trim())
       : undefined
   return {
     method: request.method,

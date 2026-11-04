@@ -43,6 +43,11 @@ describe('e2eAuthRequestHeaders', () => {
     expect(
       e2eAuthUserFromCookieStore(e2eAuthCookieStore(E2E_USER_WITH_DATA)),
     ).toBe(E2E_USER_WITH_DATA)
+    expect(
+      e2eAuthUserFromCookieStore(
+        JSON.stringify({ 'better-auth.session_token': { value: 'tok' } }),
+      ),
+    ).toBeNull()
   })
 })
 

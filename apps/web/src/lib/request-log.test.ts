@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
+import { E2E_AUTH_HEADER } from '@coffee-companion/api/lib/e2e-auth'
 import { REQUEST_ID_HEADER } from '@coffee-companion/api/lib/log'
 import { requestId, requestRecord, withRequestLog } from './request-log'
 
@@ -40,7 +41,7 @@ describe('requestRecord', () => {
     const request = new Request('https://app.test/api/auth/get-session', {
       headers: {
         'expo-origin': 'coffeecompanion:///127.0.0.1:8081',
-        'x-e2e-auth': 'e2e-user-with-data',
+        [E2E_AUTH_HEADER]: 'e2e-user-with-data',
       },
     })
 

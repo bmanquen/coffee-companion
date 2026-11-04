@@ -77,9 +77,17 @@ function e2eAuthUserId(headers: Headers): string | null {
   return decodeE2EAuthValue(headers.get(E2E_AUTH_HEADER)?.trim())
 }
 
+// Seeded personas only: a leaked bypass must not impersonate a real user.
+const E2E_USER_IDS = new Set([
+  E2E_USER_WITH_DATA,
+  E2E_USER_EMPTY,
+  E2E_USER_FREE,
+  E2E_USER_DELETE,
+])
+
 export function e2eBypassSession(headers: Headers): E2ESession | null {
   if (isProductionRuntime()) return null
   if (process.env.E2E_BYPASS_AUTH !== 'true') return null
   const userId = e2eAuthUserId(headers)
-  return userId ? makeSession(userId) : null
+  return userId && E2E_USER_IDS.has(userId) ? makeSession(userId) : null
 }

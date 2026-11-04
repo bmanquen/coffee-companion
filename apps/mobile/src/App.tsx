@@ -1,4 +1,5 @@
 import { StatusBar } from 'expo-status-bar'
+import { useEffect } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { API_URL_DEV_TAG, apiBaseUrl } from './auth/config'
 import { logApiBaseUrl } from './auth/log'
@@ -11,14 +12,12 @@ export function App({ auth }: { auth?: Auth }) {
   return auth ? <Shell auth={auth} /> : <Live />
 }
 
-let loggedApiUrl = false
-
 function Live() {
-  if (!loggedApiUrl) {
-    loggedApiUrl = true
+  const auth = useAuth()
+  useEffect(() => {
     logApiBaseUrl(apiBaseUrl(), API_URL_DEV_TAG)
-  }
-  return <Shell auth={useAuth()} />
+  }, [])
+  return <Shell auth={auth} />
 }
 
 function Shell({ auth }: { auth: Auth }) {

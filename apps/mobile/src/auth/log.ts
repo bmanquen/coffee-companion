@@ -101,9 +101,9 @@ export async function loggedAuthFetch(
   isDev = __DEV__,
   impl: typeof fetch = globalThis.fetch,
 ): Promise<Response> {
-  const userId = e2eAuthUserFromCookieStore(
-    sessionStore.getItem(SESSION_COOKIE_KEY),
-  )
+  const userId = isDev
+    ? e2eAuthUserFromCookieStore(sessionStore.getItem(SESSION_COOKIE_KEY))
+    : null
   const next = withE2EAuthHeader(init, userId, isDev)
   const url =
     typeof input === 'string'
@@ -111,13 +111,17 @@ export async function loggedAuthFetch(
       : input instanceof URL
         ? input.href
         : input.url
-  const headerInfo = {
-    names: headerNames(next.headers),
-    e2eAuth: hasE2EAuthHeader(next.headers),
-  }
+  const headerInfo = isDev
+    ? {
+        names: headerNames(next.headers),
+        e2eAuth: hasE2EAuthHeader(next.headers),
+      }
+    : undefined
   try {
     const response = await impl(input as RequestInfo, next)
-    const sessionSummary = await sessionSummaryFromResponse(response)
+    const sessionSummary = isDev
+      ? await sessionSummaryFromResponse(response)
+      : undefined
     logAuthRequest(url, response.status, isDev, headerInfo, sessionSummary)
     return response
   } catch (error) {

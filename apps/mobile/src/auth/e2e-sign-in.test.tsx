@@ -1,7 +1,19 @@
 import { fireEvent, render, screen } from '@testing-library/react-native'
+import { E2E_USER_ENV } from './e2e'
 import { E2E_SIGN_IN_TEST_ID, SignInScreen } from './SignInScreen'
 
 describe('e2e sign-in handle', () => {
+  const original = process.env[E2E_USER_ENV]
+
+  beforeEach(() => {
+    delete process.env[E2E_USER_ENV]
+  })
+
+  afterEach(() => {
+    if (original === undefined) delete process.env[E2E_USER_ENV]
+    else process.env[E2E_USER_ENV] = original
+  })
+
   it('is not rendered when the persona env is unset', async () => {
     await render(
       <SignInScreen

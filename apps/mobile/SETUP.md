@@ -5,7 +5,7 @@
 All Google clients must be in the **same** Google Cloud project (APIs & Services → Credentials).
 
 **`apps/mobile/.env`**
-- `EXPO_PUBLIC_API_URL=http://localhost:3000`. The app rewrites `localhost` to `10.0.2.2` for the Android emulator in a dev build. `127.0.0.1` is left as-is so `adb reverse` can reach the host.
+- `EXPO_PUBLIC_API_URL=http://localhost:3000`. The app rewrites `localhost` to `10.0.2.2` for the Android emulator in a dev build. `127.0.0.1` is left as-is. It works on the emulator only after `adb reverse tcp:3000 tcp:3000`. Without that reverse, use `localhost`.
 - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`: the Web application client ID. It must exactly match `GOOGLE_CLIENT_ID` in `apps/web/.env`.
 - `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`: the iOS client ID.
 - `EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME`: the iOS URL scheme shown on the iOS client (`com.googleusercontent.apps.…`).
