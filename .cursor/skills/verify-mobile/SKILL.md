@@ -120,7 +120,7 @@ After `launch-device`, doctor also checks:
 - Host GET of `http://127.0.0.1:<web>/api/auth/get-session` with the same headers native E2E sign-in sends (`Cookie: e2e_auth=…`, `x-e2e-auth`, `expo-origin`, `x-skip-oauth-proxy`) must return a body that contains `e2e-user-with-data` (not merely HTTP 200). A missing device HTTP body prints `preflight device SKIP (no http client on device)` and does not block Maestro.
 - The UI dump is the app (`sign-in-screen` or `welcome-screen`), not the Expo "Development servers" launcher and not the developer menu.
 - `adb shell dumpsys package dev.offbyonelabs.coffeecompanion` `versionName` matches `git rev-parse --short=7 HEAD`.
-- The Java Gradle will use is 17–21 (same preflight as `launch-device`).
+- The Java recorded at launch is 17–21. Doctor does not re-resolve `JAVA_HOME` on the current shell.
 
 Doctor prints `preflight host OK/FAIL (…)` and `preflight device OK/SKIP/WARN (…)` before JSON. Host preflight and missing `adb reverse` mappings fail closed (exit `2`). A device HTTP skip or warn does not. `verify-device` prints `Running Maestro flow …` after host preflight is OK and reverses are listed.
 

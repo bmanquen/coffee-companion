@@ -49,6 +49,9 @@ appId: dev.offbyonelabs.coffeecompanion
     visible:
       id: sign-in-screen
     timeout: 60000
+- assertVisible:
+    id: sign-in-heading
+    text: "Sign in"
 - takeScreenshot: signed-out
 - tapOn:
     id: e2e-sign-in
@@ -57,6 +60,9 @@ appId: dev.offbyonelabs.coffeecompanion
     visible:
       id: welcome-screen
     timeout: 60000
+- assertVisible:
+    id: welcome-heading
+    text: "Coffee Companion"
 - takeScreenshot: signed-in
 - tapOn:
     id: sign-out

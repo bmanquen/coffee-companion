@@ -501,6 +501,16 @@ describe('resolveSdkRoot', () => {
         resolveSdkRoot({ env: {}, home: tmp, platform: 'linux' }),
         studioLinux,
       )
+      const incomplete = join(tmp, 'incomplete-sdk')
+      writeSdkTree(incomplete, { systemImages: false })
+      assert.equal(
+        resolveSdkRoot({
+          env: { ANDROID_HOME: incomplete },
+          home: join(tmp, 'no-home'),
+          platform: 'linux',
+        }),
+        null,
+      )
     } finally {
       rmSync(tmp, { recursive: true, force: true })
     }
@@ -596,6 +606,13 @@ describe('chosenDeviceWebPort', () => {
   it('uses VERIFY_PORT when it is set', () => {
     assert.equal(chosenDeviceWebPort({ VERIFY_PORT: '4010' }), 4010)
   })
+
+  it('rejects ports above 65535 before the emulator starts', () => {
+    assert.throws(
+      () => chosenDeviceWebPort({ VERIFY_PORT: '65536' }),
+      /TCP port 1–65535/,
+    )
+  })
 })
 
 describe('deviceApiUrl', () => {
@@ -618,6 +635,8 @@ describe('webLaunchEnv', () => {
     assert.equal(env.VERIFY_PORT, '3910')
     assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
     assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
+    assert.equal(env.HOST, '127.0.0.1')
+    assert.equal(env.NITRO_HOST, '127.0.0.1')
     assert.equal(env.E2E_BYPASS_AUTH, 'true')
   })
 })
@@ -1899,8 +1918,13 @@ describe('sign-in-and-out flow', () => {
     assert.match(yaml, /when:\n\s+visible: "Runtime version/)
     assert.match(yaml, /text: "Close"/)
     assert.match(yaml, /extendedWaitUntil/)
-    assert.doesNotMatch(yaml, /assertVisible/)
     assert.doesNotMatch(yaml, /timeout: 15000/)
+  })
+
+  it('asserts the approved sign-in and welcome headings', () => {
+    const yaml = flow()
+    assert.match(yaml, /id: sign-in-heading\n\s+text: "Sign in"/)
+    assert.match(yaml, /id: welcome-heading\n\s+text: "Coffee Companion"/)
   })
 
   it('waits for welcome-screen after the e2e handle instead of asserting immediately', () => {

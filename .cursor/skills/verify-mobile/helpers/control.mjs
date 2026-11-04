@@ -1471,8 +1471,8 @@ function chosenDeviceWebPort(env = process.env) {
   const raw = `${env?.VERIFY_PORT ?? ''}`.trim()
   if (!raw) return DEFAULT_DEVICE_WEB_PORT
   const port = Number(raw)
-  if (!Number.isInteger(port) || port <= 0) {
-    throw new Error(`VERIFY_PORT must be a positive integer, got ${raw}`)
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error(`VERIFY_PORT must be a TCP port 1–65535, got ${raw}`)
   }
   return port
 }
@@ -1638,6 +1638,8 @@ function webLaunchEnv(port) {
     VERIFY_PORT: String(port),
     BETTER_AUTH_URL: baseUrl,
     SITE_URL: baseUrl,
+    HOST: '127.0.0.1',
+    NITRO_HOST: '127.0.0.1',
     E2E_BYPASS_AUTH: 'true',
   }
 }
@@ -2169,8 +2171,23 @@ async function waitForInstalledPackage(serial, pkg, timeoutMs, opts = {}) {
   )
 }
 
+function persistLaunchPartial(partial) {
+  writeState({
+    ...(readState() ?? {}),
+    ...Object.fromEntries(
+      Object.entries(partial).filter(([, value]) => value != null),
+    ),
+  })
+}
+
 function startWebApp(port) {
-  run(WEB_CONTROL, ['launch'], { env: webLaunchEnv(port) })
+  const launched = run(WEB_CONTROL, ['launch'], {
+    env: webLaunchEnv(port),
+    allowFail: true,
+  })
+  if (launched.status !== 0) {
+    throw new Error(`Web launch exited ${launched.status}`)
+  }
   if (!existsSync(WEB_STATE_PATH)) {
     throw new Error(`Web launch did not write ${WEB_STATE_PATH}`)
   }
@@ -2519,6 +2536,7 @@ async function cmdLaunchDevice() {
     let emulatorPid = null
     if (attachment.action === 'attach') {
       console.error(`Attaching to existing ${DEVICE_SERIAL} (AVD ${avdName})`)
+      persistLaunchPartial(partial)
       await waitForBootCompleted(DEVICE_SERIAL, EMULATOR_BOOT_TIMEOUT_MS)
     } else {
       const emulator = spawnLogged(
@@ -2529,6 +2547,7 @@ async function cmdLaunchDevice() {
       )
       emulatorPid = emulator.pid
       partial.emulatorPid = emulatorPid
+      persistLaunchPartial(partial)
       await waitForBootCompleted(DEVICE_SERIAL, EMULATOR_BOOT_TIMEOUT_MS, {
         pid: emulatorPid,
         logPath: emulatorLog,
@@ -2540,6 +2559,7 @@ async function cmdLaunchDevice() {
     )
     const web = startWebApp(webPort)
     partial.webPid = web.webPid
+    persistLaunchPartial(partial)
 
     const installed = installedVersionName(DEVICE_SERIAL, ANDROID_PACKAGE)
     const rebuild = shouldRebuildApk({
@@ -2571,6 +2591,7 @@ async function cmdLaunchDevice() {
       },
     )
     partial.expoPid = expo.pid
+    persistLaunchPartial(partial)
 
     const versionName = await waitForInstalledPackage(
       DEVICE_SERIAL,
@@ -2585,6 +2606,7 @@ async function cmdLaunchDevice() {
 
     const metro = await ensureDeviceMetro(metroPort, deviceExpoPublicEnv(webPort))
     if (metro.metroPid) partial.metroPid = metro.metroPid
+    persistLaunchPartial(partial)
 
     console.error(
       `adb reverse tcp:${metroPort} and tcp:${webPort}; opening expo-development-client`,
@@ -3172,14 +3194,12 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     }
   }
 
-  let javaHome = state.javaHome ?? null
-  let javaMajor = state.javaMajor ?? null
-  try {
-    const java = resolveGradleJava()
-    javaHome = java.javaHome
-    javaMajor = java.major
-  } catch (error) {
-    problems.push(error.message)
+  const javaHome = state.javaHome ?? null
+  const javaMajor = state.javaMajor ?? null
+  if (!javaMajorAcceptable(javaMajor)) {
+    problems.push(
+      `recorded Java ${javaMajor ?? 'unknown'} is outside ${JAVA_MIN_MAJOR}–${JAVA_MAX_MAJOR}`,
+    )
   }
 
   const metroPort = state.port ?? DEFAULT_METRO_PORT

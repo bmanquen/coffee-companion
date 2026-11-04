@@ -5,7 +5,7 @@ export const E2E_USER_WITH_DATA = 'e2e-user-with-data'
 export const E2E_SIGN_IN = 'E2E sign in'
 
 export function e2eSignInUser(
-  user = process.env[E2E_USER_ENV],
+  user = process.env.EXPO_PUBLIC_E2E_USER,
   isDev = __DEV__,
 ): string | null {
   if (!isDev) return null

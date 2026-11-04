@@ -21,15 +21,22 @@ export function gitHeadShortSha(
 
 export const VERIFY_APK_VERSION_ENV = 'VERIFY_APK_VERSION'
 
+export const APP_VERSION = '1.0.0'
+
 export function resolveApkVersion(
   env: { readonly [key: string]: string | undefined } = process.env,
   gitSha: () => string = gitHeadShortSha,
 ): string {
   const fromEnv = `${env[VERIFY_APK_VERSION_ENV] ?? ''}`.trim()
   if (fromEnv) return fromEnv
-  return gitSha()
+  try {
+    return gitSha()
+  } catch {
+    return APP_VERSION
+  }
 }
 
+const verifyStamp = `${process.env[VERIFY_APK_VERSION_ENV] ?? ''}`.trim()
 const gitHead = resolveApkVersion()
 const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME
 
@@ -56,7 +63,7 @@ const config: ExpoConfig = {
   name: 'Coffee Companion',
   slug: 'coffee-companion',
   scheme: 'coffeecompanion',
-  version: gitHead,
+  version: verifyStamp || APP_VERSION,
   orientation: 'portrait',
   // Template Expo icons. Adaptive background is neutral white — same as the
   // welcome screen. Replace artwork before any store build; do not invent brand.

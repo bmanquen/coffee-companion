@@ -1,4 +1,5 @@
 import {
+  APP_VERSION,
   DEV_CLIENT_PLUGIN_CONFIG,
   GIT_SHORT_SHA_DIGITS,
   VERIFY_APK_VERSION_ENV,
@@ -27,6 +28,14 @@ describe('resolveApkVersion', () => {
 
   it('falls back to git HEAD when the env stamp is missing', () => {
     expect(resolveApkVersion({}, () => 'e0543f5')).toBe('e0543f5')
+  })
+
+  it('keeps a semver when git is missing so Expo config still loads', () => {
+    expect(
+      resolveApkVersion({}, () => {
+        throw new Error('not a git repository')
+      }),
+    ).toBe(APP_VERSION)
   })
 })
 
