@@ -1751,6 +1751,9 @@ function deviceExpoPublicEnv(port) {
 
 function webLaunchEnv(port) {
   const baseUrl = `http://127.0.0.1:${port}`
+  // Do not set NODE_ENV: launch's `pnpm build` merges this env, and a
+  // NODE_ENV=test build would ship a test client. The spawned server pins
+  // NODE_ENV=test so the bypass allow-list can fire.
   return {
     VERIFY_PORT: String(port),
     BETTER_AUTH_URL: baseUrl,

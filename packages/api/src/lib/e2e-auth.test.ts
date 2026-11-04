@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { allowE2EAuthUsers } from '../../test/e2e-auth'
 import {
+  E2E_AUTH_ALLOWED_NODE_ENVS,
   E2E_AUTH_HEADER,
   E2E_USER_WITH_DATA,
-  allowE2EAuthUsers,
   e2eBypassSession,
 } from './e2e-auth'
 
@@ -72,26 +73,35 @@ describe('e2eBypassSession', () => {
     ).toBe('fixture-user')
   })
 
-  it('ignores x-e2e-auth and the cookie in production even when the bypass flag is set', () => {
+  it('returns null when NODE_ENV is unset, production, or staging even with the bypass flag', () => {
     process.env.E2E_BYPASS_AUTH = 'true'
-    process.env.NODE_ENV = 'production'
-    expect(
-      e2eBypassSession(
-        new Headers({
-          cookie: `e2e_auth=${E2E_USER_WITH_DATA}`,
-          [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA,
-        }),
-      ),
-    ).toBeNull()
+    const headers = new Headers({
+      cookie: `e2e_auth=${E2E_USER_WITH_DATA}`,
+      [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA,
+    })
+    for (const nodeEnv of [undefined, 'production', 'staging'] as const) {
+      if (nodeEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = nodeEnv
+      expect(e2eBypassSession(headers), `NODE_ENV=${String(nodeEnv)}`).toBeNull()
+    }
   })
 
-  it('still bypasses on a production build running as NODE_ENV=test', () => {
+  it('bypasses when NODE_ENV is test or development', () => {
     process.env.E2E_BYPASS_AUTH = 'true'
-    process.env.NODE_ENV = 'test'
-    const session = e2eBypassSession(
-      new Headers({ cookie: `e2e_auth=${E2E_USER_WITH_DATA}` }),
-    )
-    expect(session?.user.id).toBe(E2E_USER_WITH_DATA)
+    for (const nodeEnv of E2E_AUTH_ALLOWED_NODE_ENVS) {
+      process.env.NODE_ENV = nodeEnv
+      expect(
+        e2eBypassSession(
+          new Headers({ cookie: `e2e_auth=${E2E_USER_WITH_DATA}` }),
+        )?.user.id,
+      ).toBe(E2E_USER_WITH_DATA)
+    }
+  })
+
+  it('does not export the allow-list mutator from the runtime module', async () => {
+    const runtime = await import('./e2e-auth')
+    expect('allowE2EAuthUsers' in runtime).toBe(false)
+    expect('e2eAuthAllowList' in runtime).toBe(false)
   })
 
   it('returns null when the cookie or header value is not decodable', () => {

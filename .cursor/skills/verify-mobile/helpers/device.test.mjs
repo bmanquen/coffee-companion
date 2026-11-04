@@ -676,6 +676,11 @@ describe('webLaunchEnv', () => {
     assert.equal(env.HOST, '127.0.0.1')
     assert.equal(env.NITRO_HOST, '127.0.0.1')
     assert.equal(env.E2E_BYPASS_AUTH, 'true')
+    assert.equal(
+      Object.hasOwn(env, 'NODE_ENV'),
+      false,
+      'NODE_ENV must stay unset so launch does not build a test client; the spawned server pins NODE_ENV=test',
+    )
   })
 })
 

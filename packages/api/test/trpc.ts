@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, beforeEach } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../src/db'
-import { allowE2EAuthUsers } from '../src/lib/e2e-auth'
 import { REQUEST_ID_HEADER, setLogSink } from '../src/lib/log'
 import {
   brewingDeviceTypes,
@@ -11,6 +10,7 @@ import {
 } from '../src/db/schema'
 import { createCallerFactory } from '../src/trpc/init'
 import { trpcRouter } from '../src/trpc/router'
+import { allowE2EAuthUsers } from './e2e-auth'
 import type { InsertCoffee } from '../src/db/zod'
 import type { PlanId } from '../src/lib/plan'
 import type { LogLevel } from '../src/lib/log'
@@ -20,9 +20,10 @@ import type { LogLevel } from '../src/lib/log'
 // cookie bypass instead of mocking better-auth. Enabling it here (imported by
 // every integration file) keeps those files free of auth boilerplate.
 //
-// See src/lib/e2e-auth.ts for the bypass: with E2E_BYPASS_AUTH set, an
-// `e2e_auth=<userId>` cookie authenticates the request as that user.
+// See src/lib/e2e-auth.ts for the bypass: with E2E_BYPASS_AUTH set and
+// NODE_ENV=test, an `e2e_auth=<userId>` cookie authenticates as that user.
 process.env.E2E_BYPASS_AUTH = 'true'
+process.env.NODE_ENV = 'test'
 
 export const UNKNOWN_UUID = '00000000-0000-4000-8000-000000000000'
 
