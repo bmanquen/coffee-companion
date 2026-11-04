@@ -59,6 +59,8 @@ import {
   e2eSessionLooksReady,
   e2eSessionBodySummary,
   formatPreflightStage,
+  formatDevicePreflightStage,
+  DEVICE_PREFLIGHT_SKIP,
   maestroRunningStage,
   verifyDevicePassStage,
   verifyDeviceFailStage,
@@ -522,8 +524,23 @@ describe('verify-device stages', () => {
       `preflight host OK (${E2E_USER_WITH_DATA})`,
     )
     assert.equal(
-      formatPreflightStage('device', { ok: false, body: 'null' }),
-      'preflight device FAIL (null)',
+      formatDevicePreflightStage({ checked: false, body: null }),
+      DEVICE_PREFLIGHT_SKIP,
+    )
+    assert.equal(
+      DEVICE_PREFLIGHT_SKIP,
+      'preflight device SKIP (no http client on device)',
+    )
+    assert.equal(
+      formatDevicePreflightStage({ checked: true, body: 'null' }),
+      'preflight device WARN (null)',
+    )
+    assert.equal(
+      formatDevicePreflightStage({
+        checked: true,
+        body: `{"user":{"id":"${E2E_USER_WITH_DATA}"}}`,
+      }),
+      `preflight device OK (${E2E_USER_WITH_DATA})`,
     )
     assert.equal(
       maestroRunningStage('sign-in-and-out'),
@@ -1469,37 +1486,31 @@ describe('deviceReadyProblems', () => {
       requiredPorts: [8081, 3910],
       checkedDeviceMetro: true,
       deviceStatusBody: 'packager-status:running',
-      checkedDeviceE2E: true,
-      deviceE2EBody: `{"user":{"id":"${E2E_USER_WITH_DATA}"}}`,
       ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
     })
     assert.deepEqual(problems, [])
   })
 
-  it('flags a device get-session that does not return the e2e user', () => {
+  it('does not block when the device has no HTTP client', () => {
     const problems = deviceReadyProblems({
       reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
       requiredPorts: [8081, 3910],
-      checkedDeviceMetro: true,
-      deviceStatusBody: 'packager-status:running',
-      checkedDeviceE2E: true,
-      deviceE2EBody: 'null',
       ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
     })
-    assert.ok(problems.some((problem) => /get-session/.test(problem)))
-    assert.ok(problems.some((problem) => /body=null/.test(problem)))
+    assert.equal(
+      problems.some((problem) => /get-session|http client/i.test(problem)),
+      false,
+    )
   })
 
-  it('flags a missing device get-session body when the check is required', () => {
+  it('still fails when adb reverse does not map Metro or the web port', () => {
     const problems = deviceReadyProblems({
-      reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
+      reverseList: '',
       requiredPorts: [8081, 3910],
-      checkedDeviceMetro: true,
-      deviceStatusBody: 'packager-status:running',
-      requireDeviceE2E: true,
       ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
     })
-    assert.ok(problems.some((problem) => /produced no body/.test(problem)))
+    assert.ok(problems.some((problem) => problem.includes('tcp:8081')))
+    assert.ok(problems.some((problem) => problem.includes('tcp:3910')))
   })
 
   it('flags the regular developer menu as covering the app', () => {

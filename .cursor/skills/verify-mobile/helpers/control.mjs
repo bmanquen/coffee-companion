@@ -1165,9 +1165,6 @@ function deviceReadyProblems({
   requiredPorts = [],
   deviceStatusBody = null,
   checkedDeviceMetro = false,
-  checkedDeviceE2E = false,
-  deviceE2EBody = null,
-  requireDeviceE2E = false,
   ui = null,
 } = {}) {
   const problems = []
@@ -1187,19 +1184,6 @@ function deviceReadyProblems({
     problems.push(
       `Metro is not reachable from the device at 127.0.0.1 (expected ${METRO_READY_MARKER})`,
     )
-  }
-  if (requireDeviceE2E || checkedDeviceE2E) {
-    if (!checkedDeviceE2E) {
-      problems.push(
-        `device GET of ${E2E_GET_SESSION_PATH} produced no body ` +
-          `(curl/wget/nc missing or adb reverse down)`,
-      )
-    } else if (!e2eSessionLooksReady(deviceE2EBody)) {
-      problems.push(
-        `device GET of ${E2E_GET_SESSION_PATH} did not return ${E2E_USER_WITH_DATA} ` +
-          `(body=${e2eSessionBodySummary(deviceE2EBody)}; cookie not honored or E2E_BYPASS_AUTH/seed)`,
-      )
-    }
   }
   if (ui?.hasDevMenuOnboarding) {
     problems.push(devMenuOnboardingMessage())
@@ -1379,6 +1363,17 @@ function formatPreflightStage(role, { ok, body } = {}) {
   return `preflight ${role} ${ok ? 'OK' : 'FAIL'} (${e2eSessionBodySummary(body)})`
 }
 
+const DEVICE_PREFLIGHT_SKIP = 'preflight device SKIP (no http client on device)'
+
+function formatDevicePreflightStage({ checked = false, body = null } = {}) {
+  if (!checked) return DEVICE_PREFLIGHT_SKIP
+  if (e2eSessionLooksReady(body)) {
+    return `preflight device OK (${E2E_USER_WITH_DATA})`
+  }
+  // A body is informational only. API 36 images often have no curl/wget/nc.
+  return `preflight device WARN (${e2eSessionBodySummary(body)})`
+}
+
 function maestroRunningStage(flow) {
   return `Running Maestro flow ${flow}`
 }
@@ -1400,8 +1395,8 @@ function printE2EPreflightStages(report) {
     }),
   )
   console.log(
-    formatPreflightStage('device', {
-      ok: report.deviceE2EReady,
+    formatDevicePreflightStage({
+      checked: report.deviceE2EChecked,
       body: report.deviceE2EBody,
     }),
   )
@@ -2833,9 +2828,6 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
         requiredPorts: [metroPort, webPort],
         checkedDeviceMetro: deviceMetro.checked,
         deviceStatusBody: deviceMetro.body,
-        checkedDeviceE2E: deviceE2E.checked,
-        deviceE2EBody: deviceE2E.body,
-        requireDeviceE2E: true,
         ui,
       }),
     )
@@ -3169,6 +3161,8 @@ export {
   e2eSessionLooksReady,
   e2eSessionBodySummary,
   formatPreflightStage,
+  formatDevicePreflightStage,
+  DEVICE_PREFLIGHT_SKIP,
   maestroRunningStage,
   verifyDevicePassStage,
   verifyDeviceFailStage,

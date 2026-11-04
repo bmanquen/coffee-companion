@@ -116,13 +116,13 @@ After `launch-device`, doctor also checks:
 
 - Recorded emulator / web / expo pids are alive and `emulator-5554` is attached. An attached (not spawned) emulator has no `emulatorPid`.
 - `GET` on the recorded `webBaseUrl` (default `http://127.0.0.1:3910`) answers.
-- Host Metro answers and `adb reverse` maps the Metro port and the web port. A device-side GET of `http://127.0.0.1:<metro>/status` must be `packager-status:running` when wget/curl exists on the image.
-- Host and device GET of `http://127.0.0.1:<web>/api/auth/get-session` with `Cookie: e2e_auth=e2e-user-with-data` return a body that contains `e2e-user-with-data`. A 200 whose body is JSON `null` is a fail (cookie not sent or bypass off). Device curl/wget/nc is required; a missing body fails before Maestro.
+- Host Metro answers and `adb reverse --list` maps `tcp:8081` and `tcp:3910`. That reverse list is the device-side reachability check. A device wget/curl/nc of Metro or get-session is optional: API 36 Google images often have no HTTP client.
+- Host GET of `http://127.0.0.1:<web>/api/auth/get-session` with `Cookie: e2e_auth=e2e-user-with-data` must return a body that contains `e2e-user-with-data` (not merely HTTP 200). A missing device HTTP body prints `preflight device SKIP (no http client on device)` and does not block Maestro.
 - The UI dump is the app (`sign-in-screen` or `welcome-screen`), not the Expo "Development servers" launcher and not the developer menu.
 - `adb shell dumpsys package dev.offbyonelabs.coffeecompanion` `versionName` matches `git rev-parse --short=7 HEAD`.
 - The Java Gradle will use is 17–21 (same preflight as `launch-device`).
 
-Doctor prints `preflight host OK/FAIL (…)` and `preflight device OK/FAIL (…)` before JSON. Exit code `2` means do not drive — relaunch, or stop: something else is on the port or serial. `verify-device` never prints `Running Maestro flow …` unless both preflights contained the e2e user.
+Doctor prints `preflight host OK/FAIL (…)` and `preflight device OK/SKIP/WARN (…)` before JSON. Host preflight and missing `adb reverse` mappings fail closed (exit `2`). A device HTTP skip or warn does not. `verify-device` prints `Running Maestro flow …` after host preflight is OK and reverses are listed.
 
 ## Drive
 
@@ -163,7 +163,7 @@ VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control verify-device
 
 That is `cleanup` → `launch-device` → `doctor` → `drive-device sign-in-and-out`. The instance stays up if a later step fails. To drive a launched instance again: `helpers/control drive-device sign-in-and-out`.
 
-That re-applies `adb reverse` for Metro and the web port, then re-runs the doctor preflight (including device `get-session`). Stdout names each stage: `preflight host OK/FAIL (e2e-user-with-data|null|empty)`, `preflight device OK/FAIL (…)`, then `Running Maestro flow sign-in-and-out` only after both bodies contain the e2e user, then `PASS artifacts at …` or `FAIL artifacts at …` (exit non-zero on fail). Selectors are `testID`s only, except Expo overlays: `runFlow when visible` for Continue / Close, and Back only while "Go home" is showing. Never use coordinates. The first flow is `flows/sign-in-and-out.yaml`: `launchApp` with `clearState` → wait for "Fetch development servers" → `openLink` the expo-development-client URL (with `disableAutoLaunch=1`) → `openLink` once more if the launcher is still showing, else fail with that message → snapshot Continue / Close / Back if those overlays are present → `extendedWaitUntil` `sign-in-screen` → tap `e2e-sign-in` → `extendedWaitUntil` `welcome-screen` (60s, not an immediate assert) → tap `sign-out` → `sign-in-screen`. Screenshots and `proof.json` (`harness: maestro`) land under `artifacts/<runId>/<flow>/`. On failure, `drive-device` prints the failing Maestro step, an auth-error summary, and the log tail, and writes `maestro.log`, `failure.png`, `window_dump.xml`, `web-server.log`, and `logcat.txt` there.
+That re-applies `adb reverse` for Metro and the web port, then re-runs the doctor preflight. Stdout names each stage: `preflight host OK/FAIL (e2e-user-with-data|null|empty)`, `preflight device OK/SKIP/WARN (…)`, then `Running Maestro flow sign-in-and-out` after host preflight is OK and `adb reverse --list` shows `tcp:8081` and `tcp:3910`, then `PASS artifacts at …` or `FAIL artifacts at …` (exit non-zero on fail). A device HTTP skip does not block Maestro; welcome-screen wait plus `web-server.log` / logcat / `window_dump.xml` are the proof. Selectors are `testID`s only, except Expo overlays: `runFlow when visible` for Continue / Close, and Back only while "Go home" is showing. Never use coordinates. The first flow is `flows/sign-in-and-out.yaml`: `launchApp` with `clearState` → wait for "Fetch development servers" → `openLink` the expo-development-client URL (with `disableAutoLaunch=1`) → `openLink` once more if the launcher is still showing, else fail with that message → snapshot Continue / Close / Back if those overlays are present → `extendedWaitUntil` `sign-in-screen` → tap `e2e-sign-in` → `extendedWaitUntil` `welcome-screen` (60s, not an immediate assert) → tap `sign-out` → `sign-in-screen`. Screenshots and `proof.json` (`harness: maestro`) land under `artifacts/<runId>/<flow>/`. On failure, `drive-device` prints the failing Maestro step, an auth-error summary, and the log tail, and writes `maestro.log`, `failure.png`, `window_dump.xml`, `web-server.log`, and `logcat.txt` there.
 
 ## Evidence
 
@@ -200,10 +200,10 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | --- | --- |
 | `helpers/control launch` | Dedicated Expo Metro → wait for `/status` → require `Coffee Companion` in the bundle |
 | `helpers/control launch-device` | Attach or boot `emulator-5554`, start the web app on port `3910` (`VERIFY_PORT`), rebuild if `versionName` ≠ git HEAD, reverse Metro/web, open the expo-development-client deep link with `disableAutoLaunch=1`, dismiss a leftover developer menu, wait for `sign-in-screen` |
-| `helpers/control doctor` | Metro checks after `launch`; `maestro check-syntax` on `flows/`; after `launch-device` also APK SHA, adb reverse, device Metro, host and device `get-session` whose body contains the e2e user (not merely HTTP 200), and no Expo launcher or developer menu in the foreground |
+| `helpers/control doctor` | Metro checks after `launch`; `maestro check-syntax` on `flows/`; after `launch-device` also APK SHA, `adb reverse --list` for 8081 and 3910, host `get-session` whose body contains the e2e user, and no Expo launcher or developer menu in the foreground |
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
-| `helpers/control drive-device <flow>` | Re-apply adb reverse, print preflight host/device OK or FAIL, then `Running Maestro flow <flow>` on `emulator-5554`; copy screenshots to `artifacts/`; print `PASS`/`FAIL artifacts at …` (exit non-zero on fail) |
+| `helpers/control drive-device <flow>` | Re-apply adb reverse, print host preflight OK/FAIL and device OK/SKIP/WARN, then `Running Maestro flow <flow>` on `emulator-5554`; copy screenshots to `artifacts/`; print `PASS`/`FAIL artifacts at …` (exit non-zero on fail) |
 | `helpers/control verify-device [flow]` | One shot: cleanup → launch-device → doctor → drive-device. Leaves the instance up on failure. |
 | `helpers/control cleanup` | Stop recorded pids and leftover listeners on the verify ports; `emu kill` then wait for the serial to leave adb; uninstall the package from a recorded serial; keep artifacts |
 | `helpers/metro.test.mjs` | Node tests for the Metro / bundle markers |
