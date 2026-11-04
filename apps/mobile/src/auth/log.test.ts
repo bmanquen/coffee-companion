@@ -176,6 +176,43 @@ describe('loggedAuthFetch', () => {
     jest.mocked(SecureStore.setItem).mockReset()
   })
 
+  it('keeps Request headers when adding x-e2e-auth', async () => {
+    const memory = new Map<string, string>()
+    jest.mocked(SecureStore.getItem).mockImplementation((key) => memory.get(key) ?? null)
+    jest.mocked(SecureStore.setItem).mockImplementation((key, value) => {
+      memory.set(key, value)
+    })
+    writeE2EAuthCookie(E2E_USER_WITH_DATA)
+
+    let outgoing: RequestInit | undefined
+    const impl = jest.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      outgoing = init
+      return Promise.resolve(new Response('null', { status: 200 }))
+    })
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+
+    await loggedAuthFetch(
+      new Request('http://127.0.0.1:3910/api/auth/get-session', {
+        headers: {
+          authorization: 'Bearer keep-me',
+          'content-type': 'application/json',
+        },
+      }),
+      { headers: { 'expo-origin': 'coffeecompanion://' } },
+      true,
+      impl,
+    )
+
+    const headers = new Headers(outgoing?.headers)
+    expect(headers.get('authorization')).toBe('Bearer keep-me')
+    expect(headers.get('content-type')).toBe('application/json')
+    expect(headers.get('expo-origin')).toBe('coffeecompanion://')
+    expect(headers.get(E2E_AUTH_HEADER)).toBe(E2E_USER_WITH_DATA)
+    log.mockRestore()
+    jest.mocked(SecureStore.getItem).mockReset()
+    jest.mocked(SecureStore.setItem).mockReset()
+  })
+
   it('does not set x-e2e-auth in a production build', async () => {
     const memory = new Map<string, string>()
     jest.mocked(SecureStore.getItem).mockImplementation((key) => memory.get(key) ?? null)

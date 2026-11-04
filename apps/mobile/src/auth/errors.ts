@@ -73,9 +73,5 @@ export function failureMessage(caught: unknown): string {
   ) {
     return caught.message
   }
-  try {
-    return JSON.stringify(caught)
-  } catch {
-    return String(caught)
-  }
+  return 'failed'
 }

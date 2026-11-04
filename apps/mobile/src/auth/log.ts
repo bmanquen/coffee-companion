@@ -95,6 +95,21 @@ async function sessionSummaryFromResponse(response: Response): Promise<string> {
   }
 }
 
+function mergeRequestInit(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): RequestInit {
+  const headers = new Headers(
+    input instanceof Request ? input.headers : undefined,
+  )
+  if (init?.headers) {
+    new Headers(init.headers).forEach((value, key) => {
+      headers.set(key, value)
+    })
+  }
+  return { ...init, headers }
+}
+
 export async function loggedAuthFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -104,7 +119,7 @@ export async function loggedAuthFetch(
   const userId = isDev
     ? e2eAuthUserFromCookieStore(sessionStore.getItem(SESSION_COOKIE_KEY))
     : null
-  const next = withE2EAuthHeader(init, userId, isDev)
+  const next = withE2EAuthHeader(mergeRequestInit(input, init), userId, isDev)
   const url =
     typeof input === 'string'
       ? input

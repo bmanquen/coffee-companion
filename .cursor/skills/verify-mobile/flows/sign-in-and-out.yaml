@@ -17,13 +17,10 @@ appId: dev.offbyonelabs.coffeecompanion
       - openLink:
           link: ${EXPO_DEV_CLIENT_URL}
           browser: false
-- runFlow:
-    when:
-      visible: "Fetch development servers"
-    commands:
-      - assertTrue:
-          condition: ${false}
-          label: Expo Development servers launcher is still showing; Metro deep link did not connect
+# The second openLink is still transitioning; fail only if the launcher stays.
+- extendedWaitUntil:
+    notVisible: "Fetch development servers"
+    timeout: 30000
 # Overlay dismiss is runFlow when visible. tapOn has no timeout; wait with extendedWaitUntil.
 - runFlow:
     label: Dismiss first-run Continue sheet

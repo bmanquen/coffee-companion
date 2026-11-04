@@ -206,7 +206,6 @@ async function cmdLaunch() {
     DATABASE_URL: databaseUrl,
     PORT: String(port),
     E2E_BYPASS_AUTH: 'true',
-    NODE_ENV: 'test',
   }
 
   console.error('Applying migrations…')
@@ -233,7 +232,8 @@ async function cmdLaunch() {
   const logFd = openSync(logPath, 'w')
   const server = spawn('node', [serverEntry], {
     cwd: webDir,
-    env: { ...process.env, ...env },
+    // Production *build* above; test *runtime* so the bypass guard can fire.
+    env: { ...process.env, ...env, NODE_ENV: 'test' },
     stdio: ['ignore', logFd, logFd],
     detached: true,
   })

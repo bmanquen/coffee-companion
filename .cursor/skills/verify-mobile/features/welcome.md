@@ -17,7 +17,7 @@ Opening the Coffee Companion mobile app while signed in shows a centered heading
 
 Preconditions:
 
-- Coffee Companion Metro is healthy at `http://localhost:8081` (or the `VERIFY_METRO_PORT` you set).
+- Coffee Companion Metro is healthy at `http://127.0.0.1:8081` (or the `VERIFY_METRO_PORT` you set).
 - `helpers/control doctor` reports the expected URL, `packager-status:running`, and app marker `Coffee Companion`.
 - `drive welcome` re-checks that Metro is answering before it renders. A state file alone is not enough.
 - Drive is React Native Testing Library in-process unless you also ran `launch-device`.

@@ -27,7 +27,7 @@ export function requestRecord(
 ): RequestRecord | null {
   const path = new URL(request.url).pathname
   if (path.startsWith('/assets/') || SKIPPED_PATHS.has(path)) return null
-  const expoOrigin = request.headers.get('expo-origin')?.trim()
+  const expoOrigin = sanitizedExpoOrigin(request.headers.get('expo-origin'))
   const e2eAuth =
     path.endsWith('/get-session')
       ? Boolean(request.headers.get(E2E_AUTH_HEADER)?.trim())
@@ -40,6 +40,19 @@ export function requestRecord(
     requestId: id,
     ...(expoOrigin ? { expoOrigin } : {}),
     ...(e2eAuth !== undefined ? { e2eAuth } : {}),
+  }
+}
+
+function sanitizedExpoOrigin(value: string | null): string | undefined {
+  const trimmed = value?.trim()
+  if (!trimmed) return undefined
+  try {
+    const url = new URL(trimmed)
+    url.search = ''
+    url.hash = ''
+    return url.href
+  } catch {
+    return undefined
   }
 }
 

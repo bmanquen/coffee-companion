@@ -37,6 +37,22 @@ describe('requestRecord', () => {
     })
   })
 
+  it('strips query and hash from expo-origin and drops an unparseable value', () => {
+    const withQuery = new Request('https://app.test/api/auth/get-session', {
+      headers: {
+        'expo-origin': 'coffeecompanion:///127.0.0.1:8081?token=secret#frag',
+      },
+    })
+    expect(requestRecord(withQuery, 200, 8, 'req_2b')?.expoOrigin).toBe(
+      'coffeecompanion:///127.0.0.1:8081',
+    )
+
+    const invalid = new Request('https://app.test/api/auth/get-session', {
+      headers: { 'expo-origin': 'not a url' },
+    })
+    expect(requestRecord(invalid, 200, 8, 'req_2c')?.expoOrigin).toBeUndefined()
+  })
+
   it('records whether x-e2e-auth was present on get-session', () => {
     const request = new Request('https://app.test/api/auth/get-session', {
       headers: {

@@ -3,6 +3,7 @@ import {
   OAUTH_LINK_ERROR_CODE,
   SignInConflict,
   SignInFailed,
+  failureMessage,
 } from './errors'
 import { errorFromAuthServer } from './server-error'
 
@@ -36,5 +37,18 @@ describe('errorFromAuthServer', () => {
     expect(() =>
       errorFromAuthServer({ status: 401, message: 'id token is not valid' }),
     ).toThrow(SignInFailed)
+  })
+})
+
+describe('failureMessage', () => {
+  it('uses Error.message, a string, or an object message field', () => {
+    expect(failureMessage(new Error('boom'))).toBe('boom')
+    expect(failureMessage('plain')).toBe('plain')
+    expect(failureMessage({ message: 'from-object' })).toBe('from-object')
+  })
+
+  it('does not serialize an unknown object', () => {
+    expect(failureMessage({ token: 'secret' })).toBe('failed')
+    expect(failureMessage(undefined)).toBe('failed')
   })
 })

@@ -1932,7 +1932,7 @@ describe('sign-in-and-out flow', () => {
       yaml,
       /Re-open Metro deep link if still on the Expo launcher/,
     )
-    assert.match(yaml, /Metro deep link did not connect/)
+    assert.match(yaml, /notVisible: "Fetch development servers"/)
     assert.equal([...yaml.matchAll(/openLink:/g)].length, 2)
   })
 
