@@ -74,6 +74,10 @@ import {
   verifyDevicePlan,
   deviceReadyProblems,
   maestroDeviceArgs,
+  maestroLogPath,
+  maestroLogTail,
+  parseMaestroFailedStep,
+  maestroFailureMessage,
   DEVICE_SERIAL,
   AVD_NAME,
   DEFAULT_DEVICE_WEB_PORT,
@@ -87,6 +91,7 @@ import {
   AM_START_ALREADY_FOREGROUND,
   DEVICE_FAILURE_SCREENSHOT,
   DEVICE_FAILURE_DUMP,
+  MAESTRO_LOG_NAME,
   DEFAULT_VERIFY_DEVICE_FLOW,
 } from './control.mjs'
 
@@ -1389,37 +1394,84 @@ describe('maestroDeviceArgs', () => {
 })
 
 describe('sign-in-and-out flow', () => {
+  const flow = () =>
+    readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../flows/sign-in-and-out.yaml'),
+      'utf8',
+    )
+
   it('opens the injected deep link after launchApp so clearState cannot leave the launcher', () => {
-    const flow = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '../flows/sign-in-and-out.yaml'),
-      'utf8',
-    )
-    assert.match(flow, /launchApp/)
-    assert.match(flow, /openLink/)
-    assert.match(flow, /EXPO_DEV_CLIENT_URL/)
-    assert.match(flow, /sign-in-screen/)
+    const yaml = flow()
+    assert.match(yaml, /launchApp/)
+    assert.match(yaml, /openLink/)
+    assert.match(yaml, /EXPO_DEV_CLIENT_URL/)
+    assert.match(yaml, /sign-in-screen/)
   })
 
-  it('dismisses the Expo first-run developer menu then waits for sign-in-screen', () => {
-    const flow = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '../flows/sign-in-and-out.yaml'),
-      'utf8',
-    )
-    assert.match(flow, /This is the developer menu/)
-    assert.match(flow, /text: "Continue"/)
-    assert.match(flow, /optional: true/)
-    assert.match(flow, /extendedWaitUntil/)
-    assert.doesNotMatch(flow, /assertVisible/)
+  it('dismisses overlay sheets only when they are visible, then waits for sign-in-screen', () => {
+    const yaml = flow()
+    assert.match(yaml, /when:\n\s+visible: "This is the developer menu/)
+    assert.match(yaml, /text: "Continue"/)
+    assert.match(yaml, /when:\n\s+visible: "Runtime version/)
+    assert.match(yaml, /text: "Close"/)
+    assert.match(yaml, /extendedWaitUntil/)
+    assert.doesNotMatch(yaml, /assertVisible/)
+    assert.doesNotMatch(yaml, /timeout: 15000/)
   })
 
-  it('dismisses the regular developer menu with Close then Back', () => {
-    const flow = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '../flows/sign-in-and-out.yaml'),
-      'utf8',
+  it('presses Back only when Go home is visible', () => {
+    const yaml = flow()
+    assert.match(
+      yaml,
+      /visible: "Go home"\n\s+commands:\n\s+- pressKey: back/,
     )
-    assert.match(flow, /Runtime version/)
-    assert.match(flow, /text: "Close"/)
-    assert.match(flow, /Go home/)
-    assert.match(flow, /pressKey: back/)
+    const backAt = yaml.indexOf('pressKey: back')
+    const goHomeAt = yaml.lastIndexOf('visible: "Go home"', backAt)
+    assert.ok(goHomeAt >= 0)
+    assert.ok(backAt > goHomeAt)
+  })
+})
+
+describe('parseMaestroFailedStep', () => {
+  it('reads the failed command from Maestro CLI output', () => {
+    assert.equal(
+      parseMaestroFailedStep(`
+Running on emulator-5554
+ ✅  Launch app
+ ✅  Open link
+ ❌  Assert that id: welcome-screen is visible
+Element not found: Id matching regex: welcome-screen
+`),
+      'Assert that id: welcome-screen is visible',
+    )
+    assert.equal(
+      parseMaestroFailedStep('Element not found: Text matching regex: Runtime version.*\n'),
+      'Element not found: Text matching regex: Runtime version.*',
+    )
+    assert.equal(parseMaestroFailedStep('all good\n'), null)
+  })
+})
+
+describe('maestroLogTail', () => {
+  it('keeps the last lines', () => {
+    assert.equal(maestroLogTail('a\nb\nc\n', 2), 'b\nc')
+  })
+})
+
+describe('maestroFailureMessage', () => {
+  it('names the failed step and the saved log path', () => {
+    const dest = '/tmp/artifacts/run/sign-in-and-out'
+    const message = maestroFailureMessage({
+      flow: 'sign-in-and-out',
+      dest,
+      step: 'Assert that id: welcome-screen is visible',
+      tail: ' ❌  Assert that id: welcome-screen is visible',
+      screenshotPath: join(dest, DEVICE_FAILURE_SCREENSHOT),
+      dumpPath: join(dest, DEVICE_FAILURE_DUMP),
+    })
+    assert.match(message, /Failed step: Assert that id: welcome-screen is visible/)
+    assert.match(message, new RegExp(MAESTRO_LOG_NAME))
+    assert.equal(maestroLogPath(dest), join(dest, MAESTRO_LOG_NAME))
+    assert.match(message, /Maestro log tail:/)
   })
 })

@@ -5,27 +5,29 @@ appId: dev.offbyonelabs.coffeecompanion
 - openLink:
     link: ${EXPO_DEV_CLIENT_URL}
     browser: false
-- extendedWaitUntil:
-    visible:
-      text: "This is the developer menu.*"
-    timeout: 15000
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- extendedWaitUntil:
-    visible:
-      text: "Runtime version.*"
-    timeout: 15000
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
+# Overlay dismiss is a snapshot when-visible; a 15s wait for a missing menu fails the flow.
 - runFlow:
+    label: Dismiss first-run Continue sheet
     when:
-      visible: "Go home"
+      visible: "This is the developer menu.*"
     commands:
-      - pressKey: back
+      - tapOn:
+          text: "Continue"
+          timeout: 2000
+- runFlow:
+    label: Dismiss regular developer menu
+    when:
+      visible: "Runtime version.*"
+    commands:
+      - tapOn:
+          text: "Close"
+          optional: true
+          timeout: 2000
+      - runFlow:
+          when:
+            visible: "Go home"
+          commands:
+            - pressKey: back
 - extendedWaitUntil:
     visible:
       id: sign-in-screen

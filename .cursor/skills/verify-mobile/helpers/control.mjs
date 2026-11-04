@@ -6,11 +6,13 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  closeSync,
   openSync,
   readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
@@ -80,6 +82,8 @@ const DEV_MENU_ONBOARDING_FINISHED_META = 'EXDevMenuIsOnboardingFinished'
 const SIGN_IN_VISIBLE_MARKERS = ['Sign in with Google', 'E2E sign in']
 const DEVICE_FAILURE_SCREENSHOT = 'failure.png'
 const DEVICE_FAILURE_DUMP = 'window_dump.xml'
+const MAESTRO_LOG_NAME = 'maestro.log'
+const MAESTRO_LOG_TAIL_LINES = 40
 const APP_READY_PROGRESS_INTERVAL_MS = 15_000
 const DEFAULT_MAC_EMULATOR_GPU = 'host'
 const JAVA_MIN_MAJOR = 17
@@ -158,6 +162,111 @@ function run(command, args, opts = {}) {
 
 function runCapture(command, args, opts = {}) {
   return run(command, args, { ...opts, stdio: ['ignore', 'pipe', 'pipe'] })
+}
+
+function maestroLogPath(dest) {
+  return join(dest, MAESTRO_LOG_NAME)
+}
+
+function maestroLogTail(text, lines = MAESTRO_LOG_TAIL_LINES) {
+  const all = `${text ?? ''}`.replace(/\s+$/, '').split(/\r?\n/)
+  return all.slice(-Math.max(1, lines)).join('\n')
+}
+
+function parseMaestroFailedStep(text) {
+  const lines = `${text ?? ''}`.split(/\r?\n/).map((line) => line.trim())
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]
+    if (!line) continue
+    const marked = line.match(/^(?:❌|\[Failed\])\s*(.+)$/i)
+    if (marked) {
+      return marked[1].replace(/\s*❌\s*$/, '').trim()
+    }
+  }
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]
+    if (/Element not found|Assertion is false|Timed out/i.test(line)) {
+      return line
+    }
+  }
+  return null
+}
+
+function maestroFailureMessage({
+  flow,
+  dest,
+  step,
+  tail,
+  screenshotPath,
+  dumpPath,
+}) {
+  const lines = [`Maestro flow ${flow} failed.`]
+  if (step) lines.push(`Failed step: ${step}`)
+  if (tail) {
+    lines.push('Maestro log tail:')
+    lines.push(tail)
+  }
+  lines.push(
+    `See ${maestroLogPath(dest)}` +
+      `${screenshotPath ? `, ${screenshotPath}` : ''}` +
+      `${dumpPath ? `, ${dumpPath}` : ''}.`,
+  )
+  return lines.join('\n')
+}
+
+function runTee(command, args, { logPath, cwd } = {}) {
+  ensureDir(dirname(logPath))
+  const fd = openSync(logPath, 'w')
+  const chunks = []
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (result) => {
+      if (settled) return
+      settled = true
+      try {
+        closeSync(fd)
+      } catch {
+        // fd already closed
+      }
+      resolve(result)
+    }
+    const child = spawn(command, args, {
+      cwd: cwd ?? repoRoot,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const onData = (out) => (chunk) => {
+      chunks.push(chunk)
+      try {
+        writeSync(fd, chunk)
+      } catch {
+        // log fd closed
+      }
+      out.write(chunk)
+    }
+    child.stdout.on('data', onData(process.stdout))
+    child.stderr.on('data', onData(process.stderr))
+    child.on('error', (error) => {
+      const message = Buffer.from(`${error.message}\n`)
+      chunks.push(message)
+      try {
+        writeSync(fd, message)
+      } catch {
+        // log fd closed
+      }
+      finish({
+        status: 1,
+        stdout: Buffer.concat(chunks).toString('utf8'),
+        error,
+      })
+    })
+    child.on('close', (status) => {
+      finish({
+        status: status ?? 1,
+        stdout: Buffer.concat(chunks).toString('utf8'),
+      })
+    })
+  })
 }
 
 function isMetroReady(body) {
@@ -1905,6 +2014,7 @@ async function cmdDriveDevice(flow) {
   ensureDir(dest)
   const shotDir = join(runDir, 'maestro', flow)
   ensureDir(shotDir)
+  const logPath = maestroLogPath(dest)
 
   const devClientUrl =
     state.expoDevClientUrl ??
@@ -1912,7 +2022,7 @@ async function cmdDriveDevice(flow) {
       scheme: state.scheme ?? readDevClientScheme(),
       metroPort: state.port ?? DEFAULT_METRO_PORT,
     })
-  const test = run(
+  const test = await runTee(
     'maestro',
     maestroDeviceArgs({
       serial: state.serial,
@@ -1920,14 +2030,23 @@ async function cmdDriveDevice(flow) {
       flowPath,
       expoDevClientUrl: devClientUrl,
     }),
-    { cwd: shotDir, allowFail: true },
+    { logPath, cwd: shotDir },
   )
+  writeFileSync(logPath, test.stdout ?? '')
   if (test.status !== 0) {
     const captured = captureDeviceFailure({ serial: state.serial, dest })
     copyPngFiles(shotDir, dest)
+    const logText = test.stdout ?? ''
     die(
-      `Maestro flow ${flow} failed. See ${captured.screenshotPath ?? join(dest, DEVICE_FAILURE_SCREENSHOT)} ` +
-        `and ${captured.dumpPath}.`,
+      maestroFailureMessage({
+        flow,
+        dest,
+        step: parseMaestroFailedStep(logText),
+        tail: maestroLogTail(logText),
+        screenshotPath:
+          captured.screenshotPath ?? join(dest, DEVICE_FAILURE_SCREENSHOT),
+        dumpPath: captured.dumpPath,
+      }),
     )
   }
 
@@ -2685,6 +2804,10 @@ export {
   resolveEmulatorAttachment,
   deviceReadyProblems,
   maestroDeviceArgs,
+  maestroLogPath,
+  maestroLogTail,
+  parseMaestroFailedStep,
+  maestroFailureMessage,
   parseAdbDevices,
   parseDumpsysVersionName,
   parseAvdName,
@@ -2723,6 +2846,7 @@ export {
   AM_START_ALREADY_FOREGROUND,
   DEVICE_FAILURE_SCREENSHOT,
   DEVICE_FAILURE_DUMP,
+  MAESTRO_LOG_NAME,
   DEFAULT_VERIFY_DEVICE_FLOW,
   E2E_USER_WITH_DATA,
   HARNESS_MAESTRO,
