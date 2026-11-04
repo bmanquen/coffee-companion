@@ -162,7 +162,7 @@ VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control verify-device
 
 That is `cleanup` → `launch-device` → `doctor` → `drive-device sign-in-and-out`. The instance stays up if a later step fails. To drive a launched instance again: `helpers/control drive-device sign-in-and-out`.
 
-That runs `maestro --device emulator-5554 test -e EXPO_DEV_CLIENT_URL=… flows/<flow>.yaml`. Selectors are `testID`s only, except Expo overlays: optional `tapOn: Continue`, then Close (or Back if "Go home" is still visible). Never use coordinates. The first flow is `flows/sign-in-and-out.yaml`: `launchApp` with `clearState` → `openLink` the expo-development-client URL (with `disableAutoLaunch=1`) → optional Continue → optional Close/Back → `extendedWaitUntil` `sign-in-screen` → tap `e2e-sign-in` → `welcome-screen` → tap `sign-out` → `sign-in-screen`. Screenshots and `proof.json` (`harness: maestro`) land under `artifacts/<runId>/<flow>/`. On failure, `drive-device` also writes `failure.png` and a uiautomator `window_dump.xml` there.
+That runs `maestro --device emulator-5554 test -e EXPO_DEV_CLIENT_URL=… flows/<flow>.yaml`. Selectors are `testID`s only, except Expo overlays: `runFlow when visible` for Continue / Close, and Back only while "Go home" is showing. Never use coordinates. The first flow is `flows/sign-in-and-out.yaml`: `launchApp` with `clearState` → `openLink` the expo-development-client URL (with `disableAutoLaunch=1`) → snapshot Continue / Close / Back if those overlays are present → `extendedWaitUntil` `sign-in-screen` → tap `e2e-sign-in` → `welcome-screen` → tap `sign-out` → `sign-in-screen`. Screenshots and `proof.json` (`harness: maestro`) land under `artifacts/<runId>/<flow>/`. On failure, `drive-device` prints the failing Maestro step and the log tail, and writes `maestro.log`, `failure.png`, and a uiautomator `window_dump.xml` there.
 
 ## Evidence
 
@@ -202,7 +202,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | `helpers/control doctor` | Metro checks after `launch`; after `launch-device` also APK SHA, adb reverse, device Metro, and no Expo launcher or developer menu in the foreground |
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
-| `helpers/control drive-device <flow>` | Maestro `flows/<flow>.yaml` on `emulator-5554`; copy screenshots to `artifacts/`; on failure write `failure.png` and `window_dump.xml` |
+| `helpers/control drive-device <flow>` | Maestro `flows/<flow>.yaml` on `emulator-5554`; copy screenshots to `artifacts/`; on failure print the failing step and log tail, and write `maestro.log`, `failure.png`, and `window_dump.xml` |
 | `helpers/control verify-device [flow]` | One shot: cleanup → launch-device → doctor → drive-device. Leaves the instance up on failure. |
 | `helpers/control cleanup` | Stop recorded pids and leftover listeners on the verify ports; `emu kill` then wait for the serial to leave adb; uninstall the package from a recorded serial; keep artifacts |
 | `helpers/metro.test.mjs` | Node tests for the Metro / bundle markers |
