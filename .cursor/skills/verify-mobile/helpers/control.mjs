@@ -69,6 +69,12 @@ const WELCOME_SCREEN_TEST_ID = 'welcome-screen'
 const DEV_LAUNCHER_MARKERS = ['Development servers', 'npx expo start']
 const DEV_MENU_ONBOARDING_MARKERS = ['This is the developer menu']
 const DEV_MENU_CONTINUE_TEXT = 'Continue'
+const DEV_MENU_MARKERS = ['Go home', 'Runtime version', 'Toggle performance monitor']
+const DEV_MENU_CLOSE_TEXT = 'Close'
+const DEV_CLIENT_DISABLE_AUTO_LAUNCH = 'disableAutoLaunch=1'
+const DEV_CLIENT_DISABLE_ONBOARDING = 'disableOnboarding=1'
+const DEV_MENU_SHOWS_AT_LAUNCH_META = 'EXDevMenuShowsAtLaunch'
+const DEV_MENU_ONBOARDING_FINISHED_META = 'EXDevMenuIsOnboardingFinished'
 const SIGN_IN_VISIBLE_MARKERS = ['Sign in with Google', 'E2E sign in']
 const DEVICE_FAILURE_SCREENSHOT = 'failure.png'
 const DEVICE_FAILURE_DUMP = 'window_dump.xml'
@@ -587,6 +593,41 @@ function stampAndroidVersion({
   return { stamped: true, gradleStamped }
 }
 
+function upsertAndroidMetaData(xml, name, value) {
+  const item = `<meta-data android:name="${name}" android:value="${value}"/>`
+  const existing = new RegExp(
+    `<meta-data\\s+android:name="${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\s+android:value="[^"]*"\\s*/>`,
+  )
+  if (existing.test(`${xml ?? ''}`)) {
+    return `${xml}`.replace(existing, item)
+  }
+  if (!/<\/application>/i.test(`${xml ?? ''}`)) return xml
+  return `${xml}`.replace(/<\/application>/i, `    ${item}\n    </application>`)
+}
+
+function stampDevMenuManifest(contents) {
+  let next = contents
+  next = upsertAndroidMetaData(next, DEV_MENU_SHOWS_AT_LAUNCH_META, 'false')
+  next = upsertAndroidMetaData(next, DEV_MENU_ONBOARDING_FINISHED_META, 'true')
+  return next
+}
+
+function stampDevMenuLaunchPrefs({
+  androidDir,
+  exists = existsSync,
+  read = readFileSync,
+  write = writeFileSync,
+} = {}) {
+  if (!androidDir || !exists(androidDir)) return { stamped: false }
+  const manifestPath = join(androidDir, 'app', 'src', 'main', 'AndroidManifest.xml')
+  if (!exists(manifestPath)) return { stamped: false }
+  const previous = read(manifestPath, 'utf8')
+  const next = stampDevMenuManifest(previous)
+  if (next === previous) return { stamped: false }
+  write(manifestPath, next)
+  return { stamped: true }
+}
+
 function shouldRebuildApk({ installedVersion, expectedVersion }) {
   return !installedVersion || installedVersion !== expectedVersion
 }
@@ -644,7 +685,10 @@ function expoDevClientUrl({ scheme, metroPort }) {
     throw new Error('Expo scheme is required to open the dev client')
   }
   const metroUrl = `http://127.0.0.1:${metroPort}`
-  return `${scheme}://expo-development-client/?url=${encodeURIComponent(metroUrl)}`
+  return (
+    `${scheme}://expo-development-client/?url=${encodeURIComponent(metroUrl)}` +
+    `&${DEV_CLIENT_DISABLE_AUTO_LAUNCH}&${DEV_CLIENT_DISABLE_ONBOARDING}`
+  )
 }
 
 function adbReverseArgs(serial, port) {
@@ -694,11 +738,13 @@ function parseUiDump(xml) {
   const hasDevMenuOnboarding = DEV_MENU_ONBOARDING_MARKERS.some((marker) =>
     text.includes(marker),
   )
+  const hasDevMenu = DEV_MENU_MARKERS.some((marker) => text.includes(marker))
   return {
     hasSignIn,
     hasWelcome,
     hasSignInCopy,
     hasDevMenuOnboarding,
+    hasDevMenu,
     hasAppRoot: hasSignIn || hasWelcome || hasSignInCopy,
     hasDevLauncher: DEV_LAUNCHER_MARKERS.some((marker) => text.includes(marker)),
   }
@@ -707,6 +753,9 @@ function parseUiDump(xml) {
 function appForegroundReason(ui) {
   if (ui.hasDevMenuOnboarding) {
     return 'Expo developer-menu onboarding is covering the app'
+  }
+  if (ui.hasDevMenu) {
+    return 'Expo developer menu is covering the app'
   }
   if (ui.hasDevLauncher) return 'Expo launcher is in the foreground'
   if (!ui.hasAppRoot) {
@@ -717,7 +766,7 @@ function appForegroundReason(ui) {
 
 function appForegroundTick({ dump }) {
   const ui = parseUiDump(dump)
-  if (ui.hasDevMenuOnboarding) {
+  if (ui.hasDevMenuOnboarding || ui.hasDevMenu) {
     return { status: 'dismiss', ui, reason: appForegroundReason(ui) }
   }
   if (ui.hasAppRoot) return { status: 'ok', ui, reason: appForegroundReason(ui) }
@@ -744,6 +793,10 @@ function parseUiNodeCenter(dump, text) {
 
 function adbTapArgs(serial, x, y) {
   return ['-s', serial, 'shell', 'input', 'tap', String(x), String(y)]
+}
+
+function adbKeyEventArgs(serial, key) {
+  return ['-s', serial, 'shell', 'input', 'keyevent', key]
 }
 
 function adbScreencapArgs(serial) {
@@ -787,6 +840,27 @@ function dismissDevMenuOnboarding(serial, dump) {
   return true
 }
 
+function dismissDevMenu(serial, dump) {
+  const center = parseUiNodeCenter(dump, DEV_MENU_CLOSE_TEXT)
+  if (center) {
+    runCapture(adbBin(), adbTapArgs(serial, center.x, center.y), {
+      allowFail: true,
+    })
+    return true
+  }
+  runCapture(adbBin(), adbKeyEventArgs(serial, 'KEYCODE_BACK'), {
+    allowFail: true,
+  })
+  return true
+}
+
+function dismissDevMenuOverlay(serial, dump) {
+  const ui = parseUiDump(dump)
+  if (ui.hasDevMenuOnboarding) return dismissDevMenuOnboarding(serial, dump)
+  if (ui.hasDevMenu) return dismissDevMenu(serial, dump)
+  return false
+}
+
 function devLauncherForegroundMessage() {
   return (
     'Expo dev-client launcher is in the foreground (Development servers). ' +
@@ -798,6 +872,13 @@ function devMenuOnboardingMessage() {
   return (
     'Expo developer-menu onboarding is covering the app ' +
     '(This is the developer menu). Tap Continue.'
+  )
+}
+
+function devMenuForegroundMessage() {
+  return (
+    'Expo developer menu is covering the app (Runtime version / Go home). ' +
+    'Tap Close or press Back.'
   )
 }
 
@@ -828,6 +909,8 @@ function deviceReadyProblems({
   }
   if (ui?.hasDevMenuOnboarding) {
     problems.push(devMenuOnboardingMessage())
+  } else if (ui?.hasDevMenu) {
+    problems.push(devMenuForegroundMessage())
   } else if (ui?.hasDevLauncher && !ui.hasAppRoot) {
     problems.push(devLauncherForegroundMessage())
   }
@@ -1409,10 +1492,11 @@ async function waitForAppForeground(serial, timeoutMs) {
     const tick = appForegroundTick({ dump })
     if (tick.status === 'ok') return tick.ui
     if (tick.status === 'dismiss') {
-      console.error(
-        `still waiting: ${tick.reason}; tapping ${DEV_MENU_CONTINUE_TEXT}`,
-      )
-      dismissDevMenuOnboarding(serial, dump)
+      const tapLabel = tick.ui.hasDevMenuOnboarding
+        ? DEV_MENU_CONTINUE_TEXT
+        : DEV_MENU_CLOSE_TEXT
+      console.error(`still waiting: ${tick.reason}; tapping ${tapLabel}`)
+      dismissDevMenuOverlay(serial, dump)
       lastProgressAt = now
     } else if (now - lastProgressAt >= APP_READY_PROGRESS_INTERVAL_MS) {
       console.error(`still waiting: ${tick.reason}`)
@@ -1428,6 +1512,7 @@ async function waitForAppForeground(serial, timeoutMs) {
   )
   captureDeviceFailure({ serial, dest, dump })
   if (ui.hasDevMenuOnboarding) throw new Error(devMenuOnboardingMessage())
+  if (ui.hasDevMenu) throw new Error(devMenuForegroundMessage())
   if (ui.hasDevLauncher) throw new Error(devLauncherForegroundMessage())
   throw new Error(
     `Timed out waiting for ${SIGN_IN_TEST_ID} or ${WELCOME_SCREEN_TEST_ID} on ${serial}. ` +
@@ -1602,6 +1687,14 @@ async function cmdLaunchDevice() {
       androidStamp.gradleStamped
         ? `Stamped ${VERIFY_APK_VERSION_ENV}=${expectedSha} into android/gradle.properties and versionName`
         : `Stamped ${VERIFY_APK_VERSION_ENV}=${expectedSha} into android/gradle.properties`,
+    )
+  }
+  const menuStamp = stampDevMenuLaunchPrefs({
+    androidDir: join(mobileDir, 'android'),
+  })
+  if (menuStamp.stamped) {
+    console.error(
+      `Stamped ${DEV_MENU_SHOWS_AT_LAUNCH_META}=false so the developer menu does not auto-open`,
     )
   }
   const partial = {
@@ -2542,6 +2635,8 @@ export {
   stampGradleProperties,
   stampBuildGradleVersionName,
   stampAndroidVersion,
+  stampDevMenuManifest,
+  stampDevMenuLaunchPrefs,
   adbReverseArgs,
   adbOpenDevClientArgs,
   parseAdbReverseList,
@@ -2552,6 +2647,7 @@ export {
   appForegroundReason,
   portBusyMessage,
   adbTapArgs,
+  adbKeyEventArgs,
   adbScreencapArgs,
   deviceFailureArtifactPaths,
   launchDeviceTeardownPlan,
@@ -2600,6 +2696,9 @@ export {
   SIGN_IN_TEST_ID,
   WELCOME_SCREEN_TEST_ID,
   DEV_MENU_CONTINUE_TEXT,
+  DEV_MENU_CLOSE_TEXT,
+  DEV_CLIENT_DISABLE_AUTO_LAUNCH,
+  DEV_CLIENT_DISABLE_ONBOARDING,
   DEVICE_FAILURE_SCREENSHOT,
   DEVICE_FAILURE_DUMP,
   DEFAULT_VERIFY_DEVICE_FLOW,

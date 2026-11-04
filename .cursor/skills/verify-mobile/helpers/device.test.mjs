@@ -44,6 +44,7 @@ import {
   stampGradleProperties,
   stampBuildGradleVersionName,
   stampAndroidVersion,
+  stampDevMenuManifest,
   adbReverseArgs,
   adbOpenDevClientArgs,
   parseAdbReverseList,
@@ -54,6 +55,7 @@ import {
   appForegroundReason,
   portBusyMessage,
   adbTapArgs,
+  adbKeyEventArgs,
   adbScreencapArgs,
   deviceFailureArtifactPaths,
   launchDeviceTeardownPlan,
@@ -76,6 +78,9 @@ import {
   ANDROID_PACKAGE,
   SIGN_IN_TEST_ID,
   DEV_MENU_CONTINUE_TEXT,
+  DEV_MENU_CLOSE_TEXT,
+  DEV_CLIENT_DISABLE_AUTO_LAUNCH,
+  DEV_CLIENT_DISABLE_ONBOARDING,
   DEVICE_FAILURE_SCREENSHOT,
   DEVICE_FAILURE_DUMP,
   DEFAULT_VERIFY_DEVICE_FLOW,
@@ -664,10 +669,16 @@ describe('readDevClientScheme', () => {
 })
 
 describe('expoDevClientUrl', () => {
-  it('encodes the Metro loopback URL for the expo-development-client deep link', () => {
+  it('encodes the Metro loopback URL and Expo 57 disableAutoLaunch flags', () => {
+    const url = expoDevClientUrl({ scheme: 'exp+coffee-companion', metroPort: 8081 })
+    assert.match(url, /^exp\+coffee-companion:\/\/expo-development-client\/\?url=/)
+    assert.match(url, /url=http%3A%2F%2F127\.0\.0\.1%3A8081/)
+    assert.match(url, new RegExp(DEV_CLIENT_DISABLE_AUTO_LAUNCH))
+    assert.match(url, new RegExp(DEV_CLIENT_DISABLE_ONBOARDING))
     assert.equal(
-      expoDevClientUrl({ scheme: 'exp+coffee-companion', metroPort: 8081 }),
-      'exp+coffee-companion://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081',
+      url,
+      'exp+coffee-companion://expo-development-client/' +
+        `?url=http%3A%2F%2F127.0.0.1%3A8081&${DEV_CLIENT_DISABLE_AUTO_LAUNCH}&${DEV_CLIENT_DISABLE_ONBOARDING}`,
     )
   })
 })
@@ -702,6 +713,22 @@ describe('installTimeoutError', () => {
     assert.match(message, /e0543f5/)
     assert.match(message, /4bf1a18/)
     assert.match(message, /Timed out/)
+  })
+})
+
+describe('stampDevMenuManifest', () => {
+  it('sets EXDevMenuShowsAtLaunch false so the menu does not auto-open', () => {
+    const stamped = stampDevMenuManifest(
+      '<manifest><application android:name=".MainApplication"></application></manifest>',
+    )
+    assert.match(stamped, /EXDevMenuShowsAtLaunch" android:value="false"/)
+    assert.match(stamped, /EXDevMenuIsOnboardingFinished" android:value="true"/)
+    assert.match(
+      stampDevMenuManifest(
+        '<application><meta-data android:name="EXDevMenuShowsAtLaunch" android:value="true"/></application>',
+      ),
+      /EXDevMenuShowsAtLaunch" android:value="false"/,
+    )
   })
 })
 
@@ -832,6 +859,16 @@ describe('parseUiDump', () => {
     )
     assert.equal(ui.hasDevMenuOnboarding, true)
   })
+
+  it('detects the regular developer menu covering sign-in', () => {
+    const ui = parseUiDump(
+      '<node text="Runtime version: exposdk:57.0.0"/>' +
+        '<node text="Go home"/>' +
+        `<node content-desc="${DEV_MENU_CLOSE_TEXT}" bounds="[900,40][980,120]"/>`,
+    )
+    assert.equal(ui.hasDevMenu, true)
+    assert.equal(ui.hasDevMenuOnboarding, false)
+  })
 })
 
 describe('parseUiNodeCenter', () => {
@@ -842,6 +879,16 @@ describe('parseUiNodeCenter', () => {
         DEV_MENU_CONTINUE_TEXT,
       ),
       { x: 540, y: 860 },
+    )
+  })
+
+  it('returns the tap target for the Close icon content-desc', () => {
+    assert.deepEqual(
+      parseUiNodeCenter(
+        `<node content-desc="${DEV_MENU_CLOSE_TEXT}" bounds="[900,40][980,120]"/>`,
+        DEV_MENU_CLOSE_TEXT,
+      ),
+      { x: 940, y: 80 },
     )
   })
 })
@@ -872,6 +919,18 @@ describe('appForegroundTick', () => {
     assert.equal(tick.status, 'dismiss')
     assert.match(tick.reason, /developer-menu/)
     assert.equal(tick.ui.hasAppRoot, true)
+  })
+
+  it('asks to dismiss the regular developer menu covering sign-in', () => {
+    const tick = appForegroundTick({
+      dump:
+        '<node text="Runtime version: exposdk:57.0.0"/>' +
+        '<node text="Go home"/>' +
+        '<node text="Sign in with Google"/>' +
+        `<node content-desc="${DEV_MENU_CLOSE_TEXT}" bounds="[900,40][980,120]"/>`,
+    })
+    assert.equal(tick.status, 'dismiss')
+    assert.match(tick.reason, /developer menu/)
   })
 })
 
@@ -910,6 +969,19 @@ describe('adbTapArgs', () => {
       'tap',
       '540',
       '860',
+    ])
+  })
+})
+
+describe('adbKeyEventArgs', () => {
+  it('sends KEYCODE_BACK to dismiss the developer menu', () => {
+    assert.deepEqual(adbKeyEventArgs(DEVICE_SERIAL, 'KEYCODE_BACK'), [
+      '-s',
+      DEVICE_SERIAL,
+      'shell',
+      'input',
+      'keyevent',
+      'KEYCODE_BACK',
     ])
   })
 })
@@ -1202,6 +1274,20 @@ describe('deviceReadyProblems', () => {
     assert.deepEqual(problems, [])
   })
 
+  it('flags the regular developer menu as covering the app', () => {
+    const problems = deviceReadyProblems({
+      reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
+      requiredPorts: [8081, 3910],
+      checkedDeviceMetro: true,
+      deviceStatusBody: 'packager-status:running',
+      ui: parseUiDump(
+        '<node text="Runtime version: exposdk:57.0.0"/>' +
+          '<node text="Go home"/>',
+      ),
+    })
+    assert.ok(problems.some((problem) => /developer menu is covering/.test(problem)))
+  })
+
   it('flags the first-run developer-menu sheet as covering the app', () => {
     const problems = deviceReadyProblems({
       reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
@@ -1257,5 +1343,16 @@ describe('sign-in-and-out flow', () => {
     assert.match(flow, /optional: true/)
     assert.match(flow, /extendedWaitUntil/)
     assert.doesNotMatch(flow, /assertVisible/)
+  })
+
+  it('dismisses the regular developer menu with Close then Back', () => {
+    const flow = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../flows/sign-in-and-out.yaml'),
+      'utf8',
+    )
+    assert.match(flow, /Runtime version/)
+    assert.match(flow, /text: "Close"/)
+    assert.match(flow, /Go home/)
+    assert.match(flow, /pressKey: back/)
   })
 })

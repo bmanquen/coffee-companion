@@ -1,4 +1,5 @@
 import {
+  DEV_CLIENT_PLUGIN_CONFIG,
   GIT_SHORT_SHA_DIGITS,
   VERIFY_APK_VERSION_ENV,
   gitHeadShortSha,
@@ -26,5 +27,12 @@ describe('resolveApkVersion', () => {
 
   it('falls back to git HEAD when the env stamp is missing', () => {
     expect(resolveApkVersion({}, () => 'e0543f5')).toBe('e0543f5')
+  })
+})
+
+describe('DEV_CLIENT_PLUGIN_CONFIG', () => {
+  it('keeps the Expo 57 developer menu from auto-opening', () => {
+    expect(DEV_CLIENT_PLUGIN_CONFIG.showMenuAtLaunch).toBe(false)
+    expect(DEV_CLIENT_PLUGIN_CONFIG.skipOnboarding).toBe(true)
   })
 })

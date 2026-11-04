@@ -33,10 +33,16 @@ export function resolveApkVersion(
 const gitHead = resolveApkVersion()
 const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME
 
+// Expo 57 auto-opens the developer menu over the app; keep it closed for device E2E.
+export const DEV_CLIENT_PLUGIN_CONFIG = {
+  showMenuAtLaunch: false,
+  skipOnboarding: true,
+}
+
 const plugins: NonNullable<ExpoConfig['plugins']> = [
   'expo-secure-store',
   'expo-apple-authentication',
-  'expo-dev-client',
+  ['expo-dev-client', DEV_CLIENT_PLUGIN_CONFIG],
   'expo-web-browser',
 ]
 if (googleIosUrlScheme) {
