@@ -74,6 +74,10 @@ import {
   verifyDevicePlan,
   deviceReadyProblems,
   maestroDeviceArgs,
+  maestroCheckSyntaxArgs,
+  resolveMaestroBin,
+  listMaestroFlowPaths,
+  inspectMaestroFlows,
   maestroLogPath,
   maestroLogTail,
   parseMaestroFailedStep,
@@ -1429,6 +1433,60 @@ describe('sign-in-and-out flow', () => {
     const goHomeAt = yaml.lastIndexOf('visible: "Go home"', backAt)
     assert.ok(goHomeAt >= 0)
     assert.ok(backAt > goHomeAt)
+  })
+
+  it('does not put timeout on tapOn', () => {
+    const yaml = flow()
+    for (const block of yaml.split('- tapOn:').slice(1)) {
+      const body = block.split(/\n- /)[0]
+      assert.doesNotMatch(body, /\btimeout:/)
+    }
+  })
+})
+
+describe('inspectMaestroFlows', () => {
+  it('builds maestro check-syntax args', () => {
+    assert.deepEqual(maestroCheckSyntaxArgs('/tmp/flow.yaml'), [
+      'check-syntax',
+      '/tmp/flow.yaml',
+    ])
+    assert.equal(
+      resolveMaestroBin({
+        env: { HOME: '/home/you' },
+        exists: (path) => path === '/home/you/.maestro/bin/maestro',
+      }),
+      '/home/you/.maestro/bin/maestro',
+    )
+  })
+
+  it('runs maestro check-syntax on every flow', () => {
+    const flowsDir = join(dirname(fileURLToPath(import.meta.url)), '../flows')
+    const report = inspectMaestroFlows({ flowsDir })
+    assert.equal(report.ok, true, report.problems.join('\n'))
+    assert.deepEqual(
+      report.flows.map((path) => path.slice(path.lastIndexOf('/') + 1)),
+      listMaestroFlowPaths(flowsDir).map((path) => path.slice(path.lastIndexOf('/') + 1)),
+    )
+    assert.ok(report.flows.some((path) => path.endsWith('sign-in-and-out.yaml')))
+  })
+
+  it('fails closed on an unknown tapOn timeout property', () => {
+    const root = mkdtempSync(join(tmpdir(), 'maestro-syntax-'))
+    try {
+      const flowPath = join(root, 'bad.yaml')
+      writeFileSync(
+        flowPath,
+        'appId: dev.offbyonelabs.coffeecompanion\n---\n- tapOn:\n    text: Continue\n    timeout: 2000\n',
+      )
+      const report = inspectMaestroFlows({ flows: [flowPath] })
+      assert.equal(report.ok, false)
+      assert.ok(
+        report.problems.some((problem) => /Unknown Property: timeout/i.test(problem)),
+        report.problems.join('\n'),
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 

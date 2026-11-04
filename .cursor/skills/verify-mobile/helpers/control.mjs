@@ -1083,6 +1083,75 @@ function maestroDeviceArgs({
   return args
 }
 
+function maestroCheckSyntaxArgs(flowPath) {
+  return ['check-syntax', flowPath]
+}
+
+function maestroCliEnv(env = process.env) {
+  return {
+    ...env,
+    MAESTRO_CLI_NO_ANALYTICS: env.MAESTRO_CLI_NO_ANALYTICS ?? '1',
+    MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true',
+  }
+}
+
+function resolveMaestroBin({ env = process.env, exists = existsSync } = {}) {
+  const fromEnv = `${env.VERIFY_MAESTRO ?? ''}`.trim()
+  if (fromEnv) return fromEnv
+  const pinned = join(`${env.HOME ?? homedir()}`, '.maestro', 'bin', 'maestro')
+  if (exists(pinned)) return pinned
+  return 'maestro'
+}
+
+function listMaestroFlowPaths(dir = join(skillDir, 'flows')) {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.yaml') || name.endsWith('.yml'))
+    .map((name) => join(dir, name))
+    .sort()
+}
+
+function inspectMaestroFlows({
+  flowsDir = join(skillDir, 'flows'),
+  flows,
+  bin,
+  exists = existsSync,
+  run = runCapture,
+  env = process.env,
+  required = true,
+} = {}) {
+  const maestro = bin ?? resolveMaestroBin({ env, exists })
+  const paths = flows ?? listMaestroFlowPaths(flowsDir)
+  const problems = []
+  if (!exists(maestro) && maestro !== 'maestro') {
+    const missing = `Maestro CLI not found at ${maestro}`
+    if (required) problems.push(missing)
+    return { ok: !required, bin: maestro, flows: paths, problems, skipped: !required }
+  }
+  if (paths.length === 0) {
+    problems.push(`No Maestro flows in ${flowsDir}`)
+    return { ok: false, bin: maestro, flows: paths, problems }
+  }
+  for (const flowPath of paths) {
+    const result = run(maestro, maestroCheckSyntaxArgs(flowPath), {
+      allowFail: true,
+      env: maestroCliEnv(env),
+    })
+    if (result.error && result.error.code === 'ENOENT') {
+      const missing = `Maestro CLI not found (${maestro})`
+      if (required) problems.push(missing)
+      return { ok: !required, bin: maestro, flows: paths, problems, skipped: !required }
+    }
+    const output = `${result.stderr ?? ''}\n${result.stdout ?? ''}`.trim()
+    if (result.status !== 0) {
+      problems.push(
+        `${flowPath}: ${output || `maestro check-syntax exited ${result.status}`}`,
+      )
+    }
+  }
+  return { ok: problems.length === 0, bin: maestro, flows: paths, problems }
+}
+
 function listInstalledAvds() {
   const result = runCapture(emulatorBin(), ['-list-avds'], { allowFail: true })
   return parseEmulatorAvdList(`${result.stdout ?? ''}\n${result.stderr ?? ''}`)
@@ -2007,6 +2076,10 @@ async function cmdDriveDevice(flow) {
         'Do not treat a missing flow as verification.',
     )
   }
+  const syntax = inspectMaestroFlows({ flows: [flowPath] })
+  if (!syntax.ok) {
+    die(syntax.problems.join('\n'))
+  }
 
   const state = requireState()
   await requireDrivableDevice(state)
@@ -2508,6 +2581,8 @@ async function inspectInstance(state) {
   let device = null
   const autolinking = inspectExpoAutolinking()
   problems.push(...autolinking.problems)
+  const maestroFlows = inspectMaestroFlows()
+  problems.push(...maestroFlows.problems)
   if (state.metroPid || state.harness === HARNESS_RNTL) {
     metro = await inspectMetro(state)
     problems.push(...metro.problems)
@@ -2522,6 +2597,9 @@ async function inspectInstance(state) {
     importedExpoModules: autolinking.imported,
     autolinkedExpoModules: autolinking.linked,
     missingAutolinkedExpoModules: autolinking.missing,
+    maestroBin: maestroFlows.bin,
+    maestroFlows: maestroFlows.flows,
+    maestroSyntaxOk: maestroFlows.ok,
     ok: problems.length === 0,
     harness: state.harness ?? (state.serial ? HARNESS_MAESTRO : HARNESS_RNTL),
     problems,
@@ -2804,6 +2882,10 @@ export {
   resolveEmulatorAttachment,
   deviceReadyProblems,
   maestroDeviceArgs,
+  maestroCheckSyntaxArgs,
+  resolveMaestroBin,
+  listMaestroFlowPaths,
+  inspectMaestroFlows,
   maestroLogPath,
   maestroLogTail,
   parseMaestroFailedStep,
