@@ -2,9 +2,28 @@ appId: dev.offbyonelabs.coffeecompanion
 ---
 - launchApp:
     clearState: true
+# clearState cold-starts the Expo launcher; openLink only after that screen can take the intent.
+- extendedWaitUntil:
+    visible: "Fetch development servers"
+    timeout: 30000
 - openLink:
     link: ${EXPO_DEV_CLIENT_URL}
     browser: false
+- runFlow:
+    label: Re-open Metro deep link if still on the Expo launcher
+    when:
+      visible: "Fetch development servers"
+    commands:
+      - openLink:
+          link: ${EXPO_DEV_CLIENT_URL}
+          browser: false
+- runFlow:
+    when:
+      visible: "Fetch development servers"
+    commands:
+      - assertTrue:
+          condition: ${false}
+          label: Expo Development servers launcher is still showing; Metro deep link did not connect
 # Overlay dismiss is runFlow when visible. tapOn has no timeout; wait with extendedWaitUntil.
 - runFlow:
     label: Dismiss first-run Continue sheet

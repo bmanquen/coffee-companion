@@ -68,7 +68,11 @@ const PORT_FREE_POLL_MS = 500
 const DEFAULT_VERIFY_DEVICE_FLOW = 'sign-in-and-out'
 const SIGN_IN_TEST_ID = 'sign-in-screen'
 const WELCOME_SCREEN_TEST_ID = 'welcome-screen'
-const DEV_LAUNCHER_MARKERS = ['Development servers', 'npx expo start']
+const DEV_LAUNCHER_MARKERS = [
+  'Development servers',
+  'Fetch development servers',
+  'npx expo start',
+]
 const DEV_MENU_ONBOARDING_MARKERS = ['This is the developer menu']
 const DEV_MENU_CONTINUE_TEXT = 'Continue'
 const DEV_MENU_MARKERS = ['Go home', 'Runtime version', 'Toggle performance monitor']
@@ -214,7 +218,7 @@ function maestroFailureMessage({
   return lines.join('\n')
 }
 
-function runTee(command, args, { logPath, cwd } = {}) {
+function runTee(command, args, { logPath, cwd, env } = {}) {
   ensureDir(dirname(logPath))
   const fd = openSync(logPath, 'w')
   const chunks = []
@@ -232,7 +236,7 @@ function runTee(command, args, { logPath, cwd } = {}) {
     }
     const child = spawn(command, args, {
       cwd: cwd ?? repoRoot,
-      env: process.env,
+      env: { ...process.env, ...env },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     const onData = (out) => (chunk) => {
@@ -795,6 +799,7 @@ function expoDevClientUrl({ scheme, metroPort }) {
   if (!scheme) {
     throw new Error('Expo scheme is required to open the dev client')
   }
+  // 127.0.0.1 is the adb-reversed loopback; Android localhost can be IPv6 ::1.
   const metroUrl = `http://127.0.0.1:${metroPort}`
   return (
     `${scheme}://expo-development-client/?url=${encodeURIComponent(metroUrl)}` +
@@ -809,6 +814,17 @@ function quoteForAdbShell(value) {
 
 function adbReverseArgs(serial, port) {
   return ['-s', serial, 'reverse', `tcp:${port}`, `tcp:${port}`]
+}
+
+function driveDeviceReversePorts(state = {}) {
+  return [
+    state.port ?? DEFAULT_METRO_PORT,
+    state.webPort ?? DEFAULT_DEVICE_WEB_PORT,
+  ]
+}
+
+function ensureAdbReverses(serial, ports, reverse = adbReverse) {
+  for (const port of ports) reverse(serial, port)
 }
 
 function adbOpenDevClientArgs({ serial, url, pkg }) {
@@ -995,8 +1011,8 @@ function dismissDevMenuOverlay(serial, dump) {
 
 function devLauncherForegroundMessage() {
   return (
-    'Expo dev-client launcher is in the foreground (Development servers). ' +
-    'The app is not connected to Metro. Open the expo-development-client deep link.'
+    'Expo dev-client launcher is still showing (Development servers). ' +
+    'Metro deep link did not connect. Re-open EXPO_DEV_CLIENT_URL after launchApp/clearState.'
   )
 }
 
@@ -2083,6 +2099,7 @@ async function cmdDriveDevice(flow) {
 
   const state = requireState()
   await requireDrivableDevice(state)
+  ensureAdbReverses(state.serial, driveDeviceReversePorts(state))
   const dest = join(artifactsDir, state.runId, flow)
   ensureDir(dest)
   const shotDir = join(runDir, 'maestro', flow)
@@ -2103,7 +2120,11 @@ async function cmdDriveDevice(flow) {
       flowPath,
       expoDevClientUrl: devClientUrl,
     }),
-    { logPath, cwd: shotDir },
+    {
+      logPath,
+      cwd: shotDir,
+      env: { EXPO_DEV_CLIENT_URL: devClientUrl },
+    },
   )
   writeFileSync(logPath, test.stdout ?? '')
   if (test.status !== 0) {
@@ -2854,6 +2875,8 @@ export {
   stampDevMenuLaunchPrefs,
   quoteForAdbShell,
   adbReverseArgs,
+  driveDeviceReversePorts,
+  ensureAdbReverses,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   amStartSucceeded,

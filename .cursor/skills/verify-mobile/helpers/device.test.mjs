@@ -47,6 +47,8 @@ import {
   stampDevMenuManifest,
   quoteForAdbShell,
   adbReverseArgs,
+  driveDeviceReversePorts,
+  ensureAdbReverses,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   amStartSucceeded,
@@ -791,6 +793,23 @@ describe('adbReverseArgs', () => {
   })
 })
 
+describe('driveDeviceReversePorts', () => {
+  it('re-applies Metro and web reverses before Maestro', () => {
+    assert.deepEqual(driveDeviceReversePorts({ port: 8081, webPort: 3910 }), [
+      8081,
+      3910,
+    ])
+    const reversed = []
+    ensureAdbReverses(DEVICE_SERIAL, [8081, 3910], (serial, port) => {
+      reversed.push([serial, port])
+    })
+    assert.deepEqual(reversed, [
+      [DEVICE_SERIAL, 8081],
+      [DEVICE_SERIAL, 3910],
+    ])
+  })
+})
+
 describe('quoteForAdbShell', () => {
   it('single-quotes so device sh does not split on &', () => {
     assert.equal(quoteForAdbShell('a&b'), "'a&b'")
@@ -1407,9 +1426,24 @@ describe('sign-in-and-out flow', () => {
   it('opens the injected deep link after launchApp so clearState cannot leave the launcher', () => {
     const yaml = flow()
     assert.match(yaml, /launchApp/)
+    assert.match(yaml, /clearState: true/)
     assert.match(yaml, /openLink/)
     assert.match(yaml, /EXPO_DEV_CLIENT_URL/)
     assert.match(yaml, /sign-in-screen/)
+    const launchAt = yaml.indexOf('launchApp')
+    const openAt = yaml.indexOf('openLink')
+    assert.ok(openAt > launchAt)
+  })
+
+  it('waits for the Expo launcher then re-opens the deep link if it is still showing', () => {
+    const yaml = flow()
+    assert.match(yaml, /Fetch development servers/)
+    assert.match(
+      yaml,
+      /Re-open Metro deep link if still on the Expo launcher/,
+    )
+    assert.match(yaml, /Metro deep link did not connect/)
+    assert.equal([...yaml.matchAll(/openLink:/g)].length, 2)
   })
 
   it('dismisses overlay sheets only when they are visible, then waits for sign-in-screen', () => {
