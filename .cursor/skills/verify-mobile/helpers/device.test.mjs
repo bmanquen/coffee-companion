@@ -45,8 +45,11 @@ import {
   stampBuildGradleVersionName,
   stampAndroidVersion,
   stampDevMenuManifest,
+  quoteForAdbShell,
   adbReverseArgs,
   adbOpenDevClientArgs,
+  adbShellHttpGetArgs,
+  amStartSucceeded,
   parseAdbReverseList,
   missingAdbReverses,
   parseUiDump,
@@ -81,6 +84,7 @@ import {
   DEV_MENU_CLOSE_TEXT,
   DEV_CLIENT_DISABLE_AUTO_LAUNCH,
   DEV_CLIENT_DISABLE_ONBOARDING,
+  AM_START_ALREADY_FOREGROUND,
   DEVICE_FAILURE_SCREENSHOT,
   DEVICE_FAILURE_DUMP,
   DEFAULT_VERIFY_DEVICE_FLOW,
@@ -778,6 +782,13 @@ describe('adbReverseArgs', () => {
   })
 })
 
+describe('quoteForAdbShell', () => {
+  it('single-quotes so device sh does not split on &', () => {
+    assert.equal(quoteForAdbShell('a&b'), "'a&b'")
+    assert.equal(quoteForAdbShell("it's"), `'it'\\''s'`)
+  })
+})
+
 describe('adbOpenDevClientArgs', () => {
   it('opens the encoded deep link on the installed package', () => {
     const url = expoDevClientUrl({ scheme: 'exp+coffee-companion', metroPort: 8081 })
@@ -796,9 +807,65 @@ describe('adbOpenDevClientArgs', () => {
     ])
     assert.ok(args.includes('android.intent.action.VIEW'))
     assert.ok(args.includes('-d'))
-    assert.ok(args.includes(url))
     assert.equal(args.at(-1), ANDROID_PACKAGE)
     assert.ok(!args.includes('coffeecompanion://expo-development-client/?url=http://127.0.0.1:8081'))
+  })
+
+  it('keeps the full URL with both flags and the package intact', () => {
+    const url = expoDevClientUrl({ scheme: 'exp+coffee-companion', metroPort: 8081 })
+    const args = adbOpenDevClientArgs({
+      serial: DEVICE_SERIAL,
+      url,
+      pkg: ANDROID_PACKAGE,
+    })
+    const data = args[args.indexOf('-d') + 1]
+    assert.equal(data, quoteForAdbShell(url))
+    assert.match(data, new RegExp(DEV_CLIENT_DISABLE_AUTO_LAUNCH))
+    assert.match(data, new RegExp(DEV_CLIENT_DISABLE_ONBOARDING))
+    assert.ok(data.includes(`&${DEV_CLIENT_DISABLE_AUTO_LAUNCH}&${DEV_CLIENT_DISABLE_ONBOARDING}`))
+    assert.ok(!args.includes(url))
+    assert.equal(args.at(-1), ANDROID_PACKAGE)
+    const joined = args.slice(args.indexOf('am')).join(' ')
+    assert.ok(
+      joined.endsWith(
+        `&${DEV_CLIENT_DISABLE_AUTO_LAUNCH}&${DEV_CLIENT_DISABLE_ONBOARDING}' ${ANDROID_PACKAGE}`,
+      ),
+    )
+  })
+})
+
+describe('adbShellHttpGetArgs', () => {
+  it('quotes the device Metro URL so query strings cannot split wget', () => {
+    const url = 'http://127.0.0.1:8081/status?x=1&y=2'
+    const attempts = adbShellHttpGetArgs(DEVICE_SERIAL, url)
+    assert.equal(attempts.length, 3)
+    for (const args of attempts) {
+      assert.equal(args.at(-1), quoteForAdbShell(url))
+      assert.ok(args.at(-1).includes('&'))
+      assert.ok(!args.includes(url))
+    }
+  })
+})
+
+describe('amStartSucceeded', () => {
+  it('treats a delivered-to-running-instance warning as success', () => {
+    assert.equal(amStartSucceeded({ status: 0, stdout: '', stderr: '' }), true)
+    assert.equal(
+      amStartSucceeded({
+        status: 1,
+        stdout: `Starting: Intent { dat=exp+coffee-companion://expo-development-client/ }\n`,
+        stderr: `Warning: ${AM_START_ALREADY_FOREGROUND}.\n`,
+      }),
+      true,
+    )
+    assert.equal(
+      amStartSucceeded({
+        status: 1,
+        stdout: '',
+        stderr: '/system/bin/sh: dev.offbyonelabs.coffeecompanion: inaccessible or not found\n',
+      }),
+      false,
+    )
   })
 })
 

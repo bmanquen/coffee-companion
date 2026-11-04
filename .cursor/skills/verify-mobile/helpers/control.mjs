@@ -73,6 +73,8 @@ const DEV_MENU_MARKERS = ['Go home', 'Runtime version', 'Toggle performance moni
 const DEV_MENU_CLOSE_TEXT = 'Close'
 const DEV_CLIENT_DISABLE_AUTO_LAUNCH = 'disableAutoLaunch=1'
 const DEV_CLIENT_DISABLE_ONBOARDING = 'disableOnboarding=1'
+const AM_START_ALREADY_FOREGROUND =
+  'Activity not started, intent has been delivered to currently running top-most instance'
 const DEV_MENU_SHOWS_AT_LAUNCH_META = 'EXDevMenuShowsAtLaunch'
 const DEV_MENU_ONBOARDING_FINISHED_META = 'EXDevMenuIsOnboardingFinished'
 const SIGN_IN_VISIBLE_MARKERS = ['Sign in with Google', 'E2E sign in']
@@ -691,6 +693,11 @@ function expoDevClientUrl({ scheme, metroPort }) {
   )
 }
 
+function quoteForAdbShell(value) {
+  // adb shell concatenates argv and /system/bin/sh re-parses, so & in a URL is a job separator.
+  return `'${`${value ?? ''}`.replaceAll("'", `'\\''`)}'`
+}
+
 function adbReverseArgs(serial, port) {
   return ['-s', serial, 'reverse', `tcp:${port}`, `tcp:${port}`]
 }
@@ -705,9 +712,25 @@ function adbOpenDevClientArgs({ serial, url, pkg }) {
     '-a',
     'android.intent.action.VIEW',
     '-d',
-    url,
+    quoteForAdbShell(url),
     pkg,
   ]
+}
+
+function adbShellHttpGetArgs(serial, url) {
+  const quoted = quoteForAdbShell(url)
+  return [
+    ['-s', serial, 'shell', 'wget', '-qO-', quoted],
+    ['-s', serial, 'shell', 'toybox', 'wget', '-qO-', quoted],
+    ['-s', serial, 'shell', 'curl', '-s', quoted],
+  ]
+}
+
+function amStartSucceeded(result) {
+  if (result.status === 0) return true
+  return `${result.stderr ?? ''}\n${result.stdout ?? ''}`.includes(
+    AM_START_ALREADY_FOREGROUND,
+  )
 }
 
 function parseAdbReverseList(text) {
@@ -1457,12 +1480,7 @@ function adbUiDump(serial) {
 
 function fetchDeviceMetroStatus(serial, port) {
   const url = `http://127.0.0.1:${port}/status`
-  const attempts = [
-    ['-s', serial, 'shell', 'wget', '-qO-', url],
-    ['-s', serial, 'shell', 'toybox', 'wget', '-qO-', url],
-    ['-s', serial, 'shell', 'curl', '-s', url],
-  ]
-  for (const args of attempts) {
+  for (const args of adbShellHttpGetArgs(serial, url)) {
     const result = runCapture(adbBin(), args, { allowFail: true })
     const body = `${result.stdout ?? ''}`.trim()
     if (body) return { body, checked: true }
@@ -1476,7 +1494,7 @@ function openDevClient(serial, url, pkg) {
     adbOpenDevClientArgs({ serial, url, pkg }),
     { allowFail: true },
   )
-  if (result.status !== 0) {
+  if (!amStartSucceeded(result)) {
     throw new Error(
       `Failed to open expo-development-client deep link: ${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
     )
@@ -2637,8 +2655,11 @@ export {
   stampAndroidVersion,
   stampDevMenuManifest,
   stampDevMenuLaunchPrefs,
+  quoteForAdbShell,
   adbReverseArgs,
   adbOpenDevClientArgs,
+  adbShellHttpGetArgs,
+  amStartSucceeded,
   parseAdbReverseList,
   missingAdbReverses,
   parseUiDump,
@@ -2699,6 +2720,7 @@ export {
   DEV_MENU_CLOSE_TEXT,
   DEV_CLIENT_DISABLE_AUTO_LAUNCH,
   DEV_CLIENT_DISABLE_ONBOARDING,
+  AM_START_ALREADY_FOREGROUND,
   DEVICE_FAILURE_SCREENSHOT,
   DEVICE_FAILURE_DUMP,
   DEFAULT_VERIFY_DEVICE_FLOW,
