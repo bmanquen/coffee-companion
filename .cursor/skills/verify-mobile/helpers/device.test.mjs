@@ -110,8 +110,20 @@ import {
   waitForSerialGone,
   waitForPortFree,
   adbEmuKillArgs,
+  pidGoneTick,
+  stopSignalTick,
+  parseLockPid,
+  avdLockPaths,
+  avdLockTick,
+  parseEmulatorAvdPids,
+  avdBusyMessage,
+  waitForPidGone,
+  stopPidAndWait,
+  waitForAvdLocksReleased,
+  ensureAvdFreeToBoot,
   portFreeTick,
   verifyDevicePlan,
+  verifyDeviceHeadline,
   deviceReadyProblems,
   maestroDeviceArgs,
   maestroCheckSyntaxArgs,
@@ -567,6 +579,7 @@ describe('emulatorLaunchArgs', () => {
     assert.ok(!args.includes('-no-snapshot-save'))
     assert.ok(!args.includes('-no-snapshot-load'))
     assert.ok(!args.includes('-no-snapshot'))
+    assert.ok(!args.includes('-read-only'))
   })
 })
 
@@ -1809,6 +1822,255 @@ describe('verifyDevicePlan', () => {
     ])
     assert.equal(plan.leaveUpOnFailure, true)
     assert.equal(verifyDevicePlan('sign-in-and-out').flow, 'sign-in-and-out')
+    assert.equal(
+      verifyDeviceHeadline(plan),
+      'verify-device: cleanup → launch-device → doctor → drive-device (sign-in-and-out); the instance stays up if a later step fails',
+    )
+  })
+})
+
+describe('pidGoneTick', () => {
+  it('is ok when the pid is missing or not alive', () => {
+    assert.deepEqual(pidGoneTick({ pid: 11, alive: false }), { status: 'ok' })
+    assert.deepEqual(pidGoneTick({ pid: null, alive: true }), { status: 'ok' })
+    assert.deepEqual(pidGoneTick({ pid: 11, alive: true }), { status: 'wait' })
+  })
+})
+
+describe('stopSignalTick', () => {
+  it('escalates SIGTERM to SIGKILL after the grace period', () => {
+    assert.equal(stopSignalTick({ alive: false, elapsedMs: 0, escalated: false }).status, 'ok')
+    assert.equal(
+      stopSignalTick({
+        alive: true,
+        elapsedMs: 7_999,
+        escalated: false,
+        escalateAfterMs: 8_000,
+      }).status,
+      'wait',
+    )
+    assert.equal(
+      stopSignalTick({
+        alive: true,
+        elapsedMs: 8_000,
+        escalated: false,
+        escalateAfterMs: 8_000,
+      }).status,
+      'escalate',
+    )
+    assert.equal(
+      stopSignalTick({
+        alive: true,
+        elapsedMs: 9_000,
+        escalated: true,
+        escalateAfterMs: 8_000,
+      }).status,
+      'wait',
+    )
+  })
+})
+
+describe('parseLockPid', () => {
+  it('reads a leading integer from an emulator lock file', () => {
+    assert.equal(parseLockPid('87011\n'), 87011)
+    assert.equal(parseLockPid('  42'), 42)
+    assert.equal(parseLockPid(''), null)
+    assert.equal(parseLockPid('qemu'), null)
+  })
+})
+
+describe('avdLockTick', () => {
+  it('waits while any lock file still exists', () => {
+    assert.deepEqual(avdLockTick({ locks: [] }), { status: 'ok' })
+    assert.deepEqual(
+      avdLockTick({
+        locks: [
+          { name: 'hardware-qemu.ini.lock', exists: false },
+          { name: 'multiinstance.lock', exists: false },
+        ],
+      }),
+      { status: 'ok' },
+    )
+    assert.deepEqual(
+      avdLockTick({
+        locks: [
+          { name: 'hardware-qemu.ini.lock', exists: true },
+          { name: 'multiinstance.lock', exists: false },
+        ],
+      }),
+      { status: 'wait', locks: ['hardware-qemu.ini.lock'] },
+    )
+  })
+})
+
+describe('parseEmulatorAvdPids', () => {
+  it('finds emulator and qemu lines for that AVD only', () => {
+    const text = [
+      '87011 /sdk/emulator/emulator -avd verify-pixel -port 5554',
+      '87020 qemu-system-aarch64 -avd verify-pixel -verbose',
+      '99 /sdk/emulator/emulator -avd Pixel_7 -port 5556',
+      '100 /usr/bin/vim notes',
+    ].join('\n')
+    assert.deepEqual(parseEmulatorAvdPids(text, 'verify-pixel'), [87011, 87020])
+    assert.deepEqual(parseEmulatorAvdPids(text, 'Pixel_7'), [99])
+  })
+})
+
+describe('avdBusyMessage', () => {
+  it('names the pid and refuses -read-only', () => {
+    const message = avdBusyMessage('verify-pixel', [87011])
+    assert.match(message, /verify-pixel/)
+    assert.match(message, /87011/)
+    assert.match(message, /Do not pass -read-only/)
+  })
+})
+
+describe('avdLockPaths', () => {
+  it('points at the AVD lock files under ANDROID_AVD_HOME', () => {
+    const paths = avdLockPaths('verify-pixel', { ANDROID_AVD_HOME: '/tmp/avd-home' })
+    assert.deepEqual(paths, [
+      '/tmp/avd-home/verify-pixel.avd/hardware-qemu.ini.lock',
+      '/tmp/avd-home/verify-pixel.avd/multiinstance.lock',
+    ])
+  })
+})
+
+describe('waitForPidGone', () => {
+  it('succeeds once the pid is no longer alive', async () => {
+    const aliveAt = [true, true, false]
+    let i = 0
+    let t = 0
+    const result = await waitForPidGone(87011, 5_000, {
+      alive: () => aliveAt[Math.min(i++, aliveAt.length - 1)],
+      sleep: async () => {},
+      now: () => ++t,
+    })
+    assert.equal(result.status, 'ok')
+  })
+})
+
+describe('stopPidAndWait', () => {
+  it('escalates SIGTERM to SIGKILL when the group stays alive', async () => {
+    const signals = []
+    let alive = true
+    let t = 0
+    const stopped = []
+    const result = await stopPidAndWait(87011, 'emulator', stopped, {
+      escalateAfterMs: 3,
+      timeoutMs: 10,
+      now: () => ++t,
+      sleep: async () => {},
+      alive: () => alive,
+      signal: (_pid, sig) => {
+        signals.push(sig)
+        if (sig === 'SIGKILL') alive = false
+        return { group: true }
+      },
+    })
+    assert.equal(result.status, 'ok')
+    assert.equal(result.escalated, true)
+    assert.deepEqual(signals, ['SIGTERM', 'SIGKILL'])
+    assert.deepEqual(stopped, [{ kind: 'emulator', pid: 87011, group: true }])
+  })
+
+  it('does not escalate when SIGTERM is enough', async () => {
+    const signals = []
+    let alive = true
+    let t = 0
+    const result = await stopPidAndWait(11, 'emulator', [], {
+      escalateAfterMs: 5,
+      timeoutMs: 10,
+      now: () => ++t,
+      sleep: async () => {},
+      alive: () => alive,
+      signal: (_pid, sig) => {
+        signals.push(sig)
+        if (sig === 'SIGTERM') alive = false
+        return { group: true }
+      },
+    })
+    assert.equal(result.status, 'ok')
+    assert.equal(result.escalated, false)
+    assert.deepEqual(signals, ['SIGTERM'])
+  })
+
+  it('times out when the pid ignores both signals', async () => {
+    let t = 0
+    const result = await stopPidAndWait(11, 'emulator', [], {
+      escalateAfterMs: 2,
+      timeoutMs: 5,
+      now: () => ++t,
+      sleep: async () => {},
+      alive: () => true,
+      signal: () => ({ group: true }),
+    })
+    assert.equal(result.status, 'timeout')
+    assert.equal(result.escalated, true)
+  })
+})
+
+describe('waitForAvdLocksReleased', () => {
+  it('succeeds once the lock files are gone', async () => {
+    const snapshots = [
+      [{ name: 'multiinstance.lock', exists: true }],
+      [{ name: 'multiinstance.lock', exists: false }],
+    ]
+    let i = 0
+    let t = 0
+    const result = await waitForAvdLocksReleased('verify-pixel', 5_000, {
+      inspectLocks: () => snapshots[Math.min(i++, snapshots.length - 1)],
+      sleep: async () => {},
+      now: () => ++t,
+    })
+    assert.equal(result.status, 'ok')
+  })
+})
+
+describe('ensureAvdFreeToBoot', () => {
+  it('stops our recorded pid and waits for leftover pids and locks', async () => {
+    const signals = []
+    let ourAlive = true
+    let leftoverAlive = true
+    let lockExists = true
+    let t = 0
+    const result = await ensureAvdFreeToBoot('verify-pixel', {
+      ourPid: 11,
+      listPids: () => [11, leftoverAlive ? 22 : null].filter(Boolean),
+      alive: (pid) => (pid === 11 ? ourAlive : leftoverAlive),
+      signal: (pid, sig) => {
+        signals.push([pid, sig])
+        if (pid === 11 && sig === 'SIGTERM') ourAlive = false
+        return { group: true }
+      },
+      inspectLocks: () => [{ name: 'multiinstance.lock', exists: lockExists }],
+      sleep: async () => {
+        leftoverAlive = false
+        lockExists = false
+      },
+      now: () => ++t,
+      pidTimeoutMs: 10,
+      lockTimeoutMs: 10,
+    })
+    assert.equal(result.status, 'ok')
+    assert.deepEqual(signals, [[11, 'SIGTERM']])
+  })
+
+  it('fails with the foreign pid when a leftover emulator stays up', async () => {
+    let t = 0
+    await assert.rejects(
+      () =>
+        ensureAvdFreeToBoot('verify-pixel', {
+          ourPid: null,
+          listPids: () => [87011],
+          alive: () => true,
+          inspectLocks: () => [{ name: 'multiinstance.lock', exists: true }],
+          sleep: async () => {},
+          now: () => ++t,
+          pidTimeoutMs: 3,
+          lockTimeoutMs: 3,
+        }),
+      /87011/,
+    )
   })
 })
 

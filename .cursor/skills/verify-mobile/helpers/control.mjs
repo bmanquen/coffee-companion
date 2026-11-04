@@ -16,7 +16,7 @@ import {
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { delimiter, dirname, extname, join, resolve } from 'node:path'
+import { basename, delimiter, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as sleep } from 'node:timers/promises'
 
@@ -35,6 +35,7 @@ const APP_MARKER = 'Coffee Companion'
 const HTTP_OK_MIN = 200
 const HTTP_OK_MAX = 400
 const SIGTERM = 'SIGTERM'
+const SIGKILL = 'SIGKILL'
 const LAUNCH_STATUS_TIMEOUT_MS = 60_000
 const LAUNCH_BUNDLE_TIMEOUT_MS = 120_000
 const DOCTOR_FETCH_TIMEOUT_MS = 15_000
@@ -62,6 +63,10 @@ const DEVICE_METRO_WAIT_MS = 120_000
 const METRO_LOG_TAIL_LINES = 40
 const METRO_PROGRESS_INTERVAL_MS = 15_000
 const EMULATOR_GONE_TIMEOUT_MS = 60_000
+const PID_GONE_TIMEOUT_MS = 20_000
+const PID_ESCALATE_AFTER_MS = 8_000
+const AVD_LOCK_TIMEOUT_MS = 20_000
+const AVD_LOCK_NAMES = ['hardware-qemu.ini.lock', 'multiinstance.lock']
 const SERIAL_SETTLE_TIMEOUT_MS = 45_000
 const SERIAL_STALE_KILL_AFTER_MS = 8_000
 const SERIAL_POLL_MS = 1_000
@@ -528,6 +533,111 @@ function adbEmuKillArgs(serial) {
   return ['-s', serial, 'emu', 'kill']
 }
 
+function pidGoneTick({ pid, alive }) {
+  if (!pid || !alive) return { status: 'ok' }
+  return { status: 'wait' }
+}
+
+function stopSignalTick({
+  alive,
+  elapsedMs,
+  escalated,
+  escalateAfterMs = PID_ESCALATE_AFTER_MS,
+}) {
+  if (!alive) return { status: 'ok' }
+  if (!escalated && elapsedMs >= escalateAfterMs) return { status: 'escalate' }
+  return { status: 'wait' }
+}
+
+function parseLockPid(text) {
+  const match = `${text ?? ''}`.trim().match(/^(\d+)\b/)
+  return match ? Number(match[1]) : null
+}
+
+function avdHome(env = process.env) {
+  const override = `${env.ANDROID_AVD_HOME ?? ''}`.trim()
+  if (override) return override
+  return join(homedir(), '.android', 'avd')
+}
+
+function avdLockDir(avdName, env = process.env) {
+  return join(avdHome(env), `${avdName}.avd`)
+}
+
+function avdLockPaths(avdName, env = process.env) {
+  const dir = avdLockDir(avdName, env)
+  return AVD_LOCK_NAMES.map((name) => join(dir, name))
+}
+
+function readLockPid(path) {
+  if (!existsSync(path)) return { exists: false, pid: null }
+  try {
+    return { exists: true, pid: parseLockPid(readFileSync(path, 'utf8')) }
+  } catch {
+    return { exists: true, pid: null }
+  }
+}
+
+function inspectAvdLocks(avdName, opts = {}) {
+  const paths = opts.paths ?? avdLockPaths(avdName, opts.env)
+  const readLock = opts.readLock ?? readLockPid
+  return paths.map((path) => ({ path, name: basename(path), ...readLock(path) }))
+}
+
+function avdLockTick({ locks = [] }) {
+  const held = locks.filter((lock) => lock.exists)
+  if (held.length === 0) return { status: 'ok' }
+  return { status: 'wait', locks: held.map((lock) => lock.name) }
+}
+
+function parseEmulatorAvdPids(psText, avdName) {
+  const pids = []
+  const avd = `${avdName ?? ''}`
+  if (!avd) return pids
+  for (const line of `${psText ?? ''}`.split('\n')) {
+    const match = line.match(/^\s*(\d+)\s+(\S.*)$/)
+    if (!match) continue
+    const cmd = match[2]
+    if (!/emulator|qemu-system/.test(cmd)) continue
+    if (
+      cmd.includes(`-avd ${avd}`) ||
+      cmd.includes(`@${avd}`) ||
+      cmd.includes(`/${avd}.avd`)
+    ) {
+      pids.push(Number(match[1]))
+    }
+  }
+  return pids
+}
+
+function listProcessTable() {
+  const result = runCapture('ps', ['-ax', '-o', 'pid=,command='], {
+    allowFail: true,
+  })
+  return `${result.stdout ?? ''}`
+}
+
+function runningAvdPids(avdName, opts = {}) {
+  const alive = opts.alive ?? pidAlive
+  const fromLocks = inspectAvdLocks(avdName, opts)
+    .map((lock) => lock.pid)
+    .filter((pid) => pid && alive(pid))
+  const fromPs = parseEmulatorAvdPids(
+    opts.psText ?? listProcessTable(),
+    avdName,
+  ).filter((pid) => alive(pid))
+  return [...new Set([...fromLocks, ...fromPs])]
+}
+
+function avdBusyMessage(avdName, pids) {
+  const listed = pids.join(', ')
+  return (
+    `AVD ${avdName} is already running (pid ${listed}). ` +
+    'Stop that emulator, or run `helpers/control cleanup` if this script started it. ' +
+    'Do not pass -read-only.'
+  )
+}
+
 function portFreeTick(pids) {
   return pids.length === 0 ? { status: 'ok' } : { status: 'wait', pids }
 }
@@ -538,6 +648,13 @@ function verifyDevicePlan(flow) {
     steps: ['cleanup', 'launch-device', 'doctor', 'drive-device'],
     leaveUpOnFailure: true,
   }
+}
+
+function verifyDeviceHeadline(plan) {
+  return (
+    `verify-device: ${plan.steps.join(' → ')} (${plan.flow}); ` +
+    'the instance stays up if a later step fails'
+  )
 }
 
 function parseDumpsysVersionName(text) {
@@ -1748,12 +1865,142 @@ function adbDevices() {
   return parseAdbDevices(`${result.stdout ?? ''}\n${result.stderr ?? ''}`)
 }
 
-function killEmulatorSerial({
+function signalPid(pid, signal) {
+  if (!pid) return { group: null }
+  try {
+    process.kill(-pid, signal)
+    return { group: true }
+  } catch {
+    try {
+      process.kill(pid, signal)
+      return { group: false }
+    } catch {
+      return { group: null }
+    }
+  }
+}
+
+function recordStoppedPid(pid, kind, signaled, stopped) {
+  if (signaled.group === true) stopped.push({ kind, pid, group: true })
+  else if (signaled.group === false) stopped.push({ kind, pid })
+}
+
+async function waitForPidGone(pid, timeoutMs, opts = {}) {
+  const now = opts.now ?? Date.now
+  const sleepFn = opts.sleep ?? sleep
+  const alive = opts.alive ?? pidAlive
+  const pollMs = opts.pollMs ?? SERIAL_POLL_MS
+  const start = now()
+  while (now() - start < timeoutMs) {
+    const tick = pidGoneTick({ pid, alive: alive(pid) })
+    if (tick.status === 'ok') return tick
+    await sleepFn(pollMs)
+  }
+  return pidGoneTick({ pid, alive: alive(pid) })
+}
+
+async function stopPidAndWait(pid, kind, stopped, opts = {}) {
+  const escalateAfterMs = opts.escalateAfterMs ?? PID_ESCALATE_AFTER_MS
+  const timeoutMs = opts.timeoutMs ?? PID_GONE_TIMEOUT_MS
+  const now = opts.now ?? Date.now
+  const sleepFn = opts.sleep ?? sleep
+  const alive = opts.alive ?? pidAlive
+  const signal = opts.signal ?? signalPid
+  const pollMs = opts.pollMs ?? SERIAL_POLL_MS
+  if (!pid || !alive(pid)) return { status: 'ok', escalated: false }
+  recordStoppedPid(pid, kind, signal(pid, SIGTERM), stopped)
+  const start = now()
+  let escalated = false
+  for (;;) {
+    const elapsedMs = now() - start
+    const tick = stopSignalTick({
+      alive: alive(pid),
+      elapsedMs,
+      escalated,
+      escalateAfterMs,
+    })
+    if (tick.status === 'ok') return { status: 'ok', escalated }
+    if (elapsedMs >= timeoutMs) break
+    if (tick.status === 'escalate') {
+      signal(pid, SIGKILL)
+      escalated = true
+    }
+    await sleepFn(pollMs)
+  }
+  return { status: alive(pid) ? 'timeout' : 'ok', escalated }
+}
+
+async function waitForAvdLocksReleased(avdName, timeoutMs, opts = {}) {
+  const now = opts.now ?? Date.now
+  const sleepFn = opts.sleep ?? sleep
+  const inspect = opts.inspectLocks ?? (() => inspectAvdLocks(avdName, opts))
+  const pollMs = opts.pollMs ?? SERIAL_POLL_MS
+  const start = now()
+  while (now() - start < timeoutMs) {
+    const tick = avdLockTick({ locks: inspect() })
+    if (tick.status === 'ok') return tick
+    await sleepFn(pollMs)
+  }
+  return avdLockTick({ locks: inspect() })
+}
+
+async function ensureAvdFreeToBoot(avdName, opts = {}) {
+  const ourPid = opts.ourPid ?? null
+  const stopped = opts.stopped ?? []
+  const alive = opts.alive ?? pidAlive
+  const pidsNow = () =>
+    (opts.listPids ?? (() => runningAvdPids(avdName, opts)))().filter((pid) =>
+      alive(pid),
+    )
+  for (const pid of pidsNow()) {
+    if (ourPid && pid === ourPid) {
+      await stopPidAndWait(pid, 'emulator', stopped, opts)
+    }
+  }
+  for (const pid of pidsNow()) {
+    if (pid === ourPid) continue
+    const gone = await waitForPidGone(
+      pid,
+      opts.pidTimeoutMs ?? PID_GONE_TIMEOUT_MS,
+      opts,
+    )
+    if (gone.status !== 'ok') throw new Error(avdBusyMessage(avdName, [pid]))
+  }
+  if (opts.serial) {
+    const gone = await waitForSerialGone(
+      opts.serial,
+      opts.serialTimeoutMs ?? EMULATOR_GONE_TIMEOUT_MS,
+      opts,
+    )
+    if (gone.status !== 'ok') {
+      throw new Error(
+        `Timed out waiting for ${opts.serial} to leave adb devices (still ${gone.state}).`,
+      )
+    }
+  }
+  const locks = await waitForAvdLocksReleased(
+    avdName,
+    opts.lockTimeoutMs ?? AVD_LOCK_TIMEOUT_MS,
+    opts,
+  )
+  const still = pidsNow()
+  if (still.length > 0) throw new Error(avdBusyMessage(avdName, still))
+  if (locks.status !== 'ok') {
+    throw new Error(
+      `Timed out waiting for AVD ${avdName} locks to release (${(locks.locks ?? []).join(', ')}).`,
+    )
+  }
+  return { status: 'ok' }
+}
+
+async function killEmulatorSerial({
   serial,
   pid,
   stopped = [],
+  avdName,
   run = runCapture,
   adb = adbBin,
+  ...waitOpts
 } = {}) {
   if (serial) {
     try {
@@ -1762,7 +2009,21 @@ function killEmulatorSerial({
       // adb missing — fall through to the pid
     }
   }
-  if (pid) stopRecordedPid(pid, 'emulator', stopped)
+  if (pid) await stopPidAndWait(pid, 'emulator', stopped, waitOpts)
+  if (serial) {
+    await waitForSerialGone(
+      serial,
+      waitOpts.serialTimeoutMs ?? EMULATOR_GONE_TIMEOUT_MS,
+      waitOpts,
+    )
+  }
+  if (avdName) {
+    await waitForAvdLocksReleased(
+      avdName,
+      waitOpts.lockTimeoutMs ?? AVD_LOCK_TIMEOUT_MS,
+      waitOpts,
+    )
+  }
   return stopped
 }
 
@@ -1770,7 +2031,13 @@ async function waitForSerialReady(serial, timeoutMs, opts = {}) {
   const now = opts.now ?? Date.now
   const sleepFn = opts.sleep ?? sleep
   const listDevices = opts.listDevices ?? adbDevices
-  const kill = opts.kill ?? ((target) => killEmulatorSerial({ serial: target }))
+  const kill =
+    opts.kill ??
+    ((target) =>
+      killEmulatorSerial({
+        serial: target,
+        avdName: opts.avdName,
+      }))
   const staleAfter = opts.staleAfterMs ?? SERIAL_STALE_KILL_AFTER_MS
   const pollMs = opts.pollMs ?? SERIAL_POLL_MS
   const start = now()
@@ -1785,7 +2052,7 @@ async function waitForSerialReady(serial, timeoutMs, opts = {}) {
       console.error(
         `${serial} is still ${tick.state}; killing the stale emulator`,
       )
-      kill(serial)
+      await kill(serial)
       killed = true
       lastProgressAt = elapsed
     } else if (elapsed - lastProgressAt >= INSTALL_PROGRESS_INTERVAL_MS) {
@@ -1796,7 +2063,7 @@ async function waitForSerialReady(serial, timeoutMs, opts = {}) {
   }
   const last = serialWaitTick({ serial, devices: listDevices() })
   if (last.status === 'device') return { action: 'attach', state: 'device' }
-  if (last.status !== 'gone') kill(serial)
+  if (last.status !== 'gone') await kill(serial)
   return { action: 'boot', state: last.state ?? null }
 }
 
@@ -2386,16 +2653,17 @@ function launchDeviceTeardownPlan(partial) {
   }
 }
 
-function stopLaunchDevice(partial, stopped = []) {
+async function stopLaunchDevice(partial, stopped = []) {
   const plan = launchDeviceTeardownPlan(partial)
   if (partial.expoPid) stopRecordedPid(partial.expoPid, 'expo', stopped)
   if (partial.metroPid) stopRecordedPid(partial.metroPid, 'metro', stopped)
   // A failed wait still leaves the APK we just installed. Cleanup uninstalls.
   if (plan.clearReverses) adbClearReverses(partial.serial)
   if (partial.emulatorPid) {
-    killEmulatorSerial({
+    await killEmulatorSerial({
       serial: partial.serial,
       pid: partial.emulatorPid,
+      avdName: partial.avdName,
       stopped,
     })
   }
@@ -2443,7 +2711,9 @@ async function cmdLaunchDevice() {
   )
 
   const chosenAvd = chosenAvdName()
-  const settled = await waitForSerialReady(DEVICE_SERIAL, SERIAL_SETTLE_TIMEOUT_MS)
+  const settled = await waitForSerialReady(DEVICE_SERIAL, SERIAL_SETTLE_TIMEOUT_MS, {
+    avdName: chosenAvd,
+  })
   let runningAvd = null
   if (settled.action === 'attach') {
     runningAvd = parseAvdName(
@@ -2477,6 +2747,10 @@ async function cmdLaunchDevice() {
   if (attachment.action === 'boot') {
     try {
       requireAvd(avdName, listInstalledAvds())
+      await ensureAvdFreeToBoot(avdName, {
+        ourPid: existing?.emulatorPid ?? null,
+        serial: DEVICE_SERIAL,
+      })
     } catch (error) {
       die(error.message)
     }
@@ -2525,6 +2799,7 @@ async function cmdLaunchDevice() {
   const partial = {
     serial: DEVICE_SERIAL,
     androidPackage: ANDROID_PACKAGE,
+    avdName,
     emulatorPid: null,
     metroPid: null,
     webPid: null,
@@ -2685,7 +2960,7 @@ async function cmdLaunchDevice() {
       ),
     )
   } catch (error) {
-    stopLaunchDevice(partial)
+    await stopLaunchDevice(partial)
     die(error.message)
   }
 }
@@ -3459,9 +3734,10 @@ async function cmdCleanup() {
     }
     if (state.serial) adbClearReverses(state.serial)
     if (state.emulatorPid) {
-      killEmulatorSerial({
+      await killEmulatorSerial({
         serial: state.serial,
         pid: state.emulatorPid,
+        avdName: state.avdName ?? chosenAvdName(),
         stopped,
       })
       killedSerial = state.serial ?? DEVICE_SERIAL
@@ -3502,11 +3778,7 @@ async function cmdCleanup() {
 
 async function cmdVerifyDevice(flow) {
   const plan = verifyDevicePlan(flow)
-  const headline =
-    `verify-device: ${plan.steps.join(' → ')} (${plan.flow}); ` +
-    'the instance stays up if a later step fails'
-  console.log(headline)
-  console.error(headline)
+  console.error(verifyDeviceHeadline(plan))
   await cmdCleanup()
   await cmdLaunchDevice()
   await cmdDoctor()
@@ -3618,8 +3890,20 @@ export {
   waitForPortFree,
   adbEmuKillArgs,
   killEmulatorSerial,
+  pidGoneTick,
+  stopSignalTick,
+  parseLockPid,
+  avdLockPaths,
+  avdLockTick,
+  parseEmulatorAvdPids,
+  avdBusyMessage,
+  waitForPidGone,
+  stopPidAndWait,
+  waitForAvdLocksReleased,
+  ensureAvdFreeToBoot,
   portFreeTick,
   verifyDevicePlan,
+  verifyDeviceHeadline,
   shouldRebuildApk,
   resolveEmulatorAttachment,
   deviceReadyProblems,
