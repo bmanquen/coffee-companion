@@ -85,6 +85,15 @@ describe('e2eBypassSession', () => {
     ).toBeNull()
   })
 
+  it('still bypasses on a production build running as NODE_ENV=test', () => {
+    process.env.E2E_BYPASS_AUTH = 'true'
+    process.env.NODE_ENV = 'test'
+    const session = e2eBypassSession(
+      new Headers({ cookie: `e2e_auth=${E2E_USER_WITH_DATA}` }),
+    )
+    expect(session?.user.id).toBe(E2E_USER_WITH_DATA)
+  })
+
   it('returns null when the cookie or header value is not decodable', () => {
     process.env.E2E_BYPASS_AUTH = 'true'
     expect(

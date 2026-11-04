@@ -206,6 +206,7 @@ async function cmdLaunch() {
     DATABASE_URL: databaseUrl,
     PORT: String(port),
     E2E_BYPASS_AUTH: 'true',
+    NODE_ENV: 'test',
   }
 
   console.error('Applying migrations…')

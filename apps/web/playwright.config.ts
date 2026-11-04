@@ -124,11 +124,15 @@ export default defineConfig({
         reuseExistingServer: false,
         timeout: 120_000,
         // The server inherits the environment; we pin the test database
-        // resolved above and add the test-auth bypass + port.
+        // resolved above and add the test-auth bypass + port. NODE_ENV=test
+        // is required: `vite build` produces a production artifact, and
+        // Nitro/the parent process then treat unset NODE_ENV as production,
+        // which the bypass guard refuses.
         env: {
           DATABASE_URL: process.env.DATABASE_URL!,
           PORT: String(PORT),
           E2E_BYPASS_AUTH: 'true',
+          NODE_ENV: 'test',
         },
       },
 })

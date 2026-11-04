@@ -7,10 +7,14 @@
 // not ours to test).
 //
 // Independent guards keep this safe:
-//   - production never bypasses, even if the flag is set,
+//   - a production *runtime* never bypasses, even if the flag is set,
 //   - the env var is never set in production, and
 //   - the cookie/header scopes the bypass to the test client only (so, e.g.,
 //     the public-landing test still sees the unauthenticated site).
+//
+// Playwright and verify-* boot the production *build* with NODE_ENV=test.
+// The guard keys off runtime NODE_ENV so that local/CI e2e can still
+// authenticate, while a real deploy (NODE_ENV=production) cannot.
 //
 // The value is the user id, so different test contexts can act as different
 // users (e.g. one with seeded data, one empty). Native E2E also sends
@@ -53,8 +57,10 @@ function makeSession(userId: string) {
 
 export type E2ESession = ReturnType<typeof makeSession>
 
-function isProductionRuntime(nodeEnv = process.env.NODE_ENV) {
-  return nodeEnv === 'production'
+function isProductionRuntime(env: { NODE_ENV?: string } = process.env) {
+  // Property access on the env object so a production *build* still honors
+  // the process NODE_ENV at runtime (bundlers inline `process.env.NODE_ENV`).
+  return env.NODE_ENV === 'production'
 }
 
 function decodeE2EAuthValue(value: string | undefined): string | null {
