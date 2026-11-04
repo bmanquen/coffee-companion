@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../src/db'
+import { allowE2EAuthUsers } from '../src/lib/e2e-auth'
 import { REQUEST_ID_HEADER, setLogSink } from '../src/lib/log'
 import {
   brewingDeviceTypes,
@@ -38,13 +39,16 @@ const cookieFor = (userId: string) =>
 // Builds a context per call, so each procedure is its own request — matching an
 // app that fires one query at a time, and keeping per-request state (the Plan
 // and the Shelf) from going stale across a test file.
-export const callerFor = (userId: string) =>
-  createCallerFactory(trpcRouter)(() => ({ headers: cookieFor(userId) }))
+export const callerFor = (userId: string) => {
+  allowE2EAuthUsers([userId])
+  return createCallerFactory(trpcRouter)(() => ({ headers: cookieFor(userId) }))
+}
 
 // A caller whose procedures all share one context, the way tRPC's HTTP batching
 // puts a dashboard's feeds in a single request. Use it to assert what a request
 // resolves once; prefer callerFor everywhere else.
 export const batchedCallerFor = (userId: string) => {
+  allowE2EAuthUsers([userId])
   const ctx = { headers: cookieFor(userId) }
   return createCallerFactory(trpcRouter)(ctx)
 }
@@ -219,6 +223,7 @@ export function seedUsers(
   ids: Array<string>,
   onCleanup?: () => Promise<void> | void,
 ) {
+  allowE2EAuthUsers(ids)
   beforeAll(async () => {
     await db.delete(user).where(inArray(user.id, ids))
     await db

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   E2E_AUTH_HEADER,
   E2E_USER_WITH_DATA,
+  allowE2EAuthUsers,
   e2eBypassSession,
 } from './e2e-auth'
 
@@ -57,6 +58,18 @@ describe('e2eBypassSession', () => {
     expect(
       e2eBypassSession(new Headers({ [E2E_AUTH_HEADER]: 'someone' })),
     ).toBeNull()
+  })
+
+  it('returns a session for a fixture id after it is allow-listed', () => {
+    process.env.E2E_BYPASS_AUTH = 'true'
+    expect(
+      e2eBypassSession(new Headers({ cookie: 'e2e_auth=fixture-user' })),
+    ).toBeNull()
+    allowE2EAuthUsers(['fixture-user'])
+    expect(
+      e2eBypassSession(new Headers({ cookie: 'e2e_auth=fixture-user' }))?.user
+        .id,
+    ).toBe('fixture-user')
   })
 
   it('ignores x-e2e-auth and the cookie in production even when the bypass flag is set', () => {
