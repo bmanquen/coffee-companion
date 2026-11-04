@@ -25,6 +25,7 @@
     "./db/e2e-library": "./src/db/e2e-library.ts",
     "./db/zod": "./src/db/zod.ts",
     "./lib/auth": "./src/lib/auth.ts",
+    "./lib/auth-http": "./src/lib/auth-http.ts",
     "./lib/e2e-auth": "./src/lib/e2e-auth.ts",
     "./lib/plan": "./src/lib/plan.ts",
     "./lib/allowance": "./src/lib/allowance.ts",

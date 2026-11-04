@@ -20,6 +20,21 @@ describe('requestRecord', () => {
     })
   })
 
+  it('records expo-origin so native get-session lines can be told from host probes', () => {
+    const request = new Request('https://app.test/api/auth/get-session', {
+      headers: { 'expo-origin': 'coffeecompanion:///127.0.0.1:8081' },
+    })
+
+    expect(requestRecord(request, 200, 8, 'req_2')).toEqual({
+      method: 'GET',
+      path: '/api/auth/get-session',
+      status: 200,
+      duration: 8,
+      requestId: 'req_2',
+      expoOrigin: 'coffeecompanion:///127.0.0.1:8081',
+    })
+  })
+
   it('skips assets, the favicon, the manifest, and the health check', () => {
     for (const path of [
       '/assets/index-abc123.js',

@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store'
-import { E2E_AUTH_COOKIE_NAME } from './e2e'
+import { E2E_AUTH_COOKIE_NAME, E2E_AUTH_HEADER } from './e2e'
 
 export const SESSION_STORAGE_PREFIX = 'coffee-companion'
 export const SESSION_COOKIE_KEY = `${SESSION_STORAGE_PREFIX}_cookie`
@@ -10,6 +10,26 @@ export function e2eAuthCookieStore(userId: string): string {
   return JSON.stringify({
     [E2E_AUTH_COOKIE_NAME]: { value: userId, expires: null },
   })
+}
+
+export function e2eAuthUserFromCookieStore(raw: string | null): string | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as Record<string, { value?: string }>
+    const value = parsed[E2E_AUTH_COOKIE_NAME].value
+    if (typeof value !== 'string') return null
+    const trimmed = value.trim()
+    return trimmed ? trimmed : null
+  } catch {
+    return null
+  }
+}
+
+export function e2eAuthRequestHeaders(userId: string): Record<string, string> {
+  return {
+    cookie: `${E2E_AUTH_COOKIE_NAME}=${userId}`,
+    [E2E_AUTH_HEADER]: userId,
+  }
 }
 
 export function writeE2EAuthCookie(userId: string): void {

@@ -13,10 +13,16 @@ import {
   SignInCancelled,
   SignInConflict,
   SignInUnavailable,
+  failureMessage,
 } from './errors'
 import { signInWithGoogle, signOutGoogle } from './google'
+import { logAuthFailure, serverFailureDetail } from './log'
 import { e2eSignInUser } from './e2e'
-import { clearSessionStore, writeE2EAuthCookie } from './session-store'
+import {
+  clearSessionStore,
+  e2eAuthRequestHeaders,
+  writeE2EAuthCookie,
+} from './session-store'
 
 export type AuthMode = 'sign-in' | 'sign-up'
 
@@ -75,7 +81,12 @@ export function useAuth(): Auth {
         })
         return
       }
-      setError({ title: ERROR_SIGN_IN_FAILED })
+      const message = failureMessage(caught)
+      logAuthFailure('sign-in', { ...serverFailureDetail(caught), message })
+      setError({
+        title: ERROR_SIGN_IN_FAILED,
+        ...(__DEV__ ? { body: message } : {}),
+      })
     } finally {
       setBusy(false)
     }
@@ -96,7 +107,9 @@ export function useAuth(): Auth {
         const user = e2eSignInUser()
         if (!user) return
         writeE2EAuthCookie(user)
-        const result = (await authClient.getSession()) as {
+        const result = (await authClient.getSession({
+          fetchOptions: { headers: e2eAuthRequestHeaders(user) },
+        })) as {
           data?: AuthSession | null
           error?: unknown
         }

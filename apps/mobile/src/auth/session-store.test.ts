@@ -1,9 +1,11 @@
-import { E2E_AUTH_COOKIE_NAME, E2E_USER_WITH_DATA } from './e2e'
+import { E2E_AUTH_COOKIE_NAME, E2E_AUTH_HEADER, E2E_USER_WITH_DATA } from './e2e'
 import {
   SESSION_COOKIE_KEY,
   SESSION_DATA_KEY,
   clearSessionStore,
   e2eAuthCookieStore,
+  e2eAuthRequestHeaders,
+  e2eAuthUserFromCookieStore,
   writeE2EAuthCookie,
 } from './session-store'
 
@@ -29,6 +31,18 @@ describe('writeE2EAuthCookie', () => {
     expect(JSON.parse(e2eAuthCookieStore(E2E_USER_WITH_DATA))).toEqual({
       [E2E_AUTH_COOKIE_NAME]: { value: E2E_USER_WITH_DATA, expires: null },
     })
+  })
+})
+
+describe('e2eAuthRequestHeaders', () => {
+  it('sends Cookie and x-e2e-auth for the expoClient cookie map', () => {
+    expect(e2eAuthRequestHeaders(E2E_USER_WITH_DATA)).toEqual({
+      cookie: `${E2E_AUTH_COOKIE_NAME}=${E2E_USER_WITH_DATA}`,
+      [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA,
+    })
+    expect(
+      e2eAuthUserFromCookieStore(e2eAuthCookieStore(E2E_USER_WITH_DATA)),
+    ).toBe(E2E_USER_WITH_DATA)
   })
 })
 

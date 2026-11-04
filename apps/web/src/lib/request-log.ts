@@ -9,6 +9,7 @@ export type RequestRecord = {
   status: number
   duration: number
   requestId: string
+  expoOrigin?: string
 }
 
 export function requestId(request: Request): string {
@@ -24,7 +25,17 @@ export function requestRecord(
 ): RequestRecord | null {
   const path = new URL(request.url).pathname
   if (path.startsWith('/assets/') || SKIPPED_PATHS.has(path)) return null
-  return { method: request.method, path, status, duration, requestId: id }
+  const expoOrigin = request.headers.get('expo-origin')?.trim()
+  return expoOrigin
+    ? {
+        method: request.method,
+        path,
+        status,
+        duration,
+        requestId: id,
+        expoOrigin,
+      }
+    : { method: request.method, path, status, duration, requestId: id }
 }
 
 function withRequestIdHeader(response: Response, id: string): Response {

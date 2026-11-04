@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   APP_SCHEME_ORIGIN,
+  EXPO_DEV_CLIENT_ORIGIN,
   EXPO_DEV_ORIGIN,
   trustedAuthOrigins,
 } from './auth-origins'
@@ -13,16 +14,19 @@ describe('trustedAuthOrigins', () => {
       BASE_URL,
       APP_SCHEME_ORIGIN,
       EXPO_DEV_ORIGIN,
+      EXPO_DEV_CLIENT_ORIGIN,
     ])
     expect(trustedAuthOrigins(BASE_URL, 'test')).toEqual([
       BASE_URL,
       APP_SCHEME_ORIGIN,
       EXPO_DEV_ORIGIN,
+      EXPO_DEV_CLIENT_ORIGIN,
     ])
     expect(trustedAuthOrigins(BASE_URL, undefined)).toEqual([
       BASE_URL,
       APP_SCHEME_ORIGIN,
       EXPO_DEV_ORIGIN,
+      EXPO_DEV_CLIENT_ORIGIN,
     ])
     expect(trustedAuthOrigins(BASE_URL, 'production')).toEqual([
       BASE_URL,
@@ -35,6 +39,7 @@ describe('trustedAuthOrigins', () => {
       'http://127.0.0.1:3910',
       APP_SCHEME_ORIGIN,
       EXPO_DEV_ORIGIN,
+      EXPO_DEV_CLIENT_ORIGIN,
       'http://localhost:3910',
       'http://10.0.2.2:3910',
     ])

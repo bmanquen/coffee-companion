@@ -1747,4 +1747,41 @@ describe('summarizeAuthFailure', () => {
     assert.match(summary, /still on sign-in-screen/)
     assert.match(summary, /Network request failed/)
   })
+
+  it('includes the exact sign-in error and app get-session status', () => {
+    const summary = summarizeAuthFailure({
+      dump: `<node content-desc="${SIGN_IN_TEST_ID}"/><node content-desc="sign-in-error"><node text="We couldn't sign you in. Try again."/><node text="E2E get-session returned no session"/></node>`,
+      logcat: '',
+      webLog: `${JSON.stringify({
+        method: 'GET',
+        path: '/api/auth/get-session',
+        status: 200,
+        requestId: 'host',
+      })}\n${JSON.stringify({
+        method: 'GET',
+        path: '/api/auth/get-session',
+        status: 403,
+        expoOrigin: 'coffeecompanion:///127.0.0.1:8081',
+        requestId: 'app',
+      })}\n`,
+    })
+    assert.match(summary, /still on sign-in-screen/)
+    assert.match(summary, /E2E get-session returned no session/)
+    assert.match(summary, /app get-session status 403/)
+    assert.doesNotMatch(summary, /app get-session status 200/)
+  })
+
+  it('reads app get-session status from pino-pretty request lines', () => {
+    const summary = summarizeAuthFailure({
+      dump: `<node content-desc="${SIGN_IN_TEST_ID}"/>`,
+      logcat: '',
+      webLog: `[16:00:00] INFO: request
+    method: "GET"
+    path: "/api/auth/get-session"
+    status: 200
+    expoOrigin: "coffeecompanion:///127.0.0.1:8081"
+`,
+    })
+    assert.match(summary, /app get-session status 200/)
+  })
 })

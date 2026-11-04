@@ -1,17 +1,23 @@
 // Test-only authentication bypass for end-to-end tests.
 //
 // When E2E_BYPASS_AUTH=true AND the request carries an `e2e_auth=<userId>`
-// cookie, the request is treated as authenticated as that user. This lets the
-// authenticated-page e2e tests run without exercising the real Google OAuth /
-// session machinery (which is better-auth's concern, not ours to test).
+// cookie or `x-e2e-auth` header, the request is treated as authenticated as
+// that user. This lets the authenticated-page e2e tests run without exercising
+// the real Google OAuth / session machinery (which is better-auth's concern,
+// not ours to test).
 //
 // Two independent guards keep this safe:
 //   - the env var is never set in production, and
-//   - the cookie scopes the bypass to the test browser only (so, e.g., the
-//     public-landing test still sees the unauthenticated site).
+//   - the cookie/header scopes the bypass to the test client only (so, e.g.,
+//     the public-landing test still sees the unauthenticated site).
 //
-// The cookie value is the user id, so different test contexts can act as
-// different users (e.g. one with seeded data, one empty).
+// The value is the user id, so different test contexts can act as different
+// users (e.g. one with seeded data, one empty). Native E2E also sends
+// `x-e2e-auth` because React Native fetch treats Cookie as forbidden and the
+// Expo client sets credentials: omit, so a SecureStore cookie map never
+// arrives as a Cookie header the way a browser document cookie does.
+export const E2E_AUTH_COOKIE_NAME = 'e2e_auth'
+export const E2E_AUTH_HEADER = 'x-e2e-auth'
 export const E2E_USER_WITH_DATA = 'e2e-user-with-data'
 export const E2E_USER_EMPTY = 'e2e-user-empty'
 // Holds the same library as E2E_USER_WITH_DATA but no Grant, so the two of them
@@ -46,11 +52,19 @@ function makeSession(userId: string) {
 
 export type E2ESession = ReturnType<typeof makeSession>
 
+function e2eAuthUserId(headers: Headers): string | null {
+  const cookie = headers.get('cookie') ?? ''
+  const match = cookie.match(
+    new RegExp(`(?:^|;\\s*)${E2E_AUTH_COOKIE_NAME}=([^;]+)`),
+  )
+  const fromCookie = match ? decodeURIComponent(match[1].trim()) : ''
+  if (fromCookie) return fromCookie
+  const fromHeader = headers.get(E2E_AUTH_HEADER)?.trim()
+  return fromHeader ? decodeURIComponent(fromHeader) : null
+}
+
 export function e2eBypassSession(headers: Headers): E2ESession | null {
   if (process.env.E2E_BYPASS_AUTH !== 'true') return null
-  const cookie = headers.get('cookie') ?? ''
-  const match = cookie.match(/(?:^|;\s*)e2e_auth=([^;]+)/)
-  if (!match) return null
-  const userId = decodeURIComponent(match[1].trim())
+  const userId = e2eAuthUserId(headers)
   return userId ? makeSession(userId) : null
 }

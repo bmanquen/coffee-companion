@@ -40,6 +40,7 @@ jest.mock('./google', () => ({
 }))
 
 jest.mock('./session-store', () => ({
+  ...jest.requireActual('./session-store'),
   clearSessionStore: () => mocks.clearSessionStore(),
   writeE2EAuthCookie: (userId: string) => mocks.writeE2EAuthCookie(userId),
 }))
@@ -48,12 +49,15 @@ jest.mock('./auth-client', () => ({
   authClient: {
     useSession: () => ({ data: mocks.session, isPending: mocks.pending }),
     signOut: () => mocks.signOut(),
-    getSession: () => mocks.getSession(),
+    getSession: (...args: Array<unknown>) => mocks.getSession(...args),
   },
 }))
 
 describe('useAuth', () => {
+  let consoleError: jest.SpyInstance
+
   beforeEach(() => {
+    consoleError = jest.spyOn(console, 'error').mockImplementation(() => {})
     mocks.signInWithGoogle.mockReset()
     mocks.signInWithApple.mockReset()
     mocks.signOutGoogle.mockReset()
@@ -64,6 +68,10 @@ describe('useAuth', () => {
     mocks.appleAvailable = true
     mocks.session = null
     mocks.pending = false
+  })
+
+  afterEach(() => {
+    consoleError.mockRestore()
   })
 
   it('swallows a cancelled press', async () => {
@@ -96,7 +104,10 @@ describe('useAuth', () => {
     await act(async () => {
       await result.current.signInGoogle()
     })
-    expect(result.current.error).toEqual({ title: ERROR_SIGN_IN_FAILED })
+    expect(result.current.error).toEqual({
+      title: ERROR_SIGN_IN_FAILED,
+      body: 'failed',
+    })
 
     mocks.signInWithGoogle.mockRejectedValueOnce(new SignInConflict())
     await act(async () => {
@@ -165,7 +176,14 @@ describe('useAuth', () => {
     })
 
     expect(mocks.writeE2EAuthCookie).toHaveBeenCalledWith(E2E_USER_WITH_DATA)
-    expect(mocks.getSession).toHaveBeenCalled()
+    expect(mocks.getSession).toHaveBeenCalledWith({
+      fetchOptions: {
+        headers: {
+          cookie: `e2e_auth=${E2E_USER_WITH_DATA}`,
+          'x-e2e-auth': E2E_USER_WITH_DATA,
+        },
+      },
+    })
     expect(result.current.error).toBeNull()
     if (previous === undefined) delete process.env[E2E_USER_ENV]
     else process.env[E2E_USER_ENV] = previous
@@ -181,7 +199,10 @@ describe('useAuth', () => {
       await result.current.signInE2E()
     })
 
-    expect(result.current.error).toEqual({ title: ERROR_SIGN_IN_FAILED })
+    expect(result.current.error).toEqual({
+      title: ERROR_SIGN_IN_FAILED,
+      body: 'E2E get-session returned no session',
+    })
     if (previous === undefined) delete process.env[E2E_USER_ENV]
     else process.env[E2E_USER_ENV] = previous
   })

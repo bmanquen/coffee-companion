@@ -67,6 +67,7 @@ const PORT_FREE_TIMEOUT_MS = 15_000
 const PORT_FREE_POLL_MS = 500
 const DEFAULT_VERIFY_DEVICE_FLOW = 'sign-in-and-out'
 const SIGN_IN_TEST_ID = 'sign-in-screen'
+const SIGN_IN_ERROR_TEST_ID = 'sign-in-error'
 const WELCOME_SCREEN_TEST_ID = 'welcome-screen'
 const DEV_LAUNCHER_MARKERS = [
   'Development servers',
@@ -1051,29 +1052,84 @@ function adbLogcatDump(serial) {
   }`
 }
 
+function signInErrorTexts(dump) {
+  const text = `${dump ?? ''}`
+  const idx = text.indexOf(SIGN_IN_ERROR_TEST_ID)
+  if (idx < 0) return []
+  const window = text.slice(Math.max(0, idx - 800), idx + 2000)
+  const seen = new Set()
+  const texts = []
+  for (const match of window.matchAll(/\btext="([^"]+)"/g)) {
+    const value = match[1]
+    if (!value || value === SIGN_IN_ERROR_TEST_ID || seen.has(value)) continue
+    seen.add(value)
+    texts.push(value)
+  }
+  return texts
+}
+
+function getSessionStatusesFromWebLog(webLog, { appOnly = false } = {}) {
+  const statuses = []
+  for (const line of `${webLog ?? ''}`.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('{')) continue
+    let rec
+    try {
+      rec = JSON.parse(trimmed)
+    } catch {
+      continue
+    }
+    if (rec.path !== E2E_GET_SESSION_PATH) continue
+    if (appOnly && !rec.expoOrigin) continue
+    if (typeof rec.status === 'number') statuses.push(rec.status)
+  }
+  for (const match of `${webLog ?? ''}`.matchAll(
+    /path:\s*"\/api\/auth\/get-session"([\s\S]{0,500})/g,
+  )) {
+    const window = match[1] ?? ''
+    const statusMatch = window.match(/status:\s*(\d+)/)
+    if (!statusMatch) continue
+    if (appOnly && !/expoOrigin:/.test(window)) continue
+    statuses.push(Number(statusMatch[1]))
+  }
+  return statuses
+}
+
 function summarizeAuthFailure({ dump = '', logcat = '', webLog = '' } = {}) {
   const haystack = `${dump}\n${logcat}\n${webLog}`
   const clues = []
   if (dump.includes(SIGN_IN_TEST_ID) && !dump.includes(WELCOME_SCREEN_TEST_ID)) {
     clues.push(`still on ${SIGN_IN_TEST_ID}`)
   }
-  if (/couldn't sign you in/i.test(haystack)) {
+  const errorTexts = signInErrorTexts(dump)
+  if (errorTexts.length > 0) {
+    clues.push(`sign-in error: ${errorTexts.join(' / ')}`)
+  } else if (/couldn't sign you in/i.test(haystack)) {
     clues.push('sign-in error copy is visible')
   }
   const needles = [
+    /E2E get-session returned no session/i,
     /Network request failed/i,
     /Failed to connect/i,
-    /get-session/i,
-    /E2E get-session returned no session/i,
     /trusted origin/i,
     /CORS/i,
     /E2E_BYPASS_AUTH/i,
     /10\.0\.2\.2/,
-    /status\s+403/i,
   ]
   for (const needle of needles) {
     const match = haystack.match(needle)
-    if (match) clues.push(match[0])
+    if (match && !clues.some((clue) => clue.includes(match[0]))) {
+      clues.push(match[0])
+    }
+  }
+  const appStatuses = getSessionStatusesFromWebLog(webLog, { appOnly: true })
+  if (appStatuses.length > 0) {
+    clues.push(`app get-session status ${appStatuses.join(',')}`)
+  } else {
+    const statuses = getSessionStatusesFromWebLog(webLog)
+    if (statuses.length > 0) {
+      clues.push(`get-session status ${statuses.join(',')}`)
+    }
   }
   return clues.length > 0
     ? clues.join('; ')
