@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { appleSignInAvailable, signInWithApple } from './apple'
-import { authClient } from './auth-client'
+import { authClient, refetchClientSession } from './auth-client'
 import {
   ERROR_PLAY_SERVICES,
   ERROR_SIGN_IN_CONFLICT_BODY,
@@ -18,11 +18,7 @@ import {
 import { signInWithGoogle, signOutGoogle } from './google'
 import { logAuthFailure, serverFailureDetail } from './log'
 import { e2eSignInUser } from './e2e'
-import {
-  clearSessionStore,
-  e2eAuthRequestHeaders,
-  writeE2EAuthCookie,
-} from './session-store'
+import { clearSessionStore, writeE2EAuthCookie } from './session-store'
 
 export type AuthMode = 'sign-in' | 'sign-up'
 
@@ -107,14 +103,9 @@ export function useAuth(): Auth {
         const user = e2eSignInUser()
         if (!user) return
         writeE2EAuthCookie(user)
-        const result = (await authClient.getSession({
-          fetchOptions: { headers: e2eAuthRequestHeaders(user) },
-        })) as {
-          data?: AuthSession | null
-          error?: unknown
-        }
-        if (!result.data) {
-          throw result.error ?? new Error('E2E get-session returned no session')
+        const data = await refetchClientSession()
+        if (!data?.user) {
+          throw new Error('E2E get-session returned no session')
         }
       }),
     signOut: async () => {

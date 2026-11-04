@@ -10,6 +10,7 @@ export type RequestRecord = {
   duration: number
   requestId: string
   expoOrigin?: string
+  e2eAuth?: boolean
 }
 
 export function requestId(request: Request): string {
@@ -26,16 +27,19 @@ export function requestRecord(
   const path = new URL(request.url).pathname
   if (path.startsWith('/assets/') || SKIPPED_PATHS.has(path)) return null
   const expoOrigin = request.headers.get('expo-origin')?.trim()
-  return expoOrigin
-    ? {
-        method: request.method,
-        path,
-        status,
-        duration,
-        requestId: id,
-        expoOrigin,
-      }
-    : { method: request.method, path, status, duration, requestId: id }
+  const e2eAuth =
+    path.endsWith('/get-session')
+      ? Boolean(request.headers.get('x-e2e-auth')?.trim())
+      : undefined
+  return {
+    method: request.method,
+    path,
+    status,
+    duration,
+    requestId: id,
+    ...(expoOrigin ? { expoOrigin } : {}),
+    ...(e2eAuth !== undefined ? { e2eAuth } : {}),
+  }
 }
 
 function withRequestIdHeader(response: Response, id: string): Response {

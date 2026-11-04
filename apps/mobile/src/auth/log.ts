@@ -1,3 +1,15 @@
+import {
+  authResponseSessionSummary,
+  hasE2EAuthHeader,
+  headerNames,
+  withE2EAuthHeader,
+} from './e2e'
+import {
+  SESSION_COOKIE_KEY,
+  e2eAuthUserFromCookieStore,
+  sessionStore,
+} from './session-store'
+
 export const AUTH_LOG_PREFIX = '[auth]'
 
 export function authErrorCode(error: unknown): string | null {
@@ -54,12 +66,33 @@ export function logAuthRequest(
   url: string,
   status?: number,
   isDev = __DEV__,
+  headerInfo?: { names: Array<string>; e2eAuth: boolean },
+  sessionSummary?: string,
 ) {
   if (!isDev) return
   if (!url) return
   const parts = [`${AUTH_LOG_PREFIX} request ${url}`]
   if (status != null) parts.push(`status=${status}`)
+  if (headerInfo) {
+    parts.push(`headers=${headerInfo.names.join(',') || 'none'}`)
+    parts.push(`e2e-auth=${headerInfo.e2eAuth ? '1' : '0'}`)
+  }
+  if (sessionSummary) parts.push(`session=${sessionSummary}`)
   console.log(parts.join(' '))
+}
+
+async function sessionSummaryFromResponse(response: Response): Promise<string> {
+  try {
+    const text = await response.clone().text()
+    if (!text) return 'empty'
+    try {
+      return authResponseSessionSummary(JSON.parse(text) as unknown)
+    } catch {
+      return 'non-json'
+    }
+  } catch {
+    return 'unreadable'
+  }
 }
 
 export async function loggedAuthFetch(
@@ -68,18 +101,27 @@ export async function loggedAuthFetch(
   isDev = __DEV__,
   impl: typeof fetch = globalThis.fetch,
 ): Promise<Response> {
+  const userId = e2eAuthUserFromCookieStore(
+    sessionStore.getItem(SESSION_COOKIE_KEY),
+  )
+  const next = withE2EAuthHeader(init, userId)
   const url =
     typeof input === 'string'
       ? input
       : input instanceof URL
         ? input.href
         : input.url
+  const headerInfo = {
+    names: headerNames(next.headers),
+    e2eAuth: hasE2EAuthHeader(next.headers),
+  }
   try {
-    const response = await impl(input as RequestInfo, init)
-    logAuthRequest(url, response.status, isDev)
+    const response = await impl(input as RequestInfo, next)
+    const sessionSummary = await sessionSummaryFromResponse(response)
+    logAuthRequest(url, response.status, isDev, headerInfo, sessionSummary)
     return response
   } catch (error) {
-    logAuthRequest(url, undefined, isDev)
+    logAuthRequest(url, undefined, isDev, headerInfo)
     throw error
   }
 }

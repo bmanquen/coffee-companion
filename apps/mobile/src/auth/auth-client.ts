@@ -63,3 +63,20 @@ export const authClient = createAuthClient({
     }) as BetterAuthClientPlugin,
   ],
 })
+
+type SessionAtom = {
+  get: () => {
+    data: { user?: { id?: string } | null } | null
+    refetch: () => Promise<unknown>
+  }
+}
+
+// getSession does not notify useSession, and the bypass body has no Set-Cookie
+// for expoClient to pick up. Refetch the atom after writing the E2E cookie.
+export async function refetchClientSession() {
+  const session = (
+    authClient as unknown as { $store: { atoms: { session: SessionAtom } } }
+  ).$store.atoms.session
+  await session.get().refetch()
+  return session.get().data
+}

@@ -1,4 +1,13 @@
-import { E2E_USER_ENV, E2E_USER_WITH_DATA, e2eSignInUser } from './e2e'
+import {
+  E2E_AUTH_HEADER,
+  E2E_USER_ENV,
+  E2E_USER_WITH_DATA,
+  authResponseSessionSummary,
+  e2eSignInUser,
+  hasE2EAuthHeader,
+  headerNames,
+  withE2EAuthHeader,
+} from './e2e'
 
 describe('e2eSignInUser', () => {
   const original = process.env[E2E_USER_ENV]
@@ -19,5 +28,26 @@ describe('e2eSignInUser', () => {
 
   it('is unreachable in a production build even when the env is set', () => {
     expect(e2eSignInUser(E2E_USER_WITH_DATA, false)).toBeNull()
+  })
+})
+
+describe('withE2EAuthHeader', () => {
+  it('sets x-e2e-auth on a Headers object so RN fetch cannot drop it as Cookie', () => {
+    const next = withE2EAuthHeader(
+      { headers: { cookie: `e2e_auth=${E2E_USER_WITH_DATA}` } },
+      E2E_USER_WITH_DATA,
+    )
+    const headers = new Headers(next.headers)
+    expect(headers.get(E2E_AUTH_HEADER)).toBe(E2E_USER_WITH_DATA)
+    expect(hasE2EAuthHeader(next.headers)).toBe(true)
+    expect(headerNames(next.headers)).toEqual(['cookie', 'x-e2e-auth'])
+  })
+
+  it('summarizes a session body as the user id or null', () => {
+    expect(authResponseSessionSummary(null)).toBe('null')
+    expect(authResponseSessionSummary({ user: null })).toBe('user=null')
+    expect(
+      authResponseSessionSummary({ user: { id: E2E_USER_WITH_DATA } }),
+    ).toBe(`user=${E2E_USER_WITH_DATA}`)
   })
 })

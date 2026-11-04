@@ -1,3 +1,5 @@
+import * as SecureStore from 'expo-secure-store'
+import { E2E_AUTH_HEADER, E2E_USER_WITH_DATA } from './e2e'
 import {
   AUTH_LOG_PREFIX,
   logApiBaseUrl,
@@ -6,6 +8,7 @@ import {
   loggedAuthFetch,
   serverFailureDetail,
 } from './log'
+import { writeE2EAuthCookie } from './session-store'
 
 describe('logAuthFailure', () => {
   it('writes a prefixed code and message in development and stays silent in production', () => {
@@ -83,6 +86,18 @@ describe('logAuthRequest', () => {
     )
 
     log.mockClear()
+    logAuthRequest(
+      'http://127.0.0.1:3910/api/auth/get-session',
+      200,
+      true,
+      { names: ['expo-origin', 'x-e2e-auth'], e2eAuth: true },
+      'user=e2e-user-with-data',
+    )
+    expect(log).toHaveBeenCalledWith(
+      `${AUTH_LOG_PREFIX} request http://127.0.0.1:3910/api/auth/get-session status=200 headers=expo-origin,x-e2e-auth e2e-auth=1 session=user=e2e-user-with-data`,
+    )
+
+    log.mockClear()
     logAuthRequest('http://127.0.0.1:3910/api/auth/get-session', 200, false)
     expect(log).not.toHaveBeenCalled()
     log.mockRestore()
@@ -92,7 +107,7 @@ describe('logAuthRequest', () => {
 describe('loggedAuthFetch', () => {
   it('logs status on success and still logs the URL when fetch throws', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {})
-    const ok = { status: 200 } as Response
+    const ok = new Response('null', { status: 200 })
     const impl = jest.fn(() => Promise.resolve(ok))
 
     await expect(
@@ -104,7 +119,7 @@ describe('loggedAuthFetch', () => {
       ),
     ).resolves.toBe(ok)
     expect(log).toHaveBeenCalledWith(
-      `${AUTH_LOG_PREFIX} request http://127.0.0.1:3910/api/auth/get-session status=200`,
+      `${AUTH_LOG_PREFIX} request http://127.0.0.1:3910/api/auth/get-session status=200 headers=none e2e-auth=0 session=null`,
     )
 
     log.mockClear()
@@ -118,8 +133,46 @@ describe('loggedAuthFetch', () => {
       ),
     ).rejects.toThrow('network')
     expect(log).toHaveBeenCalledWith(
-      `${AUTH_LOG_PREFIX} request http://127.0.0.1:8081/api/auth/get-session`,
+      `${AUTH_LOG_PREFIX} request http://127.0.0.1:8081/api/auth/get-session headers=none e2e-auth=0`,
     )
     log.mockRestore()
+  })
+
+  it('sets x-e2e-auth from the cookie store on the outgoing request', async () => {
+    const memory = new Map<string, string>()
+    jest.mocked(SecureStore.getItem).mockImplementation((key) => memory.get(key) ?? null)
+    jest.mocked(SecureStore.setItem).mockImplementation((key, value) => {
+      memory.set(key, value)
+    })
+    writeE2EAuthCookie(E2E_USER_WITH_DATA)
+
+    let outgoing: RequestInit | undefined
+    const impl = jest.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      outgoing = init
+      return Promise.resolve(
+        new Response(JSON.stringify({ user: { id: E2E_USER_WITH_DATA } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    })
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+
+    await loggedAuthFetch(
+      'http://127.0.0.1:3910/api/auth/get-session',
+      { headers: { 'expo-origin': 'coffeecompanion://' } },
+      true,
+      impl,
+    )
+
+    expect(new Headers(outgoing?.headers).get(E2E_AUTH_HEADER)).toBe(
+      E2E_USER_WITH_DATA,
+    )
+    expect(log).toHaveBeenCalledWith(
+      `${AUTH_LOG_PREFIX} request http://127.0.0.1:3910/api/auth/get-session status=200 headers=expo-origin,x-e2e-auth e2e-auth=1 session=user=${E2E_USER_WITH_DATA}`,
+    )
+    log.mockRestore()
+    jest.mocked(SecureStore.getItem).mockReset()
+    jest.mocked(SecureStore.setItem).mockReset()
   })
 })

@@ -1226,6 +1226,19 @@ function summarizeAuthFailure({ dump = '', logcat = '', webLog = '' } = {}) {
       clues.push(`get-session status ${statuses.join(',')}`)
     }
   }
+  const stillSignedOut =
+    dump.includes(SIGN_IN_TEST_ID) && !dump.includes(WELCOME_SCREEN_TEST_ID)
+  const appReturnedOk = appStatuses.includes(HTTP_OK_MIN)
+  const sessionWasNull =
+    /session=(null|user=null|empty)\b/i.test(logcat) ||
+    /sessionUser:\s*null/.test(webLog)
+  if (
+    stillSignedOut &&
+    appReturnedOk &&
+    (sessionWasNull || errorTexts.length === 0)
+  ) {
+    clues.push('get-session 200 but null session')
+  }
   return clues.length > 0
     ? clues.join('; ')
     : 'no auth error string found in dump/logcat/web log'
@@ -1564,10 +1577,13 @@ function stampMobileExpoPublicEnv(values, { dotenvPath, backupDir } = {}) {
   ensureDir(dirname(path))
   ensureDir(dir)
   const existed = existsSync(path)
+  const backup = join(dir, MOBILE_DOTENV_BACKUP)
+  const created = join(dir, MOBILE_DOTENV_CREATED)
   if (existed) {
-    copyFileSync(path, join(dir, MOBILE_DOTENV_BACKUP))
-  } else {
-    writeFileSync(join(dir, MOBILE_DOTENV_CREATED), '1\n')
+    // Keep the first backup so a second stamp cannot clobber the user's file.
+    if (!existsSync(backup)) copyFileSync(path, backup)
+  } else if (!existsSync(created)) {
+    writeFileSync(created, '1\n')
   }
   const previous = existed ? readFileSync(path, 'utf8') : ''
   const publicValues = Object.fromEntries(

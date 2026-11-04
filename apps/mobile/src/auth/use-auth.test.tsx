@@ -22,6 +22,7 @@ const mocks = {
   signOutGoogle: jest.fn(),
   signOut: jest.fn(),
   getSession: jest.fn(),
+  refetchClientSession: jest.fn(),
   clearSessionStore: jest.fn(),
   writeE2EAuthCookie: jest.fn(),
   appleAvailable: true,
@@ -51,6 +52,7 @@ jest.mock('./auth-client', () => ({
     signOut: () => mocks.signOut(),
     getSession: (...args: Array<unknown>) => mocks.getSession(...args),
   },
+  refetchClientSession: () => mocks.refetchClientSession(),
 }))
 
 describe('useAuth', () => {
@@ -63,6 +65,7 @@ describe('useAuth', () => {
     mocks.signOutGoogle.mockReset()
     mocks.signOut.mockReset()
     mocks.getSession.mockReset()
+    mocks.refetchClientSession.mockReset()
     mocks.clearSessionStore.mockReset()
     mocks.writeE2EAuthCookie.mockReset()
     mocks.appleAvailable = true
@@ -163,11 +166,11 @@ describe('useAuth', () => {
     expect(mocks.clearSessionStore).toHaveBeenCalled()
   })
 
-  it('writes the e2e cookie and asks the auth client for the session', async () => {
+  it('writes the e2e cookie and refetches the session atom', async () => {
     const previous = process.env[E2E_USER_ENV]
     process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
-    mocks.getSession.mockResolvedValueOnce({
-      data: { user: { name: 'E2E Tester', email: 'e2e-user-with-data@example.com' } },
+    mocks.refetchClientSession.mockResolvedValueOnce({
+      user: { name: 'E2E Tester', email: 'e2e-user-with-data@example.com' },
     })
     const { result } = await renderHook(() => useAuth())
 
@@ -176,14 +179,7 @@ describe('useAuth', () => {
     })
 
     expect(mocks.writeE2EAuthCookie).toHaveBeenCalledWith(E2E_USER_WITH_DATA)
-    expect(mocks.getSession).toHaveBeenCalledWith({
-      fetchOptions: {
-        headers: {
-          cookie: `e2e_auth=${E2E_USER_WITH_DATA}`,
-          'x-e2e-auth': E2E_USER_WITH_DATA,
-        },
-      },
-    })
+    expect(mocks.refetchClientSession).toHaveBeenCalled()
     expect(result.current.error).toBeNull()
     if (previous === undefined) delete process.env[E2E_USER_ENV]
     else process.env[E2E_USER_ENV] = previous
@@ -192,7 +188,7 @@ describe('useAuth', () => {
   it('surfaces a failed e2e get-session instead of staying silently signed out', async () => {
     const previous = process.env[E2E_USER_ENV]
     process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
-    mocks.getSession.mockResolvedValueOnce({ data: null })
+    mocks.refetchClientSession.mockResolvedValueOnce(null)
     const { result } = await renderHook(() => useAuth())
 
     await act(async () => {
@@ -217,7 +213,7 @@ describe('useAuth', () => {
     })
 
     expect(mocks.writeE2EAuthCookie).not.toHaveBeenCalled()
-    expect(mocks.getSession).not.toHaveBeenCalled()
+    expect(mocks.refetchClientSession).not.toHaveBeenCalled()
     if (previous === undefined) delete process.env[E2E_USER_ENV]
     else process.env[E2E_USER_ENV] = previous
   })

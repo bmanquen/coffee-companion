@@ -32,6 +32,26 @@ describe('requestRecord', () => {
       duration: 8,
       requestId: 'req_2',
       expoOrigin: 'coffeecompanion:///127.0.0.1:8081',
+      e2eAuth: false,
+    })
+  })
+
+  it('records whether x-e2e-auth was present on get-session', () => {
+    const request = new Request('https://app.test/api/auth/get-session', {
+      headers: {
+        'expo-origin': 'coffeecompanion:///127.0.0.1:8081',
+        'x-e2e-auth': 'e2e-user-with-data',
+      },
+    })
+
+    expect(requestRecord(request, 200, 8, 'req_3')).toEqual({
+      method: 'GET',
+      path: '/api/auth/get-session',
+      status: 200,
+      duration: 8,
+      requestId: 'req_3',
+      expoOrigin: 'coffeecompanion:///127.0.0.1:8081',
+      e2eAuth: true,
     })
   })
 

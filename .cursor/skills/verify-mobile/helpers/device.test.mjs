@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -743,6 +743,47 @@ describe('stampMobileExpoPublicEnv', () => {
       assert.equal(
         readFileSync(dotenvPath, 'utf8').includes('OTHER='),
         false,
+      )
+      restoreMobileExpoPublicEnv({ dotenvPath, backupDir })
+      assert.equal(
+        readFileSync(dotenvPath, 'utf8'),
+        'EXPO_PUBLIC_API_URL=http://localhost:3000\n',
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('deletes a helper-created .env.development.local and leaves a missing file missing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cc-dotenv-new-'))
+    const dotenvPath = join(root, '.env.development.local')
+    const backupDir = join(root, 'run')
+    try {
+      stampMobileExpoPublicEnv(
+        { EXPO_PUBLIC_API_URL: 'http://127.0.0.1:3910' },
+        { dotenvPath, backupDir },
+      )
+      assert.equal(existsSync(dotenvPath), true)
+      restoreMobileExpoPublicEnv({ dotenvPath, backupDir })
+      assert.equal(existsSync(dotenvPath), false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the first backup when stamp runs twice so a user file is not clobbered', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cc-dotenv-twice-'))
+    const dotenvPath = join(root, '.env.development.local')
+    const backupDir = join(root, 'run')
+    try {
+      writeFileSync(dotenvPath, 'EXPO_PUBLIC_API_URL=http://localhost:3000\n')
+      stampMobileExpoPublicEnv(
+        { EXPO_PUBLIC_API_URL: 'http://127.0.0.1:3910' },
+        { dotenvPath, backupDir },
+      )
+      stampMobileExpoPublicEnv(
+        { EXPO_PUBLIC_API_URL: 'http://127.0.0.1:9999' },
+        { dotenvPath, backupDir },
       )
       restoreMobileExpoPublicEnv({ dotenvPath, backupDir })
       assert.equal(
@@ -2044,5 +2085,23 @@ describe('summarizeAuthFailure', () => {
 `,
     })
     assert.match(summary, /app get-session status 200/)
+    assert.match(summary, /get-session 200 but null session/)
+  })
+
+  it('flags a 200 get-session whose body had no user', () => {
+    const summary = summarizeAuthFailure({
+      dump: `<node content-desc="${SIGN_IN_TEST_ID}"/>`,
+      logcat:
+        'ReactNativeJS: [auth] request http://127.0.0.1:3910/api/auth/get-session status=200 e2e-auth=1 session=null',
+      webLog: `${JSON.stringify({
+        method: 'GET',
+        path: '/api/auth/get-session',
+        status: 200,
+        expoOrigin: 'coffeecompanion:///127.0.0.1:8081',
+        e2eAuth: true,
+        sessionUser: null,
+      })}\n`,
+    })
+    assert.match(summary, /get-session 200 but null session/)
   })
 })
