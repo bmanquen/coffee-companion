@@ -110,7 +110,7 @@ After `launch`, doctor is green only when all of these hold:
 - `GET $baseUrl/status` returns 2xx/3xx and the body is `packager-status:running`.
 - The app bundle mentions `Coffee Companion`.
 
-After `launch` or `launch-device`, doctor also compares JS-imported Expo native modules to `expo-modules-autolinking resolve -p android`. A missing autolink (the `ExpoNetwork` crash: `@better-auth/expo` imports `expo-network`, but pnpm only autolinks direct `apps/mobile` deps) fails closed.
+After `launch` or `launch-device`, doctor also compares JS-imported Expo native modules to `expo-modules-autolinking resolve -p android`. A missing autolink (the `ExpoNetwork` crash: `@better-auth/expo` imports `expo-network`, but pnpm only autolinks direct `apps/mobile` deps) fails closed. Doctor also runs `maestro check-syntax` on every file in `flows/` (CLI from `VERIFY_MAESTRO` or `~/.maestro/bin/maestro`) so an unknown property cannot wait for a device to fail.
 
 After `launch-device`, doctor also checks:
 
@@ -199,14 +199,14 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | --- | --- |
 | `helpers/control launch` | Dedicated Expo Metro → wait for `/status` → require `Coffee Companion` in the bundle |
 | `helpers/control launch-device` | Attach or boot `emulator-5554`, start the web app on port `3910` (`VERIFY_PORT`), rebuild if `versionName` ≠ git HEAD, reverse Metro/web, open the expo-development-client deep link with `disableAutoLaunch=1`, dismiss a leftover developer menu, wait for `sign-in-screen` |
-| `helpers/control doctor` | Metro checks after `launch`; after `launch-device` also APK SHA, adb reverse, device Metro, and no Expo launcher or developer menu in the foreground |
+| `helpers/control doctor` | Metro checks after `launch`; `maestro check-syntax` on `flows/`; after `launch-device` also APK SHA, adb reverse, device Metro, and no Expo launcher or developer menu in the foreground |
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
 | `helpers/control drive-device <flow>` | Maestro `flows/<flow>.yaml` on `emulator-5554`; copy screenshots to `artifacts/`; on failure print the failing step and log tail, and write `maestro.log`, `failure.png`, and `window_dump.xml` |
 | `helpers/control verify-device [flow]` | One shot: cleanup → launch-device → doctor → drive-device. Leaves the instance up on failure. |
 | `helpers/control cleanup` | Stop recorded pids and leftover listeners on the verify ports; `emu kill` then wait for the serial to leave adb; uninstall the package from a recorded serial; keep artifacts |
 | `helpers/metro.test.mjs` | Node tests for the Metro / bundle markers |
-| `helpers/device.test.mjs` | Node tests for adb / dumpsys / AVD list / boot-wait / pid / screenshot helpers |
+| `helpers/device.test.mjs` | Node tests for adb / dumpsys / AVD list / boot-wait / pid / screenshot helpers and `maestro check-syntax` on `flows/` |
 
 ```bash
 .cursor/skills/verify-mobile/helpers/control launch
