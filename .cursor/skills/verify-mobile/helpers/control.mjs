@@ -872,6 +872,29 @@ function adbShellHttpGetArgs(serial, url, headers = []) {
   ]
 }
 
+function adbShellCookieGetCommands(url, cookieHeader) {
+  const parsed = new URL(url)
+  const path = `${parsed.pathname}${parsed.search}`
+  const host = parsed.host
+  const request =
+    `GET ${path} HTTP/1.0\\r\\nHost: ${host}\\r\\n${cookieHeader}\\r\\nConnection: close\\r\\n\\r\\n`
+  return [
+    `curl -sS -H "${cookieHeader}" "${url}"`,
+    `wget -qO- --header="${cookieHeader}" "${url}"`,
+    `printf '%b' "${request}" | toybox nc ${parsed.hostname} ${parsed.port || 80}`,
+    `printf '%b' "${request}" | nc ${parsed.hostname} ${parsed.port || 80}`,
+  ]
+}
+
+function adbShellHttpCookieGetArgs(serial, url, cookieHeader) {
+  return adbShellCookieGetCommands(url, cookieHeader).map((command) => [
+    '-s',
+    serial,
+    'shell',
+    quoteForAdbShell(command),
+  ])
+}
+
 function amStartSucceeded(result) {
   if (result.status === 0) return true
   return `${result.stderr ?? ''}\n${result.stdout ?? ''}`.includes(
@@ -1144,6 +1167,7 @@ function deviceReadyProblems({
   checkedDeviceMetro = false,
   checkedDeviceE2E = false,
   deviceE2EBody = null,
+  requireDeviceE2E = false,
   ui = null,
 } = {}) {
   const problems = []
@@ -1164,14 +1188,18 @@ function deviceReadyProblems({
       `Metro is not reachable from the device at 127.0.0.1 (expected ${METRO_READY_MARKER})`,
     )
   }
-  if (
-    checkedDeviceE2E &&
-    !e2eSessionLooksReady(deviceE2EBody)
-  ) {
-    problems.push(
-      `device GET of ${E2E_GET_SESSION_PATH} did not return ${E2E_USER_WITH_DATA} ` +
-        `(adb reverse / E2E_BYPASS_AUTH / seed)`,
-    )
+  if (requireDeviceE2E || checkedDeviceE2E) {
+    if (!checkedDeviceE2E) {
+      problems.push(
+        `device GET of ${E2E_GET_SESSION_PATH} produced no body ` +
+          `(curl/wget/nc missing or adb reverse down)`,
+      )
+    } else if (!e2eSessionLooksReady(deviceE2EBody)) {
+      problems.push(
+        `device GET of ${E2E_GET_SESSION_PATH} did not return ${E2E_USER_WITH_DATA} ` +
+          `(body=${e2eSessionBodySummary(deviceE2EBody)}; cookie not honored or E2E_BYPASS_AUTH/seed)`,
+      )
+    }
   }
   if (ui?.hasDevMenuOnboarding) {
     problems.push(devMenuOnboardingMessage())
@@ -1333,6 +1361,50 @@ function e2eAuthCookieHeader() {
 
 function e2eSessionLooksReady(body) {
   return `${body ?? ''}`.includes(E2E_USER_WITH_DATA)
+}
+
+function isJsonNullBody(body) {
+  return `${body ?? ''}`.trim() === 'null'
+}
+
+function e2eSessionBodySummary(body) {
+  const text = `${body ?? ''}`.trim()
+  if (!text) return 'empty'
+  if (isJsonNullBody(text)) return 'null'
+  if (e2eSessionLooksReady(text)) return E2E_USER_WITH_DATA
+  return text.length > 80 ? `${text.slice(0, 80)}…` : text
+}
+
+function formatPreflightStage(role, { ok, body } = {}) {
+  return `preflight ${role} ${ok ? 'OK' : 'FAIL'} (${e2eSessionBodySummary(body)})`
+}
+
+function maestroRunningStage(flow) {
+  return `Running Maestro flow ${flow}`
+}
+
+function verifyDevicePassStage(dest) {
+  return `PASS artifacts at ${dest}`
+}
+
+function verifyDeviceFailStage(detail) {
+  return `FAIL ${detail}`
+}
+
+function printE2EPreflightStages(report) {
+  if (!report?.webBaseUrl && report?.hostE2EStatus == null) return
+  console.log(
+    formatPreflightStage('host', {
+      ok: report.hostE2EReady,
+      body: report.hostE2EBody,
+    }),
+  )
+  console.log(
+    formatPreflightStage('device', {
+      ok: report.deviceE2EReady,
+      body: report.deviceE2EBody,
+    }),
+  )
 }
 
 function webDoctorUrl(state) {
@@ -1818,9 +1890,19 @@ function fetchDeviceMetroStatus(serial, port) {
 }
 
 function fetchDeviceE2ESession(serial, port) {
-  return fetchDeviceHttp(serial, deviceE2ESessionUrl(port), [
-    e2eAuthCookieHeader(),
-  ])
+  const url = deviceE2ESessionUrl(port)
+  const header = e2eAuthCookieHeader()
+  let last = { body: null, checked: false }
+  for (const args of adbShellHttpCookieGetArgs(serial, url, header)) {
+    const result = runCapture(adbBin(), args, { allowFail: true })
+    const body = `${result.stdout ?? ''}`.trim()
+    if (!body) continue
+    last = { body, checked: true }
+    // JSON null is a 200 without the cookie; keep trying curl/nc.
+    if (isJsonNullBody(body)) continue
+    if (e2eSessionLooksReady(body)) return last
+  }
+  return last
 }
 
 function openDevClient(serial, url, pkg) {
@@ -2213,7 +2295,9 @@ async function requireDrivableDevice(state) {
     )
   }
   const report = await inspectDevice(state)
+  printE2EPreflightStages(report)
   if (report.ok) return report
+  console.log(verifyDeviceFailStage(report.problems.join('; ')))
   console.error(JSON.stringify(report, null, 2))
   die(
     `Device ${state.serial} is not up or not the build under test. ` +
@@ -2246,6 +2330,7 @@ async function cmdDriveDevice(flow) {
   const shotDir = join(runDir, 'maestro', flow)
   ensureDir(shotDir)
   const logPath = maestroLogPath(dest)
+  console.log(maestroRunningStage(flow))
 
   const devClientUrl =
     state.expoDevClientUrl ??
@@ -2272,6 +2357,7 @@ async function cmdDriveDevice(flow) {
     const captured = captureDeviceFailure({ serial: state.serial, dest })
     copyPngFiles(shotDir, dest)
     const logText = test.stdout ?? ''
+    console.log(verifyDeviceFailStage(`artifacts at ${dest}`))
     die(
       maestroFailureMessage({
         flow,
@@ -2291,6 +2377,7 @@ async function cmdDriveDevice(flow) {
   copyPngFiles(shotDir, dest)
   const uniqueShots = [...new Set(collectPngFiles(dest))]
   if (uniqueShots.length === 0) {
+    console.log(verifyDeviceFailStage(`artifacts at ${dest}`))
     die(`Drive did not copy any screenshots into ${dest}`)
   }
 
@@ -2317,6 +2404,7 @@ async function cmdDriveDevice(flow) {
   }
   writeFileSync(join(dest, 'proof.json'), `${JSON.stringify(proof, null, 2)}\n`)
   console.log(JSON.stringify({ ok: true, ...proof }, null, 2))
+  console.log(verifyDevicePassStage(dest))
 }
 
 const EXPO_PACKAGE_IMPORT_RE =
@@ -2747,6 +2835,7 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
         deviceStatusBody: deviceMetro.body,
         checkedDeviceE2E: deviceE2E.checked,
         deviceE2EBody: deviceE2E.body,
+        requireDeviceE2E: true,
         ui,
       }),
     )
@@ -2764,8 +2853,10 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     webBaseUrl: webUrl,
     webStatus,
     hostE2EStatus: hostE2E.status,
+    hostE2EBody: hostE2E.body,
     hostE2EReady: e2eSessionLooksReady(hostE2E.body),
     deviceE2EChecked: deviceE2E.checked,
+    deviceE2EBody: deviceE2E.body,
     deviceE2EReady: e2eSessionLooksReady(deviceE2E.body),
     port: metroPort,
     baseUrl: hostMetroUrl,
@@ -2828,8 +2919,12 @@ async function requireDrivableMetro(state) {
 async function cmdDoctor() {
   const state = requireState()
   const report = await inspectInstance(state)
+  printE2EPreflightStages(report)
   console.log(JSON.stringify(report, null, 2))
-  if (!report.ok) process.exit(EXIT_NOT_DRIVABLE)
+  if (!report.ok) {
+    console.log(verifyDeviceFailStage(report.problems.join('; ')))
+    process.exit(EXIT_NOT_DRIVABLE)
+  }
 }
 
 const DRIVES = {
@@ -3009,10 +3104,11 @@ async function cmdCleanup() {
 
 async function cmdVerifyDevice(flow) {
   const plan = verifyDevicePlan(flow)
-  console.error(
+  const headline =
     `verify-device: ${plan.steps.join(' → ')} (${plan.flow}); ` +
-      'the instance stays up if a later step fails',
-  )
+    'the instance stays up if a later step fails'
+  console.log(headline)
+  console.error(headline)
   await cmdCleanup()
   await cmdLaunchDevice()
   await cmdDoctor()
@@ -3065,10 +3161,17 @@ export {
   ensureAdbReverses,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
+  adbShellCookieGetCommands,
+  adbShellHttpCookieGetArgs,
   adbLogcatDumpArgs,
   deviceE2ESessionUrl,
   e2eAuthCookieHeader,
   e2eSessionLooksReady,
+  e2eSessionBodySummary,
+  formatPreflightStage,
+  maestroRunningStage,
+  verifyDevicePassStage,
+  verifyDeviceFailStage,
   summarizeAuthFailure,
   amStartSucceeded,
   parseAdbReverseList,

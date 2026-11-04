@@ -51,10 +51,17 @@ import {
   ensureAdbReverses,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
+  adbShellCookieGetCommands,
+  adbShellHttpCookieGetArgs,
   adbLogcatDumpArgs,
   deviceE2ESessionUrl,
   e2eAuthCookieHeader,
   e2eSessionLooksReady,
+  e2eSessionBodySummary,
+  formatPreflightStage,
+  maestroRunningStage,
+  verifyDevicePassStage,
+  verifyDeviceFailStage,
   summarizeAuthFailure,
   amStartSucceeded,
   parseAdbReverseList,
@@ -495,6 +502,38 @@ describe('device E2E session preflight', () => {
     assert.equal(e2eAuthCookieHeader(), `Cookie: e2e_auth=${E2E_USER_WITH_DATA}`)
     assert.equal(e2eSessionLooksReady(`{"user":{"id":"${E2E_USER_WITH_DATA}"}}`), true)
     assert.equal(e2eSessionLooksReady('null'), false)
+    assert.equal(e2eSessionLooksReady('{"user":null}'), false)
+    assert.equal(e2eSessionBodySummary('null'), 'null')
+    assert.equal(e2eSessionBodySummary(''), 'empty')
+    assert.equal(
+      e2eSessionBodySummary(`{"user":{"id":"${E2E_USER_WITH_DATA}"}}`),
+      E2E_USER_WITH_DATA,
+    )
+  })
+})
+
+describe('verify-device stages', () => {
+  it('names host/device preflight, Maestro start, and PASS/FAIL', () => {
+    assert.equal(
+      formatPreflightStage('host', {
+        ok: true,
+        body: `{"user":{"id":"${E2E_USER_WITH_DATA}"}}`,
+      }),
+      `preflight host OK (${E2E_USER_WITH_DATA})`,
+    )
+    assert.equal(
+      formatPreflightStage('device', { ok: false, body: 'null' }),
+      'preflight device FAIL (null)',
+    )
+    assert.equal(
+      maestroRunningStage('sign-in-and-out'),
+      'Running Maestro flow sign-in-and-out',
+    )
+    assert.equal(
+      verifyDevicePassStage('/tmp/artifacts/run/sign-in-and-out'),
+      'PASS artifacts at /tmp/artifacts/run/sign-in-and-out',
+    )
+    assert.equal(verifyDeviceFailStage('body=null'), 'FAIL body=null')
   })
 })
 
@@ -907,6 +946,23 @@ describe('adbShellHttpGetArgs', () => {
     }
     assert.ok(attempts[0].includes('--header'))
     assert.ok(attempts[2].includes('-H'))
+  })
+})
+
+describe('adbShellHttpCookieGetArgs', () => {
+  it('quotes a whole curl/wget/nc command so Cookie stays inside adb shell', () => {
+    const url = deviceE2ESessionUrl(3910)
+    const header = e2eAuthCookieHeader()
+    const commands = adbShellCookieGetCommands(url, header)
+    const attempts = adbShellHttpCookieGetArgs(DEVICE_SERIAL, url, header)
+    assert.match(commands[0], /^curl /)
+    assert.equal(attempts.length, commands.length)
+    for (let i = 0; i < commands.length; i++) {
+      assert.equal(attempts[i].at(-1), quoteForAdbShell(commands[i]))
+      assert.ok(attempts[i].at(-1).includes('Cookie'))
+      assert.ok(!attempts[i].includes(url))
+      assert.ok(!attempts[i].includes(header))
+    }
   })
 })
 
@@ -1431,6 +1487,19 @@ describe('deviceReadyProblems', () => {
       ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
     })
     assert.ok(problems.some((problem) => /get-session/.test(problem)))
+    assert.ok(problems.some((problem) => /body=null/.test(problem)))
+  })
+
+  it('flags a missing device get-session body when the check is required', () => {
+    const problems = deviceReadyProblems({
+      reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
+      requiredPorts: [8081, 3910],
+      checkedDeviceMetro: true,
+      deviceStatusBody: 'packager-status:running',
+      requireDeviceE2E: true,
+      ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
+    })
+    assert.ok(problems.some((problem) => /produced no body/.test(problem)))
   })
 
   it('flags the regular developer menu as covering the app', () => {
