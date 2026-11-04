@@ -58,7 +58,9 @@ const INSTALL_PROGRESS_INTERVAL_MS = 15_000
 const EXPO_INSTALL_TIMEOUT_MS = 900_000
 const VERIFY_APK_VERSION_ENV = 'VERIFY_APK_VERSION'
 const APP_READY_TIMEOUT_MS = 60_000
-const DEVICE_METRO_WAIT_MS = 60_000
+const DEVICE_METRO_WAIT_MS = 120_000
+const METRO_LOG_TAIL_LINES = 40
+const METRO_PROGRESS_INTERVAL_MS = 15_000
 const EMULATOR_GONE_TIMEOUT_MS = 60_000
 const SERIAL_SETTLE_TIMEOUT_MS = 45_000
 const SERIAL_STALE_KILL_AFTER_MS = 8_000
@@ -113,9 +115,12 @@ const WEB_STATE_PATH = join(
   '.cursor/skills/verify-coffee-companion/.run/state.json',
 )
 
+const BUNDLE_QUERY = 'platform=android&dev=true&minify=false'
 const BUNDLE_PATHS = [
-  '/apps/mobile/index.bundle?platform=android&dev=true&minify=false',
-  '/apps/mobile/index.ts.bundle?platform=android&dev=true&minify=false',
+  `/index.bundle?${BUNDLE_QUERY}`,
+  `/index.ts.bundle?${BUNDLE_QUERY}`,
+  `/apps/mobile/index.bundle?${BUNDLE_QUERY}`,
+  `/apps/mobile/index.ts.bundle?${BUNDLE_QUERY}`,
 ]
 
 function die(message, code = 1) {
@@ -605,10 +610,69 @@ function expoAndroidArgs(avdName, { rebuild = false } = {}) {
   return args
 }
 
-function metroStartArgs(port, { clearCache = false } = {}) {
-  const args = ['exec', 'expo', 'start', '--port', String(port), '--localhost']
+function metroStartArgs(
+  port,
+  { clearCache = false, devClient = false } = {},
+) {
+  // From apps/mobile. --localhost binds one of 127.0.0.1 / ::1 and hides the
+  // other from adb reverse; omit it so Metro listens on IPv4 loopback too.
+  // --android is a boolean flag: passing it would try to open the AVD we
+  // already installed with --no-bundler.
+  const args = ['exec', 'expo', 'start', '--port', String(port)]
+  if (devClient) args.push('--dev-client')
   if (clearCache) args.push('--clear')
   return args
+}
+
+function metroSpawnSpec(port, { clearCache = false, devClient = false, extraEnv = {} } = {}) {
+  return {
+    command: 'pnpm',
+    args: metroStartArgs(port, { clearCache, devClient }),
+    cwd: mobileDir,
+    env: {
+      CI: '1',
+      EXPO_NO_TELEMETRY: '1',
+      BROWSER: 'none',
+      ...extraEnv,
+    },
+  }
+}
+
+function metroStatusUrls(port) {
+  return [
+    `http://127.0.0.1:${port}/status`,
+    `http://[::1]:${port}/status`,
+    `http://localhost:${port}/status`,
+  ]
+}
+
+function metroBaseUrlFromStatusUrl(statusUrl) {
+  return `${statusUrl ?? ''}`.replace(/\/status$/, '')
+}
+
+function metroDiedError(logText) {
+  const tail = tailText(logText, METRO_LOG_TAIL_LINES)
+  if (!tail) {
+    return `Metro exited before /status was ${METRO_READY_MARKER}. metro.log is empty.`
+  }
+  return `Metro exited before /status was ${METRO_READY_MARKER}. Tail of metro.log:\n${tail}`
+}
+
+function metroTimeoutError({ port, logText }) {
+  const tail = tailText(logText, METRO_LOG_TAIL_LINES)
+  const hint = tail
+    ? ` Tail of metro.log:\n${tail}`
+    : ' metro.log is empty.'
+  return (
+    `Timed out waiting for Metro /status == ${METRO_READY_MARKER} on port ${port}.` +
+    hint
+  )
+}
+
+function metroWaitTick({ alive, ready, logText }) {
+  if (ready) return { status: 'ok' }
+  if (!alive) return { status: 'error', error: metroDiedError(logText) }
+  return { status: 'wait' }
 }
 
 function expoDiedError(logText) {
@@ -1681,21 +1745,83 @@ async function fetchText(url, timeoutMs, headers, { method = 'GET' } = {}) {
   }
 }
 
-async function waitForMetro(baseUrl, timeoutMs) {
-  const start = Date.now()
-  const statusUrl = `${baseUrl}/status`
-  while (Date.now() - start < timeoutMs) {
+async function probeMetroStatus(port, timeoutMs = 2_000) {
+  const perUrlMs = Math.max(200, Math.min(timeoutMs, 2_000))
+  for (const statusUrl of metroStatusUrls(port)) {
     try {
-      const { status, body } = await fetchText(statusUrl, 2_000)
+      const { status, body } = await fetchText(statusUrl, perUrlMs)
       if (status >= HTTP_OK_MIN && status < HTTP_OK_MAX && isMetroReady(body)) {
-        return
+        return {
+          ok: true,
+          statusUrl,
+          baseUrl: metroBaseUrlFromStatusUrl(statusUrl),
+        }
       }
     } catch {
-      // still booting
+      // this bind is not answering
     }
+  }
+  return { ok: false, statusUrl: null, baseUrl: null }
+}
+
+async function waitForMetro({
+  port,
+  timeoutMs,
+  pid,
+  logPath,
+  exit,
+} = {}) {
+  const start = Date.now()
+  let lastProgressAt = 0
+  while (Date.now() - start < timeoutMs) {
+    const now = Date.now()
+    if (now - lastProgressAt >= METRO_PROGRESS_INTERVAL_MS) {
+      console.error(
+        `waiting for Metro /status on ${port}… ${Math.floor((now - start) / 1000)}s elapsed`,
+      )
+      lastProgressAt = now
+    }
+    const logText =
+      logPath && existsSync(logPath) ? readFileSync(logPath, 'utf8') : ''
+    const alive =
+      exit?.died === true
+        ? false
+        : pid == null
+          ? true
+          : pidAlive(pid) || portListenerPids(port).length > 0
+    if (!alive) {
+      throw new Error(metroDiedError(logText))
+    }
+    const probe = await probeMetroStatus(port, 2_000)
+    const tick = metroWaitTick({ alive: true, ready: probe.ok, logText })
+    if (tick.status === 'ok') return { baseUrl: probe.baseUrl }
+    if (tick.status === 'error') throw new Error(tick.error)
     await sleep(250)
   }
-  throw new Error(`Timed out waiting for Metro at ${statusUrl}`)
+  const logText =
+    logPath && existsSync(logPath) ? readFileSync(logPath, 'utf8') : ''
+  throw new Error(metroTimeoutError({ port, logText }))
+}
+
+function spawnMetro(port, opts = {}) {
+  const spec = metroSpawnSpec(port, opts)
+  const logPath = opts.logPath ?? join(runDir, 'metro.log')
+  ensureDir(dirname(logPath))
+  const logFd = openSync(logPath, 'w')
+  const child = spawn(spec.command, spec.args, {
+    cwd: spec.cwd,
+    env: { ...process.env, ...spec.env },
+    stdio: ['ignore', logFd, logFd],
+    detached: true,
+  })
+  const exit = { died: false, code: null, signal: null }
+  child.once('exit', (code, signal) => {
+    exit.died = true
+    exit.code = code
+    exit.signal = signal
+  })
+  child.unref()
+  return { child, logPath, exit, spec }
 }
 
 async function fetchAppBundle(baseUrl, timeoutMs) {
@@ -1768,29 +1894,16 @@ async function cmdLaunch() {
     run('pnpm', ['install', '--frozen-lockfile'])
   }
 
-  const logPath = join(runDir, 'metro.log')
-  const logFd = openSync(logPath, 'w')
-  const metro = spawn(
-    'pnpm',
-    metroStartArgs(port),
-    {
-      cwd: mobileDir,
-      env: {
-        ...process.env,
-        CI: '1',
-        EXPO_NO_TELEMETRY: '1',
-        BROWSER: 'none',
-      },
-      stdio: ['ignore', logFd, logFd],
-      detached: true,
-    },
-  )
-  metro.unref()
-
-  // Expo `--localhost` binds ::1 here. 127.0.0.1 does not reach it.
-  const baseUrl = `http://localhost:${port}`
+  const metro = spawnMetro(port)
   try {
-    await waitForMetro(baseUrl, LAUNCH_STATUS_TIMEOUT_MS)
+    const ready = await waitForMetro({
+      port,
+      timeoutMs: LAUNCH_STATUS_TIMEOUT_MS,
+      pid: metro.child.pid,
+      logPath: metro.logPath,
+      exit: metro.exit,
+    })
+    const baseUrl = ready.baseUrl
     const bundle = await fetchAppBundle(baseUrl, LAUNCH_BUNDLE_TIMEOUT_MS)
     if (!bundleHasAppMarker(bundle.body)) {
       throw new Error(
@@ -1799,15 +1912,17 @@ async function cmdLaunch() {
       )
     }
 
-    const metroPids = [...new Set([metro.pid, ...portListenerPids(port)].filter(Boolean))]
+    const metroPids = [
+      ...new Set([metro.child.pid, ...portListenerPids(port)].filter(Boolean)),
+    ]
     const state = {
       runId: `verify-${new Date().toISOString().replace(/[:.]/g, '-')}`,
-      metroPid: metro.pid,
+      metroPid: metro.child.pid,
       metroPids,
       port,
       baseUrl,
       bundleUrl: bundle.url,
-      logPath,
+      logPath: metro.logPath,
       startedAt: new Date().toISOString(),
       harness: HARNESS_RNTL,
     }
@@ -1819,7 +1934,7 @@ async function cmdLaunch() {
           ok: true,
           runId: state.runId,
           baseUrl,
-          metroPid: metro.pid,
+          metroPid: metro.child.pid,
           bundleUrl: bundle.url,
           ready: `GET ${baseUrl}/status is ${METRO_READY_MARKER}; bundle mentions ${APP_MARKER}`,
           harness: HARNESS_RNTL,
@@ -1835,7 +1950,7 @@ async function cmdLaunch() {
   } catch (error) {
     // Only the process we spawned (and its group). Do not SIGTERM whatever
     // happens to be listening on the port after a race.
-    stopRecordedPid(metro.pid, 'metro', [])
+    stopRecordedPid(metro.child.pid, 'metro', [])
     die(error.message)
   }
 }
@@ -2068,7 +2183,6 @@ function stopListenersOnPort(port, kind, stopped = []) {
 }
 
 async function ensureDeviceMetro(port, extraEnv = {}) {
-  const baseUrl = `http://localhost:${port}`
   // expo run:android --port starts Metro without --clear, so a reused process
   // keeps a stale inlined EXPO_PUBLIC_API_URL. Always start our own with --clear.
   stopListenersOnPort(port, 'metro')
@@ -2076,23 +2190,28 @@ async function ensureDeviceMetro(port, extraEnv = {}) {
   if (freed.status !== 'ok') {
     throw new Error(portBusyMessage(port, freed.pids, 'metro'))
   }
-  const logPath = join(runDir, 'metro.log')
-  const logFd = openSync(logPath, 'w')
-  const metro = spawn('pnpm', metroStartArgs(port, { clearCache: true }), {
-    cwd: mobileDir,
-    env: {
-      ...process.env,
-      CI: '1',
-      EXPO_NO_TELEMETRY: '1',
-      BROWSER: 'none',
-      ...extraEnv,
-    },
-    stdio: ['ignore', logFd, logFd],
-    detached: true,
+  console.error(
+    `Starting Metro with --dev-client --clear on port ${port} from apps/mobile…`,
+  )
+  const metro = spawnMetro(port, {
+    clearCache: true,
+    devClient: true,
+    extraEnv,
   })
-  metro.unref()
-  await waitForMetro(baseUrl, DEVICE_METRO_WAIT_MS)
-  return { metroPid: metro.pid, reused: false, baseUrl, port, logPath }
+  const ready = await waitForMetro({
+    port,
+    timeoutMs: DEVICE_METRO_WAIT_MS,
+    pid: metro.child.pid,
+    logPath: metro.logPath,
+    exit: metro.exit,
+  })
+  return {
+    metroPid: metro.child.pid,
+    reused: false,
+    baseUrl: ready.baseUrl,
+    port,
+    logPath: metro.logPath,
+  }
 }
 
 function launchDeviceTeardownPlan(partial) {
@@ -2340,6 +2459,12 @@ async function cmdLaunchDevice() {
       androidPackage: ANDROID_PACKAGE,
       emulatorPid,
       metroPid: metro.metroPid,
+      metroPids: [
+        ...new Set(
+          [metro.metroPid, ...portListenerPids(metroPort)].filter(Boolean),
+        ),
+      ],
+      metroLogPath: metro.logPath,
       port: metroPort,
       baseUrl: metro.baseUrl,
       scheme,
@@ -2759,27 +2884,23 @@ async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
 
   let status = null
   let metroMarker = false
-  try {
-    const response = await fetchText(`${state.baseUrl}/status`, timeoutMs)
-    status = response.status
-    metroMarker = isMetroReady(response.body)
-    if (status < HTTP_OK_MIN || status >= HTTP_OK_MAX) {
-      problems.push(`GET ${state.baseUrl}/status returned ${status}`)
-    }
-    if (!metroMarker) {
-      problems.push(
-        `GET ${state.baseUrl}/status body is not ${METRO_READY_MARKER}`,
-      )
-    }
-  } catch (error) {
-    problems.push(`GET ${state.baseUrl}/status failed: ${error.message}`)
+  const probe = await probeMetroStatus(state.port, timeoutMs)
+  const baseUrl =
+    probe.baseUrl ?? state.baseUrl ?? `http://127.0.0.1:${state.port}`
+  if (probe.ok) {
+    status = HTTP_OK_MIN
+    metroMarker = true
+  } else {
+    problems.push(
+      `GET ${metroStatusUrls(state.port).join(' | ')} failed: Metro is not ${METRO_READY_MARKER}`,
+    )
   }
 
   let bundleStatus = null
   let appMarker = false
-  let bundleUrl = state.bundleUrl ?? `${state.baseUrl}${BUNDLE_PATHS[0]}`
+  let bundleUrl = state.bundleUrl ?? `${baseUrl}${BUNDLE_PATHS[0]}`
   try {
-    const bundle = await fetchAppBundle(state.baseUrl, timeoutMs)
+    const bundle = await fetchAppBundle(baseUrl, timeoutMs)
     bundleUrl = bundle.url
     bundleStatus = bundle.status
     appMarker = bundleHasAppMarker(bundle.body)
@@ -2807,7 +2928,7 @@ async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
 
   return {
     ok: problems.length === 0,
-    baseUrl: state.baseUrl,
+    baseUrl,
     metroPid: state.metroPid,
     port: state.port,
     portOwners: listeners,
@@ -2916,18 +3037,13 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   }
 
   const metroPort = state.port ?? DEFAULT_METRO_PORT
-  const hostMetroUrl = state.baseUrl ?? `http://localhost:${metroPort}`
-  let hostMetroReady = false
-  try {
-    const response = await fetchText(`${hostMetroUrl}/status`, timeoutMs)
-    hostMetroReady = isMetroReady(response.body)
-    if (!hostMetroReady) {
-      problems.push(
-        `host Metro at ${hostMetroUrl}/status is not ${METRO_READY_MARKER}`,
-      )
-    }
-  } catch (error) {
-    problems.push(`host Metro at ${hostMetroUrl} is not answering: ${error.message}`)
+  const metroProbe = await probeMetroStatus(metroPort, timeoutMs)
+  const hostMetroUrl = metroProbe.baseUrl ?? state.baseUrl ?? `http://127.0.0.1:${metroPort}`
+  const hostMetroReady = metroProbe.ok
+  if (!hostMetroReady) {
+    problems.push(
+      `host Metro at ${metroStatusUrls(metroPort).join(' | ')} is not ${METRO_READY_MARKER}`,
+    )
   }
 
   let reverseList = ''
@@ -3282,6 +3398,13 @@ export {
   adbPidofArgs,
   parseAdbPid,
   metroStartArgs,
+  metroSpawnSpec,
+  metroStatusUrls,
+  metroWaitTick,
+  metroDiedError,
+  metroTimeoutError,
+  waitForMetro,
+  BUNDLE_PATHS,
   apiUrlDevTag,
   bundleHasApiUrlTag,
   mobileExpoOrigin,

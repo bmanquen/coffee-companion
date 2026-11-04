@@ -14,6 +14,12 @@ import {
   bootWaitTick,
   expoAndroidArgs,
   metroStartArgs,
+  metroSpawnSpec,
+  metroStatusUrls,
+  metroWaitTick,
+  metroDiedError,
+  metroTimeoutError,
+  BUNDLE_PATHS,
   installWaitTick,
   resolveSdkRoot,
   chosenEmulatorGpu,
@@ -263,19 +269,91 @@ describe('expoAndroidArgs', () => {
 })
 
 describe('metroStartArgs', () => {
-  it('clears the transform cache for the device-tier Metro', () => {
-    const reused = metroStartArgs(8081)
-    assert.deepEqual(reused, [
+  it('starts a non-interactive dev-client Metro from apps/mobile without --localhost', () => {
+    const args = metroStartArgs(8081, { clearCache: true, devClient: true })
+    assert.deepEqual(args, [
       'exec',
       'expo',
       'start',
       '--port',
       '8081',
-      '--localhost',
+      '--dev-client',
+      '--clear',
     ])
-    const cleared = metroStartArgs(8081, { clearCache: true })
-    assert.ok(cleared.includes('--clear'))
-    assert.equal(cleared[cleared.indexOf('--port') + 1], '8081')
+    assert.ok(!args.includes('--localhost'))
+    assert.ok(!args.includes('--android'))
+    assert.ok(!args.includes('--android=false'))
+  })
+
+  it('spawns from apps/mobile with CI=1 so Expo does not take a TTY', () => {
+    const spec = metroSpawnSpec(8081, {
+      clearCache: true,
+      devClient: true,
+      extraEnv: { EXPO_PUBLIC_API_URL: 'http://127.0.0.1:3910' },
+    })
+    assert.equal(spec.command, 'pnpm')
+    assert.ok(spec.cwd.endsWith('apps/mobile'))
+    assert.equal(spec.env.CI, '1')
+    assert.equal(spec.env.EXPO_PUBLIC_API_URL, 'http://127.0.0.1:3910')
+  })
+})
+
+describe('metro readiness wait', () => {
+  it('probes IPv4 and IPv6 loopback, not only localhost', () => {
+    assert.deepEqual(metroStatusUrls(8081), [
+      'http://127.0.0.1:8081/status',
+      'http://[::1]:8081/status',
+      'http://localhost:8081/status',
+    ])
+  })
+
+  it('succeeds once /status is packager-status:running', () => {
+    const tick = metroWaitTick({
+      alive: true,
+      ready: true,
+      logText: '',
+    })
+    assert.equal(tick.status, 'ok')
+  })
+
+  it('fails with the Metro log tail when the process exits before ready', () => {
+    const tick = metroWaitTick({
+      alive: false,
+      ready: false,
+      logText: 'Error: listen EADDRINUSE: address already in use :::8081\n',
+    })
+    assert.equal(tick.status, 'error')
+    assert.match(tick.error, /exited before/)
+    assert.match(tick.error, /EADDRINUSE/)
+  })
+
+  it('waits while Metro is alive and /status is not ready', () => {
+    const tick = metroWaitTick({
+      alive: true,
+      ready: false,
+      logText: '',
+    })
+    assert.equal(tick.status, 'wait')
+  })
+
+  it('names an empty metro.log on timeout', () => {
+    assert.match(metroTimeoutError({ port: 8081, logText: '' }), /8081/)
+    assert.match(metroTimeoutError({ port: 8081, logText: '' }), /empty/)
+    assert.match(metroDiedError(''), /empty/)
+  })
+})
+
+describe('dev-client bundle URL', () => {
+  it('asks Metro for /index.bundle relative to apps/mobile before the workspace path', () => {
+    assert.equal(
+      BUNDLE_PATHS[0],
+      '/index.bundle?platform=android&dev=true&minify=false',
+    )
+    assert.ok(
+      BUNDLE_PATHS.includes(
+        '/apps/mobile/index.bundle?platform=android&dev=true&minify=false',
+      ),
+    )
   })
 })
 

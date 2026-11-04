@@ -3,11 +3,13 @@ import { createServer } from 'node:http'
 import { describe, it } from 'node:test'
 import {
   APP_MARKER,
+  BUNDLE_PATHS,
   METRO_READY_MARKER,
   bundleHasAppMarker,
   fetchAppBundle,
   inspectMetro,
   isMetroReady,
+  waitForMetro,
 } from './control.mjs'
 
 describe('isMetroReady', () => {
@@ -57,7 +59,75 @@ describe('inspectMetro', () => {
   })
 })
 
+describe('waitForMetro', () => {
+  it('returns the IPv4 base URL once /status is packager-status:running', async () => {
+    const server = createServer((req, res) => {
+      if (req.url === '/status') {
+        res.writeHead(200, { 'content-type': 'text/plain' })
+        res.end(METRO_READY_MARKER)
+        return
+      }
+      res.writeHead(404)
+      res.end()
+    })
+    await new Promise((resolve) => {
+      server.listen(0, '127.0.0.1', resolve)
+    })
+    const { port } = server.address()
+    try {
+      const ready = await waitForMetro({ port, timeoutMs: 2_000 })
+      assert.equal(ready.baseUrl, `http://127.0.0.1:${port}`)
+    } finally {
+      await new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()))
+      })
+    }
+  })
+
+  it('fails with the Metro log tail when the process is already dead', async () => {
+    await assert.rejects(
+      () =>
+        waitForMetro({
+          port: 59_998,
+          timeoutMs: 500,
+          pid: 999_999_999,
+          exit: { died: true },
+          logPath: undefined,
+        }),
+      /exited before/,
+    )
+  })
+})
+
 describe('fetchAppBundle', () => {
+  it('uses /index.bundle relative to the apps/mobile Metro root', async () => {
+    const server = createServer((req, res) => {
+      if (req.url?.startsWith('/index.bundle')) {
+        res.writeHead(200, { 'content-type': 'text/javascript' })
+        res.end(`var title = "${APP_MARKER}"`)
+        return
+      }
+      res.writeHead(404)
+      res.end('missing')
+    })
+    await new Promise((resolve) => {
+      server.listen(0, '127.0.0.1', resolve)
+    })
+    const { port } = server.address()
+    try {
+      const bundle = await fetchAppBundle(`http://127.0.0.1:${port}`, 2_000)
+      assert.equal(
+        bundle.url,
+        `http://127.0.0.1:${port}${BUNDLE_PATHS[0]}`,
+      )
+      assert.equal(bundleHasAppMarker(bundle.body), true)
+    } finally {
+      await new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()))
+      })
+    }
+  })
+
   it('returns within the budget when the bundle endpoint stalls', async () => {
     const server = createServer(() => {})
     await new Promise((resolve) => {
