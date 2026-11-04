@@ -96,7 +96,13 @@ export function useAuth(): Auth {
         const user = e2eSignInUser()
         if (!user) return
         writeE2EAuthCookie(user)
-        await authClient.getSession()
+        const result = (await authClient.getSession()) as {
+          data?: AuthSession | null
+          error?: unknown
+        }
+        if (!result.data) {
+          throw result.error ?? new Error('E2E get-session returned no session')
+        }
       }),
     signOut: async () => {
       try {

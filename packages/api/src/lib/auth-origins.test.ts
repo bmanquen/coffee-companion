@@ -35,6 +35,7 @@ describe('trustedAuthOrigins', () => {
       'http://127.0.0.1:3910',
       APP_SCHEME_ORIGIN,
       EXPO_DEV_ORIGIN,
+      'http://localhost:3910',
       'http://10.0.2.2:3910',
     ])
     expect(

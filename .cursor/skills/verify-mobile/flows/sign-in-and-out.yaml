@@ -52,6 +52,7 @@ appId: dev.offbyonelabs.coffeecompanion
 - takeScreenshot: signed-out
 - tapOn:
     id: e2e-sign-in
+# get-session is a network hop; an immediate visible check would fail before the session lands.
 - extendedWaitUntil:
     visible:
       id: welcome-screen

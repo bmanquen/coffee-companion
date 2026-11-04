@@ -3,7 +3,7 @@ import { Platform } from 'react-native'
 export const APP_SCHEME = 'coffeecompanion'
 export const APP_BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
 
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1'])
+const ANDROID_EMULATOR_REWRITE_HOSTS = new Set(['localhost'])
 const ANDROID_EMULATOR_HOST = '10.0.2.2'
 
 export function resolveApiBaseUrl(
@@ -21,9 +21,10 @@ export function resolveApiBaseUrl(
   } catch {
     return url
   }
-  if (!LOOPBACK_HOSTS.has(parsed.hostname)) return url
+  if (!ANDROID_EMULATOR_REWRITE_HOSTS.has(parsed.hostname)) return url
 
-  // The emulator's localhost is the guest; 10.0.2.2 is the host machine.
+  // localhost on the guest is the emulator itself. 127.0.0.1 stays so adb reverse
+  // can reach the host; 10.0.2.2 is the alias when reverse is not in play.
   parsed.hostname = ANDROID_EMULATOR_HOST
   const rewritten = parsed.toString()
   return url.endsWith('/') ? rewritten : rewritten.replace(/\/$/, '')

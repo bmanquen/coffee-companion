@@ -86,8 +86,14 @@ const DEV_MENU_ONBOARDING_FINISHED_META = 'EXDevMenuIsOnboardingFinished'
 const SIGN_IN_VISIBLE_MARKERS = ['Sign in with Google', 'E2E sign in']
 const DEVICE_FAILURE_SCREENSHOT = 'failure.png'
 const DEVICE_FAILURE_DUMP = 'window_dump.xml'
+const DEVICE_FAILURE_WEB_LOG = 'web-server.log'
+const DEVICE_FAILURE_LOGCAT = 'logcat.txt'
 const MAESTRO_LOG_NAME = 'maestro.log'
 const MAESTRO_LOG_TAIL_LINES = 40
+const WEB_LOG_TAIL_LINES = 80
+const LOGCAT_DUMP_LINES = 400
+const E2E_AUTH_COOKIE_NAME = 'e2e_auth'
+const E2E_GET_SESSION_PATH = '/api/auth/get-session'
 const APP_READY_PROGRESS_INTERVAL_MS = 15_000
 const DEFAULT_MAC_EMULATOR_GPU = 'host'
 const JAVA_MIN_MAJOR = 17
@@ -203,18 +209,25 @@ function maestroFailureMessage({
   tail,
   screenshotPath,
   dumpPath,
+  webLogPath,
+  logcatPath,
+  authSummary,
 }) {
   const lines = [`Maestro flow ${flow} failed.`]
   if (step) lines.push(`Failed step: ${step}`)
+  if (authSummary) lines.push(`Auth error: ${authSummary}`)
   if (tail) {
     lines.push('Maestro log tail:')
     lines.push(tail)
   }
-  lines.push(
-    `See ${maestroLogPath(dest)}` +
-      `${screenshotPath ? `, ${screenshotPath}` : ''}` +
-      `${dumpPath ? `, ${dumpPath}` : ''}.`,
-  )
+  const extras = [
+    maestroLogPath(dest),
+    screenshotPath,
+    dumpPath,
+    webLogPath,
+    logcatPath,
+  ].filter(Boolean)
+  lines.push(`See ${extras.join(', ')}.`)
   return lines.join('\n')
 }
 
@@ -842,12 +855,20 @@ function adbOpenDevClientArgs({ serial, url, pkg }) {
   ]
 }
 
-function adbShellHttpGetArgs(serial, url) {
-  const quoted = quoteForAdbShell(url)
+function adbShellHttpGetArgs(serial, url, headers = []) {
+  const quotedUrl = quoteForAdbShell(url)
+  const wgetHeaders = headers.flatMap((header) => [
+    '--header',
+    quoteForAdbShell(header),
+  ])
+  const curlHeaders = headers.flatMap((header) => [
+    '-H',
+    quoteForAdbShell(header),
+  ])
   return [
-    ['-s', serial, 'shell', 'wget', '-qO-', quoted],
-    ['-s', serial, 'shell', 'toybox', 'wget', '-qO-', quoted],
-    ['-s', serial, 'shell', 'curl', '-s', quoted],
+    ['-s', serial, 'shell', 'wget', '-qO-', ...wgetHeaders, quotedUrl],
+    ['-s', serial, 'shell', 'toybox', 'wget', '-qO-', ...wgetHeaders, quotedUrl],
+    ['-s', serial, 'shell', 'curl', '-s', ...curlHeaders, quotedUrl],
   ]
 }
 
@@ -955,7 +976,85 @@ function deviceFailureArtifactPaths(dest) {
   return {
     screenshotPath: join(dest, DEVICE_FAILURE_SCREENSHOT),
     dumpPath: join(dest, DEVICE_FAILURE_DUMP),
+    webLogPath: join(dest, DEVICE_FAILURE_WEB_LOG),
+    logcatPath: join(dest, DEVICE_FAILURE_LOGCAT),
   }
+}
+
+function fileTail(text, lines) {
+  return maestroLogTail(text, lines)
+}
+
+function webServerLogPath() {
+  if (existsSync(WEB_STATE_PATH)) {
+    try {
+      const web = JSON.parse(readFileSync(WEB_STATE_PATH, 'utf8'))
+      if (web.logPath) return web.logPath
+    } catch {
+      // fall through to the default path
+    }
+  }
+  return join(
+    repoRoot,
+    '.cursor/skills/verify-coffee-companion/.run/server.log',
+  )
+}
+
+function readWebServerLogTail(lines = WEB_LOG_TAIL_LINES) {
+  const path = webServerLogPath()
+  if (!existsSync(path)) return ''
+  return fileTail(readFileSync(path, 'utf8'), lines)
+}
+
+function adbLogcatDumpArgs(serial) {
+  return [
+    '-s',
+    serial,
+    'logcat',
+    '-d',
+    '-t',
+    String(LOGCAT_DUMP_LINES),
+    'ReactNativeJS:V',
+    'Expo:V',
+    'AndroidRuntime:E',
+    '*:E',
+  ]
+}
+
+function adbLogcatDump(serial) {
+  return `${
+    runCapture(adbBin(), adbLogcatDumpArgs(serial), { allowFail: true }).stdout ??
+    ''
+  }`
+}
+
+function summarizeAuthFailure({ dump = '', logcat = '', webLog = '' } = {}) {
+  const haystack = `${dump}\n${logcat}\n${webLog}`
+  const clues = []
+  if (dump.includes(SIGN_IN_TEST_ID) && !dump.includes(WELCOME_SCREEN_TEST_ID)) {
+    clues.push(`still on ${SIGN_IN_TEST_ID}`)
+  }
+  if (/couldn't sign you in/i.test(haystack)) {
+    clues.push('sign-in error copy is visible')
+  }
+  const needles = [
+    /Network request failed/i,
+    /Failed to connect/i,
+    /get-session/i,
+    /E2E get-session returned no session/i,
+    /trusted origin/i,
+    /CORS/i,
+    /E2E_BYPASS_AUTH/i,
+    /10\.0\.2\.2/,
+    /status\s+403/i,
+  ]
+  for (const needle of needles) {
+    const match = haystack.match(needle)
+    if (match) clues.push(match[0])
+  }
+  return clues.length > 0
+    ? clues.join('; ')
+    : 'no auth error string found in dump/logcat/web log'
 }
 
 function writeAdbScreenshot(serial, destPath) {
@@ -971,11 +1070,19 @@ function writeAdbScreenshot(serial, destPath) {
 function captureDeviceFailure({ serial, dest, dump }) {
   ensureDir(dest)
   const paths = deviceFailureArtifactPaths(dest)
-  writeFileSync(paths.dumpPath, dump ?? adbUiDump(serial))
+  const dumpText = dump ?? adbUiDump(serial)
+  writeFileSync(paths.dumpPath, dumpText)
   const screenshotPath = writeAdbScreenshot(serial, paths.screenshotPath)
+  const webLog = readWebServerLogTail()
+  writeFileSync(paths.webLogPath, webLog)
+  const logcat = adbLogcatDump(serial)
+  writeFileSync(paths.logcatPath, logcat)
   return {
     dumpPath: paths.dumpPath,
     screenshotPath,
+    webLogPath: paths.webLogPath,
+    logcatPath: paths.logcatPath,
+    authSummary: summarizeAuthFailure({ dump: dumpText, logcat, webLog }),
   }
 }
 
@@ -1035,6 +1142,8 @@ function deviceReadyProblems({
   requiredPorts = [],
   deviceStatusBody = null,
   checkedDeviceMetro = false,
+  checkedDeviceE2E = false,
+  deviceE2EBody = null,
   ui = null,
 } = {}) {
   const problems = []
@@ -1053,6 +1162,15 @@ function deviceReadyProblems({
   ) {
     problems.push(
       `Metro is not reachable from the device at 127.0.0.1 (expected ${METRO_READY_MARKER})`,
+    )
+  }
+  if (
+    checkedDeviceE2E &&
+    !e2eSessionLooksReady(deviceE2EBody)
+  ) {
+    problems.push(
+      `device GET of ${E2E_GET_SESSION_PATH} did not return ${E2E_USER_WITH_DATA} ` +
+        `(adb reverse / E2E_BYPASS_AUTH / seed)`,
     )
   }
   if (ui?.hasDevMenuOnboarding) {
@@ -1184,8 +1302,8 @@ function chosenDeviceWebPort(env = process.env) {
 }
 
 function deviceApiUrl(port) {
-  // localhost so apps/mobile/src/auth/config.ts rewrites it to 10.0.2.2
-  return `http://localhost:${port}`
+  // 127.0.0.1 is the adb-reversed host loopback; localhost can be IPv6 ::1.
+  return `http://127.0.0.1:${port}`
 }
 
 function deviceExpoPublicEnv(port) {
@@ -1201,7 +1319,20 @@ function webLaunchEnv(port) {
     VERIFY_PORT: String(port),
     BETTER_AUTH_URL: baseUrl,
     SITE_URL: baseUrl,
+    E2E_BYPASS_AUTH: 'true',
   }
+}
+
+function deviceE2ESessionUrl(port) {
+  return `${deviceApiUrl(port)}${E2E_GET_SESSION_PATH}`
+}
+
+function e2eAuthCookieHeader() {
+  return `Cookie: ${E2E_AUTH_COOKIE_NAME}=${E2E_USER_WITH_DATA}`
+}
+
+function e2eSessionLooksReady(body) {
+  return `${body ?? ''}`.includes(E2E_USER_WITH_DATA)
 }
 
 function webDoctorUrl(state) {
@@ -1357,13 +1488,14 @@ function collectPngFiles(dir) {
   return found
 }
 
-async function fetchText(url, timeoutMs) {
+async function fetchText(url, timeoutMs, headers) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetch(url, {
       redirect: 'manual',
       signal: controller.signal,
+      headers,
     })
     const body = await response.text()
     return { status: response.status, body }
@@ -1672,14 +1804,23 @@ function adbUiDump(serial) {
   }`
 }
 
-function fetchDeviceMetroStatus(serial, port) {
-  const url = `http://127.0.0.1:${port}/status`
-  for (const args of adbShellHttpGetArgs(serial, url)) {
+function fetchDeviceHttp(serial, url, headers = []) {
+  for (const args of adbShellHttpGetArgs(serial, url, headers)) {
     const result = runCapture(adbBin(), args, { allowFail: true })
     const body = `${result.stdout ?? ''}`.trim()
     if (body) return { body, checked: true }
   }
   return { body: null, checked: false }
+}
+
+function fetchDeviceMetroStatus(serial, port) {
+  return fetchDeviceHttp(serial, `http://127.0.0.1:${port}/status`)
+}
+
+function fetchDeviceE2ESession(serial, port) {
+  return fetchDeviceHttp(serial, deviceE2ESessionUrl(port), [
+    e2eAuthCookieHeader(),
+  ])
 }
 
 function openDevClient(serial, url, pkg) {
@@ -2098,8 +2239,8 @@ async function cmdDriveDevice(flow) {
   }
 
   const state = requireState()
-  await requireDrivableDevice(state)
   ensureAdbReverses(state.serial, driveDeviceReversePorts(state))
+  await requireDrivableDevice(state)
   const dest = join(artifactsDir, state.runId, flow)
   ensureDir(dest)
   const shotDir = join(runDir, 'maestro', flow)
@@ -2140,6 +2281,9 @@ async function cmdDriveDevice(flow) {
         screenshotPath:
           captured.screenshotPath ?? join(dest, DEVICE_FAILURE_SCREENSHOT),
         dumpPath: captured.dumpPath,
+        webLogPath: captured.webLogPath,
+        logcatPath: captured.logcatPath,
+        authSummary: captured.authSummary,
       }),
     )
   }
@@ -2445,6 +2589,21 @@ async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     if (!appMarker) {
       problems.push(`bundle at ${bundle.url} does not mention ${APP_MARKER}`)
     }
+    if (state.webPort) {
+      if (
+        !bundle.body.includes(`127.0.0.1:${state.webPort}`) &&
+        !bundle.body.includes(`localhost:${state.webPort}`)
+      ) {
+        problems.push(
+          `bundle at ${bundle.url} does not mention the device API URL for port ${state.webPort}`,
+        )
+      }
+      if (!bundle.body.includes(E2E_USER_WITH_DATA)) {
+        problems.push(
+          `bundle at ${bundle.url} does not mention ${E2E_USER_WITH_DATA}; ${E2E_USER_ENV} was not inlined`,
+        )
+      }
+    }
   } catch (error) {
     problems.push(`app bundle check failed: ${error.message}`)
   }
@@ -2513,6 +2672,7 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
 
   const webUrl = webDoctorUrl(state)
   let webStatus = null
+  let hostE2E = { status: null, body: null }
   if (!webUrl) {
     problems.push('no web base URL is recorded')
   } else {
@@ -2524,6 +2684,23 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
       }
     } catch (error) {
       problems.push(`GET ${webUrl} failed: ${error.message}`)
+    }
+    try {
+      hostE2E = await fetchText(
+        `${webUrl.replace(/\/$/, '')}${E2E_GET_SESSION_PATH}`,
+        timeoutMs,
+        { cookie: `${E2E_AUTH_COOKIE_NAME}=${E2E_USER_WITH_DATA}` },
+      )
+      if (!e2eSessionLooksReady(hostE2E.body)) {
+        problems.push(
+          `host GET of ${webUrl}${E2E_GET_SESSION_PATH} did not return ${E2E_USER_WITH_DATA} ` +
+            `(E2E_BYPASS_AUTH / seed)`,
+        )
+      }
+    } catch (error) {
+      problems.push(
+        `host GET of ${webUrl}${E2E_GET_SESSION_PATH} failed: ${error.message}`,
+      )
     }
   }
 
@@ -2555,16 +2732,21 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   let reverseList = ''
   let ui = null
   let deviceMetro = { body: null, checked: false }
+  let deviceE2E = { body: null, checked: false }
+  const webPort = state.webPort ?? DEFAULT_DEVICE_WEB_PORT
   if (serial && attached?.state === 'device') {
     reverseList = `${adbReverseList(serial) ?? ''}`
     ui = parseUiDump(adbUiDump(serial))
     deviceMetro = fetchDeviceMetroStatus(serial, metroPort)
+    deviceE2E = fetchDeviceE2ESession(serial, webPort)
     problems.push(
       ...deviceReadyProblems({
         reverseList,
-        requiredPorts: [metroPort, state.webPort ?? DEFAULT_DEVICE_WEB_PORT],
+        requiredPorts: [metroPort, webPort],
         checkedDeviceMetro: deviceMetro.checked,
         deviceStatusBody: deviceMetro.body,
+        checkedDeviceE2E: deviceE2E.checked,
+        deviceE2EBody: deviceE2E.body,
         ui,
       }),
     )
@@ -2581,6 +2763,10 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     webPort: state.webPort,
     webBaseUrl: webUrl,
     webStatus,
+    hostE2EStatus: hostE2E.status,
+    hostE2EReady: e2eSessionLooksReady(hostE2E.body),
+    deviceE2EChecked: deviceE2E.checked,
+    deviceE2EReady: e2eSessionLooksReady(deviceE2E.body),
     port: metroPort,
     baseUrl: hostMetroUrl,
     hostMetroReady,
@@ -2879,6 +3065,11 @@ export {
   ensureAdbReverses,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
+  adbLogcatDumpArgs,
+  deviceE2ESessionUrl,
+  e2eAuthCookieHeader,
+  e2eSessionLooksReady,
+  summarizeAuthFailure,
   amStartSucceeded,
   parseAdbReverseList,
   missingAdbReverses,
@@ -2951,6 +3142,8 @@ export {
   AM_START_ALREADY_FOREGROUND,
   DEVICE_FAILURE_SCREENSHOT,
   DEVICE_FAILURE_DUMP,
+  DEVICE_FAILURE_WEB_LOG,
+  DEVICE_FAILURE_LOGCAT,
   MAESTRO_LOG_NAME,
   DEFAULT_VERIFY_DEVICE_FLOW,
   E2E_USER_WITH_DATA,

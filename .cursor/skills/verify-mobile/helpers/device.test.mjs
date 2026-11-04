@@ -51,6 +51,11 @@ import {
   ensureAdbReverses,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
+  adbLogcatDumpArgs,
+  deviceE2ESessionUrl,
+  e2eAuthCookieHeader,
+  e2eSessionLooksReady,
+  summarizeAuthFailure,
   amStartSucceeded,
   parseAdbReverseList,
   missingAdbReverses,
@@ -97,6 +102,8 @@ import {
   AM_START_ALREADY_FOREGROUND,
   DEVICE_FAILURE_SCREENSHOT,
   DEVICE_FAILURE_DUMP,
+  DEVICE_FAILURE_WEB_LOG,
+  DEVICE_FAILURE_LOGCAT,
   MAESTRO_LOG_NAME,
   DEFAULT_VERIFY_DEVICE_FLOW,
 } from './control.mjs'
@@ -456,25 +463,38 @@ describe('chosenDeviceWebPort', () => {
 })
 
 describe('deviceApiUrl', () => {
-  it('uses localhost so the Android emulator rewrite can map it to 10.0.2.2', () => {
-    assert.equal(deviceApiUrl(3910), 'http://localhost:3910')
+  it('uses 127.0.0.1 so the bundle hits the web server through adb reverse', () => {
+    assert.equal(deviceApiUrl(3910), 'http://127.0.0.1:3910')
   })
 })
 
 describe('deviceExpoPublicEnv', () => {
   it('sets EXPO_PUBLIC_API_URL so Metro inlines the dedicated port', () => {
     const env = deviceExpoPublicEnv(3910)
-    assert.equal(env.EXPO_PUBLIC_API_URL, 'http://localhost:3910')
+    assert.equal(env.EXPO_PUBLIC_API_URL, 'http://127.0.0.1:3910')
     assert.equal(env.EXPO_PUBLIC_E2E_USER, E2E_USER_WITH_DATA)
   })
 })
 
 describe('webLaunchEnv', () => {
-  it('pins VERIFY_PORT and Better Auth to the dedicated port', () => {
+  it('pins VERIFY_PORT, Better Auth, and the e2e bypass flag to the dedicated port', () => {
     const env = webLaunchEnv(3910)
     assert.equal(env.VERIFY_PORT, '3910')
     assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
     assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
+    assert.equal(env.E2E_BYPASS_AUTH, 'true')
+  })
+})
+
+describe('device E2E session preflight', () => {
+  it('builds the get-session URL on the reversed loopback', () => {
+    assert.equal(
+      deviceE2ESessionUrl(3910),
+      'http://127.0.0.1:3910/api/auth/get-session',
+    )
+    assert.equal(e2eAuthCookieHeader(), `Cookie: e2e_auth=${E2E_USER_WITH_DATA}`)
+    assert.equal(e2eSessionLooksReady(`{"user":{"id":"${E2E_USER_WITH_DATA}"}}`), true)
+    assert.equal(e2eSessionLooksReady('null'), false)
   })
 })
 
@@ -873,6 +893,21 @@ describe('adbShellHttpGetArgs', () => {
       assert.ok(!args.includes(url))
     }
   })
+
+  it('quotes Cookie headers so they stay one adb shell argv', () => {
+    const url = deviceE2ESessionUrl(3910)
+    const header = e2eAuthCookieHeader()
+    const attempts = adbShellHttpGetArgs(DEVICE_SERIAL, url, [header])
+    assert.equal(attempts.length, 3)
+    for (const args of attempts) {
+      assert.equal(args.at(-1), quoteForAdbShell(url))
+      assert.ok(args.includes(quoteForAdbShell(header)))
+      assert.ok(!args.includes(url))
+      assert.ok(!args.includes(header))
+    }
+    assert.ok(attempts[0].includes('--header'))
+    assert.ok(attempts[2].includes('-H'))
+  })
 })
 
 describe('amStartSucceeded', () => {
@@ -1086,12 +1121,26 @@ describe('deviceFailureArtifacts', () => {
     const paths = deviceFailureArtifactPaths('/tmp/run/sign-in-and-out')
     assert.equal(paths.screenshotPath.endsWith(DEVICE_FAILURE_SCREENSHOT), true)
     assert.equal(paths.dumpPath.endsWith(DEVICE_FAILURE_DUMP), true)
+    assert.equal(paths.webLogPath.endsWith(DEVICE_FAILURE_WEB_LOG), true)
+    assert.equal(paths.logcatPath.endsWith(DEVICE_FAILURE_LOGCAT), true)
     assert.deepEqual(adbScreencapArgs(DEVICE_SERIAL), [
       '-s',
       DEVICE_SERIAL,
       'exec-out',
       'screencap',
       '-p',
+    ])
+    assert.deepEqual(adbLogcatDumpArgs(DEVICE_SERIAL), [
+      '-s',
+      DEVICE_SERIAL,
+      'logcat',
+      '-d',
+      '-t',
+      '400',
+      'ReactNativeJS:V',
+      'Expo:V',
+      'AndroidRuntime:E',
+      '*:E',
     ])
   })
 })
@@ -1364,9 +1413,24 @@ describe('deviceReadyProblems', () => {
       requiredPorts: [8081, 3910],
       checkedDeviceMetro: true,
       deviceStatusBody: 'packager-status:running',
+      checkedDeviceE2E: true,
+      deviceE2EBody: `{"user":{"id":"${E2E_USER_WITH_DATA}"}}`,
       ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
     })
     assert.deepEqual(problems, [])
+  })
+
+  it('flags a device get-session that does not return the e2e user', () => {
+    const problems = deviceReadyProblems({
+      reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
+      requiredPorts: [8081, 3910],
+      checkedDeviceMetro: true,
+      deviceStatusBody: 'packager-status:running',
+      checkedDeviceE2E: true,
+      deviceE2EBody: 'null',
+      ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
+    })
+    assert.ok(problems.some((problem) => /get-session/.test(problem)))
   })
 
   it('flags the regular developer menu as covering the app', () => {
@@ -1455,6 +1519,14 @@ describe('sign-in-and-out flow', () => {
     assert.match(yaml, /extendedWaitUntil/)
     assert.doesNotMatch(yaml, /assertVisible/)
     assert.doesNotMatch(yaml, /timeout: 15000/)
+  })
+
+  it('waits for welcome-screen after the e2e handle instead of asserting immediately', () => {
+    const yaml = flow()
+    assert.match(
+      yaml,
+      /id: e2e-sign-in\n# get-session is a network hop[^\n]*\n- extendedWaitUntil:\n\s+visible:\n\s+id: welcome-screen\n\s+timeout: 60000/,
+    )
   })
 
   it('presses Back only when Go home is visible', () => {
@@ -1565,5 +1637,34 @@ describe('maestroFailureMessage', () => {
     assert.match(message, new RegExp(MAESTRO_LOG_NAME))
     assert.equal(maestroLogPath(dest), join(dest, MAESTRO_LOG_NAME))
     assert.match(message, /Maestro log tail:/)
+  })
+
+  it('prints an auth error summary and extra artifact paths', () => {
+    const dest = '/tmp/artifacts/run/sign-in-and-out'
+    const message = maestroFailureMessage({
+      flow: 'sign-in-and-out',
+      dest,
+      step: 'Assert that id: welcome-screen is visible',
+      authSummary: 'still on sign-in-screen; Network request failed',
+      screenshotPath: join(dest, DEVICE_FAILURE_SCREENSHOT),
+      dumpPath: join(dest, DEVICE_FAILURE_DUMP),
+      webLogPath: join(dest, DEVICE_FAILURE_WEB_LOG),
+      logcatPath: join(dest, DEVICE_FAILURE_LOGCAT),
+    })
+    assert.match(message, /Auth error: still on sign-in-screen/)
+    assert.match(message, new RegExp(DEVICE_FAILURE_WEB_LOG))
+    assert.match(message, new RegExp(DEVICE_FAILURE_LOGCAT))
+  })
+})
+
+describe('summarizeAuthFailure', () => {
+  it('names a leftover sign-in screen and a React Native network error', () => {
+    const summary = summarizeAuthFailure({
+      dump: `<node content-desc="${SIGN_IN_TEST_ID}"/>`,
+      logcat: 'ReactNativeJS: Network request failed',
+      webLog: '',
+    })
+    assert.match(summary, /still on sign-in-screen/)
+    assert.match(summary, /Network request failed/)
   })
 })

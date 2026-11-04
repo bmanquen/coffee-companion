@@ -155,6 +155,9 @@ describe('useAuth', () => {
   it('writes the e2e cookie and asks the auth client for the session', async () => {
     const previous = process.env[E2E_USER_ENV]
     process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
+    mocks.getSession.mockResolvedValueOnce({
+      data: { user: { name: 'E2E Tester', email: 'e2e-user-with-data@example.com' } },
+    })
     const { result } = await renderHook(() => useAuth())
 
     await act(async () => {
@@ -163,6 +166,22 @@ describe('useAuth', () => {
 
     expect(mocks.writeE2EAuthCookie).toHaveBeenCalledWith(E2E_USER_WITH_DATA)
     expect(mocks.getSession).toHaveBeenCalled()
+    expect(result.current.error).toBeNull()
+    if (previous === undefined) delete process.env[E2E_USER_ENV]
+    else process.env[E2E_USER_ENV] = previous
+  })
+
+  it('surfaces a failed e2e get-session instead of staying silently signed out', async () => {
+    const previous = process.env[E2E_USER_ENV]
+    process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
+    mocks.getSession.mockResolvedValueOnce({ data: null })
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signInE2E()
+    })
+
+    expect(result.current.error).toEqual({ title: ERROR_SIGN_IN_FAILED })
     if (previous === undefined) delete process.env[E2E_USER_ENV]
     else process.env[E2E_USER_ENV] = previous
   })
