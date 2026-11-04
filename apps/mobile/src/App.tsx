@@ -1,5 +1,7 @@
 import { StatusBar } from 'expo-status-bar'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import { API_URL_DEV_TAG, apiBaseUrl } from './auth/config'
+import { logApiBaseUrl } from './auth/log'
 import { SignedInHome } from './auth/SignedInHome'
 import { SignInScreen } from './auth/SignInScreen'
 import { useAuth } from './auth/use-auth'
@@ -9,7 +11,13 @@ export function App({ auth }: { auth?: Auth }) {
   return auth ? <Shell auth={auth} /> : <Live />
 }
 
+let loggedApiUrl = false
+
 function Live() {
+  if (!loggedApiUrl) {
+    loggedApiUrl = true
+    logApiBaseUrl(apiBaseUrl(), API_URL_DEV_TAG)
+  }
   return <Shell auth={useAuth()} />
 }
 

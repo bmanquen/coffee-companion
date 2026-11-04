@@ -1,4 +1,10 @@
-import { resolveApiBaseUrl } from './config'
+import {
+  API_URL_DEV_TAG_PREFIX,
+  FALLBACK_API_URL,
+  apiUrlDevTag,
+  configuredApiUrl,
+  resolveApiBaseUrl,
+} from './config'
 
 describe('resolveApiBaseUrl', () => {
   it('rewrites localhost to the Android emulator alias in a dev build', () => {
@@ -11,6 +17,16 @@ describe('resolveApiBaseUrl', () => {
     expect(
       resolveApiBaseUrl('http://127.0.0.1:3000', { os: 'android', isDev: true }),
     ).toBe('http://127.0.0.1:3000')
+  })
+
+  it('tags the configured URL so a stale Metro cache cannot hide behind extra.apiUrl', () => {
+    expect(configuredApiUrl('http://127.0.0.1:3910')).toBe(
+      'http://127.0.0.1:3910',
+    )
+    expect(configuredApiUrl(undefined)).toBe(FALLBACK_API_URL)
+    expect(apiUrlDevTag('http://127.0.0.1:3910')).toBe(
+      `${API_URL_DEV_TAG_PREFIX}http://127.0.0.1:3910`,
+    )
   })
 
   it('leaves ios, release, and non-loopback hosts unchanged', () => {

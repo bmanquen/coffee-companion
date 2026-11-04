@@ -2,6 +2,7 @@ import { createAuthClient } from 'better-auth/react'
 import { expoClient } from '@better-auth/expo/client'
 import { APP_SCHEME, apiBaseUrl } from './config'
 import { E2E_AUTH_HEADER } from './e2e'
+import { loggedAuthFetch } from './log'
 import {
   SESSION_COOKIE_KEY,
   SESSION_STORAGE_PREFIX,
@@ -48,6 +49,8 @@ const e2eAuthHeaderPlugin = {
 export const authClient = createAuthClient({
   baseURL: apiBaseUrl(),
   fetchOptions: {
+    customFetchImpl: ((input: RequestInfo | URL, init?: RequestInit) =>
+      loggedAuthFetch(input, init)) as never,
     // better-fetch plugin headers are a branded record, not HeadersInit.
     plugins: [e2eAuthHeaderPlugin as never],
   },

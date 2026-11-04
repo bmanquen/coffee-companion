@@ -40,6 +40,50 @@ export function serverFailureDetail(error: unknown): {
   }
 }
 
+export function logApiBaseUrl(
+  url: string,
+  tag?: string,
+  isDev = __DEV__,
+) {
+  if (!isDev) return
+  const extra = tag ? ` ${tag}` : ''
+  console.log(`${AUTH_LOG_PREFIX} api-url ${url}${extra}`)
+}
+
+export function logAuthRequest(
+  url: string,
+  status?: number,
+  isDev = __DEV__,
+) {
+  if (!isDev) return
+  if (!url) return
+  const parts = [`${AUTH_LOG_PREFIX} request ${url}`]
+  if (status != null) parts.push(`status=${status}`)
+  console.log(parts.join(' '))
+}
+
+export async function loggedAuthFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  isDev = __DEV__,
+  impl: typeof fetch = globalThis.fetch,
+): Promise<Response> {
+  const url =
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url
+  try {
+    const response = await impl(input as RequestInfo, init)
+    logAuthRequest(url, response.status, isDev)
+    return response
+  } catch (error) {
+    logAuthRequest(url, undefined, isDev)
+    throw error
+  }
+}
+
 export function logAuthFailure(
   kind: string,
   detail: {

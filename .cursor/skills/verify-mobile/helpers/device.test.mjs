@@ -13,6 +13,7 @@ import {
   requireAvd,
   bootWaitTick,
   expoAndroidArgs,
+  metroStartArgs,
   installWaitTick,
   resolveSdkRoot,
   chosenEmulatorGpu,
@@ -54,8 +55,16 @@ import {
   adbShellCookieGetCommands,
   adbShellHttpCookieGetArgs,
   adbLogcatDumpArgs,
+  adbPidofArgs,
+  parseAdbPid,
   deviceE2ESessionUrl,
   e2eAuthCookieHeader,
+  mobileExpoOrigin,
+  mobileE2ESignInHeaders,
+  apiUrlDevTag,
+  bundleHasApiUrlTag,
+  E2E_AUTH_HEADER,
+  E2E_GET_SESSION_METHOD,
   e2eSessionLooksReady,
   e2eSessionBodySummary,
   formatPreflightStage,
@@ -241,14 +250,32 @@ describe('expoAndroidArgs', () => {
     assert.ok(deviceAt >= 0)
     assert.equal(args[deviceAt + 1], 'Pixel_7')
     assert.ok(!args.includes(DEVICE_SERIAL))
+    assert.ok(args.includes('--no-bundler'))
+    assert.ok(!args.includes('--port'))
   })
 
   it('clears the native build cache when the installed APK is stale', () => {
     const args = expoAndroidArgs('Pixel_7', { rebuild: true })
     assert.ok(args.includes('--no-build-cache'))
-    const portAt = args.indexOf('--port')
-    assert.ok(portAt >= 0)
-    assert.equal(args[portAt + 1], '8081')
+    assert.ok(args.includes('--no-bundler'))
+    assert.ok(!args.includes('--port'))
+  })
+})
+
+describe('metroStartArgs', () => {
+  it('clears the transform cache for the device-tier Metro', () => {
+    const reused = metroStartArgs(8081)
+    assert.deepEqual(reused, [
+      'exec',
+      'expo',
+      'start',
+      '--port',
+      '8081',
+      '--localhost',
+    ])
+    const cleared = metroStartArgs(8081, { clearCache: true })
+    assert.ok(cleared.includes('--clear'))
+    assert.equal(cleared[cleared.indexOf('--port') + 1], '8081')
   })
 })
 
@@ -328,6 +355,16 @@ describe('installWaitTick', () => {
       logText: '',
     })
     assert.equal(tick.status, 'ok')
+  })
+
+  it('waits after expo --no-bundler exits once BUILD SUCCESSFUL until dumpsys sees the package', () => {
+    const tick = installWaitTick({
+      alive: false,
+      versionName: null,
+      expectedVersion: '4bf1a18',
+      logText: 'BUILD SUCCESSFUL in 6s\n',
+    })
+    assert.equal(tick.status, 'wait')
   })
 })
 
@@ -510,6 +547,39 @@ describe('device E2E session preflight', () => {
     assert.equal(
       e2eSessionBodySummary(`{"user":{"id":"${E2E_USER_WITH_DATA}"}}`),
       E2E_USER_WITH_DATA,
+    )
+  })
+
+  it('sends the same method, path, and headers as native E2E get-session', () => {
+    assert.equal(E2E_GET_SESSION_METHOD, 'GET')
+    assert.equal(E2E_AUTH_HEADER, 'x-e2e-auth')
+    assert.equal(mobileExpoOrigin(8081), 'coffeecompanion:///127.0.0.1:8081')
+    assert.deepEqual(mobileE2ESignInHeaders({ expoOrigin: mobileExpoOrigin(8081) }), {
+      cookie: `e2e_auth=${E2E_USER_WITH_DATA}`,
+      [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA,
+      'expo-origin': 'coffeecompanion:///127.0.0.1:8081',
+      'x-skip-oauth-proxy': 'true',
+    })
+  })
+
+  it('requires the cc-api-url tag, not only extra.apiUrl in the bundle', () => {
+    const apiUrl = 'http://127.0.0.1:3910'
+    assert.equal(apiUrlDevTag(apiUrl), 'cc-api-url:http://127.0.0.1:3910')
+    assert.equal(
+      bundleHasApiUrlTag(`var x = "cc-api-url:${apiUrl}"`, apiUrl),
+      true,
+    )
+    assert.equal(
+      bundleHasApiUrlTag(`extra:{apiUrl:"${apiUrl}"}`, apiUrl),
+      false,
+    )
+    assert.equal(
+      bundleHasApiUrlTag(`"cc-api-url:" + "${apiUrl}"`, apiUrl),
+      true,
+    )
+    assert.equal(
+      bundleHasApiUrlTag('`cc-api-url:${"http://127.0.0.1:3910"}`', apiUrl),
+      true,
     )
   })
 })
@@ -1211,9 +1281,29 @@ describe('deviceFailureArtifacts', () => {
       '-t',
       '400',
       'ReactNativeJS:V',
-      'Expo:V',
-      'AndroidRuntime:E',
-      '*:E',
+      '*:S',
+    ])
+    assert.deepEqual(adbPidofArgs(DEVICE_SERIAL, ANDROID_PACKAGE), [
+      '-s',
+      DEVICE_SERIAL,
+      'shell',
+      'pidof',
+      '-s',
+      ANDROID_PACKAGE,
+    ])
+    assert.equal(parseAdbPid('  4321\n'), '4321')
+    assert.equal(parseAdbPid(''), null)
+    assert.deepEqual(adbLogcatDumpArgs(DEVICE_SERIAL, { pid: '4321' }), [
+      '-s',
+      DEVICE_SERIAL,
+      'logcat',
+      '-d',
+      '-t',
+      '400',
+      '--pid',
+      '4321',
+      'ReactNativeJS:V',
+      '*:S',
     ])
   })
 })

@@ -2,9 +2,26 @@ import { Platform } from 'react-native'
 
 export const APP_SCHEME = 'coffeecompanion'
 export const APP_BUNDLE_ID = 'dev.offbyonelabs.coffeecompanion'
+export const FALLBACK_API_URL = 'http://localhost:3000'
+export const API_URL_DEV_TAG_PREFIX = 'cc-api-url:'
 
 const ANDROID_EMULATOR_REWRITE_HOSTS = new Set(['localhost'])
 const ANDROID_EMULATOR_HOST = '10.0.2.2'
+
+export function configuredApiUrl(
+  envUrl: string | undefined = process.env.EXPO_PUBLIC_API_URL,
+): string {
+  return envUrl || FALLBACK_API_URL
+}
+
+export function apiUrlDevTag(url = configuredApiUrl()): string {
+  return `${API_URL_DEV_TAG_PREFIX}${url}`
+}
+
+// Metro inlines EXPO_PUBLIC_* at transform time. Keep the env read in this
+// template so doctor can see cc-api-url:<url> even when extra.apiUrl also
+// mentions the port.
+export const API_URL_DEV_TAG = `${API_URL_DEV_TAG_PREFIX}${process.env.EXPO_PUBLIC_API_URL ?? FALLBACK_API_URL}`
 
 export function resolveApiBaseUrl(
   url: string,
@@ -31,9 +48,7 @@ export function resolveApiBaseUrl(
 }
 
 export function apiBaseUrl(): string {
-  return resolveApiBaseUrl(
-    process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000',
-  )
+  return resolveApiBaseUrl(configuredApiUrl())
 }
 
 export function googleWebClientId(): string {

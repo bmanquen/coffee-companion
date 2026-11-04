@@ -94,7 +94,11 @@ const MAESTRO_LOG_TAIL_LINES = 40
 const WEB_LOG_TAIL_LINES = 80
 const LOGCAT_DUMP_LINES = 400
 const E2E_AUTH_COOKIE_NAME = 'e2e_auth'
+const E2E_AUTH_HEADER = 'x-e2e-auth'
 const E2E_GET_SESSION_PATH = '/api/auth/get-session'
+const E2E_GET_SESSION_METHOD = 'GET'
+const X_SKIP_OAUTH_PROXY = 'x-skip-oauth-proxy'
+const API_URL_DEV_TAG_PREFIX = 'cc-api-url:'
 const APP_READY_PROGRESS_INTERVAL_MS = 15_000
 const DEFAULT_MAC_EMULATOR_GPU = 'host'
 const JAVA_MIN_MAJOR = 17
@@ -583,11 +587,10 @@ function bootWaitTick({ alive, bootCompleted, logText }) {
   return { status: 'wait' }
 }
 
-function expoAndroidArgs(
-  avdName,
-  { rebuild = false, port = DEFAULT_METRO_PORT } = {},
-) {
+function expoAndroidArgs(avdName, { rebuild = false } = {}) {
   // Expo 57 --device matches device.name (the AVD), not the adb serial.
+  // --port starts Metro without --clear and is mutually exclusive with
+  // --no-bundler; launch-device starts Metro itself so the device env is inlined.
   const args = [
     '--filter',
     '@coffee-companion/mobile',
@@ -596,10 +599,15 @@ function expoAndroidArgs(
     'run:android',
     '--device',
     avdName,
-    '--port',
-    String(port),
+    '--no-bundler',
   ]
   if (rebuild) args.push('--no-build-cache')
+  return args
+}
+
+function metroStartArgs(port, { clearCache = false } = {}) {
+  const args = ['exec', 'expo', 'start', '--port', String(port), '--localhost']
+  if (clearCache) args.push('--clear')
   return args
 }
 
@@ -668,7 +676,9 @@ function installWaitTick({
     }
   }
   if (versionName) return { status: 'ok' }
-  if (!alive) return { status: 'error', error: expoDiedError(logText) }
+  if (!alive && !finished) {
+    return { status: 'error', error: expoDiedError(logText) }
+  }
   return {
     status: 'wait',
     reason: installWaitReason({ versionName, expectedVersion, buildFinished: finished }),
@@ -1030,25 +1040,37 @@ function readWebServerLogTail(lines = WEB_LOG_TAIL_LINES) {
   return fileTail(readFileSync(path, 'utf8'), lines)
 }
 
-function adbLogcatDumpArgs(serial) {
-  return [
+function adbPidofArgs(serial, pkg) {
+  return ['-s', serial, 'shell', 'pidof', '-s', pkg]
+}
+
+function parseAdbPid(text) {
+  const match = `${text ?? ''}`.trim().match(/^(\d+)\b/m)
+  return match ? match[1] : null
+}
+
+function adbLogcatDumpArgs(serial, { pid } = {}) {
+  const args = [
     '-s',
     serial,
     'logcat',
     '-d',
     '-t',
     String(LOGCAT_DUMP_LINES),
-    'ReactNativeJS:V',
-    'Expo:V',
-    'AndroidRuntime:E',
-    '*:E',
   ]
+  if (pid) args.push('--pid', String(pid))
+  args.push('ReactNativeJS:V', '*:S')
+  return args
 }
 
-function adbLogcatDump(serial) {
+function adbLogcatDump(serial, pkg = ANDROID_PACKAGE) {
+  const pid = parseAdbPid(
+    runCapture(adbBin(), adbPidofArgs(serial, pkg), { allowFail: true }).stdout,
+  )
   return `${
-    runCapture(adbBin(), adbLogcatDumpArgs(serial), { allowFail: true }).stdout ??
-    ''
+    runCapture(adbBin(), adbLogcatDumpArgs(serial, { pid }), {
+      allowFail: true,
+    }).stdout ?? ''
   }`
 }
 
@@ -1374,6 +1396,37 @@ function deviceApiUrl(port) {
   return `http://127.0.0.1:${port}`
 }
 
+function apiUrlDevTag(url) {
+  return `${API_URL_DEV_TAG_PREFIX}${url}`
+}
+
+function bundleHasApiUrlTag(body, apiUrl) {
+  const text = `${body ?? ''}`
+  const tag = apiUrlDevTag(apiUrl)
+  if (text.includes(tag)) return true
+  const idx = text.indexOf(API_URL_DEV_TAG_PREFIX)
+  if (idx < 0) return false
+  return text
+    .slice(idx, idx + API_URL_DEV_TAG_PREFIX.length + apiUrl.length + 120)
+    .includes(apiUrl)
+}
+
+function mobileExpoOrigin(metroPort = DEFAULT_METRO_PORT) {
+  return `coffeecompanion:///127.0.0.1:${metroPort}`
+}
+
+function mobileE2ESignInHeaders({
+  userId = E2E_USER_WITH_DATA,
+  expoOrigin = mobileExpoOrigin(),
+} = {}) {
+  return {
+    cookie: `${E2E_AUTH_COOKIE_NAME}=${userId}`,
+    [E2E_AUTH_HEADER]: userId,
+    'expo-origin': expoOrigin,
+    [X_SKIP_OAUTH_PROXY]: 'true',
+  }
+}
+
 function deviceExpoPublicEnv(port) {
   return {
     EXPO_PUBLIC_API_URL: deviceApiUrl(port),
@@ -1611,11 +1664,12 @@ function collectPngFiles(dir) {
   return found
 }
 
-async function fetchText(url, timeoutMs, headers) {
+async function fetchText(url, timeoutMs, headers, { method = 'GET' } = {}) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetch(url, {
+      method,
       redirect: 'manual',
       signal: controller.signal,
       headers,
@@ -1718,7 +1772,7 @@ async function cmdLaunch() {
   const logFd = openSync(logPath, 'w')
   const metro = spawn(
     'pnpm',
-    ['exec', 'expo', 'start', '--port', String(port), '--localhost'],
+    metroStartArgs(port),
     {
       cwd: mobileDir,
       env: {
@@ -2006,32 +2060,36 @@ async function waitForAppForeground(serial, timeoutMs) {
   )
 }
 
+function stopListenersOnPort(port, kind, stopped = []) {
+  for (const pid of portListenerPids(port)) {
+    stopRecordedPid(pid, kind, stopped)
+  }
+  return stopped
+}
+
 async function ensureDeviceMetro(port, extraEnv = {}) {
   const baseUrl = `http://localhost:${port}`
-  try {
-    await waitForMetro(baseUrl, 10_000)
-    return { metroPid: null, reused: true, baseUrl, port }
-  } catch {
-    // expo run:android did not leave Metro up — start one with the device env.
+  // expo run:android --port starts Metro without --clear, so a reused process
+  // keeps a stale inlined EXPO_PUBLIC_API_URL. Always start our own with --clear.
+  stopListenersOnPort(port, 'metro')
+  const freed = await waitForPortFree(port, PORT_FREE_TIMEOUT_MS)
+  if (freed.status !== 'ok') {
+    throw new Error(portBusyMessage(port, freed.pids, 'metro'))
   }
   const logPath = join(runDir, 'metro.log')
   const logFd = openSync(logPath, 'w')
-  const metro = spawn(
-    'pnpm',
-    ['exec', 'expo', 'start', '--port', String(port), '--localhost'],
-    {
-      cwd: mobileDir,
-      env: {
-        ...process.env,
-        CI: '1',
-        EXPO_NO_TELEMETRY: '1',
-        BROWSER: 'none',
-        ...extraEnv,
-      },
-      stdio: ['ignore', logFd, logFd],
-      detached: true,
+  const metro = spawn('pnpm', metroStartArgs(port, { clearCache: true }), {
+    cwd: mobileDir,
+    env: {
+      ...process.env,
+      CI: '1',
+      EXPO_NO_TELEMETRY: '1',
+      BROWSER: 'none',
+      ...extraEnv,
     },
-  )
+    stdio: ['ignore', logFd, logFd],
+    detached: true,
+  })
   metro.unref()
   await waitForMetro(baseUrl, DEVICE_METRO_WAIT_MS)
   return { metroPid: metro.pid, reused: false, baseUrl, port, logPath }
@@ -2234,7 +2292,7 @@ async function cmdLaunchDevice() {
     const expoLog = join(runDir, 'expo-android.log')
     const expo = spawnLogged(
       'pnpm',
-      expoAndroidArgs(avdName, { rebuild, port: metroPort }),
+      expoAndroidArgs(avdName, { rebuild }),
       expoLog,
       {
         cwd: repoRoot,
@@ -2672,7 +2730,7 @@ function inspectExpoAutolinking(opts = {}) {
 async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   const problems = []
 
-  if (!pidAlive(state.metroPid)) {
+  if (state.metroPid && !pidAlive(state.metroPid)) {
     problems.push(`metro pid ${state.metroPid} is not running`)
   }
 
@@ -2729,12 +2787,12 @@ async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
       problems.push(`bundle at ${bundle.url} does not mention ${APP_MARKER}`)
     }
     if (state.webPort) {
-      if (
-        !bundle.body.includes(`127.0.0.1:${state.webPort}`) &&
-        !bundle.body.includes(`localhost:${state.webPort}`)
-      ) {
+      const expectedApiUrl = deviceApiUrl(state.webPort)
+      const expectedTag = apiUrlDevTag(expectedApiUrl)
+      if (!bundleHasApiUrlTag(bundle.body, expectedApiUrl)) {
         problems.push(
-          `bundle at ${bundle.url} does not mention the device API URL for port ${state.webPort}`,
+          `bundle at ${bundle.url} does not mention ${expectedTag}; ` +
+            'EXPO_PUBLIC_API_URL was not inlined',
         )
       }
       if (!bundle.body.includes(E2E_USER_WITH_DATA)) {
@@ -2784,7 +2842,7 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   if (state.webPid && !pidAlive(state.webPid)) {
     problems.push(`web pid ${state.webPid} is not running`)
   }
-  if (state.expoPid && !pidAlive(state.expoPid)) {
+  if (state.expoPid && !state.metroPid && !pidAlive(state.expoPid)) {
     problems.push(`expo pid ${state.expoPid} is not running`)
   }
 
@@ -2825,20 +2883,24 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
       problems.push(`GET ${webUrl} failed: ${error.message}`)
     }
     try {
+      const sessionUrl = `${webUrl.replace(/\/$/, '')}${E2E_GET_SESSION_PATH}`
       hostE2E = await fetchText(
-        `${webUrl.replace(/\/$/, '')}${E2E_GET_SESSION_PATH}`,
+        sessionUrl,
         timeoutMs,
-        { cookie: `${E2E_AUTH_COOKIE_NAME}=${E2E_USER_WITH_DATA}` },
+        mobileE2ESignInHeaders({
+          expoOrigin: mobileExpoOrigin(state.port ?? DEFAULT_METRO_PORT),
+        }),
+        { method: E2E_GET_SESSION_METHOD },
       )
       if (!e2eSessionLooksReady(hostE2E.body)) {
         problems.push(
-          `host GET of ${webUrl}${E2E_GET_SESSION_PATH} did not return ${E2E_USER_WITH_DATA} ` +
-            `(E2E_BYPASS_AUTH / seed)`,
+          `host ${E2E_GET_SESSION_METHOD} of ${sessionUrl} did not return ${E2E_USER_WITH_DATA} ` +
+            `(E2E_BYPASS_AUTH / seed / ${E2E_AUTH_HEADER})`,
         )
       }
     } catch (error) {
       problems.push(
-        `host GET of ${webUrl}${E2E_GET_SESSION_PATH} failed: ${error.message}`,
+        `host ${E2E_GET_SESSION_METHOD} of ${webUrl}${E2E_GET_SESSION_PATH} failed: ${error.message}`,
       )
     }
   }
@@ -2929,7 +2991,12 @@ async function inspectInstance(state) {
   problems.push(...autolinking.problems)
   const maestroFlows = inspectMaestroFlows()
   problems.push(...maestroFlows.problems)
-  if (state.metroPid || state.harness === HARNESS_RNTL) {
+  if (
+    state.metroPid ||
+    state.port ||
+    state.harness === HARNESS_RNTL ||
+    state.harness === HARNESS_MAESTRO
+  ) {
     metro = await inspectMetro(state)
     problems.push(...metro.problems)
   }
@@ -3212,8 +3279,17 @@ export {
   adbShellCookieGetCommands,
   adbShellHttpCookieGetArgs,
   adbLogcatDumpArgs,
+  adbPidofArgs,
+  parseAdbPid,
+  metroStartArgs,
+  apiUrlDevTag,
+  bundleHasApiUrlTag,
+  mobileExpoOrigin,
+  mobileE2ESignInHeaders,
   deviceE2ESessionUrl,
   e2eAuthCookieHeader,
+  E2E_AUTH_HEADER,
+  E2E_GET_SESSION_METHOD,
   e2eSessionLooksReady,
   e2eSessionBodySummary,
   formatPreflightStage,
