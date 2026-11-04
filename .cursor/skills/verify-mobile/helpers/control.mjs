@@ -115,13 +115,21 @@ const WEB_STATE_PATH = join(
   '.cursor/skills/verify-coffee-companion/.run/state.json',
 )
 
-const BUNDLE_QUERY = 'platform=android&dev=true&minify=false'
+// getMetroServerRoot() in a pnpm workspace is the repo root, so the dev client
+// asks for /apps/mobile/index.bundle, not /index.bundle. lazy=false is the full
+// graph (including expo/virtual/env); the client may still request lazy=true.
+const BUNDLE_QUERY = 'platform=android&dev=true&minify=false&lazy=false'
+const METRO_WORKSPACE_ENTRY = '/apps/mobile/index'
 const BUNDLE_PATHS = [
+  `${METRO_WORKSPACE_ENTRY}.bundle?${BUNDLE_QUERY}`,
   `/index.bundle?${BUNDLE_QUERY}`,
+  `/.expo/.virtual-metro-entry.bundle?${BUNDLE_QUERY}`,
+  `${METRO_WORKSPACE_ENTRY}.ts.bundle?${BUNDLE_QUERY}`,
   `/index.ts.bundle?${BUNDLE_QUERY}`,
-  `/apps/mobile/index.bundle?${BUNDLE_QUERY}`,
-  `/apps/mobile/index.ts.bundle?${BUNDLE_QUERY}`,
 ]
+const MOBILE_DOTENV_LOCAL = '.env.development.local'
+const MOBILE_DOTENV_BACKUP = 'env.development.local.bak'
+const MOBILE_DOTENV_CREATED = 'env.development.local.created'
 
 function die(message, code = 1) {
   console.error(message)
@@ -633,6 +641,7 @@ function metroSpawnSpec(port, { clearCache = false, devClient = false, extraEnv 
       CI: '1',
       EXPO_NO_TELEMETRY: '1',
       BROWSER: 'none',
+      // @expo/env does not overwrite keys already on process.env.
       ...extraEnv,
     },
   }
@@ -1464,15 +1473,124 @@ function apiUrlDevTag(url) {
   return `${API_URL_DEV_TAG_PREFIX}${url}`
 }
 
+function listedExpoPublicApiUrls(body) {
+  const text = `${body ?? ''}`
+  const urls = []
+  const patterns = [
+    /"EXPO_PUBLIC_API_URL"\s*:\s*\{\s*enumerable:\s*true,\s*value:\s*"([^"]*)"/g,
+    /EXPO_PUBLIC_API_URL=([^\s"'\\]+)/g,
+    /EXPO_PUBLIC_API_URL["']?\s*:\s*["']([^"']+)["']/g,
+  ]
+  for (const pattern of patterns) {
+    let match
+    while ((match = pattern.exec(text))) {
+      urls.push(match[1])
+    }
+  }
+  return [...new Set(urls)]
+}
+
+function foundApiUrlDevTags(body) {
+  const text = `${body ?? ''}`
+  const tags = []
+  const pattern = /cc-api-url:[^\s"'`]*/g
+  let match
+  while ((match = pattern.exec(text))) {
+    tags.push(match[0].slice(0, 80))
+  }
+  return tags
+}
+
+function clientApiUrlFromBundle(body) {
+  const text = `${body ?? ''}`
+  const dotenv = [...text.matchAll(/EXPO_PUBLIC_API_URL=([^\s"'\\]+)/g)].map(
+    (match) => match[1],
+  )
+  if (dotenv.length) return dotenv[dotenv.length - 1]
+  const serializer = text.match(
+    /"EXPO_PUBLIC_API_URL"\s*:\s*\{\s*enumerable:\s*true,\s*value:\s*"([^"]*)"/,
+  )
+  if (serializer) return serializer[1]
+  const tag = text.match(/cc-api-url:(https?:\/\/[^\s"'`]+)/)
+  if (tag) return tag[1]
+  const listed = listedExpoPublicApiUrls(text)
+  return listed[listed.length - 1] ?? null
+}
+
 function bundleHasApiUrlTag(body, apiUrl) {
   const text = `${body ?? ''}`
+  if (!text.includes(API_URL_DEV_TAG_PREFIX)) return false
   const tag = apiUrlDevTag(apiUrl)
   if (text.includes(tag)) return true
+  if (clientApiUrlFromBundle(text) === apiUrl) return true
   const idx = text.indexOf(API_URL_DEV_TAG_PREFIX)
-  if (idx < 0) return false
   return text
     .slice(idx, idx + API_URL_DEV_TAG_PREFIX.length + apiUrl.length + 120)
     .includes(apiUrl)
+}
+
+function bundleApiUrlMissMessage(body, bundleUrl, expectedApiUrl) {
+  const expectedTag = apiUrlDevTag(expectedApiUrl)
+  const inlined = clientApiUrlFromBundle(body)
+  const tags = foundApiUrlDevTags(body)
+  const foundEnv = inlined
+    ? `EXPO_PUBLIC_API_URL is inlined as ${inlined}`
+    : 'EXPO_PUBLIC_API_URL was not inlined'
+  const foundTag = tags[0] ? `found ${tags[0]}` : 'no cc-api-url: tag'
+  return `bundle at ${bundleUrl} does not mention ${expectedTag}; ${foundEnv}; ${foundTag}`
+}
+
+function upsertDotenvKeys(contents, values) {
+  let next = `${contents ?? ''}`
+  for (const [key, value] of Object.entries(values)) {
+    const line = `${key}=${value}`
+    const pattern = new RegExp(`^${key}=.*$`, 'm')
+    if (pattern.test(next)) {
+      next = next.replace(pattern, line)
+    } else {
+      next = `${next.replace(/\s*$/, '')}${next.trim() ? '\n' : ''}${line}\n`
+    }
+  }
+  return next.endsWith('\n') ? next : `${next}\n`
+}
+
+function mobileDotenvLocalPath() {
+  return join(mobileDir, MOBILE_DOTENV_LOCAL)
+}
+
+function stampMobileExpoPublicEnv(values, { dotenvPath, backupDir } = {}) {
+  const path = dotenvPath ?? mobileDotenvLocalPath()
+  const dir = backupDir ?? runDir
+  ensureDir(dirname(path))
+  ensureDir(dir)
+  const existed = existsSync(path)
+  if (existed) {
+    copyFileSync(path, join(dir, MOBILE_DOTENV_BACKUP))
+  } else {
+    writeFileSync(join(dir, MOBILE_DOTENV_CREATED), '1\n')
+  }
+  const previous = existed ? readFileSync(path, 'utf8') : ''
+  const publicValues = Object.fromEntries(
+    Object.entries(values).filter(([key]) => key.startsWith('EXPO_PUBLIC_')),
+  )
+  writeFileSync(path, upsertDotenvKeys(previous, publicValues))
+  return path
+}
+
+function restoreMobileExpoPublicEnv({ dotenvPath, backupDir } = {}) {
+  const path = dotenvPath ?? mobileDotenvLocalPath()
+  const dir = backupDir ?? runDir
+  const backup = join(dir, MOBILE_DOTENV_BACKUP)
+  const created = join(dir, MOBILE_DOTENV_CREATED)
+  if (existsSync(backup)) {
+    copyFileSync(backup, path)
+    return 'restored'
+  }
+  if (existsSync(created) && existsSync(path)) {
+    rmSync(path)
+    return 'removed'
+  }
+  return 'noop'
 }
 
 function mobileExpoOrigin(metroPort = DEFAULT_METRO_PORT) {
@@ -2185,6 +2303,9 @@ function stopListenersOnPort(port, kind, stopped = []) {
 async function ensureDeviceMetro(port, extraEnv = {}) {
   // expo run:android --port starts Metro without --clear, so a reused process
   // keeps a stale inlined EXPO_PUBLIC_API_URL. Always start our own with --clear.
+  // expo/virtual/env merges .env* over process.env in the client, so spawn env
+  // alone is not enough when apps/mobile/.env exists.
+  stampMobileExpoPublicEnv(extraEnv)
   stopListenersOnPort(port, 'metro')
   const freed = await waitForPortFree(port, PORT_FREE_TIMEOUT_MS)
   if (freed.status !== 'ok') {
@@ -2205,10 +2326,17 @@ async function ensureDeviceMetro(port, extraEnv = {}) {
     logPath: metro.logPath,
     exit: metro.exit,
   })
+  const bundle = await fetchAppBundle(ready.baseUrl, LAUNCH_BUNDLE_TIMEOUT_MS)
+  if (!bundleHasAppMarker(bundle.body)) {
+    throw new Error(
+      `Metro answered but the bundle at ${bundle.url} does not mention ${APP_MARKER}.`,
+    )
+  }
   return {
     metroPid: metro.child.pid,
     reused: false,
     baseUrl: ready.baseUrl,
+    bundleUrl: bundle.url,
     port,
     logPath: metro.logPath,
   }
@@ -2239,6 +2367,7 @@ function stopLaunchDevice(partial, stopped = []) {
     })
   }
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
+  restoreMobileExpoPublicEnv()
 }
 
 async function cmdLaunchDevice() {
@@ -2467,6 +2596,7 @@ async function cmdLaunchDevice() {
       metroLogPath: metro.logPath,
       port: metroPort,
       baseUrl: metro.baseUrl,
+      bundleUrl: metro.bundleUrl,
       scheme,
       expoDevClientUrl: devClientUrl,
       webPid: web.webPid,
@@ -2498,6 +2628,7 @@ async function cmdLaunchDevice() {
           metroPid: metro.metroPid,
           port: metroPort,
           baseUrl: metro.baseUrl,
+          bundleUrl: metro.bundleUrl,
           scheme,
           expoDevClientUrl: devClientUrl,
           webPid: web.webPid,
@@ -2899,8 +3030,9 @@ async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   let bundleStatus = null
   let appMarker = false
   let bundleUrl = state.bundleUrl ?? `${baseUrl}${BUNDLE_PATHS[0]}`
+  const bundleTimeoutMs = state.webPort ? LAUNCH_BUNDLE_TIMEOUT_MS : timeoutMs
   try {
-    const bundle = await fetchAppBundle(baseUrl, timeoutMs)
+    const bundle = await fetchAppBundle(baseUrl, bundleTimeoutMs)
     bundleUrl = bundle.url
     bundleStatus = bundle.status
     appMarker = bundleHasAppMarker(bundle.body)
@@ -2909,11 +3041,9 @@ async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     }
     if (state.webPort) {
       const expectedApiUrl = deviceApiUrl(state.webPort)
-      const expectedTag = apiUrlDevTag(expectedApiUrl)
       if (!bundleHasApiUrlTag(bundle.body, expectedApiUrl)) {
         problems.push(
-          `bundle at ${bundle.url} does not mention ${expectedTag}; ` +
-            'EXPO_PUBLIC_API_URL was not inlined',
+          bundleApiUrlMissMessage(bundle.body, bundle.url, expectedApiUrl),
         )
       }
       if (!bundle.body.includes(E2E_USER_WITH_DATA)) {
@@ -3315,6 +3445,7 @@ async function cmdCleanup() {
     await waitForPortFree(port, PORT_FREE_TIMEOUT_MS)
   }
 
+  restoreMobileExpoPublicEnv()
   if (existsSync(runDir)) {
     rmSync(runDir, { recursive: true, force: true })
   }
@@ -3405,8 +3536,17 @@ export {
   metroTimeoutError,
   waitForMetro,
   BUNDLE_PATHS,
+  METRO_WORKSPACE_ENTRY,
+  BUNDLE_QUERY,
   apiUrlDevTag,
   bundleHasApiUrlTag,
+  listedExpoPublicApiUrls,
+  foundApiUrlDevTags,
+  clientApiUrlFromBundle,
+  bundleApiUrlMissMessage,
+  upsertDotenvKeys,
+  stampMobileExpoPublicEnv,
+  restoreMobileExpoPublicEnv,
   mobileExpoOrigin,
   mobileE2ESignInHeaders,
   deviceE2ESessionUrl,

@@ -69,6 +69,13 @@ import {
   mobileE2ESignInHeaders,
   apiUrlDevTag,
   bundleHasApiUrlTag,
+  listedExpoPublicApiUrls,
+  foundApiUrlDevTags,
+  clientApiUrlFromBundle,
+  bundleApiUrlMissMessage,
+  upsertDotenvKeys,
+  stampMobileExpoPublicEnv,
+  restoreMobileExpoPublicEnv,
   E2E_AUTH_HEADER,
   E2E_GET_SESSION_METHOD,
   e2eSessionLooksReady,
@@ -344,14 +351,19 @@ describe('metro readiness wait', () => {
 })
 
 describe('dev-client bundle URL', () => {
-  it('asks Metro for /index.bundle relative to apps/mobile before the workspace path', () => {
+  it('asks Metro for the workspace /apps/mobile/index.bundle the dev client loads', () => {
     assert.equal(
       BUNDLE_PATHS[0],
-      '/index.bundle?platform=android&dev=true&minify=false',
+      '/apps/mobile/index.bundle?platform=android&dev=true&minify=false&lazy=false',
     )
     assert.ok(
       BUNDLE_PATHS.includes(
-        '/apps/mobile/index.bundle?platform=android&dev=true&minify=false',
+        '/index.bundle?platform=android&dev=true&minify=false&lazy=false',
+      ),
+    )
+    assert.ok(
+      BUNDLE_PATHS.includes(
+        '/.expo/.virtual-metro-entry.bundle?platform=android&dev=true&minify=false&lazy=false',
       ),
     )
   })
@@ -659,6 +671,87 @@ describe('device E2E session preflight', () => {
       bundleHasApiUrlTag('`cc-api-url:${"http://127.0.0.1:3910"}`', apiUrl),
       true,
     )
+  })
+
+  it('reads the client EXPO_PUBLIC_API_URL from the serializer polyfill or .env overlay', () => {
+    const apiUrl = 'http://127.0.0.1:3910'
+    const serializer =
+      '/* HMR env vars from Expo CLI (dev-only) */ process.env=Object.defineProperties(process.env, {"EXPO_PUBLIC_API_URL": { enumerable: true, value: "http://127.0.0.1:3910" }});'
+    const prefixAndSerializer = `var tag = "cc-api-url:" + env.EXPO_PUBLIC_API_URL;\n${serializer}`
+    assert.equal(clientApiUrlFromBundle(serializer), apiUrl)
+    assert.equal(bundleHasApiUrlTag(prefixAndSerializer, apiUrl), true)
+    assert.equal(
+      clientApiUrlFromBundle('EXPO_PUBLIC_API_URL=http://localhost:3000\nEXPO_PUBLIC_API_URL=http://127.0.0.1:3910'),
+      apiUrl,
+    )
+    assert.deepEqual(listedExpoPublicApiUrls(serializer), [apiUrl])
+    assert.equal(
+      listedExpoPublicApiUrls(`extra:{apiUrl:"${apiUrl}"}`).includes(apiUrl),
+      false,
+    )
+    assert.deepEqual(foundApiUrlDevTags('var x = "cc-api-url:" + env.EXPO_PUBLIC_API_URL'), [
+      'cc-api-url:',
+    ])
+  })
+
+  it('names the inlined EXPO_PUBLIC_API_URL when the expected tag is missing', () => {
+    const expected = 'http://127.0.0.1:3910'
+    const body =
+      'var tag = "cc-api-url:" + env.EXPO_PUBLIC_API_URL;\nprocess.env=Object.defineProperties(process.env, {"EXPO_PUBLIC_API_URL": { enumerable: true, value: "http://localhost:3000" }});'
+    const message = bundleApiUrlMissMessage(
+      body,
+      'http://[::1]:8081/apps/mobile/index.bundle?platform=android&dev=true&minify=false&lazy=false',
+      expected,
+    )
+    assert.match(message, /\/apps\/mobile\/index\.bundle/)
+    assert.match(message, /cc-api-url:http:\/\/127\.0\.0\.1:3910/)
+    assert.match(message, /EXPO_PUBLIC_API_URL is inlined as http:\/\/localhost:3000/)
+    assert.match(message, /found cc-api-url:/)
+    assert.equal(
+      bundleApiUrlMissMessage('', 'http://127.0.0.1:8081/apps/mobile/index.bundle', expected),
+      'bundle at http://127.0.0.1:8081/apps/mobile/index.bundle does not mention cc-api-url:http://127.0.0.1:3910; EXPO_PUBLIC_API_URL was not inlined; no cc-api-url: tag',
+    )
+  })
+})
+
+describe('stampMobileExpoPublicEnv', () => {
+  it('upserts EXPO_PUBLIC_* into .env.development.local so expo/virtual/env cannot keep .env', () => {
+    assert.equal(
+      upsertDotenvKeys('EXPO_PUBLIC_API_URL=http://localhost:3000\nKEEP=1\n', {
+        EXPO_PUBLIC_API_URL: 'http://127.0.0.1:3910',
+        EXPO_PUBLIC_E2E_USER: 'e2e-user-with-data',
+      }),
+      'EXPO_PUBLIC_API_URL=http://127.0.0.1:3910\nKEEP=1\nEXPO_PUBLIC_E2E_USER=e2e-user-with-data\n',
+    )
+    const root = mkdtempSync(join(tmpdir(), 'cc-dotenv-'))
+    const dotenvPath = join(root, '.env.development.local')
+    const backupDir = join(root, 'run')
+    try {
+      writeFileSync(dotenvPath, 'EXPO_PUBLIC_API_URL=http://localhost:3000\n')
+      stampMobileExpoPublicEnv(
+        {
+          EXPO_PUBLIC_API_URL: 'http://127.0.0.1:3910',
+          EXPO_PUBLIC_E2E_USER: 'e2e-user-with-data',
+          OTHER: 'skip',
+        },
+        { dotenvPath, backupDir },
+      )
+      assert.match(
+        readFileSync(dotenvPath, 'utf8'),
+        /EXPO_PUBLIC_API_URL=http:\/\/127\.0\.0\.1:3910/,
+      )
+      assert.equal(
+        readFileSync(dotenvPath, 'utf8').includes('OTHER='),
+        false,
+      )
+      restoreMobileExpoPublicEnv({ dotenvPath, backupDir })
+      assert.equal(
+        readFileSync(dotenvPath, 'utf8'),
+        'EXPO_PUBLIC_API_URL=http://localhost:3000\n',
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 

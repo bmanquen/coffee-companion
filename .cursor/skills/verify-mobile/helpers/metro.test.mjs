@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import {
   APP_MARKER,
   BUNDLE_PATHS,
+  E2E_USER_WITH_DATA,
   METRO_READY_MARKER,
   bundleHasAppMarker,
   fetchAppBundle,
@@ -34,6 +35,51 @@ describe('bundleHasAppMarker', () => {
 })
 
 describe('inspectMetro', () => {
+  it('uses /apps/mobile/index.bundle and the serializer EXPO_PUBLIC_API_URL', async () => {
+    const apiUrl = 'http://127.0.0.1:3910'
+    const body = [
+      `var title = "${APP_MARKER}"`,
+      'var tag = "cc-api-url:" + env.EXPO_PUBLIC_API_URL',
+      `process.env=Object.defineProperties(process.env, {"EXPO_PUBLIC_API_URL": { enumerable: true, value: "${apiUrl}" }});`,
+      E2E_USER_WITH_DATA,
+    ].join('\n')
+    const server = createServer((req, res) => {
+      if (req.url === '/status') {
+        res.writeHead(200, { 'content-type': 'text/plain' })
+        res.end(METRO_READY_MARKER)
+        return
+      }
+      if (req.url?.startsWith('/apps/mobile/index.bundle')) {
+        res.writeHead(200, { 'content-type': 'text/javascript' })
+        res.end(body)
+        return
+      }
+      res.writeHead(404)
+      res.end('missing')
+    })
+    await new Promise((resolve) => {
+      server.listen(0, '127.0.0.1', resolve)
+    })
+    const { port } = server.address()
+    try {
+      const report = await inspectMetro(
+        {
+          port,
+          webPort: 3910,
+          baseUrl: `http://127.0.0.1:${port}`,
+        },
+        2_000,
+      )
+      assert.equal(report.ok, true)
+      assert.match(report.bundleUrl, /\/apps\/mobile\/index\.bundle/)
+      assert.match(report.bundleUrl, /lazy=false/)
+    } finally {
+      await new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()))
+      })
+    }
+  })
+
   it('fails closed when the recorded Metro is not answering', async () => {
     const report = await inspectMetro(
       {
@@ -100,9 +146,9 @@ describe('waitForMetro', () => {
 })
 
 describe('fetchAppBundle', () => {
-  it('uses /index.bundle relative to the apps/mobile Metro root', async () => {
+  it('uses /apps/mobile/index.bundle at the pnpm workspace Metro root', async () => {
     const server = createServer((req, res) => {
-      if (req.url?.startsWith('/index.bundle')) {
+      if (req.url?.startsWith('/apps/mobile/index.bundle')) {
         res.writeHead(200, { 'content-type': 'text/javascript' })
         res.end(`var title = "${APP_MARKER}"`)
         return
@@ -120,7 +166,33 @@ describe('fetchAppBundle', () => {
         bundle.url,
         `http://127.0.0.1:${port}${BUNDLE_PATHS[0]}`,
       )
+      assert.match(bundle.url, /lazy=false/)
       assert.equal(bundleHasAppMarker(bundle.body), true)
+    } finally {
+      await new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()))
+      })
+    }
+  })
+
+  it('falls back to /index.bundle when the workspace path 404s', async () => {
+    const server = createServer((req, res) => {
+      if (req.url?.startsWith('/index.bundle')) {
+        res.writeHead(200, { 'content-type': 'text/javascript' })
+        res.end(`var title = "${APP_MARKER}"`)
+        return
+      }
+      res.writeHead(404)
+      res.end('missing')
+    })
+    await new Promise((resolve) => {
+      server.listen(0, '127.0.0.1', resolve)
+    })
+    const { port } = server.address()
+    try {
+      const bundle = await fetchAppBundle(`http://127.0.0.1:${port}`, 2_000)
+      assert.match(bundle.url, /\/index\.bundle\?/)
+      assert.ok(!bundle.url.includes('/apps/mobile/index.bundle'))
     } finally {
       await new Promise((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()))
