@@ -36,8 +36,9 @@ export function authResponseSessionSummary(body: unknown): string {
 export function withE2EAuthHeader(
   init: RequestInit | undefined,
   userId: string | null,
+  isDev = __DEV__,
 ): RequestInit {
-  if (!userId) return init ?? {}
+  if (!isDev || !userId) return init ?? {}
   const headers = new Headers(init?.headers)
   headers.set(E2E_AUTH_HEADER, userId)
   return { ...init, headers }

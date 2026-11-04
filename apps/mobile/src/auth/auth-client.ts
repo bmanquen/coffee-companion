@@ -34,6 +34,7 @@ const e2eAuthHeaderPlugin = {
   id: 'e2e-auth-header',
   name: 'e2e-auth-header',
   init(url: string, options?: { headers?: unknown }) {
+    if (!__DEV__) return { url, options }
     const userId = e2eAuthUserFromCookieStore(
       sessionStore.getItem(SESSION_COOKIE_KEY),
     )

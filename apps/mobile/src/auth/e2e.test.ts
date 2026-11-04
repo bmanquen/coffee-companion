@@ -36,11 +36,21 @@ describe('withE2EAuthHeader', () => {
     const next = withE2EAuthHeader(
       { headers: { cookie: `e2e_auth=${E2E_USER_WITH_DATA}` } },
       E2E_USER_WITH_DATA,
+      true,
     )
     const headers = new Headers(next.headers)
     expect(headers.get(E2E_AUTH_HEADER)).toBe(E2E_USER_WITH_DATA)
     expect(hasE2EAuthHeader(next.headers)).toBe(true)
     expect(headerNames(next.headers)).toEqual(['cookie', 'x-e2e-auth'])
+  })
+
+  it('does not set x-e2e-auth in a production build', () => {
+    const next = withE2EAuthHeader(
+      { headers: { cookie: `e2e_auth=${E2E_USER_WITH_DATA}` } },
+      E2E_USER_WITH_DATA,
+      false,
+    )
+    expect(hasE2EAuthHeader(next.headers)).toBe(false)
   })
 
   it('summarizes a session body as the user id or null', () => {

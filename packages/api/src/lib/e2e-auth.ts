@@ -6,7 +6,8 @@
 // the real Google OAuth / session machinery (which is better-auth's concern,
 // not ours to test).
 //
-// Two independent guards keep this safe:
+// Independent guards keep this safe:
+//   - production never bypasses, even if the flag is set,
 //   - the env var is never set in production, and
 //   - the cookie/header scopes the bypass to the test client only (so, e.g.,
 //     the public-landing test still sees the unauthenticated site).
@@ -52,18 +53,32 @@ function makeSession(userId: string) {
 
 export type E2ESession = ReturnType<typeof makeSession>
 
+function isProductionRuntime(nodeEnv = process.env.NODE_ENV) {
+  return nodeEnv === 'production'
+}
+
+function decodeE2EAuthValue(value: string | undefined): string | null {
+  if (!value) return null
+  try {
+    const decoded = decodeURIComponent(value.trim()).trim()
+    return decoded ? decoded : null
+  } catch {
+    return null
+  }
+}
+
 function e2eAuthUserId(headers: Headers): string | null {
   const cookie = headers.get('cookie') ?? ''
   const match = cookie.match(
     new RegExp(`(?:^|;\\s*)${E2E_AUTH_COOKIE_NAME}=([^;]+)`),
   )
-  const fromCookie = match ? decodeURIComponent(match[1].trim()) : ''
+  const fromCookie = decodeE2EAuthValue(match?.[1])
   if (fromCookie) return fromCookie
-  const fromHeader = headers.get(E2E_AUTH_HEADER)?.trim()
-  return fromHeader ? decodeURIComponent(fromHeader) : null
+  return decodeE2EAuthValue(headers.get(E2E_AUTH_HEADER)?.trim())
 }
 
 export function e2eBypassSession(headers: Headers): E2ESession | null {
+  if (isProductionRuntime()) return null
   if (process.env.E2E_BYPASS_AUTH !== 'true') return null
   const userId = e2eAuthUserId(headers)
   return userId ? makeSession(userId) : null
