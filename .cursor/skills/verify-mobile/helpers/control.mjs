@@ -3821,7 +3821,7 @@ function usage() {
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
   drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}
-  verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); leave the instance up on failure
+  verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); the instance stays up if a later step fails
   cleanup             Stop recorded pids, free ports this helper recorded, uninstall the package from a recorded serial; keep artifacts/
 
 `)

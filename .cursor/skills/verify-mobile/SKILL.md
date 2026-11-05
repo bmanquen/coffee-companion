@@ -31,7 +31,7 @@ The RNTL tier is the gate on every machine. If an Android AVD exists, also run t
 
 # Device (only where SDK + an AVD exist; default name is verify-pixel)
 # Dedicated web port is 3910 (VERIFY_PORT) so it does not collide with pnpm dev on 3000.
-# One command: cleanup → launch-device → doctor → drive-device. Leaves the instance up on failure.
+# One command: cleanup → launch-device → doctor → drive-device. Stays up if a later step fails.
 VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control verify-device
 ```
 
@@ -81,7 +81,7 @@ VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control launch-device
 
 The device tier starts its own web app on port `3910` so it does not collide with `pnpm dev` on `3000`. Override with `VERIFY_PORT` if that port is taken.
 
-`helpers/control verify-device [flow]` is the one command: `cleanup` → `launch-device` → `doctor` → `drive-device` (default flow `sign-in-and-out`). On failure it leaves the instance up for inspection. Do not insert manual waits between those steps.
+`helpers/control verify-device [flow]` is the one command: `cleanup` → `launch-device` → `doctor` → `drive-device` (default flow `sign-in-and-out`). If `doctor` or `drive-device` fails, the instance stays up for inspection. If `launch-device` fails, its own teardown runs (step 6). Do not insert manual waits between those steps.
 
 `launch-device` does all of this, in order:
 
@@ -204,7 +204,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
 | `helpers/control drive-device <flow>` | Re-apply adb reverse, print host preflight OK/FAIL and device OK/SKIP/WARN, then `Running Maestro flow <flow>` on `emulator-5554`; copy screenshots to `artifacts/`; print `PASS`/`FAIL artifacts at …` (exit non-zero on fail) |
-| `helpers/control verify-device [flow]` | One shot: cleanup → launch-device → doctor → drive-device. Leaves the instance up on failure. |
+| `helpers/control verify-device [flow]` | One shot: cleanup → launch-device → doctor → drive-device. Leaves the instance up if doctor or drive-device fails. |
 | `helpers/control cleanup` | Stop recorded pids and leftover listeners on ports this helper recorded; `emu kill`, wait for the pid/group (SIGTERM then SIGKILL), wait for the serial and AVD locks; uninstall the package from a recorded serial; keep artifacts |
 | `helpers/metro.test.mjs` | Node tests for the Metro / bundle markers |
 | `helpers/device.test.mjs` | Node tests for adb / dumpsys / AVD list / boot-wait / pid / screenshot helpers and `maestro check-syntax` on `flows/` |
