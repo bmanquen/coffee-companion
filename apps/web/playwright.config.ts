@@ -26,7 +26,8 @@ import { loadTestDatabaseUrl } from '@coffee-companion/api/test/database'
 //     hosted/staging instance); Playwright does NOT start a local server.
 //   - otherwise         -> build and boot the app locally on PORT (used by CI).
 const PORT = 3000
-const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`
+// Match NITRO_HOST: localhost can resolve to ::1 first and miss an IPv4-only bind.
+const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${PORT}`
 const cookieDomain = new URL(baseURL).hostname
 
 // A local run seeds and boots against the test database named by
@@ -118,7 +119,7 @@ export default defineConfig({
     ? undefined
     : {
         command: 'node .output/server/index.mjs',
-        url: `http://localhost:${PORT}`,
+        url: `http://127.0.0.1:${PORT}`,
         // Never reuse: a server already on the port is a dev server on the
         // development database, without the auth bypass.
         reuseExistingServer: false,
