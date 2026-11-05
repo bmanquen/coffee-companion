@@ -24,9 +24,27 @@ describe('resolveApiBaseUrl', () => {
       'http://127.0.0.1:3910',
     )
     expect(configuredApiUrl(undefined)).toBe(FALLBACK_API_URL)
+    expect(configuredApiUrl('')).toBe(FALLBACK_API_URL)
     expect(apiUrlDevTag('http://127.0.0.1:3910')).toBe(
       `${API_URL_DEV_TAG_PREFIX}http://127.0.0.1:3910`,
     )
+  })
+
+  it('keeps API_URL_DEV_TAG on the fallback when EXPO_PUBLIC_API_URL is empty', () => {
+    const original = process.env.EXPO_PUBLIC_API_URL
+    process.env.EXPO_PUBLIC_API_URL = ''
+    jest.resetModules()
+    try {
+      const fresh = jest.requireActual('./config')
+      expect(fresh.API_URL_DEV_TAG).toBe(
+        `${fresh.API_URL_DEV_TAG_PREFIX}${fresh.FALLBACK_API_URL}`,
+      )
+      expect(fresh.configuredApiUrl()).toBe(fresh.FALLBACK_API_URL)
+    } finally {
+      if (original === undefined) delete process.env.EXPO_PUBLIC_API_URL
+      else process.env.EXPO_PUBLIC_API_URL = original
+      jest.resetModules()
+    }
   })
 
   it('leaves ios, release, and non-loopback hosts unchanged', () => {

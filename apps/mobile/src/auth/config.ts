@@ -21,7 +21,7 @@ export function apiUrlDevTag(url = configuredApiUrl()): string {
 // Production babel stringifies EXPO_PUBLIC_*. Dev rewrites it to expo/virtual/env
 // (HMR), so the contiguous cc-api-url:<url> tag only appears after that rewrite
 // plus the serializer polyfill / .env files. extra.apiUrl is not this tag.
-export const API_URL_DEV_TAG = `${API_URL_DEV_TAG_PREFIX}${process.env.EXPO_PUBLIC_API_URL ?? FALLBACK_API_URL}`
+export const API_URL_DEV_TAG = `${API_URL_DEV_TAG_PREFIX}${process.env.EXPO_PUBLIC_API_URL || FALLBACK_API_URL}`
 
 export function resolveApiBaseUrl(
   url: string,
