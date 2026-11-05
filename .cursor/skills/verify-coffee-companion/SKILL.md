@@ -29,7 +29,7 @@ Launch does all of this, in order:
 4. Applies migrations with `pnpm db:migrate` against that URL.
 5. Seeds the e2e bypass users (`e2e-user-with-data` on a Pro Grant, `e2e-user-free` on Free, same library, and `e2e-user-delete` with no library). The empty identity is left unseeded.
 6. Always rebuilds `apps/web` with `pnpm --filter coffee-companion build` (production `NODE_ENV`, so the client bundle is the production one). Existence of `.output` is not enough: a leftover build from another branch would invalidate the proof. The production build is short (~15s here); launch does not reuse a stale artifact.
-7. Starts `node apps/web/.output/server/index.mjs` with `DATABASE_URL`, `PORT`, `E2E_BYPASS_AUTH=true`, and `NODE_ENV=test`. The production *build* must run as `NODE_ENV=test` at runtime or the bypass guard refuses every persona. `BETTER_AUTH_SECRET` and `GOOGLE_CLIENT_SECRET` come from the environment or are generated for this process; they are not literals in the skill. Billing stays off (no `STRIPE_SECRET_KEY`).
+7. Starts `node apps/web/.output/server/index.mjs` with `DATABASE_URL`, `PORT`, `E2E_BYPASS_AUTH=true`, `NODE_ENV=test`, and `NITRO_HOST`/`HOST` `127.0.0.1` so the bypass server stays on loopback. The production *build* must run as `NODE_ENV=test` at runtime or the bypass guard refuses every persona. `BETTER_AUTH_SECRET` and `GOOGLE_CLIENT_SECRET` come from the environment or are generated for this process; they are not literals in the skill. Billing stays off (no `STRIPE_SECRET_KEY`).
 8. Waits until `GET http://127.0.0.1:$PORT` answers. Writes `.cursor/skills/verify-coffee-companion/.run/state.json`.
 
 Ready signal: launch prints JSON with `ok: true`, `baseUrl`, and `serverPid`. Default URL is `http://127.0.0.1:3000`.

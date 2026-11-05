@@ -9,9 +9,12 @@
 // Independent guards keep this safe:
 //   - NODE_ENV must be exactly test or development (unset, production,
 //     staging, and anything else refuse),
-//   - the env var is never set in production, and
-//   - the cookie/header scopes the bypass to the test client only (so, e.g.,
-//     the public-landing test still sees the unauthenticated site).
+//   - E2E_BYPASS_AUTH must be the string true,
+//   - the cookie/header value must be an allow-listed persona id.
+// The cookie/header selects which persona to act as. It is not an access
+// boundary: any client that can reach a server with the bypass enabled can
+// send it. Public-landing tests omit the credential so they see the
+// unauthenticated site.
 //
 // Playwright and verify-* boot the production *build* with NODE_ENV=test.
 // `pnpm dev` is NODE_ENV=development. Property access on the env object

@@ -6,6 +6,7 @@ import {
   requireUniqueRegion,
   resolveClickTarget,
   webBuildEnv,
+  webRuntimeEnv,
 } from './control.mjs'
 
 function mockLocator(label, trail, { countValue = 1 } = {}) {
@@ -252,6 +253,21 @@ describe('webBuildEnv', () => {
       NODE_ENV: 'test',
     })
     assert.equal(env.NODE_ENV, 'production')
+    assert.equal(env.DATABASE_URL, 'postgres://local/test')
+    assert.equal(env.E2E_BYPASS_AUTH, 'true')
+  })
+})
+
+describe('webRuntimeEnv', () => {
+  it('pins NODE_ENV=test and loopback for the spawned Nitro server', () => {
+    const env = webRuntimeEnv({
+      DATABASE_URL: 'postgres://local/test',
+      E2E_BYPASS_AUTH: 'true',
+      HOST: '0.0.0.0',
+    })
+    assert.equal(env.NODE_ENV, 'test')
+    assert.equal(env.HOST, '127.0.0.1')
+    assert.equal(env.NITRO_HOST, '127.0.0.1')
     assert.equal(env.DATABASE_URL, 'postgres://local/test')
     assert.equal(env.E2E_BYPASS_AUTH, 'true')
   })

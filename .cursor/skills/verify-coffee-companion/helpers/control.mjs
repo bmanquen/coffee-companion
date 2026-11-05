@@ -80,6 +80,15 @@ function webBuildEnv(env) {
   return { ...env, NODE_ENV: 'production' }
 }
 
+function webRuntimeEnv(env) {
+  return {
+    ...env,
+    NODE_ENV: 'test',
+    HOST: '127.0.0.1',
+    NITRO_HOST: '127.0.0.1',
+  }
+}
+
 function run(command, args, opts = {}) {
   const result = spawnSync(command, args, {
     cwd: opts.cwd ?? repoRoot,
@@ -240,7 +249,8 @@ async function cmdLaunch() {
   const server = spawn('node', [serverEntry], {
     cwd: webDir,
     // Production *build* above; test *runtime* so the bypass guard can fire.
-    env: { ...process.env, ...env, NODE_ENV: 'test' },
+    // Pin loopback so Nitro does not inherit an unspecified HOST.
+    env: { ...process.env, ...webRuntimeEnv(env) },
     stdio: ['ignore', logFd, logFd],
     detached: true,
   })
@@ -1089,6 +1099,7 @@ export {
   requireUniqueRegion,
   resolveClickTarget,
   webBuildEnv,
+  webRuntimeEnv,
 }
 
 // Importing this file for locator tests must not run launch/doctor/cleanup.

@@ -133,6 +133,8 @@ export default defineConfig({
           PORT: String(PORT),
           E2E_BYPASS_AUTH: 'true',
           NODE_ENV: 'test',
+          HOST: '127.0.0.1',
+          NITRO_HOST: '127.0.0.1',
         },
       },
 })
