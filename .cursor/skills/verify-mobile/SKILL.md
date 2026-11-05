@@ -32,6 +32,8 @@ The RNTL tier is the gate on every machine. If an Android AVD exists, also run t
 # Device (only where SDK + an AVD exist; default name is verify-pixel)
 # Dedicated web port is 3910 (VERIFY_PORT) so it does not collide with pnpm dev on 3000.
 # One command: cleanup → launch-device → doctor → drive-device. Stays up if a later step fails.
+.cursor/skills/verify-mobile/helpers/control verify-device
+# If `verify-pixel` is missing from `emulator -list-avds`, name an installed AVD:
 VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control verify-device
 ```
 
@@ -158,6 +160,8 @@ CI runs those same screen tests without Metro (`pnpm --filter @coffee-companion/
 Where an AVD exists (default `verify-pixel`, or `VERIFY_AVD`), one command:
 
 ```bash
+.cursor/skills/verify-mobile/helpers/control verify-device
+# If `verify-pixel` is missing from `emulator -list-avds`, name an installed AVD:
 VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control verify-device
 ```
 
