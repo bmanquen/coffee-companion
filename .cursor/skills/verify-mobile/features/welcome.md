@@ -33,4 +33,4 @@ Preconditions:
 - Android needs the SDK and an AVD. `launch-device` boots `verify-pixel` on `emulator-5554` unless `VERIFY_AVD` names another installed AVD. This skill does not install the SDK.
 - `testID` and `accessibilityLabel` live in `apps/mobile/src/welcome.ts`. Drive those handles, not coordinates or visible text.
 - Icon and adaptive-icon files under `apps/mobile/assets/` are Expo template artwork. `android.adaptiveIcon.backgroundColor` is `#FFFFFF` (neutral, same as the welcome screen). Do not treat them as brand. Real artwork comes before any store build.
-- Metro on 8081 that you did not launch is the wrong instance. `launch` refuses a busy port rather than attaching.
+- Metro on `VERIFY_METRO_PORT` (default `8081`) that you did not launch is the wrong instance. `launch` refuses a busy port rather than attaching.

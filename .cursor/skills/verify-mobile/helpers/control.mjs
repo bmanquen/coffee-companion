@@ -3830,7 +3830,7 @@ function usage() {
   console.log(`Usage: helpers/control <launch|launch-device|doctor|drive|drive-device|verify-device|cleanup>
 
   launch              Start Expo Metro on VERIFY_METRO_PORT (default 8081)
-  launch-device       Attach or boot ${DEVICE_SERIAL}, rebuild if versionName is stale, reverse Metro/web, open the expo-development-client deep link
+  launch-device       Attach or boot ${DEVICE_SERIAL} (AVD verify-pixel unless VERIFY_AVD is set); web on VERIFY_PORT (default 3910); rebuild if versionName is stale; reverse Metro/web; open the expo-development-client deep link
   doctor              Read-only check that this instance is worth driving
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library

@@ -1670,6 +1670,46 @@ describe('metroPortClaim', () => {
   })
 })
 
+describe('verify-mobile usage defaults', () => {
+  const skill = () =>
+    readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../SKILL.md'),
+      'utf8',
+    )
+  const controlSrc = () =>
+    readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'),
+      'utf8',
+    )
+
+  it('shows default verify-device and launch-device commands before VERIFY_AVD overrides', () => {
+    const fences = skill().split('```bash').slice(1)
+    for (const fence of fences) {
+      const body = fence.split('```')[0]
+      const commands = body
+        .split('\n')
+        .filter((line) =>
+          /helpers\/control (verify-device|launch-device)/.test(line),
+        )
+      if (commands.length === 0) continue
+      assert.ok(
+        commands.some((line) => !line.startsWith('VERIFY_AVD=')),
+        'example must show the default command before VERIFY_AVD',
+      )
+    }
+  })
+
+  it('names default AVD and ports in control usage text', () => {
+    const start = controlSrc().indexOf('function usage()')
+    assert.ok(start >= 0)
+    const usage = controlSrc().slice(start, controlSrc().indexOf('\nexport {', start))
+    assert.match(usage, /VERIFY_METRO_PORT \(default 8081\)/)
+    assert.match(usage, /verify-pixel/)
+    assert.match(usage, /VERIFY_PORT \(default 3910\)/)
+    assert.doesNotMatch(usage, /VERIFY_AVD=Pixel_7/)
+  })
+})
+
 describe('cmdLaunchDevice metro snapshot', () => {
   it('snapshots Metro-port pids before expo run:android', () => {
     const src = readFileSync(
