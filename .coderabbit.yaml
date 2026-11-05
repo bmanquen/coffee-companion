@@ -11,8 +11,11 @@ reviews:
   # comments into the summary.
   profile: assertive
 
-  # Canonical replacements for the deprecated reviews.request_changes_workflow
-  # and reviews.allow_author_approval aliases. Do not set both old and new keys.
+  # Legacy alias of reviews.auto_approvals.enabled. Both are true (same
+  # value) so CodeRabbit requests changes on findings and auto-approves
+  # once its threads are resolved and the latest review is clean. Do not
+  # set these two keys to different values or Automatic Approvals turns off.
+  request_changes_workflow: true
   auto_approvals:
     enabled: true
     allow_author_approval: false
