@@ -130,6 +130,9 @@ import {
   resolveMaestroBin,
   listMaestroFlowPaths,
   inspectMaestroFlows,
+  maestroSyntaxRequired,
+  HARNESS_MAESTRO,
+  HARNESS_RNTL,
   maestroLogPath,
   maestroLogTail,
   parseMaestroFailedStep,
@@ -2272,6 +2275,28 @@ describe('inspectMaestroFlows', () => {
       listMaestroFlowPaths(flowsDir).map((path) => path.slice(path.lastIndexOf('/') + 1)),
     )
     assert.ok(report.flows.some((path) => path.endsWith('sign-in-and-out.yaml')))
+  })
+
+  it('requires syntax checks only for Maestro or device runs', () => {
+    assert.equal(maestroSyntaxRequired({ harness: HARNESS_RNTL }), false)
+    assert.equal(maestroSyntaxRequired({}), false)
+    assert.equal(maestroSyntaxRequired({ harness: HARNESS_MAESTRO }), true)
+    assert.equal(maestroSyntaxRequired({ serial: 'emulator-5554' }), true)
+    assert.equal(
+      maestroSyntaxRequired({ harness: HARNESS_RNTL, serial: 'emulator-5554' }),
+      true,
+    )
+  })
+
+  it('skips a missing CLI when the syntax check is optional', () => {
+    const report = inspectMaestroFlows({
+      bin: '/definitely-missing-maestro',
+      exists: () => false,
+      required: false,
+    })
+    assert.equal(report.ok, true)
+    assert.equal(report.skipped, true)
+    assert.deepEqual(report.problems, [])
   })
 
   it('fails closed on an unknown tapOn timeout property', { skip: !hasMaestro }, () => {

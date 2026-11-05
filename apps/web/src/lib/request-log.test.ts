@@ -37,7 +37,7 @@ describe('requestRecord', () => {
     })
   })
 
-  it('strips query and hash from expo-origin and drops an unparseable value', () => {
+  it('strips query, hash, and userinfo from expo-origin and drops an unparseable value', () => {
     const withQuery = new Request('https://app.test/api/auth/get-session', {
       headers: {
         'expo-origin': 'coffeecompanion:///127.0.0.1:8081?token=secret#frag',
@@ -45,6 +45,15 @@ describe('requestRecord', () => {
     })
     expect(requestRecord(withQuery, 200, 8, 'req_2b')?.expoOrigin).toBe(
       'coffeecompanion:///127.0.0.1:8081',
+    )
+
+    const withUserinfo = new Request('https://app.test/api/auth/get-session', {
+      headers: {
+        'expo-origin': 'https://user:secret@example.com/callback',
+      },
+    })
+    expect(requestRecord(withUserinfo, 200, 8, 'req_2d')?.expoOrigin).toBe(
+      'https://example.com/callback',
     )
 
     const invalid = new Request('https://app.test/api/auth/get-session', {

@@ -62,6 +62,17 @@ export function logApiBaseUrl(
   console.log(`${AUTH_LOG_PREFIX} api-url ${url}${extra}`)
 }
 
+export function authRequestUrlForLog(url: string): string {
+  try {
+    const parsed = new URL(url)
+    return `${parsed.origin}${parsed.pathname}`
+  } catch {
+    const withoutHash = url.split('#')[0] ?? url
+    const query = withoutHash.indexOf('?')
+    return query === -1 ? withoutHash : withoutHash.slice(0, query)
+  }
+}
+
 export function logAuthRequest(
   url: string,
   status?: number,
@@ -71,7 +82,7 @@ export function logAuthRequest(
 ) {
   if (!isDev) return
   if (!url) return
-  const parts = [`${AUTH_LOG_PREFIX} request ${url}`]
+  const parts = [`${AUTH_LOG_PREFIX} request ${authRequestUrlForLog(url)}`]
   if (status != null) parts.push(`status=${status}`)
   if (headerInfo) {
     parts.push(`headers=${headerInfo.names.join(',') || 'none'}`)

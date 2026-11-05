@@ -6,14 +6,17 @@ import {
   e2eAuthCookieStore,
   e2eAuthRequestHeaders,
   e2eAuthUserFromCookieStore,
+  readSessionCookie,
+  restoreSessionCookie,
   writeE2EAuthCookie,
 } from './session-store'
 
 const mockDeleteItemAsync = jest.fn()
 const mockSetItem = jest.fn()
+const mockCookieMemory = new Map<string, string>()
 
 jest.mock('expo-secure-store', () => ({
-  getItem: jest.fn(() => null),
+  getItem: (key: string) => mockCookieMemory.get(key) ?? null,
   setItem: (...args: [string, string]) => mockSetItem(...args),
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(() => undefined),
@@ -21,6 +24,14 @@ jest.mock('expo-secure-store', () => ({
 }))
 
 describe('writeE2EAuthCookie', () => {
+  beforeEach(() => {
+    mockCookieMemory.clear()
+    mockSetItem.mockImplementation((key: string, value: string) => {
+      mockCookieMemory.set(key, value)
+    })
+    mockDeleteItemAsync.mockReset()
+  })
+
   it('stores e2e_auth in the expoClient cookie map', () => {
     writeE2EAuthCookie(E2E_USER_WITH_DATA)
 
@@ -57,5 +68,27 @@ describe('clearSessionStore', () => {
 
     expect(mockDeleteItemAsync).toHaveBeenCalledWith(SESSION_COOKIE_KEY)
     expect(mockDeleteItemAsync).toHaveBeenCalledWith(SESSION_DATA_KEY)
+  })
+})
+
+describe('restoreSessionCookie', () => {
+  beforeEach(() => {
+    mockCookieMemory.clear()
+    mockSetItem.mockImplementation((key: string, value: string) => {
+      mockCookieMemory.set(key, value)
+    })
+    mockDeleteItemAsync.mockReset()
+  })
+
+  it('puts back the prior cookie map or deletes when there was none', async () => {
+    const prior = e2eAuthCookieStore(E2E_USER_WITH_DATA)
+    writeE2EAuthCookie(E2E_USER_WITH_DATA)
+    expect(readSessionCookie()).toBe(prior)
+
+    await restoreSessionCookie(null)
+    expect(mockDeleteItemAsync).toHaveBeenCalledWith(SESSION_COOKIE_KEY)
+
+    await restoreSessionCookie(prior)
+    expect(readSessionCookie()).toBe(prior)
   })
 })

@@ -23,8 +23,11 @@ const mocks = {
   signOut: jest.fn(),
   getSession: jest.fn(),
   refetchClientSession: jest.fn(),
+  clearClientSession: jest.fn(),
   clearSessionStore: jest.fn(),
   writeE2EAuthCookie: jest.fn(),
+  readSessionCookie: jest.fn(),
+  restoreSessionCookie: jest.fn(),
   appleAvailable: true,
   session: null as null | { user: { name: string } },
   pending: false,
@@ -44,6 +47,8 @@ jest.mock('./session-store', () => ({
   ...jest.requireActual('./session-store'),
   clearSessionStore: () => mocks.clearSessionStore(),
   writeE2EAuthCookie: (userId: string) => mocks.writeE2EAuthCookie(userId),
+  readSessionCookie: () => mocks.readSessionCookie(),
+  restoreSessionCookie: (raw: string | null) => mocks.restoreSessionCookie(raw),
 }))
 
 jest.mock('./auth-client', () => ({
@@ -53,6 +58,7 @@ jest.mock('./auth-client', () => ({
     getSession: (...args: Array<unknown>) => mocks.getSession(...args),
   },
   refetchClientSession: () => mocks.refetchClientSession(),
+  clearClientSession: () => mocks.clearClientSession(),
 }))
 
 describe('useAuth', () => {
@@ -66,8 +72,13 @@ describe('useAuth', () => {
     mocks.signOut.mockReset()
     mocks.getSession.mockReset()
     mocks.refetchClientSession.mockReset()
+    mocks.clearClientSession.mockReset()
     mocks.clearSessionStore.mockReset()
     mocks.writeE2EAuthCookie.mockReset()
+    mocks.readSessionCookie.mockReset()
+    mocks.restoreSessionCookie.mockReset()
+    mocks.readSessionCookie.mockReturnValue(null)
+    mocks.restoreSessionCookie.mockResolvedValue(undefined)
     mocks.appleAvailable = true
     mocks.session = null
     mocks.pending = false
@@ -141,6 +152,10 @@ describe('useAuth', () => {
     expect(mocks.signOutGoogle).toHaveBeenCalled()
     expect(mocks.signOut).toHaveBeenCalled()
     expect(mocks.clearSessionStore).toHaveBeenCalled()
+    expect(mocks.clearClientSession).toHaveBeenCalled()
+    expect(mocks.clearClientSession.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mocks.clearSessionStore.mock.invocationCallOrder[0],
+    )
   })
 
   it('clears the secure session when remote sign-out fails', async () => {
@@ -152,6 +167,7 @@ describe('useAuth', () => {
     })
 
     expect(mocks.clearSessionStore).toHaveBeenCalled()
+    expect(mocks.clearClientSession).toHaveBeenCalled()
   })
 
   it('still revokes the server session when Google sign-out throws', async () => {
@@ -164,6 +180,7 @@ describe('useAuth', () => {
 
     expect(mocks.signOut).toHaveBeenCalled()
     expect(mocks.clearSessionStore).toHaveBeenCalled()
+    expect(mocks.clearClientSession).toHaveBeenCalled()
   })
 
   it('writes the e2e cookie and refetches the session atom', async () => {
@@ -180,6 +197,7 @@ describe('useAuth', () => {
 
     expect(mocks.writeE2EAuthCookie).toHaveBeenCalledWith(E2E_USER_WITH_DATA)
     expect(mocks.refetchClientSession).toHaveBeenCalled()
+    expect(mocks.restoreSessionCookie).not.toHaveBeenCalled()
     expect(result.current.error).toBeNull()
     if (previous === undefined) delete process.env[E2E_USER_ENV]
     else process.env[E2E_USER_ENV] = previous
@@ -198,6 +216,27 @@ describe('useAuth', () => {
     expect(result.current.error).toEqual({
       title: ERROR_SIGN_IN_FAILED,
       body: 'E2E get-session returned no session',
+    })
+    expect(mocks.restoreSessionCookie).toHaveBeenCalledWith(null)
+    if (previous === undefined) delete process.env[E2E_USER_ENV]
+    else process.env[E2E_USER_ENV] = previous
+  })
+
+  it('restores the prior cookie when e2e get-session throws', async () => {
+    const previous = process.env[E2E_USER_ENV]
+    process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
+    mocks.readSessionCookie.mockReturnValueOnce('prior-cookie')
+    mocks.refetchClientSession.mockRejectedValueOnce(new Error('network'))
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signInE2E()
+    })
+
+    expect(mocks.restoreSessionCookie).toHaveBeenCalledWith('prior-cookie')
+    expect(result.current.error).toEqual({
+      title: ERROR_SIGN_IN_FAILED,
+      body: 'network',
     })
     if (previous === undefined) delete process.env[E2E_USER_ENV]
     else process.env[E2E_USER_ENV] = previous

@@ -20,9 +20,14 @@ describe('e2eBypassSession', () => {
 
   it('returns null when the bypass env flag is not set', () => {
     delete process.env.E2E_BYPASS_AUTH
-    expect(e2eBypassSession(new Headers({ cookie: 'e2e_auth=someone' }))).toBeNull()
+    process.env.NODE_ENV = 'test'
     expect(
-      e2eBypassSession(new Headers({ [E2E_AUTH_HEADER]: 'someone' })),
+      e2eBypassSession(
+        new Headers({ cookie: `e2e_auth=${E2E_USER_WITH_DATA}` }),
+      ),
+    ).toBeNull()
+    expect(
+      e2eBypassSession(new Headers({ [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA })),
     ).toBeNull()
   })
 

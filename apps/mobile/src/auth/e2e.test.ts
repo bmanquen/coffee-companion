@@ -59,5 +59,8 @@ describe('withE2EAuthHeader', () => {
     expect(
       authResponseSessionSummary({ user: { id: E2E_USER_WITH_DATA } }),
     ).toBe(`user=${E2E_USER_WITH_DATA}`)
+    expect(authResponseSessionSummary({ user: { id: 'user-xyz' } })).toBe(
+      'user=present',
+    )
   })
 })

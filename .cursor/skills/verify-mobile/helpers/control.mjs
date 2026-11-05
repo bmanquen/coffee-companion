@@ -3543,13 +3543,19 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   }
 }
 
+function maestroSyntaxRequired(state) {
+  return state.harness === HARNESS_MAESTRO || Boolean(state.serial)
+}
+
 async function inspectInstance(state) {
   const problems = []
   let metro = null
   let device = null
   const autolinking = inspectExpoAutolinking()
   problems.push(...autolinking.problems)
-  const maestroFlows = inspectMaestroFlows()
+  const maestroFlows = inspectMaestroFlows({
+    required: maestroSyntaxRequired(state),
+  })
   problems.push(...maestroFlows.problems)
   if (
     state.metroPid ||
@@ -3915,6 +3921,7 @@ export {
   resolveMaestroBin,
   listMaestroFlowPaths,
   inspectMaestroFlows,
+  maestroSyntaxRequired,
   maestroLogPath,
   maestroLogTail,
   parseMaestroFailedStep,

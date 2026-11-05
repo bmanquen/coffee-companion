@@ -2,7 +2,17 @@ export const E2E_AUTH_COOKIE_NAME = 'e2e_auth'
 export const E2E_AUTH_HEADER = 'x-e2e-auth'
 export const E2E_USER_ENV = 'EXPO_PUBLIC_E2E_USER'
 export const E2E_USER_WITH_DATA = 'e2e-user-with-data'
+export const E2E_USER_EMPTY = 'e2e-user-empty'
+export const E2E_USER_FREE = 'e2e-user-free'
+export const E2E_USER_DELETE = 'e2e-user-delete'
 export const E2E_SIGN_IN = 'E2E sign in'
+
+const E2E_PERSONA_IDS = new Set([
+  E2E_USER_WITH_DATA,
+  E2E_USER_EMPTY,
+  E2E_USER_FREE,
+  E2E_USER_DELETE,
+])
 
 export function e2eSignInUser(
   user = process.env.EXPO_PUBLIC_E2E_USER,
@@ -26,7 +36,8 @@ export function authResponseSessionSummary(body: unknown): string {
   const user = (body as { user?: { id?: unknown } | null }).user
   if (user == null) return 'user=null'
   if (typeof user === 'object' && typeof user.id === 'string' && user.id) {
-    return `user=${user.id}`
+    // Ordinary ids are PII in a shared log; E2E personas are the allow-list.
+    return E2E_PERSONA_IDS.has(user.id) ? `user=${user.id}` : 'user=present'
   }
   return 'user=missing-id'
 }

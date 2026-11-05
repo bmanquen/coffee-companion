@@ -50,6 +50,8 @@ function sanitizedExpoOrigin(value: string | null): string | undefined {
     const url = new URL(trimmed)
     url.search = ''
     url.hash = ''
+    url.username = ''
+    url.password = ''
     return url.href
   } catch {
     return undefined

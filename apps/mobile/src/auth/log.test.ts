@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store'
 import { E2E_AUTH_HEADER, E2E_USER_WITH_DATA } from './e2e'
 import {
   AUTH_LOG_PREFIX,
+  authRequestUrlForLog,
   logApiBaseUrl,
   logAuthFailure,
   logAuthRequest,
@@ -76,6 +77,19 @@ describe('logApiBaseUrl', () => {
   })
 })
 
+describe('authRequestUrlForLog', () => {
+  it('drops query, hash, and userinfo from the logged URL', () => {
+    expect(
+      authRequestUrlForLog(
+        'https://user:secret@example.com/api/auth/callback/google?code=oauth-code#frag',
+      ),
+    ).toBe('https://example.com/api/auth/callback/google')
+    expect(authRequestUrlForLog('/api/auth/get-session?token=abc')).toBe(
+      '/api/auth/get-session',
+    )
+  })
+})
+
 describe('logAuthRequest', () => {
   it('writes the request URL and status in development', () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {})
@@ -100,6 +114,18 @@ describe('logAuthRequest', () => {
     log.mockClear()
     logAuthRequest('http://127.0.0.1:3910/api/auth/get-session', 200, false)
     expect(log).not.toHaveBeenCalled()
+
+    log.mockClear()
+    logAuthRequest(
+      'http://127.0.0.1:3910/api/auth/callback/google?code=oauth-code',
+      302,
+      true,
+    )
+    const line = String(log.mock.calls[0][0])
+    expect(line).toBe(
+      `${AUTH_LOG_PREFIX} request http://127.0.0.1:3910/api/auth/callback/google status=302`,
+    )
+    expect(line).not.toContain('oauth-code')
     log.mockRestore()
   })
 })

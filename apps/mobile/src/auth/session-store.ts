@@ -39,6 +39,18 @@ export function writeE2EAuthCookie(userId: string): void {
   sessionStore.setItem(SESSION_COOKIE_KEY, e2eAuthCookieStore(userId))
 }
 
+export function readSessionCookie(): string | null {
+  return sessionStore.getItem(SESSION_COOKIE_KEY)
+}
+
+export async function restoreSessionCookie(raw: string | null) {
+  if (raw == null) {
+    await SecureStore.deleteItemAsync(SESSION_COOKIE_KEY)
+    return
+  }
+  sessionStore.setItem(SESSION_COOKIE_KEY, raw)
+}
+
 // Sync get/set: the Expo client plugin reads the cookie on every request.
 export const sessionStore = {
   getItem: (key: string) => SecureStore.getItem(key),
