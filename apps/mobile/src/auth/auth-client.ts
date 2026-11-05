@@ -38,7 +38,9 @@ type SessionAtom = {
   }) => void
 }
 
-function sessionAtom() {
+// better-auth 1.6.26: useSession does not see a cookie-only bypass until this
+// store atom is refetched. Keep one cast so the e2e path test cannot drift.
+export function sessionAtom() {
   return (
     authClient as unknown as { $store: { atoms: { session: SessionAtom } } }
   ).$store.atoms.session

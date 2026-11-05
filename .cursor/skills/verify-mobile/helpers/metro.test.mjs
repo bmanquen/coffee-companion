@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { createServer } from 'node:http'
 import { describe, it } from 'node:test'
 import {
@@ -12,6 +13,11 @@ import {
   isMetroReady,
   waitForMetro,
 } from './control.mjs'
+
+const hasPortTool = ['lsof', 'ss'].some((bin) => {
+  const result = spawnSync(bin, ['-v'], { encoding: 'utf8', timeout: 5_000 })
+  return !result.error
+})
 
 describe('isMetroReady', () => {
   it('accepts the Expo packager status line', () => {
@@ -35,50 +41,54 @@ describe('bundleHasAppMarker', () => {
 })
 
 describe('inspectMetro', () => {
-  it('uses /apps/mobile/index.bundle and the serializer EXPO_PUBLIC_API_URL', async () => {
-    const apiUrl = 'http://127.0.0.1:3910'
-    const body = [
-      `var title = "${APP_MARKER}"`,
-      'var tag = "cc-api-url:" + env.EXPO_PUBLIC_API_URL',
-      `process.env=Object.defineProperties(process.env, {"EXPO_PUBLIC_API_URL": { enumerable: true, value: "${apiUrl}" }});`,
-      E2E_USER_WITH_DATA,
-    ].join('\n')
-    const server = createServer((req, res) => {
-      if (req.url === '/status') {
-        res.writeHead(200, { 'content-type': 'text/plain' })
-        res.end(METRO_READY_MARKER)
-        return
-      }
-      if (req.url?.startsWith('/apps/mobile/index.bundle')) {
-        res.writeHead(200, { 'content-type': 'text/javascript' })
-        res.end(body)
-        return
-      }
-      res.writeHead(404)
-      res.end('missing')
-    })
-    await new Promise((resolve) => {
-      server.listen(0, '127.0.0.1', resolve)
-    })
-    const { port } = server.address()
-    try {
-      const report = await inspectMetro(
-        {
-          port,
-          webPort: 3910,
-          baseUrl: `http://127.0.0.1:${port}`,
-        },
-        2_000,
-      )
-      assert.equal(report.ok, true)
-      assert.match(report.bundleUrl, /\/apps\/mobile\/index\.bundle/)
-      assert.match(report.bundleUrl, /lazy=false/)
-    } finally {
-      await new Promise((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()))
+  it(
+    'uses /apps/mobile/index.bundle and the serializer EXPO_PUBLIC_API_URL',
+    { skip: !hasPortTool },
+    async () => {
+      const apiUrl = 'http://127.0.0.1:3910'
+      const body = [
+        `var title = "${APP_MARKER}"`,
+        'var tag = "cc-api-url:" + env.EXPO_PUBLIC_API_URL',
+        `process.env=Object.defineProperties(process.env, {"EXPO_PUBLIC_API_URL": { enumerable: true, value: "${apiUrl}" }});`,
+        E2E_USER_WITH_DATA,
+      ].join('\n')
+      const server = createServer((req, res) => {
+        if (req.url === '/status') {
+          res.writeHead(200, { 'content-type': 'text/plain' })
+          res.end(METRO_READY_MARKER)
+          return
+        }
+        if (req.url?.startsWith('/apps/mobile/index.bundle')) {
+          res.writeHead(200, { 'content-type': 'text/javascript' })
+          res.end(body)
+          return
+        }
+        res.writeHead(404)
+        res.end('missing')
       })
-    }
-  })
+      await new Promise((resolve) => {
+        server.listen(0, '127.0.0.1', resolve)
+      })
+      const { port } = server.address()
+      try {
+        const report = await inspectMetro(
+          {
+            port,
+            webPort: 3910,
+            baseUrl: `http://127.0.0.1:${port}`,
+          },
+          2_000,
+        )
+        assert.equal(report.ok, true)
+        assert.match(report.bundleUrl, /\/apps\/mobile\/index\.bundle/)
+        assert.match(report.bundleUrl, /lazy=false/)
+      } finally {
+        await new Promise((resolve, reject) => {
+          server.close((error) => (error ? reject(error) : resolve()))
+        })
+      }
+    },
+  )
 
   it('fails closed when the recorded Metro is not answering', async () => {
     const report = await inspectMetro(

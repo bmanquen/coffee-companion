@@ -63,6 +63,7 @@ jest.mock('./auth-client', () => ({
 
 describe('useAuth', () => {
   let consoleError: jest.SpyInstance
+  const previousE2EUser = process.env[E2E_USER_ENV]
 
   beforeEach(() => {
     consoleError = jest.spyOn(console, 'error').mockImplementation(() => {})
@@ -86,6 +87,8 @@ describe('useAuth', () => {
 
   afterEach(() => {
     consoleError.mockRestore()
+    if (previousE2EUser === undefined) delete process.env[E2E_USER_ENV]
+    else process.env[E2E_USER_ENV] = previousE2EUser
   })
 
   it('swallows a cancelled press', async () => {
@@ -184,7 +187,6 @@ describe('useAuth', () => {
   })
 
   it('writes the e2e cookie and refetches the session atom', async () => {
-    const previous = process.env[E2E_USER_ENV]
     process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
     mocks.refetchClientSession.mockResolvedValueOnce({
       user: { name: 'E2E Tester', email: 'e2e-user-with-data@example.com' },
@@ -199,12 +201,9 @@ describe('useAuth', () => {
     expect(mocks.refetchClientSession).toHaveBeenCalled()
     expect(mocks.restoreSessionCookie).not.toHaveBeenCalled()
     expect(result.current.error).toBeNull()
-    if (previous === undefined) delete process.env[E2E_USER_ENV]
-    else process.env[E2E_USER_ENV] = previous
   })
 
   it('surfaces a failed e2e get-session instead of staying silently signed out', async () => {
-    const previous = process.env[E2E_USER_ENV]
     process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
     mocks.refetchClientSession.mockResolvedValueOnce(null)
     const { result } = await renderHook(() => useAuth())
@@ -218,12 +217,9 @@ describe('useAuth', () => {
       body: 'E2E get-session returned no session',
     })
     expect(mocks.restoreSessionCookie).toHaveBeenCalledWith(null)
-    if (previous === undefined) delete process.env[E2E_USER_ENV]
-    else process.env[E2E_USER_ENV] = previous
   })
 
   it('restores the prior cookie when e2e get-session throws', async () => {
-    const previous = process.env[E2E_USER_ENV]
     process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
     mocks.readSessionCookie.mockReturnValueOnce('prior-cookie')
     mocks.refetchClientSession.mockRejectedValueOnce(new Error('network'))
@@ -238,12 +234,9 @@ describe('useAuth', () => {
       title: ERROR_SIGN_IN_FAILED,
       body: 'network',
     })
-    if (previous === undefined) delete process.env[E2E_USER_ENV]
-    else process.env[E2E_USER_ENV] = previous
   })
 
   it('does not write a cookie when the e2e persona is unset', async () => {
-    const previous = process.env[E2E_USER_ENV]
     delete process.env[E2E_USER_ENV]
     const { result } = await renderHook(() => useAuth())
 
@@ -253,7 +246,5 @@ describe('useAuth', () => {
 
     expect(mocks.writeE2EAuthCookie).not.toHaveBeenCalled()
     expect(mocks.refetchClientSession).not.toHaveBeenCalled()
-    if (previous === undefined) delete process.env[E2E_USER_ENV]
-    else process.env[E2E_USER_ENV] = previous
   })
 })

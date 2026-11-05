@@ -151,6 +151,22 @@ describe('logAuthRequest', () => {
 })
 
 describe('loggedAuthFetch', () => {
+  const memory = new Map<string, string>()
+
+  beforeEach(() => {
+    memory.clear()
+    jest.mocked(SecureStore.getItem).mockImplementation((key) => memory.get(key) ?? null)
+    jest.mocked(SecureStore.setItem).mockImplementation((key, value) => {
+      memory.set(key, value)
+    })
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+    jest.mocked(SecureStore.getItem).mockReset()
+    jest.mocked(SecureStore.setItem).mockReset()
+  })
+
   it('logs status on success and still logs the URL when fetch throws', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {})
     const ok = new Response('null', { status: 200 })
@@ -185,11 +201,6 @@ describe('loggedAuthFetch', () => {
   })
 
   it('sets x-e2e-auth from the cookie store on the outgoing request', async () => {
-    const memory = new Map<string, string>()
-    jest.mocked(SecureStore.getItem).mockImplementation((key) => memory.get(key) ?? null)
-    jest.mocked(SecureStore.setItem).mockImplementation((key, value) => {
-      memory.set(key, value)
-    })
     writeE2EAuthCookie(E2E_USER_WITH_DATA)
 
     let outgoing: RequestInit | undefined
@@ -217,17 +228,9 @@ describe('loggedAuthFetch', () => {
     expect(log).toHaveBeenCalledWith(
       `${AUTH_LOG_PREFIX} request http://127.0.0.1:3910/api/auth/get-session status=200 headers=expo-origin,x-e2e-auth e2e-auth=1 session=user=${E2E_USER_WITH_DATA}`,
     )
-    log.mockRestore()
-    jest.mocked(SecureStore.getItem).mockReset()
-    jest.mocked(SecureStore.setItem).mockReset()
   })
 
   it('keeps Request headers when adding x-e2e-auth', async () => {
-    const memory = new Map<string, string>()
-    jest.mocked(SecureStore.getItem).mockImplementation((key) => memory.get(key) ?? null)
-    jest.mocked(SecureStore.setItem).mockImplementation((key, value) => {
-      memory.set(key, value)
-    })
     writeE2EAuthCookie(E2E_USER_WITH_DATA)
 
     let outgoing: RequestInit | undefined
@@ -235,7 +238,7 @@ describe('loggedAuthFetch', () => {
       outgoing = init
       return Promise.resolve(new Response('null', { status: 200 }))
     })
-    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+    jest.spyOn(console, 'log').mockImplementation(() => {})
 
     await loggedAuthFetch(
       new Request('http://127.0.0.1:3910/api/auth/get-session', {
@@ -254,17 +257,9 @@ describe('loggedAuthFetch', () => {
     expect(headers.get('content-type')).toBe('application/json')
     expect(headers.get('expo-origin')).toBe('coffeecompanion://')
     expect(headers.get(E2E_AUTH_HEADER)).toBe(E2E_USER_WITH_DATA)
-    log.mockRestore()
-    jest.mocked(SecureStore.getItem).mockReset()
-    jest.mocked(SecureStore.setItem).mockReset()
   })
 
   it('does not set x-e2e-auth in a production build', async () => {
-    const memory = new Map<string, string>()
-    jest.mocked(SecureStore.getItem).mockImplementation((key) => memory.get(key) ?? null)
-    jest.mocked(SecureStore.setItem).mockImplementation((key, value) => {
-      memory.set(key, value)
-    })
     writeE2EAuthCookie(E2E_USER_WITH_DATA)
 
     let outgoing: RequestInit | undefined
@@ -286,8 +281,5 @@ describe('loggedAuthFetch', () => {
     expect(new Headers(outgoing?.headers).get(E2E_AUTH_HEADER)).toBeNull()
     expect(SecureStore.getItem).not.toHaveBeenCalled()
     expect(clone).not.toHaveBeenCalled()
-    clone.mockRestore()
-    jest.mocked(SecureStore.getItem).mockReset()
-    jest.mocked(SecureStore.setItem).mockReset()
   })
 })

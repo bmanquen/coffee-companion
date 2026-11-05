@@ -53,7 +53,16 @@ describe('requestRecord', () => {
       },
     })
     expect(requestRecord(withUserinfo, 200, 8, 'req_2d')?.expoOrigin).toBe(
-      'https://example.com/callback',
+      'https://example.com',
+    )
+
+    const withHttpPath = new Request('https://app.test/api/auth/get-session', {
+      headers: {
+        'expo-origin': 'https://example.com/private/token',
+      },
+    })
+    expect(requestRecord(withHttpPath, 200, 8, 'req_2e')?.expoOrigin).toBe(
+      'https://example.com',
     )
 
     const invalid = new Request('https://app.test/api/auth/get-session', {

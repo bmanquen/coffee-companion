@@ -55,7 +55,11 @@ function sanitizedExpoOrigin(value: string | null): string | undefined {
     url.hash = ''
     url.username = ''
     url.password = ''
-    return url.href
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      return url.origin
+    }
+    const path = url.pathname === '/' ? '' : url.pathname
+    return `${url.protocol}//${url.host}${path}`
   } catch {
     return undefined
   }

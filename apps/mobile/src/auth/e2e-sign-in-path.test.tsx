@@ -9,7 +9,7 @@ import {
 import * as SecureStore from 'expo-secure-store'
 import { App } from '../App'
 import { WELCOME_SCREEN_TEST_ID } from '../welcome'
-import { authClient } from './auth-client'
+import { sessionAtom } from './auth-client'
 import { E2E_AUTH_HEADER, E2E_USER_ENV, E2E_USER_WITH_DATA } from './e2e'
 import { E2E_SIGN_IN_TEST_ID } from './SignInScreen'
 import { SESSION_COOKIE_KEY } from './session-store'
@@ -28,21 +28,6 @@ function e2eSessionBody(userId: string) {
       userId,
     },
   }
-}
-
-function sessionAtom() {
-  return (
-    authClient as unknown as {
-      $store: {
-        atoms: {
-          session: {
-            get: () => { refetch: () => Promise<unknown> }
-            set: (value: unknown) => void
-          }
-        }
-      }
-    }
-  ).$store.atoms.session
 }
 
 describe('E2E sign-in path', () => {
