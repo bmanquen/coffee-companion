@@ -75,9 +75,11 @@ Mac / Linux prerequisites:
 - Create the AVD in Android Studio Device Manager (API 36 / arm64 is fine). Default name is `verify-pixel`.
 - Java 17–21 for the Gradle build. Android Studio's bundled JBR (Java 25) crashes `compileKotlin`. `launch-device` uses `JAVA_HOME` when it is 17–21, otherwise `/usr/libexec/java_home -v 17` on macOS. Install with `brew install --cask temurin@17` if that lookup fails.
 
-On a machine that already has that SDK and an AVD. If `emulator -list-avds` does not include `verify-pixel`, set `VERIFY_AVD` to one of the listed names (for example `Pixel_7`):
+On a machine that already has that SDK and an AVD:
 
 ```bash
+.cursor/skills/verify-mobile/helpers/control launch-device
+# If `verify-pixel` is missing from `emulator -list-avds`, name an installed AVD:
 VERIFY_AVD=Pixel_7 .cursor/skills/verify-mobile/helpers/control launch-device
 ```
 
