@@ -139,7 +139,9 @@ export async function loggedAuthFetch(
   const userId = isDev
     ? e2eAuthUserFromCookieStore(sessionStore.getItem(SESSION_COOKIE_KEY))
     : null
-  const next = withE2EAuthHeader(mergeRequestInit(input, init), userId, isDev)
+  const next = isDev
+    ? withE2EAuthHeader(mergeRequestInit(input, init), userId, isDev)
+    : (init ?? {})
   const url =
     typeof input === 'string'
       ? input

@@ -273,14 +273,16 @@ describe('loggedAuthFetch', () => {
       return Promise.resolve(new Response('null', { status: 200 }))
     })
     const clone = jest.spyOn(Response.prototype, 'clone')
+    const init = { headers: { 'expo-origin': 'coffeecompanion://' } }
 
     await loggedAuthFetch(
       'http://127.0.0.1:3910/api/auth/get-session',
-      { headers: { 'expo-origin': 'coffeecompanion://' } },
+      init,
       false,
       impl,
     )
 
+    expect(impl.mock.calls[0]?.[1]).toBe(init)
     expect(new Headers(outgoing?.headers).get(E2E_AUTH_HEADER)).toBeNull()
     expect(SecureStore.getItem).not.toHaveBeenCalled()
     expect(clone).not.toHaveBeenCalled()
