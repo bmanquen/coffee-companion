@@ -1,3 +1,5 @@
+import { E2E_AUTH_ALLOWED_NODE_ENVS } from './e2e-auth'
+
 export const APP_SCHEME_ORIGIN = 'coffeecompanion://'
 export const EXPO_DEV_ORIGIN = 'exp://'
 export const EXPO_DEV_CLIENT_ORIGIN = 'exp+coffee-companion://'
@@ -25,15 +27,17 @@ function loopbackAliasOrigins(baseURL: string): Array<string> {
 }
 
 // Expo’s bundler speaks exp://. The development client uses exp+<slug>://.
-// Those origins are development clients, not a production install, so
-// production must not treat them as trusted. A loopback BETTER_AUTH_URL is
-// reached as localhost, 127.0.0.1 (adb reverse), or 10.0.2.2, and those hosts
-// are trusted only outside production.
+// Those origins are development clients, not a production install, so only
+// development and test treat them as trusted. A loopback BETTER_AUTH_URL is
+// reached as localhost, 127.0.0.1 (adb reverse), or 10.0.2.2 under the same
+// allow-list. Unset, staging, and production stay on the app scheme.
 export function trustedAuthOrigins(
   baseURL: string,
-  nodeEnv: string | undefined = process.env.NODE_ENV,
+  env: { NODE_ENV?: string } = process.env,
 ): Array<string> {
-  if (nodeEnv === 'production') return [baseURL, APP_SCHEME_ORIGIN]
+  if (!E2E_AUTH_ALLOWED_NODE_ENVS.some((allowed) => allowed === env.NODE_ENV)) {
+    return [baseURL, APP_SCHEME_ORIGIN]
+  }
   const origins = [
     baseURL,
     APP_SCHEME_ORIGIN,
