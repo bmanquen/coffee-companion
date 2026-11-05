@@ -694,7 +694,7 @@ describe('webLaunchEnv', () => {
     assert.equal(
       Object.hasOwn(env, 'NODE_ENV'),
       false,
-      'NODE_ENV must stay unset so launch does not build a test client; the spawned server pins NODE_ENV=test',
+      'NODE_ENV must stay unset on webLaunchEnv; the web launch pins production on pnpm build and test on the spawned server',
     )
   })
 })

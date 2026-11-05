@@ -5,6 +5,7 @@ import {
   locatorFrom,
   requireUniqueRegion,
   resolveClickTarget,
+  webBuildEnv,
 } from './control.mjs'
 
 function mockLocator(label, trail, { countValue = 1 } = {}) {
@@ -240,5 +241,18 @@ describe('resolveClickTarget', () => {
       ['getByRole', 'region', { name: 'Apple', exact: true }],
       ['count', 2],
     ])
+  })
+})
+
+describe('webBuildEnv', () => {
+  it('pins NODE_ENV=production without dropping the rest of the launch env', () => {
+    const env = webBuildEnv({
+      DATABASE_URL: 'postgres://local/test',
+      E2E_BYPASS_AUTH: 'true',
+      NODE_ENV: 'test',
+    })
+    assert.equal(env.NODE_ENV, 'production')
+    assert.equal(env.DATABASE_URL, 'postgres://local/test')
+    assert.equal(env.E2E_BYPASS_AUTH, 'true')
   })
 })

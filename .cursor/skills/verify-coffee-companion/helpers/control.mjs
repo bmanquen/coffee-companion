@@ -76,6 +76,10 @@ function pidAlive(pid) {
   }
 }
 
+function webBuildEnv(env) {
+  return { ...env, NODE_ENV: 'production' }
+}
+
 function run(command, args, opts = {}) {
   const result = spawnSync(command, args, {
     cwd: opts.cwd ?? repoRoot,
@@ -220,10 +224,13 @@ async function cmdLaunch() {
 
   // Always rebuild. An existence-only check would serve a stale .output after
   // a branch switch or source edit and invalidate the proof. The production
-  // build is ~15s here; correctness beats reuse.
+  // build is ~15s here; correctness beats reuse. Pin NODE_ENV=production so a
+  // shell NODE_ENV=test cannot leak into the Vite client bundle.
   const serverEntry = join(webDir, '.output/server/index.mjs')
   console.error('Building the production web app…')
-  run('pnpm', ['--filter', 'coffee-companion', 'build'], { env })
+  run('pnpm', ['--filter', 'coffee-companion', 'build'], {
+    env: webBuildEnv(env),
+  })
   if (!existsSync(serverEntry)) {
     die(`Build did not produce ${serverEntry}`)
   }
@@ -1081,6 +1088,7 @@ export {
   assertOneRegion,
   requireUniqueRegion,
   resolveClickTarget,
+  webBuildEnv,
 }
 
 // Importing this file for locator tests must not run launch/doctor/cleanup.
