@@ -2596,20 +2596,28 @@ async function waitForAppForeground(serial, timeoutMs) {
   )
 }
 
-function stopListenersOnPort(port, kind, stopped = []) {
-  for (const pid of portListenerPids(port)) {
-    stopRecordedPid(pid, kind, stopped)
+function metroPortClaim(leftoverPids, currentPids) {
+  const leftover = new Set((leftoverPids ?? []).filter(Boolean))
+  return {
+    stop: currentPids.filter((pid) => leftover.has(pid)),
+    foreign: currentPids.filter((pid) => !leftover.has(pid)),
   }
-  return stopped
 }
 
-async function ensureDeviceMetro(port, extraEnv = {}) {
+async function ensureDeviceMetro(port, extraEnv = {}, leftoverPids = []) {
   // expo run:android --port starts Metro without --clear, so a reused process
   // keeps a stale inlined EXPO_PUBLIC_API_URL. Always start our own with --clear.
   // expo/virtual/env merges .env* over process.env in the client, so spawn env
-  // alone is not enough when apps/mobile/.env exists.
+  // alone is not enough when apps/mobile/.env exists. Only stop pids that
+  // appeared after expo run:android; refuse any other listener.
   stampMobileExpoPublicEnv(extraEnv)
-  stopListenersOnPort(port, 'metro')
+  const claim = metroPortClaim(leftoverPids, portListenerPids(port))
+  if (claim.foreign.length > 0) {
+    throw new Error(portBusyMessage(port, claim.foreign, 'metro'))
+  }
+  for (const pid of claim.stop) {
+    stopRecordedPid(pid, 'metro')
+  }
   const freed = await waitForPortFree(port, PORT_FREE_TIMEOUT_MS)
   if (freed.status !== 'ok') {
     throw new Error(portBusyMessage(port, freed.pids, 'metro'))
@@ -2882,7 +2890,12 @@ async function cmdLaunchDevice() {
       },
     )
 
-    const metro = await ensureDeviceMetro(metroPort, deviceExpoPublicEnv(webPort))
+    const leftoverMetroPids = portListenerPids(metroPort)
+    const metro = await ensureDeviceMetro(
+      metroPort,
+      deviceExpoPublicEnv(webPort),
+      leftoverMetroPids,
+    )
     if (metro.metroPid) partial.metroPid = metro.metroPid
     persistLaunchPartial(partial)
 
@@ -3912,6 +3925,7 @@ export {
   launchDeviceTeardownPlan,
   verifyListenPorts,
   ownedVerifyListenPorts,
+  metroPortClaim,
   serialWaitTick,
   waitForSerialReady,
   waitForSerialGone,

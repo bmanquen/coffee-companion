@@ -104,6 +104,7 @@ import {
   launchDeviceTeardownPlan,
   verifyListenPorts,
   ownedVerifyListenPorts,
+  metroPortClaim,
   shouldRebuildApk,
   resolveEmulatorAttachment,
   serialWaitTick,
@@ -1650,6 +1651,18 @@ describe('ownedVerifyListenPorts', () => {
       ),
       [],
     )
+  })
+})
+
+describe('metroPortClaim', () => {
+  it('stops only leftover pids and names any other listener as foreign', () => {
+    assert.deepEqual(metroPortClaim([11], [11]), { stop: [11], foreign: [] })
+    assert.deepEqual(metroPortClaim([11], [11, 22]), {
+      stop: [11],
+      foreign: [22],
+    })
+    assert.deepEqual(metroPortClaim([], [22]), { stop: [], foreign: [22] })
+    assert.deepEqual(metroPortClaim([11], []), { stop: [], foreign: [] })
   })
 })
 
