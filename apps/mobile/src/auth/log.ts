@@ -52,20 +52,29 @@ export function serverFailureDetail(error: unknown): {
   }
 }
 
+function apiUrlTagForLog(tag: string): string {
+  const sep = tag.indexOf(':')
+  if (sep === -1) return authRequestUrlForLog(tag)
+  const rest = tag.slice(sep + 1)
+  if (!rest.includes('://') && !rest.startsWith('/')) return tag
+  return `${tag.slice(0, sep + 1)}${authRequestUrlForLog(rest)}`
+}
+
 export function logApiBaseUrl(
   url: string,
   tag?: string,
   isDev = __DEV__,
 ) {
   if (!isDev) return
-  const extra = tag ? ` ${tag}` : ''
-  console.log(`${AUTH_LOG_PREFIX} api-url ${url}${extra}`)
+  const extra = tag ? ` ${apiUrlTagForLog(tag)}` : ''
+  console.log(`${AUTH_LOG_PREFIX} api-url ${authRequestUrlForLog(url)}${extra}`)
 }
 
 export function authRequestUrlForLog(url: string): string {
   try {
     const parsed = new URL(url)
-    return `${parsed.origin}${parsed.pathname}`
+    const path = parsed.pathname === '/' ? '' : parsed.pathname
+    return `${parsed.origin}${path}`
   } catch {
     const withoutHash = url.split('#')[0] ?? url
     const query = withoutHash.indexOf('?')

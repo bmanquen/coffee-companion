@@ -3717,8 +3717,26 @@ function verifyListenPorts(env = process.env) {
   ]
 }
 
-function stopListenersOnVerifyPorts(stopped = [], env = process.env) {
-  for (const { port, kind } of verifyListenPorts(env)) {
+function ownedVerifyListenPorts(state, env = process.env) {
+  if (!state) return []
+  const ports = []
+  if (state.metroPid || state.port || (state.metroPids?.length ?? 0) > 0) {
+    const port = Number(state.port ?? env.VERIFY_METRO_PORT ?? DEFAULT_METRO_PORT)
+    ports.push({ port, kind: 'metro' })
+  }
+  if (state.webPid || state.webPort) {
+    const port = Number(state.webPort ?? chosenDeviceWebPort(env))
+    ports.push({ port, kind: 'web' })
+  }
+  return ports
+}
+
+function stopListenersOnOwnedVerifyPorts(
+  state,
+  stopped = [],
+  env = process.env,
+) {
+  for (const { port, kind } of ownedVerifyListenPorts(state, env)) {
     if (!Number.isInteger(port) || port <= 0) continue
     for (const pid of portListenerPids(port)) {
       stopRecordedPid(pid, kind, stopped)
@@ -3753,7 +3771,7 @@ async function cmdCleanup() {
     }
     if (state.webPid) stopRecordedPid(state.webPid, 'web', stopped)
   }
-  stopListenersOnVerifyPorts(stopped)
+  stopListenersOnOwnedVerifyPorts(state, stopped)
   if (killedSerial) {
     const gone = await waitForSerialGone(killedSerial, EMULATOR_GONE_TIMEOUT_MS)
     if (gone.status !== 'ok') {
@@ -3762,7 +3780,7 @@ async function cmdCleanup() {
       )
     }
   }
-  for (const { port } of verifyListenPorts()) {
+  for (const { port } of ownedVerifyListenPorts(state)) {
     await waitForPortFree(port, PORT_FREE_TIMEOUT_MS)
   }
 
@@ -3804,7 +3822,7 @@ function usage() {
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
   drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}
   verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); leave the instance up on failure
-  cleanup             Stop recorded pids, free VERIFY_METRO_PORT and VERIFY_PORT, uninstall the package from a recorded serial; keep artifacts/
+  cleanup             Stop recorded pids, free ports this helper recorded, uninstall the package from a recorded serial; keep artifacts/
 
 `)
 }
@@ -3893,6 +3911,7 @@ export {
   deviceFailureArtifactPaths,
   launchDeviceTeardownPlan,
   verifyListenPorts,
+  ownedVerifyListenPorts,
   serialWaitTick,
   waitForSerialReady,
   waitForSerialGone,

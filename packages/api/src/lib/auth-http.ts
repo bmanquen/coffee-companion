@@ -1,13 +1,14 @@
 import { db } from '../db'
 import { auth } from './auth'
-import { E2E_AUTH_HEADER, e2eBypassSession } from './e2e-auth'
+import {
+  E2E_AUTH_HEADER,
+  e2eBypassSession,
+  isE2EAuthRuntime,
+} from './e2e-auth'
 import { log } from './log'
 
-function shouldLogE2EGetSession() {
-  return (
-    process.env.E2E_BYPASS_AUTH === 'true' ||
-    process.env.NODE_ENV !== 'production'
-  )
+function shouldLogE2EGetSession(env: { NODE_ENV?: string } = process.env) {
+  return isE2EAuthRuntime(env)
 }
 
 export async function handleAuthGet(request: Request): Promise<Response> {

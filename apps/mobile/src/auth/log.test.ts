@@ -75,6 +75,23 @@ describe('logApiBaseUrl', () => {
     expect(log).not.toHaveBeenCalled()
     log.mockRestore()
   })
+
+  it('drops query, hash, and userinfo from the URL and tag', () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+
+    logApiBaseUrl(
+      'https://user:secret@example.com/api?token=abc#frag',
+      'cc-api-url:https://user:secret@example.com/api?token=abc#frag',
+      true,
+    )
+    const line = String(log.mock.calls[0][0])
+    expect(line).toBe(
+      `${AUTH_LOG_PREFIX} api-url https://example.com/api cc-api-url:https://example.com/api`,
+    )
+    expect(line).not.toContain('secret')
+    expect(line).not.toContain('token=abc')
+    log.mockRestore()
+  })
 })
 
 describe('authRequestUrlForLog', () => {
@@ -86,6 +103,9 @@ describe('authRequestUrlForLog', () => {
     ).toBe('https://example.com/api/auth/callback/google')
     expect(authRequestUrlForLog('/api/auth/get-session?token=abc')).toBe(
       '/api/auth/get-session',
+    )
+    expect(authRequestUrlForLog('http://127.0.0.1:3910')).toBe(
+      'http://127.0.0.1:3910',
     )
   })
 })

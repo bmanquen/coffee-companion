@@ -1,4 +1,4 @@
-import { E2E_AUTH_ALLOWED_NODE_ENVS } from './e2e-auth'
+import { isE2EAuthRuntime } from './e2e-auth'
 
 export const APP_SCHEME_ORIGIN = 'coffeecompanion://'
 export const EXPO_DEV_ORIGIN = 'exp://'
@@ -35,7 +35,7 @@ export function trustedAuthOrigins(
   baseURL: string,
   env: { NODE_ENV?: string } = process.env,
 ): Array<string> {
-  if (!E2E_AUTH_ALLOWED_NODE_ENVS.some((allowed) => allowed === env.NODE_ENV)) {
+  if (!isE2EAuthRuntime(env)) {
     return [baseURL, APP_SCHEME_ORIGIN]
   }
   const origins = [

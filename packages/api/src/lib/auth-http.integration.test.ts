@@ -51,6 +51,29 @@ describe('GET /api/auth/get-session', () => {
     )
   })
 
+  it('does not log get-session diagnostics outside development and test', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    process.env.E2E_BYPASS_AUTH = 'true'
+    process.env.NODE_ENV = 'staging'
+    const sink = vi.fn()
+    setLogSink(sink)
+    try {
+      await handleAuthGet(
+        new Request(`${baseURL}/api/auth/get-session`, {
+          method: 'GET',
+          headers: {
+            'expo-origin': MOBILE_EXPO_ORIGIN,
+            [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA,
+          },
+        }),
+      )
+      expect(sink).not.toHaveBeenCalled()
+    } finally {
+      if (originalNodeEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
   it('yields a session from the native E2E request when Cookie is stripped', async () => {
     process.env.E2E_BYPASS_AUTH = 'true'
     const response = await handleAuthGet(

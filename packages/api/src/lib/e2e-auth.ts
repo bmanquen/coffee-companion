@@ -63,7 +63,7 @@ function makeSession(userId: string) {
 
 export type E2ESession = ReturnType<typeof makeSession>
 
-function isE2EAuthRuntime(env: { NODE_ENV?: string } = process.env) {
+export function isE2EAuthRuntime(env: { NODE_ENV?: string } = process.env) {
   return E2E_AUTH_ALLOWED_NODE_ENVS.some((allowed) => allowed === env.NODE_ENV)
 }
 

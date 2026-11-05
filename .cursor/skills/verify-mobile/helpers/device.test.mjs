@@ -103,6 +103,7 @@ import {
   deviceFailureArtifactPaths,
   launchDeviceTeardownPlan,
   verifyListenPorts,
+  ownedVerifyListenPorts,
   shouldRebuildApk,
   resolveEmulatorAttachment,
   serialWaitTick,
@@ -1610,6 +1611,45 @@ describe('verifyListenPorts', () => {
     )
     assert.equal(ports.find((entry) => entry.port === 3910).kind, 'web')
     assert.equal(ports.find((entry) => entry.port === 8081).kind, 'metro')
+  })
+})
+
+describe('ownedVerifyListenPorts', () => {
+  it('returns no ports when state is missing', () => {
+    assert.deepEqual(
+      ownedVerifyListenPorts(null, {
+        VERIFY_METRO_PORT: '8081',
+        VERIFY_PORT: '3910',
+      }),
+      [],
+    )
+  })
+
+  it('returns only ports this helper recorded', () => {
+    assert.deepEqual(
+      ownedVerifyListenPorts(
+        { metroPid: 11, port: 8082 },
+        { VERIFY_METRO_PORT: '8081', VERIFY_PORT: '3910' },
+      ),
+      [{ port: 8082, kind: 'metro' }],
+    )
+    assert.deepEqual(
+      ownedVerifyListenPorts(
+        { metroPid: 11, port: 8082, webPid: 22, webPort: 3911 },
+        { VERIFY_METRO_PORT: '8081', VERIFY_PORT: '3910' },
+      ),
+      [
+        { port: 8082, kind: 'metro' },
+        { port: 3911, kind: 'web' },
+      ],
+    )
+    assert.deepEqual(
+      ownedVerifyListenPorts(
+        { emulatorPid: 33, serial: 'emulator-5554' },
+        { VERIFY_METRO_PORT: '8081', VERIFY_PORT: '3910' },
+      ),
+      [],
+    )
   })
 })
 

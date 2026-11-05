@@ -81,6 +81,24 @@ describe('requestRecord', () => {
     })
   })
 
+  it('omits the e2e-auth flag outside development and test', () => {
+    const original = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      const request = new Request('https://app.test/api/auth/get-session', {
+        headers: {
+          'expo-origin': 'coffeecompanion:///127.0.0.1:8081',
+          [E2E_AUTH_HEADER]: 'e2e-user-with-data',
+        },
+      })
+      expect(requestRecord(request, 200, 8, 'req_3p')).not.toHaveProperty(
+        'e2eAuth',
+      )
+    } finally {
+      process.env.NODE_ENV = original
+    }
+  })
+
   it('skips assets, the favicon, the manifest, and the health check', () => {
     for (const path of [
       '/assets/index-abc123.js',

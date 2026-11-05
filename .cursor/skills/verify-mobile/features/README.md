@@ -24,8 +24,8 @@ This directory is the maintained source for verifying the user-facing behavior o
 ## Proof and skip reporting
 
 - Capture the user-visible tree after the render, not only a pass/fail.
-- UI proof includes a host-tree dump (`tree.txt`) that shows the `header` named `Coffee Companion`. A welcome tree must include `welcome-screen` and `welcome-heading`. A sign-in tree must include `sign-in-screen` and `sign-in-heading`.
-- RNTL cannot take a device screenshot. `drive-device` writes Maestro screenshots under `artifacts/<runId>/<flow>/` with `proof.json` harness `maestro`.
+- RNTL proof includes a host-tree dump (`tree.txt`) that shows the `header` named `Coffee Companion`. A welcome tree must include `welcome-screen` and `welcome-heading`. A sign-in tree must include `sign-in-screen` and `sign-in-heading`.
+- Maestro proof from `drive-device` includes screenshots under `artifacts/<runId>/<flow>/` plus `proof.json` with harness `maestro`. RNTL cannot take a device screenshot; Maestro does not write `tree.txt`.
 - Record the feature ID, harness (`rntl` or `maestro`), and entry point with every artifact.
 - Report an unreachable path with the attempted command and the unmet precondition.
 - Do not report a skipped platform (iOS simulator, Android emulator) as verified.
