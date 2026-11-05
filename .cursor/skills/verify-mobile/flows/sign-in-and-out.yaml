@@ -21,34 +21,43 @@ appId: dev.offbyonelabs.coffeecompanion
 - extendedWaitUntil:
     notVisible: "Fetch development servers"
     timeout: 30000
-# Overlay dismiss is runFlow when visible. tapOn has no timeout; wait with extendedWaitUntil.
-- runFlow:
-    label: Dismiss first-run Continue sheet
-    when:
-      visible: "This is the developer menu.*"
+# Overlays can appear after the first check. Poll until sign-in-screen while dismissing them.
+- repeat:
+    times: 12
+    while:
+      notVisible:
+        id: sign-in-screen
     commands:
-      - tapOn:
-          text: "Continue"
-- runFlow:
-    label: Dismiss regular developer menu
-    when:
-      visible: "Runtime version.*"
-    commands:
-      - tapOn:
-          text: "Close"
-          optional: true
       - runFlow:
+          label: Dismiss first-run Continue sheet
           when:
-            visible: "Go home"
+            visible: "This is the developer menu.*"
           commands:
-            - pressKey: back
-- extendedWaitUntil:
-    visible:
-      id: sign-in-screen
-    timeout: 60000
+            - tapOn:
+                text: "Continue"
+      - runFlow:
+          label: Dismiss regular developer menu
+          when:
+            visible: "Runtime version.*"
+          commands:
+            - tapOn:
+                text: "Close"
+                optional: true
+            - runFlow:
+                when:
+                  visible: "Go home"
+                commands:
+                  - pressKey: back
+      - assertVisible:
+          id: sign-in-screen
+          optional: true
+- assertVisible:
+    id: sign-in-screen
 - assertVisible:
     id: sign-in-heading
-    text: "Sign in"
+- copyTextFrom:
+    id: sign-in-heading
+- assertTrue: ${maestro.copiedText == "Sign in"}
 - takeScreenshot: signed-out
 - tapOn:
     id: e2e-sign-in
@@ -59,7 +68,9 @@ appId: dev.offbyonelabs.coffeecompanion
     timeout: 60000
 - assertVisible:
     id: welcome-heading
-    text: "Coffee Companion"
+- copyTextFrom:
+    id: welcome-heading
+- assertTrue: ${maestro.copiedText == "Coffee Companion"}
 - takeScreenshot: signed-in
 - tapOn:
     id: sign-out
@@ -69,5 +80,7 @@ appId: dev.offbyonelabs.coffeecompanion
     timeout: 60000
 - assertVisible:
     id: sign-in-heading
-    text: "Sign in"
+- copyTextFrom:
+    id: sign-in-heading
+- assertTrue: ${maestro.copiedText == "Sign in"}
 - takeScreenshot: signed-out-again

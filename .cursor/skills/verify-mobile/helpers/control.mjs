@@ -717,7 +717,7 @@ function bootWaitTick({ alive, bootCompleted, logText }) {
   return { status: 'wait' }
 }
 
-function expoAndroidArgs(avdName, { rebuild = false } = {}) {
+function expoAndroidArgs(avdName, { noBuildCache = false } = {}) {
   // Expo 57 --device matches device.name (the AVD), not the adb serial.
   // --port starts Metro without --clear and is mutually exclusive with
   // --no-bundler; launch-device starts Metro itself so the device env is inlined.
@@ -731,7 +731,7 @@ function expoAndroidArgs(avdName, { rebuild = false } = {}) {
     avdName,
     '--no-bundler',
   ]
-  if (rebuild) args.push('--no-build-cache')
+  if (noBuildCache) args.push('--no-build-cache')
   return args
 }
 
@@ -959,6 +959,10 @@ function stampDevMenuLaunchPrefs({
 
 function shouldRebuildApk({ installedVersion, expectedVersion }) {
   return !installedVersion || installedVersion !== expectedVersion
+}
+
+function shouldClearAndroidBuildCache({ installedVersion, rebuild }) {
+  return Boolean(installedVersion && rebuild)
 }
 
 function parseAppScheme(source) {
@@ -2853,6 +2857,10 @@ async function cmdLaunchDevice() {
       installedVersion: installed,
       expectedVersion: expectedSha,
     })
+    const noBuildCache = shouldClearAndroidBuildCache({
+      installedVersion: installed,
+      rebuild,
+    })
     if (rebuild && installed) {
       console.error(
         `Installed ${ANDROID_PACKAGE} versionName ${installed} != git HEAD ${expectedSha}; uninstalling and rebuilding`,
@@ -2864,7 +2872,7 @@ async function cmdLaunchDevice() {
     const metroPidsBeforeExpo = portListenerPids(metroPort)
     const expo = spawnLogged(
       'pnpm',
-      expoAndroidArgs(avdName, { rebuild }),
+      expoAndroidArgs(avdName, { noBuildCache }),
       expoLog,
       {
         cwd: repoRoot,
@@ -3948,6 +3956,7 @@ export {
   verifyDevicePlan,
   verifyDeviceHeadline,
   shouldRebuildApk,
+  shouldClearAndroidBuildCache,
   resolveEmulatorAttachment,
   deviceReadyProblems,
   maestroDeviceArgs,

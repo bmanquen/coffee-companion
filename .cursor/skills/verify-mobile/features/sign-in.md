@@ -28,7 +28,7 @@ Preconditions:
 
 - **Read the signed-out screen.** Run `helpers/control drive sign-in`. The host tree contains brand `Coffee Companion`, heading `Sign in`, `testID=sign-in-google`, `testID=sign-in-apple`, and `testID=sign-in-toggle`.
 - **Proof.** `drive sign-in` writes `artifacts/<run>/sign-in/tree.txt`, `tree.json`, and `proof.json`. `tree.txt` must show `Sign in` and `Coffee Companion`.
-- **Device (where an AVD exists).** Run `helpers/control verify-device`. That is cleanup → launch-device → doctor → drive-device `sign-in-and-out`. Maestro asserts heading `Sign in`, taps `e2e-sign-in`, asserts heading `Coffee Companion`, taps `sign-out`, asserts heading `Sign in` again, and writes screenshots plus `proof.json` (`harness: maestro`) under `artifacts/<run>/sign-in-and-out/`.
+- **Device (where an AVD exists).** Run `helpers/control verify-device`. That is cleanup → launch-device → doctor → drive-device `sign-in-and-out`. Maestro copies heading text and requires it equals `Sign in`, taps `e2e-sign-in`, copies heading text and requires it equals `Coffee Companion`, taps `sign-out`, copies heading text and requires it equals `Sign in` again, and writes screenshots plus `proof.json` (`harness: maestro`) under `artifacts/<run>/sign-in-and-out/`.
 
 ## Gotchas
 
@@ -40,5 +40,5 @@ Preconditions:
 - `testID` and `accessibilityLabel` live in `apps/mobile/src/auth/SignInScreen.tsx` and `apps/mobile/src/auth/copy.ts`. Drive those handles, not coordinates or visible text.
 - The E2E handle is shown only when `EXPO_PUBLIC_E2E_USER` is set in a development build. On device the API URL must be `http://127.0.0.1:<web>` so get-session uses `adb reverse`; `localhost` rewrites to `10.0.2.2` and misses the server.
 - `expo-network` must be a direct `apps/mobile` dependency. A missing autolink crashes at launch with `Cannot find native module 'ExpoNetwork'`.
-- A development build can stay on the Expo "Development servers" launcher, or cover Sign in with a first-run Continue sheet or the developer menu. The flow dismisses those overlays when they are visible, then waits for `sign-in-screen`.
+- A development build can stay on the Expo "Development servers" launcher, or cover Sign in with a first-run Continue sheet or the developer menu. The flow keeps dismissing those overlays while waiting for `sign-in-screen`, including overlays that appear after the first check.
 - `sign-in-screen` and `welcome-screen` live on a `View` with `collapsable={false}` so Maestro can see the `testID`.

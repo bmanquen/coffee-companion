@@ -106,6 +106,7 @@ import {
   ownedVerifyListenPorts,
   metroPortClaim,
   shouldRebuildApk,
+  shouldClearAndroidBuildCache,
   resolveEmulatorAttachment,
   serialWaitTick,
   waitForSerialReady,
@@ -313,10 +314,16 @@ describe('expoAndroidArgs', () => {
   })
 
   it('clears the native build cache when the installed APK is stale', () => {
-    const args = expoAndroidArgs('Pixel_7', { rebuild: true })
+    const args = expoAndroidArgs('Pixel_7', { noBuildCache: true })
     assert.ok(args.includes('--no-build-cache'))
     assert.ok(args.includes('--no-bundler'))
     assert.ok(!args.includes('--port'))
+  })
+
+  it('rebuilds a missing APK without clearing the Gradle cache', () => {
+    const args = expoAndroidArgs('Pixel_7', { noBuildCache: false })
+    assert.ok(!args.includes('--no-build-cache'))
+    assert.ok(args.includes('--no-bundler'))
   })
 })
 
@@ -1771,6 +1778,32 @@ describe('shouldRebuildApk', () => {
   })
 })
 
+describe('shouldClearAndroidBuildCache', () => {
+  it('clears the cache only when an installed version is present and stale', () => {
+    assert.equal(
+      shouldClearAndroidBuildCache({
+        installedVersion: null,
+        rebuild: true,
+      }),
+      false,
+    )
+    assert.equal(
+      shouldClearAndroidBuildCache({
+        installedVersion: 'e0543f5',
+        rebuild: true,
+      }),
+      true,
+    )
+    assert.equal(
+      shouldClearAndroidBuildCache({
+        installedVersion: '4bf1a18',
+        rebuild: false,
+      }),
+      false,
+    )
+  })
+})
+
 describe('resolveEmulatorAttachment', () => {
   it('attaches when emulator-5554 is already a device', () => {
     const resolved = resolveEmulatorAttachment({
@@ -2334,21 +2367,40 @@ describe('sign-in-and-out flow', () => {
     assert.match(yaml, /text: "Close"/)
     assert.match(yaml, /extendedWaitUntil/)
     assert.doesNotMatch(yaml, /timeout: 15000/)
+    const repeatAt = yaml.indexOf('repeat:')
+    const continueAt = yaml.indexOf('This is the developer menu')
+    assert.ok(repeatAt >= 0 && continueAt > repeatAt)
+    assert.match(
+      yaml,
+      /while:\n\s+notVisible:\n\s+id: sign-in-screen/,
+    )
   })
 
   it('asserts the approved sign-in and welcome headings', () => {
     const yaml = flow()
-    assert.match(yaml, /id: sign-in-heading\n\s+text: "Sign in"/)
-    assert.match(yaml, /id: welcome-heading\n\s+text: "Coffee Companion"/)
-    const firstHeading = yaml.indexOf('id: sign-in-heading')
-    const secondHeading = yaml.indexOf('id: sign-in-heading', firstHeading + 1)
+    assert.match(
+      yaml,
+      /id: sign-in-heading\n- copyTextFrom:\n\s+id: sign-in-heading\n- assertTrue: \$\{maestro\.copiedText == "Sign in"\}/,
+    )
+    assert.match(
+      yaml,
+      /id: welcome-heading\n- copyTextFrom:\n\s+id: welcome-heading\n- assertTrue: \$\{maestro\.copiedText == "Coffee Companion"\}/,
+    )
     const signedOut = yaml.indexOf('takeScreenshot: signed-out\n')
     const signedOutAgain = yaml.indexOf('takeScreenshot: signed-out-again')
     const signOutTap = yaml.indexOf('id: sign-out')
-    assert.ok(firstHeading >= 0 && firstHeading < signedOut)
-    assert.ok(
-      secondHeading > signOutTap && secondHeading < signedOutAgain,
+    assert.match(
+      yaml.slice(0, signedOut),
+      /maestro\.copiedText == "Sign in"/,
+    )
+    assert.match(
+      yaml.slice(signOutTap, signedOutAgain),
+      /maestro\.copiedText == "Sign in"/,
       'signed-out-again must assert Sign in copy',
+    )
+    assert.equal(
+      [...yaml.matchAll(/maestro\.copiedText == "Sign in"/g)].length,
+      2,
     )
   })
 

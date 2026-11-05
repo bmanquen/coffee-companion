@@ -19,7 +19,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Prefer `testID`, `accessibilityRole`, and `accessibilityLabel` over coordinates or tree position.
 - Treat every command as literal. Keep quoted names and flags unchanged.
 - Run screen assertions through `helpers/control drive welcome` or `helpers/control drive sign-in` (or the same RNTL queries those tests use).
-- Where an AVD exists, run `helpers/control verify-device` (cleanup → launch-device → doctor → drive-device). Maestro selectors are `testID`s only, except `runFlow when visible` Continue / Close / Back that dismiss Expo developer-menu overlays.
+- Where an AVD exists, run `helpers/control verify-device` (cleanup → launch-device → doctor → drive-device). Maestro selectors are `testID`s only, except `runFlow when visible` Continue / Close / Back that dismiss Expo developer-menu overlays whenever they appear while waiting for `sign-in-screen`.
 
 ## Proof and skip reporting
 
