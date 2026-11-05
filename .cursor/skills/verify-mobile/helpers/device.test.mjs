@@ -1655,14 +1655,38 @@ describe('ownedVerifyListenPorts', () => {
 })
 
 describe('metroPortClaim', () => {
-  it('stops only leftover pids and names any other listener as foreign', () => {
-    assert.deepEqual(metroPortClaim([11], [11]), { stop: [11], foreign: [] })
+  it('does not stop a pre-existing foreign listener on the port', () => {
+    // First arg is the snapshot taken before expo run:android.
+    assert.deepEqual(metroPortClaim([11], [11]), { stop: [], foreign: [11] })
     assert.deepEqual(metroPortClaim([11], [11, 22]), {
-      stop: [11],
-      foreign: [22],
+      stop: [22],
+      foreign: [11],
     })
-    assert.deepEqual(metroPortClaim([], [22]), { stop: [], foreign: [22] })
+  })
+
+  it('stops only pids that appeared after the snapshot', () => {
+    assert.deepEqual(metroPortClaim([], [22]), { stop: [22], foreign: [] })
     assert.deepEqual(metroPortClaim([11], []), { stop: [], foreign: [] })
+  })
+})
+
+describe('cmdLaunchDevice metro snapshot', () => {
+  it('snapshots Metro-port pids before expo run:android', () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'),
+      'utf8',
+    )
+    const fnStart = src.indexOf('async function cmdLaunchDevice()')
+    assert.ok(fnStart >= 0)
+    const nextFn = src.indexOf('\nasync function ', fnStart + 1)
+    const fn = src.slice(fnStart, nextFn)
+    const snapshotAt = fn.indexOf('portListenerPids(metroPort)')
+    const expoAt = fn.indexOf('expoAndroidArgs')
+    assert.ok(snapshotAt >= 0, 'cmdLaunchDevice must snapshot Metro-port pids')
+    assert.ok(
+      expoAt > snapshotAt,
+      'snapshot must be taken before expo run:android',
+    )
   })
 })
 

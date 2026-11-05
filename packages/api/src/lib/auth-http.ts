@@ -3,12 +3,12 @@ import { auth } from './auth'
 import {
   E2E_AUTH_HEADER,
   e2eBypassSession,
-  isE2EAuthRuntime,
+  isDevOrTestRuntime,
 } from './e2e-auth'
 import { log } from './log'
 
 function shouldLogE2EGetSession(env: { NODE_ENV?: string } = process.env) {
-  return isE2EAuthRuntime(env)
+  return isDevOrTestRuntime(env)
 }
 
 export async function handleAuthGet(request: Request): Promise<Response> {

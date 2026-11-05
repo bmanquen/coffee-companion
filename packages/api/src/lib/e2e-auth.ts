@@ -63,7 +63,7 @@ function makeSession(userId: string) {
 
 export type E2ESession = ReturnType<typeof makeSession>
 
-export function isE2EAuthRuntime(env: { NODE_ENV?: string } = process.env) {
+export function isDevOrTestRuntime(env: { NODE_ENV?: string } = process.env) {
   return E2E_AUTH_ALLOWED_NODE_ENVS.some((allowed) => allowed === env.NODE_ENV)
 }
 
@@ -97,7 +97,7 @@ for (const id of [
 }
 
 export function e2eBypassSession(headers: Headers): E2ESession | null {
-  if (!isE2EAuthRuntime()) return null
+  if (!isDevOrTestRuntime()) return null
   if (process.env.E2E_BYPASS_AUTH !== 'true') return null
   const userId = e2eAuthUserId(headers)
   return userId && e2eAuthAllowList.has(userId) ? makeSession(userId) : null

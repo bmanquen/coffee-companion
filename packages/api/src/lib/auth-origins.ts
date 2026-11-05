@@ -1,4 +1,4 @@
-import { isE2EAuthRuntime } from './e2e-auth'
+import { isDevOrTestRuntime } from './e2e-auth'
 
 export const APP_SCHEME_ORIGIN = 'coffeecompanion://'
 export const EXPO_DEV_ORIGIN = 'exp://'
@@ -35,7 +35,7 @@ export function trustedAuthOrigins(
   baseURL: string,
   env: { NODE_ENV?: string } = process.env,
 ): Array<string> {
-  if (!isE2EAuthRuntime(env)) {
+  if (!isDevOrTestRuntime(env)) {
     return [baseURL, APP_SCHEME_ORIGIN]
   }
   const origins = [

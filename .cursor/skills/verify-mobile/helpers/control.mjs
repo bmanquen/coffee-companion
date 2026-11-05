@@ -2596,22 +2596,23 @@ async function waitForAppForeground(serial, timeoutMs) {
   )
 }
 
-function metroPortClaim(leftoverPids, currentPids) {
-  const leftover = new Set((leftoverPids ?? []).filter(Boolean))
+function metroPortClaim(beforePids, currentPids) {
+  const before = new Set((beforePids ?? []).filter(Boolean))
   return {
-    stop: currentPids.filter((pid) => leftover.has(pid)),
-    foreign: currentPids.filter((pid) => !leftover.has(pid)),
+    stop: currentPids.filter((pid) => !before.has(pid)),
+    foreign: currentPids.filter((pid) => before.has(pid)),
   }
 }
 
-async function ensureDeviceMetro(port, extraEnv = {}, leftoverPids = []) {
+async function ensureDeviceMetro(port, extraEnv = {}, beforePids = []) {
   // expo run:android --port starts Metro without --clear, so a reused process
   // keeps a stale inlined EXPO_PUBLIC_API_URL. Always start our own with --clear.
   // expo/virtual/env merges .env* over process.env in the client, so spawn env
-  // alone is not enough when apps/mobile/.env exists. Only stop pids that
-  // appeared after expo run:android; refuse any other listener.
+  // alone is not enough when apps/mobile/.env exists. beforePids is the
+  // snapshot taken before expo run:android. Stop only pids that appeared
+  // after that; refuse (do not kill) any listener that was already there.
   stampMobileExpoPublicEnv(extraEnv)
-  const claim = metroPortClaim(leftoverPids, portListenerPids(port))
+  const claim = metroPortClaim(beforePids, portListenerPids(port))
   if (claim.foreign.length > 0) {
     throw new Error(portBusyMessage(port, claim.foreign, 'metro'))
   }
@@ -2860,6 +2861,7 @@ async function cmdLaunchDevice() {
     }
 
     const expoLog = join(runDir, 'expo-android.log')
+    const metroPidsBeforeExpo = portListenerPids(metroPort)
     const expo = spawnLogged(
       'pnpm',
       expoAndroidArgs(avdName, { rebuild }),
@@ -2890,11 +2892,10 @@ async function cmdLaunchDevice() {
       },
     )
 
-    const leftoverMetroPids = portListenerPids(metroPort)
     const metro = await ensureDeviceMetro(
       metroPort,
       deviceExpoPublicEnv(webPort),
-      leftoverMetroPids,
+      metroPidsBeforeExpo,
     )
     if (metro.metroPid) partial.metroPid = metro.metroPid
     persistLaunchPartial(partial)

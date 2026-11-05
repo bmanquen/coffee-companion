@@ -1,6 +1,6 @@
 import {
   E2E_AUTH_HEADER,
-  isE2EAuthRuntime,
+  isDevOrTestRuntime,
 } from '@coffee-companion/api/lib/e2e-auth'
 import { REQUEST_ID_HEADER } from '@coffee-companion/api/lib/log'
 import { HEALTH_PATH } from './health'
@@ -32,7 +32,7 @@ export function requestRecord(
   if (path.startsWith('/assets/') || SKIPPED_PATHS.has(path)) return null
   const expoOrigin = sanitizedExpoOrigin(request.headers.get('expo-origin'))
   const e2eAuth =
-    path.endsWith('/get-session') && isE2EAuthRuntime()
+    path.endsWith('/get-session') && isDevOrTestRuntime()
       ? Boolean(request.headers.get(E2E_AUTH_HEADER)?.trim())
       : undefined
   return {
