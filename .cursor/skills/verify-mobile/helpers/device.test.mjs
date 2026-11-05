@@ -163,8 +163,11 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
 function maestroCliAvailable() {
   const bin = resolveMaestroBin()
   if (bin !== 'maestro' && !existsSync(bin)) return false
-  const result = spawnSync(bin, ['--version'], { encoding: 'utf8' })
-  return result.error?.code !== 'ENOENT'
+  const result = spawnSync(bin, ['--version'], {
+    encoding: 'utf8',
+    timeout: 30_000,
+  })
+  return !result.error && result.status === 0
 }
 
 function mobileDepsInstalled() {

@@ -52,7 +52,9 @@ describe('withE2EAuthHeader', () => {
     )
     expect(hasE2EAuthHeader(next.headers)).toBe(false)
   })
+})
 
+describe('authResponseSessionSummary', () => {
   it('summarizes a session body as the user id or null', () => {
     expect(authResponseSessionSummary(null)).toBe('null')
     expect(authResponseSessionSummary({ user: null })).toBe('user=null')
@@ -61,6 +63,16 @@ describe('withE2EAuthHeader', () => {
     ).toBe(`user=${E2E_USER_WITH_DATA}`)
     expect(authResponseSessionSummary({ user: { id: 'user-xyz' } })).toBe(
       'user=present',
+    )
+  })
+
+  it('names a non-object body and a user without a usable id', () => {
+    expect(authResponseSessionSummary('nope')).toBe('non-object')
+    expect(authResponseSessionSummary({ user: { name: 'x' } })).toBe(
+      'user=missing-id',
+    )
+    expect(authResponseSessionSummary({ user: { id: '' } })).toBe(
+      'user=missing-id',
     )
   })
 })
