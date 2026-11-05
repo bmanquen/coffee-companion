@@ -12,6 +12,20 @@ import {
 
 export const AUTH_LOG_PREFIX = '[auth]'
 
+let authFetchEpoch = 0
+
+export function invalidatePendingAuthFetches() {
+  authFetchEpoch += 1
+}
+
+function isAuthGetSessionUrl(url: string): boolean {
+  try {
+    return new URL(url, 'http://127.0.0.1').pathname.endsWith('/get-session')
+  } catch {
+    return url.includes('/get-session')
+  }
+}
+
 export function authErrorCode(error: unknown): string | null {
   if (!error || typeof error !== 'object' || !('code' in error)) return null
   const code = error.code
@@ -154,13 +168,22 @@ export async function loggedAuthFetch(
         e2eAuth: hasE2EAuthHeader(next.headers),
       }
     : undefined
+  const epoch = authFetchEpoch
   try {
     const response = await impl(input as RequestInfo, next)
+    const staleGetSession =
+      epoch !== authFetchEpoch && isAuthGetSessionUrl(url)
+    const returned = staleGetSession
+      ? new Response('null', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      : response
     const sessionSummary = isDev
-      ? await sessionSummaryFromResponse(response)
+      ? await sessionSummaryFromResponse(returned)
       : undefined
-    logAuthRequest(url, response.status, isDev, headerInfo, sessionSummary)
-    return response
+    logAuthRequest(url, returned.status, isDev, headerInfo, sessionSummary)
+    return returned
   } catch (error) {
     logAuthRequest(url, undefined, isDev, headerInfo)
     throw error

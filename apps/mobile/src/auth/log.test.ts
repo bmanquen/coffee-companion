@@ -3,6 +3,7 @@ import { E2E_AUTH_HEADER, E2E_USER_WITH_DATA } from './e2e'
 import {
   AUTH_LOG_PREFIX,
   authRequestUrlForLog,
+  invalidatePendingAuthFetches,
   logApiBaseUrl,
   logAuthFailure,
   logAuthRequest,
@@ -281,5 +282,34 @@ describe('loggedAuthFetch', () => {
     expect(new Headers(outgoing?.headers).get(E2E_AUTH_HEADER)).toBeNull()
     expect(SecureStore.getItem).not.toHaveBeenCalled()
     expect(clone).not.toHaveBeenCalled()
+  })
+
+  it('replaces a get-session body that finished after sign-out invalidated the fetch', async () => {
+    let release!: (value: Response) => void
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve
+    })
+    const impl = jest.fn(() => pending)
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+
+    const fetchPromise = loggedAuthFetch(
+      'http://127.0.0.1:3910/api/auth/get-session',
+      undefined,
+      true,
+      impl,
+    )
+    invalidatePendingAuthFetches()
+    release(
+      new Response(JSON.stringify({ user: { id: E2E_USER_WITH_DATA } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+
+    const response = await fetchPromise
+    expect(await response.json()).toBeNull()
+    expect(log).toHaveBeenCalledWith(
+      `${AUTH_LOG_PREFIX} request http://127.0.0.1:3910/api/auth/get-session status=200 headers=none e2e-auth=0 session=null`,
+    )
   })
 })

@@ -1,7 +1,7 @@
 import { createAuthClient } from 'better-auth/react'
 import { expoClient } from '@better-auth/expo/client'
 import { APP_SCHEME, apiBaseUrl } from './config'
-import { loggedAuthFetch } from './log'
+import { invalidatePendingAuthFetches, loggedAuthFetch } from './log'
 import { SESSION_STORAGE_PREFIX, sessionStore } from './session-store'
 import type { BetterAuthClientPlugin } from 'better-auth/client'
 
@@ -57,6 +57,9 @@ export async function refetchClientSession() {
 // signOut's delayed get-session can re-read the E2E cookie before SecureStore
 // delete finishes. Force the atom empty after the store is cleared.
 export function clearClientSession() {
+  // Drop in-flight get-session bodies so a late 200 cannot refill the atom
+  // or the Expo session cache after sign-out.
+  invalidatePendingAuthFetches()
   const session = sessionAtom()
   const current = session.get()
   session.set({

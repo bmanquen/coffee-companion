@@ -3,6 +3,7 @@ import { allowE2EAuthUsers } from '../../test/e2e-auth'
 import {
   E2E_AUTH_ALLOWED_NODE_ENVS,
   E2E_AUTH_HEADER,
+  E2E_USER_EMPTY,
   E2E_USER_WITH_DATA,
   e2eBypassSession,
   isDevOrTestRuntime,
@@ -54,6 +55,28 @@ describe('e2eBypassSession', () => {
       new Headers({ [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA }),
     )
     expect(session).not.toBeNull()
+    expect(session?.user.id).toBe(E2E_USER_WITH_DATA)
+  })
+
+  it('uses a valid x-e2e-auth header when the cookie id is not allow-listed', () => {
+    process.env.E2E_BYPASS_AUTH = 'true'
+    const session = e2eBypassSession(
+      new Headers({
+        cookie: 'e2e_auth=user-xyz',
+        [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA,
+      }),
+    )
+    expect(session?.user.id).toBe(E2E_USER_WITH_DATA)
+  })
+
+  it('prefers an allow-listed cookie over the header', () => {
+    process.env.E2E_BYPASS_AUTH = 'true'
+    const session = e2eBypassSession(
+      new Headers({
+        cookie: `e2e_auth=${E2E_USER_WITH_DATA}`,
+        [E2E_AUTH_HEADER]: E2E_USER_EMPTY,
+      }),
+    )
     expect(session?.user.id).toBe(E2E_USER_WITH_DATA)
   })
 

@@ -83,7 +83,8 @@ function e2eAuthUserId(headers: Headers): string | null {
     new RegExp(`(?:^|;\\s*)${E2E_AUTH_COOKIE_NAME}=([^;]+)`),
   )
   const fromCookie = decodeE2EAuthValue(match?.[1])
-  if (fromCookie) return fromCookie
+  // A leftover or unknown cookie must not hide a valid x-e2e-auth header.
+  if (fromCookie && e2eAuthAllowList.has(fromCookie)) return fromCookie
   return decodeE2EAuthValue(headers.get(E2E_AUTH_HEADER)?.trim())
 }
 
