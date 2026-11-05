@@ -2297,6 +2297,16 @@ describe('sign-in-and-out flow', () => {
     const yaml = flow()
     assert.match(yaml, /id: sign-in-heading\n\s+text: "Sign in"/)
     assert.match(yaml, /id: welcome-heading\n\s+text: "Coffee Companion"/)
+    const firstHeading = yaml.indexOf('id: sign-in-heading')
+    const secondHeading = yaml.indexOf('id: sign-in-heading', firstHeading + 1)
+    const signedOut = yaml.indexOf('takeScreenshot: signed-out\n')
+    const signedOutAgain = yaml.indexOf('takeScreenshot: signed-out-again')
+    const signOutTap = yaml.indexOf('id: sign-out')
+    assert.ok(firstHeading >= 0 && firstHeading < signedOut)
+    assert.ok(
+      secondHeading > signOutTap && secondHeading < signedOutAgain,
+      'signed-out-again must assert Sign in copy',
+    )
   })
 
   it('waits for welcome-screen after the e2e handle instead of asserting immediately', () => {

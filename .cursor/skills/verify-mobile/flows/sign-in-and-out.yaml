@@ -67,4 +67,7 @@ appId: dev.offbyonelabs.coffeecompanion
     visible:
       id: sign-in-screen
     timeout: 60000
+- assertVisible:
+    id: sign-in-heading
+    text: "Sign in"
 - takeScreenshot: signed-out-again
