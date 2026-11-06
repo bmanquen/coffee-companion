@@ -10,7 +10,12 @@ import * as SecureStore from 'expo-secure-store'
 import { App } from '../App'
 import { WELCOME_SCREEN_TEST_ID } from '../welcome'
 import { sessionAtom } from './auth-client'
-import { E2E_AUTH_HEADER, E2E_USER_ENV, E2E_USER_WITH_DATA } from './e2e'
+import {
+  E2E_AUTH_HEADER,
+  E2E_SIGN_IN,
+  E2E_USER_ENV,
+  E2E_USER_WITH_DATA,
+} from './e2e'
 import { E2E_SIGN_IN_TEST_ID } from './SignInScreen'
 import { SESSION_COOKIE_KEY } from './session-store'
 
@@ -80,11 +85,12 @@ describe('E2E sign-in path', () => {
     await render(<App />)
 
     await waitFor(() => {
+      expect(screen.getByRole('button', { name: E2E_SIGN_IN })).toBeTruthy()
       expect(screen.getByTestId(E2E_SIGN_IN_TEST_ID)).toBeTruthy()
     })
 
     await act(async () => {
-      fireEvent.press(screen.getByTestId(E2E_SIGN_IN_TEST_ID))
+      fireEvent.press(screen.getByRole('button', { name: E2E_SIGN_IN }))
       await Promise.resolve()
     })
 

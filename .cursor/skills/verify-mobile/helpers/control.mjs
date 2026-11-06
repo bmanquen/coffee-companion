@@ -735,6 +735,25 @@ function expoAndroidArgs(avdName, { noBuildCache = false } = {}) {
   return args
 }
 
+function spawnExpoAndroid({
+  metroPort,
+  avdName,
+  noBuildCache = false,
+  logPath,
+  cwd,
+  env,
+  listPids = portListenerPids,
+  androidArgs = expoAndroidArgs,
+  spawn = spawnLogged,
+}) {
+  const metroPidsBeforeExpo = listPids(metroPort)
+  const expo = spawn('pnpm', androidArgs(avdName, { noBuildCache }), logPath, {
+    cwd,
+    env,
+  })
+  return { metroPidsBeforeExpo, expo }
+}
+
 function metroStartArgs(
   port,
   { clearCache = false, devClient = false } = {},
@@ -2870,23 +2889,21 @@ async function cmdLaunchDevice() {
     }
 
     const expoLog = join(runDir, 'expo-android.log')
-    const metroPidsBeforeExpo = portListenerPids(metroPort)
-    const expo = spawnLogged(
-      'pnpm',
-      expoAndroidArgs(avdName, { noBuildCache }),
-      expoLog,
-      {
-        cwd: repoRoot,
-        env: {
-          ...sdkChildEnv(sdk),
-          CI: '1',
-          EXPO_NO_TELEMETRY: '1',
-          ...deviceExpoPublicEnv(webPort),
-          [VERIFY_APK_VERSION_ENV]: expectedSha,
-          ...(java.javaHome ? { JAVA_HOME: java.javaHome } : {}),
-        },
+    const { metroPidsBeforeExpo, expo } = spawnExpoAndroid({
+      metroPort,
+      avdName,
+      noBuildCache,
+      logPath: expoLog,
+      cwd: repoRoot,
+      env: {
+        ...sdkChildEnv(sdk),
+        CI: '1',
+        EXPO_NO_TELEMETRY: '1',
+        ...deviceExpoPublicEnv(webPort),
+        [VERIFY_APK_VERSION_ENV]: expectedSha,
+        ...(java.javaHome ? { JAVA_HOME: java.javaHome } : {}),
       },
-    )
+    })
     partial.expoPid = expo.pid
     persistLaunchPartial(partial)
 
@@ -3978,6 +3995,7 @@ export {
   requireAvd,
   bootWaitTick,
   expoAndroidArgs,
+  spawnExpoAndroid,
   installWaitTick,
   resolveSdkRoot,
   chosenEmulatorGpu,

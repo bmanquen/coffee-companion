@@ -1,6 +1,19 @@
 import {
+  E2E_AUTH_COOKIE_NAME as API_E2E_AUTH_COOKIE_NAME,
+  E2E_AUTH_HEADER as API_E2E_AUTH_HEADER,
+  E2E_USER_DELETE as API_E2E_USER_DELETE,
+  E2E_USER_EMPTY as API_E2E_USER_EMPTY,
+  E2E_USER_FREE as API_E2E_USER_FREE,
+  E2E_USER_WITH_DATA as API_E2E_USER_WITH_DATA,
+  e2eBypassSession,
+} from '../../../../packages/api/src/lib/e2e-auth'
+import {
+  E2E_AUTH_COOKIE_NAME,
   E2E_AUTH_HEADER,
+  E2E_USER_DELETE,
+  E2E_USER_EMPTY,
   E2E_USER_ENV,
+  E2E_USER_FREE,
   E2E_USER_WITH_DATA,
   authResponseSessionSummary,
   e2eSignInUser,
@@ -74,5 +87,30 @@ describe('authResponseSessionSummary', () => {
     expect(authResponseSessionSummary({ user: { id: '' } })).toBe(
       'user=missing-id',
     )
+  })
+})
+
+describe('mobile E2E contract', () => {
+  const originalBypass = process.env.E2E_BYPASS_AUTH
+
+  afterEach(() => {
+    if (originalBypass === undefined) delete process.env.E2E_BYPASS_AUTH
+    else process.env.E2E_BYPASS_AUTH = originalBypass
+  })
+
+  it('matches the API header, cookie, and personas so Expo-inlined values authenticate', () => {
+    expect(E2E_USER_ENV).toBe('EXPO_PUBLIC_E2E_USER')
+    expect(E2E_AUTH_COOKIE_NAME).toBe(API_E2E_AUTH_COOKIE_NAME)
+    expect(E2E_AUTH_HEADER).toBe(API_E2E_AUTH_HEADER)
+    expect(E2E_USER_WITH_DATA).toBe(API_E2E_USER_WITH_DATA)
+    expect(E2E_USER_EMPTY).toBe(API_E2E_USER_EMPTY)
+    expect(E2E_USER_FREE).toBe(API_E2E_USER_FREE)
+    expect(E2E_USER_DELETE).toBe(API_E2E_USER_DELETE)
+
+    process.env.E2E_BYPASS_AUTH = 'true'
+    const session = e2eBypassSession(
+      new Headers({ [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA }),
+    )
+    expect(session?.user.id).toBe(E2E_USER_WITH_DATA)
   })
 })

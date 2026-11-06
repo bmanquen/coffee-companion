@@ -67,7 +67,9 @@ describe('sign-in screen', () => {
   it('shows the heading, both provider buttons, and the no-account line', async () => {
     const view = await render(<App auth={signedOut()} />)
 
-    expect(screen.getByTestId(SIGN_IN_SCREEN_TEST_ID)).toBeTruthy()
+    const signInHost = screen.getByTestId(SIGN_IN_SCREEN_TEST_ID)
+    expect(signInHost.props.collapsable).toBe(false)
+    expect(signInHost.props.testID).toBe(SIGN_IN_SCREEN_TEST_ID)
     expect(screen.getByLabelText(SIGN_IN_A11Y_LABEL)).toBeTruthy()
     expect(screen.getByRole('header', { name: APP_NAME })).toBeTruthy()
     expect(screen.getByRole('header', { name: SIGN_IN_HEADING })).toBeTruthy()

@@ -15,6 +15,7 @@ import {
   requireAvd,
   bootWaitTick,
   expoAndroidArgs,
+  spawnExpoAndroid,
   metroStartArgs,
   metroSpawnSpec,
   metroStatusUrls,
@@ -1720,38 +1721,36 @@ describe('verify-mobile usage defaults', () => {
   })
 })
 
-describe('cmdLaunchDevice metro snapshot', () => {
+describe('spawnExpoAndroid', () => {
   it('snapshots Metro-port pids before expo run:android', () => {
-    const src = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'),
-      'utf8',
-    )
-    const fnStart = src.indexOf('async function cmdLaunchDevice()')
-    assert.ok(fnStart >= 0)
-    const nextFn = src.indexOf('\nasync function ', fnStart + 1)
-    const fn = src.slice(fnStart, nextFn)
-    const snapshotAt = fn.indexOf('portListenerPids(metroPort)')
-    const expoAt = fn.indexOf('expoAndroidArgs')
-    assert.ok(snapshotAt >= 0, 'cmdLaunchDevice must snapshot Metro-port pids')
-    assert.ok(
-      expoAt > snapshotAt,
-      'snapshot must be taken before expo run:android',
-    )
-  })
-})
-
-describe('screen testID hosts', () => {
-  it('keeps sign-in and welcome roots from collapsing on Android', () => {
-    const mobileSrc = join(
-      dirname(fileURLToPath(import.meta.url)),
-      '../../../../apps/mobile/src',
-    )
-    const signIn = readFileSync(join(mobileSrc, 'auth/SignInScreen.tsx'), 'utf8')
-    const welcome = readFileSync(join(mobileSrc, 'auth/SignedInHome.tsx'), 'utf8')
-    assert.match(signIn, /collapsable=\{false\}/)
-    assert.match(signIn, /testID=\{SIGN_IN_SCREEN_TEST_ID\}/)
-    assert.match(welcome, /collapsable=\{false\}/)
-    assert.match(welcome, /testID=\{WELCOME_SCREEN_TEST_ID\}/)
+    const calls = []
+    const { metroPidsBeforeExpo, expo } = spawnExpoAndroid({
+      metroPort: 8081,
+      avdName: AVD_NAME,
+      noBuildCache: false,
+      logPath: '/tmp/expo-android.log',
+      cwd: '/repo',
+      env: { CI: '1' },
+      listPids: (port) => {
+        calls.push(`list:${port}`)
+        return [11]
+      },
+      androidArgs: (avdName, { noBuildCache } = {}) => {
+        calls.push(`args:${avdName}:${noBuildCache}`)
+        return ['expo', 'run:android']
+      },
+      spawn: (command, args, logPath, opts) => {
+        calls.push(`spawn:${command}:${args.join(',')}:${logPath}:${opts.cwd}`)
+        return { pid: 99 }
+      },
+    })
+    assert.deepEqual(calls, [
+      'list:8081',
+      `args:${AVD_NAME}:false`,
+      'spawn:pnpm:expo,run:android:/tmp/expo-android.log:/repo',
+    ])
+    assert.deepEqual(metroPidsBeforeExpo, [11])
+    assert.equal(expo.pid, 99)
   })
 })
 

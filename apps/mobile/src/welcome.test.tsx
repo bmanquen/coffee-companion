@@ -32,13 +32,16 @@ describe('App welcome screen', () => {
   it('shows the app name as a heading when signed in', async () => {
     const view = await render(<App auth={signedIn} />)
 
-    expect(screen.getByTestId(WELCOME_SCREEN_TEST_ID)).toBeTruthy()
+    const welcomeHost = screen.getByTestId(WELCOME_SCREEN_TEST_ID)
+    expect(welcomeHost.props.collapsable).toBe(false)
+    expect(welcomeHost.props.testID).toBe(WELCOME_SCREEN_TEST_ID)
     expect(screen.getByLabelText(WELCOME_A11Y_LABEL)).toBeTruthy()
     expect(
       screen.getByRole(WELCOME_HEADING_ROLE, { name: welcomeMessage() }),
     ).toBeTruthy()
     expect(screen.getByTestId(WELCOME_HEADING_TEST_ID)).toBeTruthy()
     expect(screen.getByText('Ada Lovelace')).toBeTruthy()
+    expect(screen.getByRole('button', { name: SIGN_OUT })).toBeTruthy()
     expect(screen.getByTestId(SIGN_OUT_TEST_ID)).toHaveTextContent(SIGN_OUT)
 
     writeHostTreeArtifacts(view.toJSON())

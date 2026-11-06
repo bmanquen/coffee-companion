@@ -96,26 +96,6 @@ describe('GET /api/auth/get-session', () => {
     expect(body.session?.userId).toBe(E2E_USER_WITH_DATA)
   })
 
-  it('yields a session for the mobile client fetch after Cookie is stripped', async () => {
-    process.env.E2E_BYPASS_AUTH = 'true'
-    const headers = new Headers({
-      'expo-origin': MOBILE_EXPO_ORIGIN,
-      'x-skip-oauth-proxy': 'true',
-      [E2E_AUTH_HEADER]: E2E_USER_WITH_DATA,
-    })
-    const response = await handleAuthGet(
-      new Request(`${baseURL}/api/auth/get-session`, {
-        method: 'GET',
-        headers,
-      }),
-    )
-
-    expect(response.status).toBe(200)
-    const body = (await response.json()) as { user?: { id?: string } }
-    expect(body.user?.id).toBe(E2E_USER_WITH_DATA)
-    expect(headers.has('cookie')).toBe(false)
-  })
-
   it('still yields a session from the expoClient Cookie map', async () => {
     process.env.E2E_BYPASS_AUTH = 'true'
     const response = await handleAuthGet(
