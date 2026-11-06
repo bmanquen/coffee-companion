@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { waitForHydration } from './helpers'
 
 // The public marketing site, unauthenticated (the `public` project carries no
 // bypass cookie). Content assertions stay loose — they check the page says the
@@ -126,6 +127,7 @@ test('marketing pages render none of the authenticated app chrome', async ({
 }) => {
   for (const path of ['/', '/pricing']) {
     await page.goto(path)
+    await waitForHydration(page.getByRole('banner'))
 
     // Exactly one banner — the marketing header. MobileHeader is also a
     // <header>, so a leak shows up as two rather than as a missing element,
@@ -142,6 +144,7 @@ test('the home page carries its canonical URL and social card tags', async ({
   page,
 }) => {
   await page.goto('/')
+  await waitForHydration(page.getByRole('heading', { level: 1 }))
 
   // Presence and shape only — the copy itself is free to change.
   // One tag each: SSR and the hydrated client must advertise the same origin.
