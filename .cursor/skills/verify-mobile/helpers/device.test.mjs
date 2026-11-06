@@ -26,6 +26,7 @@ import {
   BUNDLE_PATHS,
   installWaitTick,
   resolveSdkRoot,
+  isHomebrewSdkRoot,
   chosenEmulatorGpu,
   emulatorLaunchArgs,
   parseJavaMajor,
@@ -562,6 +563,29 @@ describe('resolveSdkRoot', () => {
         resolveSdkRoot({ env: {}, home: tmp, platform: 'linux' }),
         studioLinux,
       )
+      const named = join(tmp, 'android-commandlinetools', 'sdk')
+      writeSdkTree(named)
+      assert.equal(
+        resolveSdkRoot({
+          env: { ANDROID_HOME: named },
+          home: join(tmp, 'no-home'),
+          platform: 'linux',
+        }),
+        named,
+      )
+      const linuxbrew = join(tmp, 'home', 'linuxbrew', '.linuxbrew', 'share', 'android-commandlinetools')
+      writeSdkTree(linuxbrew)
+      assert.equal(
+        resolveSdkRoot({
+          env: { ANDROID_HOME: linuxbrew },
+          home: join(tmp, 'no-home'),
+          platform: 'linux',
+        }),
+        null,
+      )
+      assert.equal(isHomebrewSdkRoot(homebrew), true)
+      assert.equal(isHomebrewSdkRoot(linuxbrew), true)
+      assert.equal(isHomebrewSdkRoot(named), false)
       const incomplete = join(tmp, 'incomplete-sdk')
       writeSdkTree(incomplete, { systemImages: false })
       assert.equal(
@@ -1703,6 +1727,7 @@ describe('verify-mobile usage defaults', () => {
 
   it('shows default verify-device and launch-device commands before VERIFY_AVD overrides', () => {
     const fences = skill().split('```bash').slice(1)
+    let matched = false
     for (const fence of fences) {
       const body = fence.split('```')[0]
       const commands = body
@@ -1711,11 +1736,16 @@ describe('verify-mobile usage defaults', () => {
           /helpers\/control (verify-device|launch-device)/.test(line),
         )
       if (commands.length === 0) continue
+      matched = true
       assert.ok(
-        commands.some((line) => !line.startsWith('VERIFY_AVD=')),
+        commands.some(
+          (line) =>
+            !/(?:^|\s)VERIFY_AVD=/.test(line.split('helpers/control')[0]),
+        ),
         'example must show the default command before VERIFY_AVD',
       )
     }
+    assert.ok(matched, 'expected a device command example')
   })
 
   it('names default AVD and ports in control usage text', () => {
@@ -1735,6 +1765,12 @@ describe('verify-mobile usage defaults', () => {
     assert.match(text, /launchApp. without .clearState/)
     assert.match(text, /session restore/)
     assert.match(text, /as soon as the process is spawned/)
+  })
+
+  it('documents Homebrew trees are skipped and a named-parent Studio SDK is accepted', () => {
+    const text = skill()
+    assert.match(text, /Homebrew trees/)
+    assert.match(text, /complete Studio SDK is accepted/)
   })
 })
 

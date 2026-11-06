@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
+    "@coffee-companion/api": "workspace:*",
     "@tanstack/eslint-config": "^0.3.4",
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "^29.5.14",

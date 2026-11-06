@@ -6,7 +6,7 @@ import {
   E2E_USER_FREE as API_E2E_USER_FREE,
   E2E_USER_WITH_DATA as API_E2E_USER_WITH_DATA,
   e2eBypassSession,
-} from '../../../../packages/api/src/lib/e2e-auth'
+} from '@coffee-companion/api/lib/e2e-auth'
 import {
   E2E_AUTH_COOKIE_NAME,
   E2E_AUTH_HEADER,

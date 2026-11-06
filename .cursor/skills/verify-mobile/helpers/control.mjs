@@ -110,7 +110,7 @@ const APP_READY_PROGRESS_INTERVAL_MS = 15_000
 const DEFAULT_MAC_EMULATOR_GPU = 'host'
 const JAVA_MIN_MAJOR = 17
 const JAVA_MAX_MAJOR = 21
-const HOMEBREW_SDK_MARKER = 'android-commandlinetools'
+const HOMEBREW_SDK_PATH = /(?:^|\/)(?:(?:opt\/)?homebrew|linuxbrew)\//i
 const WEB_CONTROL = join(
   repoRoot,
   '.cursor/skills/verify-coffee-companion/helpers/control',
@@ -368,10 +368,14 @@ function defaultStudioSdkRoot(home, platform) {
   return join(home, 'Android', 'Sdk')
 }
 
+function isHomebrewSdkRoot(root) {
+  return HOMEBREW_SDK_PATH.test(`${root ?? ''}`.replaceAll('\\', '/'))
+}
+
 function sdkLooksComplete(root, exists) {
   if (!root) return false
-  // Homebrew android-commandlinetools can ship emulator/adb without the AVD images.
-  if (`${root}`.includes(HOMEBREW_SDK_MARKER)) return false
+  // Homebrew android-commandlinetools can ship emulator/adb without AVD images.
+  if (isHomebrewSdkRoot(root)) return false
   return (
     exists(join(root, 'emulator', 'emulator')) &&
     exists(join(root, 'platform-tools', 'adb')) &&
@@ -4094,6 +4098,7 @@ export {
   ensureDeviceMetro,
   installWaitTick,
   resolveSdkRoot,
+  isHomebrewSdkRoot,
   chosenEmulatorGpu,
   emulatorLaunchArgs,
   parseJavaMajor,
