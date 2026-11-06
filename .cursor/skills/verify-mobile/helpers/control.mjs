@@ -1014,6 +1014,30 @@ function shouldRunClearStateDeviceFlow({ ownedPackage, clearsState }) {
   return ownedPackage !== false || !clearsState
 }
 
+function maestroFlowFile(flow) {
+  return join(skillDir, 'flows', `${flow}.yaml`)
+}
+
+function plannedFlowClearsAppState(flow) {
+  const flowPath = maestroFlowFile(flow)
+  if (!existsSync(flowPath)) return false
+  return flowClearsAppState(readFileSync(flowPath, 'utf8'))
+}
+
+function shouldInstallForPlannedDeviceFlow({ plannedFlow, ownedPackage }) {
+  if (!plannedFlow) return true
+  return shouldRunClearStateDeviceFlow({
+    ownedPackage,
+    clearsState: plannedFlowClearsAppState(plannedFlow),
+  })
+}
+
+function notDrivable(message) {
+  const error = new Error(message)
+  error.exitCode = EXIT_NOT_DRIVABLE
+  return error
+}
+
 function preexistingInstallClearStateMessage() {
   return (
     'Refusing a Maestro flow that clears app data on an attached emulator ' +
@@ -2769,7 +2793,8 @@ async function stopLaunchDevice(partial, stopped = []) {
   restoreMobileExpoPublicEnv()
 }
 
-async function cmdLaunchDevice() {
+async function cmdLaunchDevice(opts = {}) {
+  const plannedFlow = `${opts.plannedFlow ?? ''}`.trim() || null
   const existing = readState()
   if (hasLiveRecordedPids(existing)) {
     die(
@@ -2929,13 +2954,6 @@ async function cmdLaunchDevice() {
       })
     }
 
-    console.error(
-      `Starting the web app on port ${webPort} with E2E_BYPASS_AUTH=true…`,
-    )
-    const web = startWebApp(webPort)
-    partial.webPid = web.webPid
-    persistLaunchPartial(partial)
-
     const installed = installedVersionName(DEVICE_SERIAL, ANDROID_PACKAGE)
     if (attachedEmulator) {
       partial.ownedPackage = ownedDevicePackage({
@@ -2944,6 +2962,22 @@ async function cmdLaunchDevice() {
       })
       persistLaunchPartial(partial)
     }
+    if (
+      !shouldInstallForPlannedDeviceFlow({
+        plannedFlow,
+        ownedPackage: partial.ownedPackage,
+      })
+    ) {
+      throw notDrivable(preexistingInstallClearStateMessage())
+    }
+
+    console.error(
+      `Starting the web app on port ${webPort} with E2E_BYPASS_AUTH=true…`,
+    )
+    const web = startWebApp(webPort)
+    partial.webPid = web.webPid
+    persistLaunchPartial(partial)
+
     const rebuild = shouldRebuildApk({
       installedVersion: installed,
       expectedVersion: expectedSha,
@@ -3089,7 +3123,7 @@ async function cmdLaunchDevice() {
     )
   } catch (error) {
     await stopLaunchDevice(partial)
-    die(error.message)
+    die(error.message, error.exitCode)
   }
 }
 
@@ -3116,7 +3150,7 @@ async function cmdDriveDevice(flow) {
   if (!flow) {
     die('Usage: helpers/control drive-device <flow>')
   }
-  const flowPath = join(skillDir, 'flows', `${flow}.yaml`)
+  const flowPath = maestroFlowFile(flow)
   if (!existsSync(flowPath)) {
     die(
       `No Maestro flow at ${flowPath}. ` +
@@ -3940,7 +3974,7 @@ async function cmdVerifyDevice(flow) {
   const plan = verifyDevicePlan(flow)
   console.error(verifyDeviceHeadline(plan))
   await cmdCleanup()
-  await cmdLaunchDevice()
+  await cmdLaunchDevice({ plannedFlow: plan.flow })
   await cmdDoctor()
   await cmdDriveDevice(plan.flow)
 }
@@ -3954,7 +3988,7 @@ function usage() {
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
   drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}; refuse clearState when ownedPackage is false
-  verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); the instance stays up if a later step fails
+  verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); refuse a clearState flow on an attached preexisting install before Expo; the instance stays up if a later step fails
   cleanup             Stop recorded pids, free ports this helper recorded, uninstall a package this run owns; keep artifacts/
 
 `)
@@ -4073,6 +4107,7 @@ export {
   shouldUninstallRecordedPackage,
   flowClearsAppState,
   shouldRunClearStateDeviceFlow,
+  shouldInstallForPlannedDeviceFlow,
   preexistingInstallClearStateMessage,
   resolveEmulatorAttachment,
   deviceReadyProblems,

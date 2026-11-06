@@ -115,6 +115,7 @@ import {
   shouldUninstallRecordedPackage,
   flowClearsAppState,
   shouldRunClearStateDeviceFlow,
+  shouldInstallForPlannedDeviceFlow,
   preexistingInstallClearStateMessage,
   resolveEmulatorAttachment,
   serialWaitTick,
@@ -1756,12 +1757,14 @@ describe('verify-mobile usage defaults', () => {
     assert.match(usage, /verify-pixel/)
     assert.match(usage, /VERIFY_PORT \(default 3910\)/)
     assert.match(usage, /refuse clearState when ownedPackage is false/)
+    assert.match(usage, /refuse a clearState flow on an attached preexisting install before Expo/)
     assert.doesNotMatch(usage, /VERIFY_AVD=Pixel_7/)
   })
 
   it('documents that a clearState flow is refused on a pre-existing attached install', () => {
     const text = skill()
     assert.match(text, /ownedPackage. is false/)
+    assert.match(text, /refuses before starting the web app or Expo/)
     assert.match(text, /launchApp. without .clearState/)
     assert.match(text, /session restore/)
     assert.match(text, /as soon as the process is spawned/)
@@ -1972,6 +1975,39 @@ describe('shouldRunClearStateDeviceFlow', () => {
     assert.equal(flowClearsAppState('# clearState: true\n'), false)
     assert.match(preexistingInstallClearStateMessage(), /already installed/)
     assert.match(preexistingInstallClearStateMessage(), /verify-pixel/)
+  })
+})
+
+describe('shouldInstallForPlannedDeviceFlow', () => {
+  it('skips Expo install when verify-device would refuse a clearState flow', () => {
+    assert.equal(
+      shouldInstallForPlannedDeviceFlow({
+        plannedFlow: 'sign-in-and-out',
+        ownedPackage: false,
+      }),
+      false,
+    )
+    assert.equal(
+      shouldInstallForPlannedDeviceFlow({
+        plannedFlow: 'sign-in-and-out',
+        ownedPackage: true,
+      }),
+      true,
+    )
+    assert.equal(
+      shouldInstallForPlannedDeviceFlow({
+        plannedFlow: null,
+        ownedPackage: false,
+      }),
+      true,
+    )
+    assert.equal(
+      shouldInstallForPlannedDeviceFlow({
+        plannedFlow: '',
+        ownedPackage: false,
+      }),
+      true,
+    )
   })
 })
 
