@@ -141,6 +141,7 @@ export default defineConfig({
           // and HeadContent keeps both tags.
           SITE_URL: `http://127.0.0.1:${PORT}`,
           BETTER_AUTH_URL: `http://127.0.0.1:${PORT}`,
+          STRIPE_SECRET_KEY: '',
         },
       },
 })

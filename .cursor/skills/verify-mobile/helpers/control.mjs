@@ -1868,6 +1868,7 @@ function webLaunchEnv(port) {
     HOST: '127.0.0.1',
     NITRO_HOST: '127.0.0.1',
     E2E_BYPASS_AUTH: 'true',
+    STRIPE_SECRET_KEY: '',
   }
 }
 

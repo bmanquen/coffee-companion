@@ -99,6 +99,9 @@ function webRuntimeEnv(env) {
     // otherwise bake marketing tags and the auth base URL for the wrong origin.
     BETTER_AUTH_URL: origin,
     SITE_URL: origin,
+    // Empty, not omitted: a shell STRIPE_SECRET_KEY would otherwise enable
+    // billing or crash launch on an incomplete Stripe config.
+    STRIPE_SECRET_KEY: '',
   }
 }
 
@@ -178,6 +181,7 @@ function placeholderEnv(port) {
     GOOGLE_CLIENT_SECRET:
       process.env.GOOGLE_CLIENT_SECRET ?? randomBytes(32).toString('hex'),
     SITE_URL: origin,
+    STRIPE_SECRET_KEY: '',
   }
 }
 

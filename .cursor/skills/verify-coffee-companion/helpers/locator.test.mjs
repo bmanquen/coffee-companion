@@ -281,6 +281,15 @@ describe('webRuntimeEnv', () => {
     assert.equal(env.E2E_BYPASS_AUTH, 'true')
     assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
     assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
+    assert.equal(env.STRIPE_SECRET_KEY, '')
+  })
+
+  it('clears STRIPE_SECRET_KEY even when the launch env inherited a live key', () => {
+    const env = webRuntimeEnv({
+      PORT: '3910',
+      STRIPE_SECRET_KEY: 'sk_live_inherited',
+    })
+    assert.equal(env.STRIPE_SECRET_KEY, '')
   })
 })
 
@@ -294,6 +303,7 @@ describe('placeholderEnv', () => {
       const env = placeholderEnv(3910)
       assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
       assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
+      assert.equal(env.STRIPE_SECRET_KEY, '')
     } finally {
       if (previousSite === undefined) delete process.env.SITE_URL
       else process.env.SITE_URL = previousSite

@@ -759,6 +759,7 @@ describe('webLaunchEnv', () => {
     assert.equal(env.HOST, '127.0.0.1')
     assert.equal(env.NITRO_HOST, '127.0.0.1')
     assert.equal(env.E2E_BYPASS_AUTH, 'true')
+    assert.equal(env.STRIPE_SECRET_KEY, '')
     assert.equal(
       Object.hasOwn(env, 'NODE_ENV'),
       false,
