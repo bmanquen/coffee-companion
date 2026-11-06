@@ -454,11 +454,11 @@ describe('installWaitTick', () => {
     assert.equal(tick.status, 'wait')
   })
 
-  it('succeeds when the package versionName is present', () => {
+  it('succeeds when the package versionName is present after this run finished installing', () => {
     const tick = installWaitTick({
       alive: true,
       versionName: 'abc1234',
-      logText: '',
+      logText: 'BUILD SUCCESSFUL in 6s\n',
     })
     assert.equal(tick.status, 'ok')
   })
@@ -500,12 +500,45 @@ describe('installWaitTick', () => {
     assert.match(tick.error, /4bf1a18/)
   })
 
-  it('succeeds when the installed versionName matches git HEAD', () => {
+  it('waits when a matching HEAD SHA is already installed until this Expo run finishes', () => {
     const tick = installWaitTick({
       alive: true,
       versionName: '4bf1a18',
       expectedVersion: '4bf1a18',
       logText: '',
+    })
+    assert.equal(tick.status, 'wait')
+    assert.match(tick.reason, /prior install/)
+  })
+
+  it('succeeds when this Expo run finished installing a matching HEAD SHA', () => {
+    const tick = installWaitTick({
+      alive: false,
+      versionName: '4bf1a18',
+      expectedVersion: '4bf1a18',
+      logText: 'BUILD SUCCESSFUL in 6s\n',
+    })
+    assert.equal(tick.status, 'ok')
+  })
+
+  it('fails when expo exits with a leftover matching SHA and no BUILD SUCCESSFUL', () => {
+    const tick = installWaitTick({
+      alive: false,
+      versionName: '4bf1a18',
+      expectedVersion: '4bf1a18',
+      logText: 'CommandError: Gradle build failed\n',
+    })
+    assert.equal(tick.status, 'error')
+    assert.match(tick.error, /exited before/)
+  })
+
+  it('accepts a matching SHA on an attached preexisting install without this run installing', () => {
+    const tick = installWaitTick({
+      alive: true,
+      versionName: '4bf1a18',
+      expectedVersion: '4bf1a18',
+      logText: '',
+      ownedPackage: false,
     })
     assert.equal(tick.status, 'ok')
   })

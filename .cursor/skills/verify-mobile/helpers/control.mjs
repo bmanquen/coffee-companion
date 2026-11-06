@@ -840,6 +840,7 @@ function installWaitReason({
   versionName,
   expectedVersion,
   buildFinished = false,
+  awaitingThisRun = false,
 }) {
   if (!versionName) {
     return buildFinished
@@ -848,6 +849,9 @@ function installWaitReason({
   }
   if (expectedVersion && versionName !== expectedVersion) {
     return `installed versionName ${versionName} != expected ${expectedVersion}`
+  }
+  if (awaitingThisRun) {
+    return 'matching versionName is from a prior install; waiting for this Expo run'
   }
   return 'installed versionName matches'
 }
@@ -873,28 +877,45 @@ function installWaitTick({
   expectedVersion,
   logText,
   buildFinished,
+  ownedPackage,
 }) {
   const finished = buildFinished ?? gradleBuildFinished(logText)
+  const versionOk =
+    Boolean(versionName) &&
+    (!expectedVersion || versionName === expectedVersion)
+  const reasonOpts = {
+    versionName,
+    expectedVersion,
+    buildFinished: finished,
+  }
   if (versionName && expectedVersion && versionName !== expectedVersion) {
     if (!alive || finished) {
       return {
         status: 'error',
         error: staleVersionError(versionName, expectedVersion),
-        reason: installWaitReason({ versionName, expectedVersion, buildFinished: finished }),
+        reason: installWaitReason(reasonOpts),
       }
     }
     return {
       status: 'wait',
-      reason: installWaitReason({ versionName, expectedVersion, buildFinished: finished }),
+      reason: installWaitReason(reasonOpts),
     }
   }
-  if (versionName) return { status: 'ok' }
+  // A leftover APK on an attached emulator may already match HEAD. Do not
+  // treat that as this Expo run installing, except when we do not own the
+  // package and must leave it in place.
+  if (versionOk && ownedPackage === false) {
+    return { status: 'ok', reason: installWaitReason(reasonOpts) }
+  }
+  if (versionOk && finished) {
+    return { status: 'ok', reason: installWaitReason(reasonOpts) }
+  }
   if (!alive && !finished) {
     return { status: 'error', error: expoDiedError(logText) }
   }
   return {
     status: 'wait',
-    reason: installWaitReason({ versionName, expectedVersion, buildFinished: finished }),
+    reason: installWaitReason({ ...reasonOpts, awaitingThisRun: versionOk }),
   }
 }
 
@@ -2513,6 +2534,7 @@ async function waitForInstalledPackage(serial, pkg, timeoutMs, opts = {}) {
       versionName,
       expectedVersion: opts.expectedVersion,
       logText,
+      ownedPackage: opts.ownedPackage,
     })
     if (tick.status === 'ok') return versionName
     if (tick.status === 'error') throw new Error(tick.error)
@@ -3026,6 +3048,7 @@ async function cmdLaunchDevice(opts = {}) {
         logPath: expoLog,
         pid: expo.pid,
         expectedVersion: expectedSha,
+        ownedPackage: partial.ownedPackage,
       },
     )
 
