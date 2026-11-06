@@ -173,6 +173,18 @@ describe('useAuth', () => {
     expect(mocks.clearClientSession).toHaveBeenCalled()
   })
 
+  it('clears the client session when store deletion fails', async () => {
+    mocks.clearSessionStore.mockRejectedValueOnce(new Error('secure store'))
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await expect(result.current.signOut()).rejects.toThrow('secure store')
+    })
+
+    expect(mocks.clearSessionStore).toHaveBeenCalled()
+    expect(mocks.clearClientSession).toHaveBeenCalled()
+  })
+
   it('still revokes the server session when Google sign-out throws', async () => {
     mocks.signOutGoogle.mockRejectedValueOnce(new Error('offline'))
     const { result } = await renderHook(() => useAuth())

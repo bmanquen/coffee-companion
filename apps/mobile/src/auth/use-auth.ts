@@ -129,8 +129,11 @@ export function useAuth(): Auth {
         }
         await authClient.signOut()
       } finally {
-        await clearSessionStore()
-        clearClientSession()
+        try {
+          await clearSessionStore()
+        } finally {
+          clearClientSession()
+        }
       }
     },
   }

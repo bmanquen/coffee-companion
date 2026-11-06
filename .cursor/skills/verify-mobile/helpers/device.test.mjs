@@ -168,6 +168,7 @@ import {
   DEVICE_FAILURE_LOGCAT,
   MAESTRO_LOG_NAME,
   DEFAULT_VERIFY_DEVICE_FLOW,
+  VERIFY_APK_VERSION_ENV,
 } from './control.mjs'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
@@ -1246,6 +1247,37 @@ describe('stampDevMenuManifest', () => {
       ),
       /EXDevMenuShowsAtLaunch" android:value="false"/,
     )
+  })
+})
+
+describe('helper-to-config version stamp', () => {
+  it('applies VERIFY_APK_VERSION_ENV to Expo version and extra.gitHead', () => {
+    const stamp = 'a1b2c3d'
+    const script = `
+      import { createRequire } from 'node:module'
+      import { join } from 'node:path'
+      const mobileDir = join(${JSON.stringify(repoRoot)}, 'apps/mobile')
+      const expoRequire = createRequire(
+        createRequire(join(mobileDir, 'package.json')).resolve('expo/package.json'),
+      )
+      const { getConfig } = expoRequire('@expo/config')
+      const exp = getConfig(mobileDir, {
+        skipSDKVersionRequirement: true,
+        isPublicConfig: true,
+      }).exp
+      process.stdout.write(JSON.stringify({
+        version: exp.version,
+        gitHead: exp.extra?.gitHead,
+      }))
+    `
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      encoding: 'utf8',
+      env: { ...process.env, [VERIFY_APK_VERSION_ENV]: stamp },
+    })
+    assert.equal(result.status, 0, result.stderr)
+    const loaded = JSON.parse(result.stdout)
+    assert.equal(loaded.version, stamp)
+    assert.equal(loaded.gitHead, stamp)
   })
 })
 
