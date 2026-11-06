@@ -1772,6 +1772,18 @@ describe('verify-mobile usage defaults', () => {
     assert.match(text, /Homebrew trees/)
     assert.match(text, /complete Studio SDK is accepted/)
   })
+
+  it('documents that doctor accepts whichever loopback answered Metro', () => {
+    const readme = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../features/README.md'),
+      'utf8',
+    )
+    assert.match(readme, /baseUrl.*127\.0\.0\.1/)
+    assert.match(readme, /\[::1\]/)
+    assert.match(readme, /localhost/)
+    assert.match(readme, /VERIFY_METRO_PORT/)
+    assert.match(readme, /60s wall-clock deadline/)
+  })
 })
 
 describe('spawnExpoAndroid', () => {
@@ -2575,13 +2587,16 @@ describe('sign-in-and-out flow', () => {
     assert.match(yaml, /text: "Close"/)
     assert.match(yaml, /extendedWaitUntil/)
     assert.doesNotMatch(yaml, /timeout: 15000/)
+    assert.doesNotMatch(yaml, /times: 12/)
+    const deadlineAt = yaml.indexOf('signInDeadlineMs')
     const repeatAt = yaml.indexOf('repeat:')
     const continueAt = yaml.indexOf('This is the developer menu')
-    assert.ok(repeatAt >= 0 && continueAt > repeatAt)
+    assert.ok(deadlineAt >= 0 && repeatAt > deadlineAt && continueAt > repeatAt)
     assert.match(
       yaml,
-      /while:\n\s+notVisible:\n\s+id: sign-in-screen/,
+      /while:\n\s+notVisible:\n\s+id: sign-in-screen\n\s+true: \$\{Date\.now\(\) < output\.signInDeadlineMs\}/,
     )
+    assert.match(yaml, /evalScript: \$\{output\.signInWaitTick = Date\.now\(\)\}/)
   })
 
   it('asserts the approved sign-in and welcome headings', () => {

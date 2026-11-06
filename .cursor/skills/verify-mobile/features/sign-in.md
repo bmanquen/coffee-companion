@@ -21,8 +21,8 @@ Opening the Coffee Companion mobile app while signed out shows Sign in, with Goo
 
 Preconditions:
 
-- Coffee Companion Metro is healthy at `http://127.0.0.1:8081` (or the `VERIFY_METRO_PORT` you set).
-- `helpers/control doctor` reports the expected URL, `packager-status:running`, and app marker `Coffee Companion`.
+- Coffee Companion Metro is healthy: `doctor` reports a `baseUrl` using `127.0.0.1`, `[::1]`, or `localhost` on port `8081` (or the `VERIFY_METRO_PORT` you set).
+- `helpers/control doctor` reports `ok: true`, that `baseUrl`, `packager-status:running`, and app marker `Coffee Companion`.
 - `drive sign-in` re-checks that Metro is answering before it renders. A state file alone is not enough.
 - Drive is React Native Testing Library in-process unless you also ran `launch-device`. The native Google and Apple sheets cannot be presented in RNTL.
 
@@ -40,5 +40,5 @@ Preconditions:
 - `testID` and `accessibilityLabel` live in `apps/mobile/src/auth/SignInScreen.tsx` and `apps/mobile/src/auth/copy.ts`. Drive those handles, not coordinates or visible text.
 - The E2E handle is shown only when `EXPO_PUBLIC_E2E_USER` is set in a development build. On device the API URL must be `http://127.0.0.1:<web>` so get-session uses `adb reverse`; `localhost` rewrites to `10.0.2.2` and misses the server.
 - `expo-network` must be a direct `apps/mobile` dependency. A missing autolink crashes at launch with `Cannot find native module 'ExpoNetwork'`.
-- A development build can stay on the Expo "Development servers" launcher, or cover Sign in with a first-run Continue sheet or the developer menu. The flow keeps dismissing those overlays while waiting for `sign-in-screen`, including overlays that appear after the first check.
+- A development build can stay on the Expo "Development servers" launcher, or cover Sign in with a first-run Continue sheet or the developer menu. The flow keeps dismissing those overlays while waiting for `sign-in-screen`, including overlays that appear after the first check, until a 60s wall-clock deadline.
 - `sign-in-screen` and `welcome-screen` live on a `View` with `collapsable={false}` so Maestro can see the `testID`.

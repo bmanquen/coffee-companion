@@ -22,12 +22,17 @@ appId: dev.offbyonelabs.coffeecompanion
     notVisible: "Fetch development servers"
     timeout: 30000
 # Overlays can appear after the first check. Poll until sign-in-screen while dismissing them.
+# Maestro v1.40.3 shrinks lookup timeouts after the last mutating command, so a
+# times: N loop can finish before a slow load. evalScript counts as a mutation
+# and Date.now() is the wall-clock stop.
+- evalScript: ${output.signInDeadlineMs = Date.now() + 60000}
 - repeat:
-    times: 12
     while:
       notVisible:
         id: sign-in-screen
+      true: ${Date.now() < output.signInDeadlineMs}
     commands:
+      - evalScript: ${output.signInWaitTick = Date.now()}
       - runFlow:
           label: Dismiss first-run Continue sheet
           when:
