@@ -108,6 +108,9 @@ import {
   metroPortClaim,
   shouldRebuildApk,
   shouldClearAndroidBuildCache,
+  ownedDevicePackage,
+  shouldUninstallStalePackage,
+  shouldUninstallRecordedPackage,
   resolveEmulatorAttachment,
   serialWaitTick,
   waitForSerialReady,
@@ -1751,6 +1754,88 @@ describe('spawnExpoAndroid', () => {
     ])
     assert.deepEqual(metroPidsBeforeExpo, [11])
     assert.equal(expo.pid, 99)
+  })
+})
+
+describe('ownedDevicePackage', () => {
+  it('owns the package when this run booted the emulator', () => {
+    assert.equal(
+      ownedDevicePackage({ attachedEmulator: false, installedBefore: true }),
+      true,
+    )
+    assert.equal(
+      ownedDevicePackage({ attachedEmulator: false, installedBefore: false }),
+      true,
+    )
+  })
+
+  it('owns the package on an attached emulator only when it was missing', () => {
+    assert.equal(
+      ownedDevicePackage({ attachedEmulator: true, installedBefore: true }),
+      false,
+    )
+    assert.equal(
+      ownedDevicePackage({ attachedEmulator: true, installedBefore: false }),
+      true,
+    )
+  })
+})
+
+describe('shouldUninstallStalePackage', () => {
+  it('uninstalls a stale APK only when this run owns it', () => {
+    assert.equal(
+      shouldUninstallStalePackage({
+        ownedPackage: true,
+        rebuild: true,
+        installedVersion: 'e0543f5',
+      }),
+      true,
+    )
+    assert.equal(
+      shouldUninstallStalePackage({
+        ownedPackage: false,
+        rebuild: true,
+        installedVersion: 'e0543f5',
+      }),
+      false,
+    )
+    assert.equal(
+      shouldUninstallStalePackage({
+        ownedPackage: true,
+        rebuild: true,
+        installedVersion: null,
+      }),
+      false,
+    )
+  })
+})
+
+describe('shouldUninstallRecordedPackage', () => {
+  it('uninstalls a recorded package unless an attached run found it already installed', () => {
+    assert.equal(
+      shouldUninstallRecordedPackage({
+        serial: DEVICE_SERIAL,
+        androidPackage: ANDROID_PACKAGE,
+      }),
+      true,
+    )
+    assert.equal(
+      shouldUninstallRecordedPackage({
+        serial: DEVICE_SERIAL,
+        androidPackage: ANDROID_PACKAGE,
+        ownedPackage: true,
+      }),
+      true,
+    )
+    assert.equal(
+      shouldUninstallRecordedPackage({
+        serial: DEVICE_SERIAL,
+        androidPackage: ANDROID_PACKAGE,
+        ownedPackage: false,
+      }),
+      false,
+    )
+    assert.equal(shouldUninstallRecordedPackage(null), false)
   })
 })
 

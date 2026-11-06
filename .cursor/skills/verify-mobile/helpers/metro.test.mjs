@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, it } from 'node:test'
 import {
   APP_MARKER,
@@ -152,6 +155,27 @@ describe('waitForMetro', () => {
         }),
       /exited before/,
     )
+  })
+
+  it('includes the Metro log tail when the process is already dead', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'verify-metro-'))
+    const logPath = join(dir, 'metro.log')
+    writeFileSync(logPath, 'Metro bundler failed to start\n')
+    try {
+      await assert.rejects(
+        () =>
+          waitForMetro({
+            port: 59_998,
+            timeoutMs: 500,
+            pid: 999_999_999,
+            exit: { died: true },
+            logPath,
+          }),
+        /Tail of metro.log:\nMetro bundler failed to start/,
+      )
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

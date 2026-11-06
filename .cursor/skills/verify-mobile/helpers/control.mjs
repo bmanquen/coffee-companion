@@ -984,6 +984,24 @@ function shouldClearAndroidBuildCache({ installedVersion, rebuild }) {
   return Boolean(installedVersion && rebuild)
 }
 
+function ownedDevicePackage({ attachedEmulator, installedBefore }) {
+  return !attachedEmulator || !installedBefore
+}
+
+function shouldUninstallStalePackage({
+  ownedPackage,
+  rebuild,
+  installedVersion,
+}) {
+  return Boolean(ownedPackage && rebuild && installedVersion)
+}
+
+function shouldUninstallRecordedPackage(state) {
+  return Boolean(
+    state?.serial && state?.androidPackage && state.ownedPackage !== false,
+  )
+}
+
 function parseAppScheme(source) {
   if (typeof source !== 'string') return null
   const ts = source.match(
@@ -2693,7 +2711,8 @@ async function stopLaunchDevice(partial, stopped = []) {
   const plan = launchDeviceTeardownPlan(partial)
   if (partial.expoPid) stopRecordedPid(partial.expoPid, 'expo', stopped)
   if (partial.metroPid) stopRecordedPid(partial.metroPid, 'metro', stopped)
-  // A failed wait still leaves the APK we just installed. Cleanup uninstalls.
+  // A failed wait still leaves an APK this run installed. Cleanup uninstalls
+  // only when ownedPackage is not false.
   if (plan.clearReverses) adbClearReverses(partial.serial)
   if (partial.emulatorPid) {
     await killEmulatorSerial({
@@ -2832,6 +2851,7 @@ async function cmdLaunchDevice() {
       `Stamped ${DEV_MENU_SHOWS_AT_LAUNCH_META}=false so the developer menu does not auto-open`,
     )
   }
+  const attachedEmulator = attachment.action === 'attach'
   const partial = {
     serial: DEVICE_SERIAL,
     androidPackage: ANDROID_PACKAGE,
@@ -2840,12 +2860,13 @@ async function cmdLaunchDevice() {
     metroPid: null,
     webPid: null,
     expoPid: null,
+    ownedPackage: !attachedEmulator,
   }
 
   try {
     const emulatorLog = join(runDir, 'emulator.log')
     let emulatorPid = null
-    if (attachment.action === 'attach') {
+    if (attachedEmulator) {
       console.error(`Attaching to existing ${DEVICE_SERIAL} (AVD ${avdName})`)
       persistLaunchPartial(partial)
       await waitForBootCompleted(DEVICE_SERIAL, EMULATOR_BOOT_TIMEOUT_MS)
@@ -2873,6 +2894,13 @@ async function cmdLaunchDevice() {
     persistLaunchPartial(partial)
 
     const installed = installedVersionName(DEVICE_SERIAL, ANDROID_PACKAGE)
+    if (attachedEmulator) {
+      partial.ownedPackage = ownedDevicePackage({
+        attachedEmulator: true,
+        installedBefore: Boolean(installed),
+      })
+      persistLaunchPartial(partial)
+    }
     const rebuild = shouldRebuildApk({
       installedVersion: installed,
       expectedVersion: expectedSha,
@@ -2881,7 +2909,13 @@ async function cmdLaunchDevice() {
       installedVersion: installed,
       rebuild,
     })
-    if (rebuild && installed) {
+    if (
+      shouldUninstallStalePackage({
+        ownedPackage: partial.ownedPackage,
+        rebuild,
+        installedVersion: installed,
+      })
+    ) {
       console.error(
         `Installed ${ANDROID_PACKAGE} versionName ${installed} != git HEAD ${expectedSha}; uninstalling and rebuilding`,
       )
@@ -2940,7 +2974,8 @@ async function cmdLaunchDevice() {
       harness: HARNESS_MAESTRO,
       serial: DEVICE_SERIAL,
       avdName,
-      attachedEmulator: attachment.action === 'attach',
+      attachedEmulator,
+      ownedPackage: partial.ownedPackage,
       androidPackage: ANDROID_PACKAGE,
       emulatorPid,
       metroPid: metro.metroPid,
@@ -2979,6 +3014,7 @@ async function cmdLaunchDevice() {
           serial: DEVICE_SERIAL,
           avdName,
           attachedEmulator: state.attachedEmulator,
+          ownedPackage: state.ownedPackage,
           androidPackage: ANDROID_PACKAGE,
           emulatorPid,
           metroPid: metro.metroPid,
@@ -3796,7 +3832,7 @@ async function cmdCleanup() {
       if (pid === state.emulatorPid || pid === state.webPid) continue
       stopRecordedPid(pid, pidKind(pid, state), stopped)
     }
-    if (state.serial && state.androidPackage) {
+    if (shouldUninstallRecordedPackage(state)) {
       uninstallPackage(state.serial, state.androidPackage)
     }
     if (state.serial) adbClearReverses(state.serial)
@@ -3862,7 +3898,7 @@ function usage() {
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
   drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}
   verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); the instance stays up if a later step fails
-  cleanup             Stop recorded pids, free ports this helper recorded, uninstall the package from a recorded serial; keep artifacts/
+  cleanup             Stop recorded pids, free ports this helper recorded, uninstall a package this run owns; keep artifacts/
 
 `)
 }
@@ -3975,6 +4011,9 @@ export {
   verifyDeviceHeadline,
   shouldRebuildApk,
   shouldClearAndroidBuildCache,
+  ownedDevicePackage,
+  shouldUninstallStalePackage,
+  shouldUninstallRecordedPackage,
   resolveEmulatorAttachment,
   deviceReadyProblems,
   maestroDeviceArgs,
