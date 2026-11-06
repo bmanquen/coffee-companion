@@ -84,3 +84,16 @@ appId: dev.offbyonelabs.coffeecompanion
     id: sign-in-heading
 - assertTrue: ${maestro.copiedText == "Sign in"}
 - takeScreenshot: signed-out-again
+# Sign-out must persist in SecureStore: relaunch without wiping data.
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: sign-in-screen
+    timeout: 60000
+- assertVisible:
+    id: sign-in-heading
+- copyTextFrom:
+    id: sign-in-heading
+- assertTrue: ${maestro.copiedText == "Sign in"}
+- takeScreenshot: signed-out-after-relaunch

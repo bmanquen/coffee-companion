@@ -111,6 +111,9 @@ import {
   ownedDevicePackage,
   shouldUninstallStalePackage,
   shouldUninstallRecordedPackage,
+  flowClearsAppState,
+  shouldRunClearStateDeviceFlow,
+  preexistingInstallClearStateMessage,
   resolveEmulatorAttachment,
   serialWaitTick,
   waitForSerialReady,
@@ -1720,7 +1723,15 @@ describe('verify-mobile usage defaults', () => {
     assert.match(usage, /VERIFY_METRO_PORT \(default 8081\)/)
     assert.match(usage, /verify-pixel/)
     assert.match(usage, /VERIFY_PORT \(default 3910\)/)
+    assert.match(usage, /refuse clearState when ownedPackage is false/)
     assert.doesNotMatch(usage, /VERIFY_AVD=Pixel_7/)
+  })
+
+  it('documents that a clearState flow is refused on a pre-existing attached install', () => {
+    const text = skill()
+    assert.match(text, /ownedPackage. is false/)
+    assert.match(text, /launchApp. without .clearState/)
+    assert.match(text, /session restore/)
   })
 })
 
@@ -1836,6 +1847,51 @@ describe('shouldUninstallRecordedPackage', () => {
       false,
     )
     assert.equal(shouldUninstallRecordedPackage(null), false)
+  })
+})
+
+describe('shouldRunClearStateDeviceFlow', () => {
+  it('refuses clearState on an attached emulator whose app was already installed', () => {
+    assert.equal(
+      shouldRunClearStateDeviceFlow({
+        ownedPackage: false,
+        clearsState: true,
+      }),
+      false,
+    )
+    assert.equal(
+      shouldRunClearStateDeviceFlow({
+        ownedPackage: true,
+        clearsState: true,
+      }),
+      true,
+    )
+    assert.equal(
+      shouldRunClearStateDeviceFlow({
+        ownedPackage: false,
+        clearsState: false,
+      }),
+      true,
+    )
+    assert.equal(
+      shouldRunClearStateDeviceFlow({
+        ownedPackage: undefined,
+        clearsState: true,
+      }),
+      true,
+    )
+  })
+
+  it('treats the default Maestro flow as one that clears app data', () => {
+    const yaml = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../flows/sign-in-and-out.yaml'),
+      'utf8',
+    )
+    assert.equal(flowClearsAppState(yaml), true)
+    assert.equal(flowClearsAppState('    clearState: false\n'), false)
+    assert.equal(flowClearsAppState('# clearState: true\n'), false)
+    assert.match(preexistingInstallClearStateMessage(), /already installed/)
+    assert.match(preexistingInstallClearStateMessage(), /verify-pixel/)
   })
 })
 
@@ -2484,8 +2540,20 @@ describe('sign-in-and-out flow', () => {
     )
     assert.equal(
       [...yaml.matchAll(/maestro\.copiedText == "Sign in"/g)].length,
-      2,
+      3,
     )
+  })
+
+  it('relaunches without clearState after sign-out so a restored session stays signed out', () => {
+    const yaml = flow()
+    const signedOutAgain = yaml.indexOf('takeScreenshot: signed-out-again')
+    assert.ok(signedOutAgain >= 0)
+    const rest = yaml.slice(signedOutAgain)
+    assert.match(rest, /launchApp:\n\s+clearState: false/)
+    assert.match(rest, /id: sign-in-screen/)
+    assert.match(rest, /maestro\.copiedText == "Sign in"/)
+    assert.match(rest, /takeScreenshot: signed-out-after-relaunch/)
+    assert.doesNotMatch(rest, /clearState: true/)
   })
 
   it('waits for welcome-screen after the e2e handle instead of asserting immediately', () => {

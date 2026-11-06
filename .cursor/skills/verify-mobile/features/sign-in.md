@@ -28,7 +28,7 @@ Preconditions:
 
 - **Read the signed-out screen.** Run `helpers/control drive sign-in`. The host tree contains brand `Coffee Companion`, heading `Sign in`, `testID=sign-in-google`, `testID=sign-in-apple`, and `testID=sign-in-toggle`.
 - **Proof.** `drive sign-in` writes `artifacts/<run>/sign-in/tree.txt`, `tree.json`, and `proof.json`. `tree.txt` must show `Sign in` and `Coffee Companion`.
-- **Device (where an AVD exists).** Run `helpers/control verify-device`. That is cleanup → launch-device → doctor → drive-device `sign-in-and-out`. Maestro copies heading text and requires it equals `Sign in`, taps `e2e-sign-in`, copies heading text and requires it equals `Coffee Companion`, taps `sign-out`, copies heading text and requires it equals `Sign in` again, and writes screenshots plus `proof.json` (`harness: maestro`) under `artifacts/<run>/sign-in-and-out/`.
+- **Device (where an AVD exists).** Run `helpers/control verify-device`. That is cleanup → launch-device → doctor → drive-device `sign-in-and-out`. Maestro copies heading text and requires it equals `Sign in`, taps `e2e-sign-in`, copies heading text and requires it equals `Coffee Companion`, taps `sign-out`, copies heading text and requires it equals `Sign in` again, then relaunches without `clearState` and requires `Sign in` still, and writes screenshots plus `proof.json` (`harness: maestro`) under `artifacts/<run>/sign-in-and-out/`. `drive-device` refuses this flow when `ownedPackage` is false (the app was already on an attached emulator).
 
 ## Gotchas
 

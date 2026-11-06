@@ -144,6 +144,8 @@ test('the home page carries its canonical URL and social card tags', async ({
   await page.goto('/')
 
   // Presence and shape only — the copy itself is free to change.
+  // One tag each: SSR and the hydrated client must advertise the same origin.
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(1)
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
     /^https?:\/\/.+\/$/,
@@ -157,6 +159,7 @@ test('the home page carries its canonical URL and social card tags', async ({
     /.+/,
   )
   // Raster, not SVG — every major unfurler drops an SVG og:image.
+  await expect(page.locator('meta[property="og:image"]')).toHaveCount(1)
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
     'content',
     /^https?:\/\/.+\.(png|jpg|jpeg)$/,

@@ -136,6 +136,11 @@ export default defineConfig({
           NODE_ENV: 'test',
           HOST: '127.0.0.1',
           NITRO_HOST: '127.0.0.1',
+          // Pin the canonical origin to the IPv4 probe. Unset SITE_URL makes
+          // SSR advertise localhost while the browser origin is 127.0.0.1,
+          // and HeadContent keeps both tags.
+          SITE_URL: `http://127.0.0.1:${PORT}`,
+          BETTER_AUTH_URL: `http://127.0.0.1:${PORT}`,
         },
       },
 })

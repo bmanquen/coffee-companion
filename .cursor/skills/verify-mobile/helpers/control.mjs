@@ -1002,6 +1002,22 @@ function shouldUninstallRecordedPackage(state) {
   )
 }
 
+function flowClearsAppState(yaml) {
+  return /^\s*clearState:\s*true\b/m.test(String(yaml ?? ''))
+}
+
+function shouldRunClearStateDeviceFlow({ ownedPackage, clearsState }) {
+  return ownedPackage !== false || !clearsState
+}
+
+function preexistingInstallClearStateMessage() {
+  return (
+    'Refusing a Maestro flow that clears app data on an attached emulator ' +
+    'whose app was already installed. Boot an isolated AVD (default verify-pixel) ' +
+    'or use a flow that does not set clearState.'
+  )
+}
+
 function parseAppScheme(source) {
   if (typeof source !== 'string') return null
   const ts = source.match(
@@ -3080,6 +3096,14 @@ async function cmdDriveDevice(flow) {
   }
 
   const state = requireState()
+  if (
+    !shouldRunClearStateDeviceFlow({
+      ownedPackage: state.ownedPackage,
+      clearsState: flowClearsAppState(readFileSync(flowPath, 'utf8')),
+    })
+  ) {
+    die(preexistingInstallClearStateMessage(), EXIT_NOT_DRIVABLE)
+  }
   ensureAdbReverses(state.serial, driveDeviceReversePorts(state))
   await requireDrivableDevice(state)
   const dest = join(artifactsDir, state.runId, flow)
@@ -3896,7 +3920,7 @@ function usage() {
   doctor              Read-only check that this instance is worth driving
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
-  drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}
+  drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}; refuse clearState when ownedPackage is false
   verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); the instance stays up if a later step fails
   cleanup             Stop recorded pids, free ports this helper recorded, uninstall a package this run owns; keep artifacts/
 
@@ -4014,6 +4038,9 @@ export {
   ownedDevicePackage,
   shouldUninstallStalePackage,
   shouldUninstallRecordedPackage,
+  flowClearsAppState,
+  shouldRunClearStateDeviceFlow,
+  preexistingInstallClearStateMessage,
   resolveEmulatorAttachment,
   deviceReadyProblems,
   maestroDeviceArgs,
