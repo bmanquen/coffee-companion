@@ -2359,6 +2359,15 @@ async function cmdLaunch() {
   }
 
   const metro = spawnMetro(port)
+  writeState({
+    runId: `verify-${new Date().toISOString().replace(/[:.]/g, '-')}`,
+    metroPid: metro.child.pid,
+    metroPids: [metro.child.pid].filter(Boolean),
+    port,
+    logPath: metro.logPath,
+    startedAt: new Date().toISOString(),
+    harness: HARNESS_RNTL,
+  })
   try {
     const ready = await waitForMetro({
       port,
@@ -2380,14 +2389,13 @@ async function cmdLaunch() {
       ...new Set([metro.child.pid, ...portListenerPids(port)].filter(Boolean)),
     ]
     const state = {
-      runId: `verify-${new Date().toISOString().replace(/[:.]/g, '-')}`,
+      ...(readState() ?? {}),
       metroPid: metro.child.pid,
       metroPids,
       port,
       baseUrl,
       bundleUrl: bundle.url,
       logPath: metro.logPath,
-      startedAt: new Date().toISOString(),
       harness: HARNESS_RNTL,
     }
     writeState(state)
@@ -2662,42 +2670,57 @@ function metroPortClaim(beforePids, currentPids) {
   }
 }
 
-async function ensureDeviceMetro(port, extraEnv = {}, beforePids = []) {
+async function ensureDeviceMetro(
+  port,
+  extraEnv = {},
+  beforePids = [],
+  {
+    stampEnv = stampMobileExpoPublicEnv,
+    listPids = portListenerPids,
+    waitPort = waitForPortFree,
+    spawn = spawnMetro,
+    wait = waitForMetro,
+    fetchBundle = fetchAppBundle,
+    hasMarker = bundleHasAppMarker,
+    onSpawn,
+  } = {},
+) {
   // expo run:android --port starts Metro without --clear, so a reused process
   // keeps a stale inlined EXPO_PUBLIC_API_URL. Always start our own with --clear.
   // expo/virtual/env merges .env* over process.env in the client, so spawn env
   // alone is not enough when apps/mobile/.env exists. beforePids is the
   // snapshot taken before expo run:android. Stop only pids that appeared
   // after that; refuse (do not kill) any listener that was already there.
-  stampMobileExpoPublicEnv(extraEnv)
-  const claim = metroPortClaim(beforePids, portListenerPids(port))
+  stampEnv(extraEnv)
+  const claim = metroPortClaim(beforePids, listPids(port))
   if (claim.foreign.length > 0) {
     throw new Error(portBusyMessage(port, claim.foreign, 'metro'))
   }
   for (const pid of claim.stop) {
     stopRecordedPid(pid, 'metro')
   }
-  const freed = await waitForPortFree(port, PORT_FREE_TIMEOUT_MS)
+  const freed = await waitPort(port, PORT_FREE_TIMEOUT_MS)
   if (freed.status !== 'ok') {
     throw new Error(portBusyMessage(port, freed.pids, 'metro'))
   }
   console.error(
     `Starting Metro with --dev-client --clear on port ${port} from apps/mobile…`,
   )
-  const metro = spawnMetro(port, {
+  const metro = spawn(port, {
     clearCache: true,
     devClient: true,
     extraEnv,
   })
-  const ready = await waitForMetro({
+  onSpawn?.({ metroPid: metro.child.pid, logPath: metro.logPath })
+  const ready = await wait({
     port,
     timeoutMs: DEVICE_METRO_WAIT_MS,
     pid: metro.child.pid,
     logPath: metro.logPath,
     exit: metro.exit,
   })
-  const bundle = await fetchAppBundle(ready.baseUrl, LAUNCH_BUNDLE_TIMEOUT_MS)
-  if (!bundleHasAppMarker(bundle.body)) {
+  const bundle = await fetchBundle(ready.baseUrl, LAUNCH_BUNDLE_TIMEOUT_MS)
+  if (!hasMarker(bundle.body)) {
     throw new Error(
       `Metro answered but the bundle at ${bundle.url} does not mention ${APP_MARKER}.`,
     )
@@ -2972,6 +2995,12 @@ async function cmdLaunchDevice() {
       metroPort,
       deviceExpoPublicEnv(webPort),
       metroPidsBeforeExpo,
+      {
+        onSpawn: ({ metroPid }) => {
+          partial.metroPid = metroPid
+          persistLaunchPartial(partial)
+        },
+      },
     )
     if (metro.metroPid) partial.metroPid = metro.metroPid
     persistLaunchPartial(partial)
@@ -4062,6 +4091,7 @@ export {
   bootWaitTick,
   expoAndroidArgs,
   spawnExpoAndroid,
+  ensureDeviceMetro,
   installWaitTick,
   resolveSdkRoot,
   chosenEmulatorGpu,

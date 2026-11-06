@@ -32,7 +32,7 @@ describe('requestRecord', () => {
       status: 200,
       duration: 8,
       requestId: 'req_2',
-      expoOrigin: 'coffeecompanion:///127.0.0.1:8081',
+      expoOrigin: 'coffeecompanion://',
       e2eAuth: false,
     })
   })
@@ -44,7 +44,7 @@ describe('requestRecord', () => {
       },
     })
     expect(requestRecord(withQuery, 200, 8, 'req_2b')?.expoOrigin).toBe(
-      'coffeecompanion:///127.0.0.1:8081',
+      'coffeecompanion://',
     )
 
     const withUserinfo = new Request('https://app.test/api/auth/get-session', {
@@ -63,6 +63,18 @@ describe('requestRecord', () => {
     })
     expect(requestRecord(withHttpPath, 200, 8, 'req_2e')?.expoOrigin).toBe(
       'https://example.com',
+    )
+
+    const withCustomPath = new Request('https://app.test/api/auth/get-session', {
+      headers: {
+        'expo-origin': 'coffeecompanion:///private/token',
+      },
+    })
+    expect(requestRecord(withCustomPath, 200, 8, 'req_2f')?.expoOrigin).toBe(
+      'coffeecompanion://',
+    )
+    expect(requestRecord(withCustomPath, 200, 8, 'req_2f')?.expoOrigin).not.toContain(
+      'token',
     )
 
     const invalid = new Request('https://app.test/api/auth/get-session', {
@@ -85,7 +97,7 @@ describe('requestRecord', () => {
       status: 200,
       duration: 8,
       requestId: 'req_3',
-      expoOrigin: 'coffeecompanion:///127.0.0.1:8081',
+      expoOrigin: 'coffeecompanion://',
       e2eAuth: true,
     })
   })

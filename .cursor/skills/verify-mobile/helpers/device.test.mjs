@@ -16,6 +16,7 @@ import {
   bootWaitTick,
   expoAndroidArgs,
   spawnExpoAndroid,
+  ensureDeviceMetro,
   metroStartArgs,
   metroSpawnSpec,
   metroStatusUrls,
@@ -143,6 +144,7 @@ import {
   maestroSyntaxRequired,
   HARNESS_MAESTRO,
   HARNESS_RNTL,
+  APP_MARKER,
   maestroLogPath,
   maestroLogTail,
   parseMaestroFailedStep,
@@ -1732,6 +1734,7 @@ describe('verify-mobile usage defaults', () => {
     assert.match(text, /ownedPackage. is false/)
     assert.match(text, /launchApp. without .clearState/)
     assert.match(text, /session restore/)
+    assert.match(text, /as soon as the process is spawned/)
   })
 })
 
@@ -1765,6 +1768,35 @@ describe('spawnExpoAndroid', () => {
     ])
     assert.deepEqual(metroPidsBeforeExpo, [11])
     assert.equal(expo.pid, 99)
+  })
+})
+
+describe('ensureDeviceMetro', () => {
+  it('records the Metro pid before waiting for /status', async () => {
+    const events = []
+    const result = await ensureDeviceMetro(8081, {}, [], {
+      stampEnv: () => {},
+      listPids: () => [],
+      waitPort: async () => ({ status: 'ok', pids: [] }),
+      spawn: () => ({
+        child: { pid: 42 },
+        logPath: '/tmp/metro.log',
+        exit: { died: false },
+      }),
+      wait: async () => {
+        events.push('wait')
+        return { baseUrl: 'http://127.0.0.1:8081' }
+      },
+      fetchBundle: async () => ({
+        url: 'http://127.0.0.1:8081/apps/mobile/index.bundle',
+        body: APP_MARKER,
+      }),
+      onSpawn: ({ metroPid }) => {
+        events.push(`spawn:${metroPid}`)
+      },
+    })
+    assert.deepEqual(events, ['spawn:42', 'wait'])
+    assert.equal(result.metroPid, 42)
   })
 })
 

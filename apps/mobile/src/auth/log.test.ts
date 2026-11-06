@@ -109,6 +109,15 @@ describe('authRequestUrlForLog', () => {
       'http://127.0.0.1:3910',
     )
   })
+
+  it('strips userinfo when the URL is too malformed to parse', () => {
+    expect(
+      authRequestUrlForLog('http://user:secret@%zz.host/api?token=x#frag'),
+    ).toBe('http://%zz.host/api')
+    expect(
+      authRequestUrlForLog('http://user:secret@%zz.host/api?token=x#frag'),
+    ).not.toContain('secret')
+  })
 })
 
 describe('logAuthRequest', () => {

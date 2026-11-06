@@ -84,6 +84,10 @@ export function logApiBaseUrl(
   console.log(`${AUTH_LOG_PREFIX} api-url ${authRequestUrlForLog(url)}${extra}`)
 }
 
+function stripLogUrlUserinfo(url: string): string {
+  return url.replace(/^((?:[a-z][a-z\d+.-]*:)?\/\/)[^/?#]*@/i, '$1')
+}
+
 export function authRequestUrlForLog(url: string): string {
   try {
     const parsed = new URL(url)
@@ -91,8 +95,11 @@ export function authRequestUrlForLog(url: string): string {
     return `${parsed.origin}${path}`
   } catch {
     const withoutHash = url.split('#')[0] ?? url
-    const query = withoutHash.indexOf('?')
-    return query === -1 ? withoutHash : withoutHash.slice(0, query)
+    const withoutUserinfo = stripLogUrlUserinfo(withoutHash)
+    const query = withoutUserinfo.indexOf('?')
+    return query === -1
+      ? withoutUserinfo
+      : withoutUserinfo.slice(0, query)
   }
 }
 
