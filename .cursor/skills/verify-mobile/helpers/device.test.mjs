@@ -2576,7 +2576,7 @@ describe('sign-in-and-out flow', () => {
       /Re-open Metro deep link if still on the Expo launcher/,
     )
     assert.match(yaml, /notVisible: "Fetch development servers"/)
-    assert.equal([...yaml.matchAll(/openLink:/g)].length, 2)
+    assert.ok([...yaml.matchAll(/openLink:/g)].length >= 3)
   })
 
   it('dismisses overlay sheets only when they are visible, then waits for sign-in-screen', () => {
@@ -2634,6 +2634,9 @@ describe('sign-in-and-out flow', () => {
     const rest = yaml.slice(signedOutAgain)
     assert.match(rest, /launchApp:\n\s+clearState: false/)
     assert.match(rest, /id: sign-in-screen/)
+    assert.match(rest, /Fetch development servers/)
+    assert.match(rest, /EXPO_DEV_CLIENT_URL/)
+    assert.match(rest, /relaunchDeadlineMs/)
     assert.match(rest, /maestro\.copiedText == "Sign in"/)
     assert.match(rest, /takeScreenshot: signed-out-after-relaunch/)
     assert.doesNotMatch(rest, /clearState: true/)

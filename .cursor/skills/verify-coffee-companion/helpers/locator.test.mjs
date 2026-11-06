@@ -7,6 +7,7 @@ import {
   resolveClickTarget,
   webBuildEnv,
   webRuntimeEnv,
+  placeholderEnv,
 } from './control.mjs'
 
 function mockLocator(label, trail, { countValue = 1 } = {}) {
@@ -246,29 +247,58 @@ describe('resolveClickTarget', () => {
 })
 
 describe('webBuildEnv', () => {
-  it('pins NODE_ENV=production without dropping the rest of the launch env', () => {
+  it('pins NODE_ENV=production and the selected-port origin without dropping the rest of the launch env', () => {
     const env = webBuildEnv({
       DATABASE_URL: 'postgres://local/test',
       E2E_BYPASS_AUTH: 'true',
       NODE_ENV: 'test',
+      PORT: '3910',
+      SITE_URL: 'https://preview.example',
+      BETTER_AUTH_URL: 'https://auth.example',
     })
     assert.equal(env.NODE_ENV, 'production')
     assert.equal(env.DATABASE_URL, 'postgres://local/test')
     assert.equal(env.E2E_BYPASS_AUTH, 'true')
+    assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
+    assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
   })
 })
 
 describe('webRuntimeEnv', () => {
-  it('pins NODE_ENV=test and loopback for the spawned Nitro server', () => {
+  it('pins NODE_ENV=test, loopback, and the selected-port origin for the spawned Nitro server', () => {
     const env = webRuntimeEnv({
       DATABASE_URL: 'postgres://local/test',
       E2E_BYPASS_AUTH: 'true',
       HOST: '0.0.0.0',
+      PORT: '3910',
+      SITE_URL: 'https://preview.example',
+      BETTER_AUTH_URL: 'https://auth.example',
     })
     assert.equal(env.NODE_ENV, 'test')
     assert.equal(env.HOST, '127.0.0.1')
     assert.equal(env.NITRO_HOST, '127.0.0.1')
     assert.equal(env.DATABASE_URL, 'postgres://local/test')
     assert.equal(env.E2E_BYPASS_AUTH, 'true')
+    assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
+    assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
+  })
+})
+
+describe('placeholderEnv', () => {
+  it('pins SITE_URL and BETTER_AUTH_URL to the selected port even when the shell exported others', () => {
+    const previousSite = process.env.SITE_URL
+    const previousAuth = process.env.BETTER_AUTH_URL
+    process.env.SITE_URL = 'https://preview.example'
+    process.env.BETTER_AUTH_URL = 'https://auth.example'
+    try {
+      const env = placeholderEnv(3910)
+      assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
+      assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
+    } finally {
+      if (previousSite === undefined) delete process.env.SITE_URL
+      else process.env.SITE_URL = previousSite
+      if (previousAuth === undefined) delete process.env.BETTER_AUTH_URL
+      else process.env.BETTER_AUTH_URL = previousAuth
+    }
   })
 })

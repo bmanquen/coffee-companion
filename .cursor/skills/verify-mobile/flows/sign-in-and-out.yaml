@@ -90,12 +90,28 @@ appId: dev.offbyonelabs.coffeecompanion
 - assertTrue: ${maestro.copiedText == "Sign in"}
 - takeScreenshot: signed-out-again
 # Sign-out must persist in SecureStore: relaunch without wiping data.
+# A failed Metro reconnect can land on the Expo launcher; reopen the deep link
+# until sign-in-screen or the same 60s deadline.
 - launchApp:
     clearState: false
-- extendedWaitUntil:
-    visible:
-      id: sign-in-screen
-    timeout: 60000
+- evalScript: ${output.relaunchDeadlineMs = Date.now() + 60000}
+- repeat:
+    while:
+      notVisible:
+        id: sign-in-screen
+      true: ${Date.now() < output.relaunchDeadlineMs}
+    commands:
+      - evalScript: ${output.relaunchWaitTick = Date.now()}
+      - runFlow:
+          label: Re-open Metro deep link if relaunch landed on the Expo launcher
+          when:
+            visible: "Fetch development servers"
+          commands:
+            - openLink:
+                link: ${EXPO_DEV_CLIENT_URL}
+                browser: false
+- assertVisible:
+    id: sign-in-screen
 - assertVisible:
     id: sign-in-heading
 - copyTextFrom:

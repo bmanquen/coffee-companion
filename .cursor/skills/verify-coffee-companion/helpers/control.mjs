@@ -77,15 +77,28 @@ function pidAlive(pid) {
 }
 
 function webBuildEnv(env) {
-  return { ...env, NODE_ENV: 'production' }
+  const port = env.PORT ?? DEFAULT_PORT
+  const origin = `http://127.0.0.1:${port}`
+  return {
+    ...env,
+    NODE_ENV: 'production',
+    BETTER_AUTH_URL: origin,
+    SITE_URL: origin,
+  }
 }
 
 function webRuntimeEnv(env) {
+  const port = env.PORT ?? DEFAULT_PORT
+  const origin = `http://127.0.0.1:${port}`
   return {
     ...env,
     NODE_ENV: 'test',
     HOST: '127.0.0.1',
     NITRO_HOST: '127.0.0.1',
+    // Always the selected port. A shell SITE_URL / BETTER_AUTH_URL would
+    // otherwise bake marketing tags and the auth base URL for the wrong origin.
+    BETTER_AUTH_URL: origin,
+    SITE_URL: origin,
   }
 }
 
@@ -155,15 +168,16 @@ function refuseIfPortBusy(port) {
 }
 
 function placeholderEnv(port) {
+  const origin = `http://127.0.0.1:${port}`
   return {
     BETTER_AUTH_SECRET:
       process.env.BETTER_AUTH_SECRET ?? randomBytes(32).toString('hex'),
-    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? `http://127.0.0.1:${port}`,
+    BETTER_AUTH_URL: origin,
     GOOGLE_CLIENT_ID:
       process.env.GOOGLE_CLIENT_ID ?? `verify-${randomBytes(8).toString('hex')}`,
     GOOGLE_CLIENT_SECRET:
       process.env.GOOGLE_CLIENT_SECRET ?? randomBytes(32).toString('hex'),
-    SITE_URL: process.env.SITE_URL ?? `http://127.0.0.1:${port}`,
+    SITE_URL: origin,
   }
 }
 
@@ -985,6 +999,12 @@ async function runDaemon() {
             'React never tagged this node. If the page is interactive in a browser, the tag has been renamed.',
           )
         }
+        await target.evaluate(
+          () =>
+            new Promise((resolve) => {
+              requestAnimationFrame(() => requestAnimationFrame(resolve))
+            }),
+        )
         await target.fill(String(msg.value ?? ''), { timeout: 15_000 })
         return { value: msg.value }
       }
@@ -1100,6 +1120,7 @@ export {
   resolveClickTarget,
   webBuildEnv,
   webRuntimeEnv,
+  placeholderEnv,
 }
 
 // Importing this file for locator tests must not run launch/doctor/cleanup.

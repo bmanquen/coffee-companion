@@ -84,4 +84,12 @@ export async function waitForHydration(node: Locator) {
       'React never tagged this node. If the page is interactive in a browser, the tag has been renamed.',
     ).toBe(true)
   }).toPass({ timeout: 30_000 })
+  // __reactProps$ can land during hydrateInstance before the commit flushes.
+  // Two animation frames wait for that paint so counts are not SSR leftovers.
+  await node.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      }),
+  )
 }

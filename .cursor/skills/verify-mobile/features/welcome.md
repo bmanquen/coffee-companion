@@ -24,7 +24,7 @@ Preconditions:
 
 - **Read the heading.** Run `helpers/control drive welcome`. The host tree contains a `header` whose name is `Coffee Companion`, on a view labelled `Welcome` with `testID=welcome-screen`. The heading node has `testID=welcome-heading`. Button `testID=sign-out` is present.
 - **Proof.** `drive welcome` writes `artifacts/<run>/welcome/tree.txt`, `tree.json`, and `proof.json`. `tree.txt` must show `Coffee Companion`.
-- **Device (where an AVD exists).** Run `helpers/control verify-device`. The flow keeps dismissing Expo Continue / Close overlays while waiting for `sign-in-screen` (until a 60s wall-clock deadline), then `extendedWaitUntil` `welcome-screen` after `e2e-sign-in`, then Sign Out, then relaunches without `clearState` and still requires Sign in. `drive-device` refuses this flow when `ownedPackage` is false. Screenshots plus `proof.json` (`harness: maestro`) land under `artifacts/`.
+- **Device (where an AVD exists).** Run `helpers/control verify-device`. The flow keeps dismissing Expo Continue / Close overlays while waiting for `sign-in-screen` (until a 60s wall-clock deadline), then `extendedWaitUntil` `welcome-screen` after `e2e-sign-in`, then Sign Out, then relaunches without `clearState` and reopens the Metro deep link if the Expo launcher appears, and still requires Sign in. `drive-device` refuses this flow when `ownedPackage` is false. Screenshots plus `proof.json` (`harness: maestro`) land under `artifacts/`.
 
 ## Gotchas
 
