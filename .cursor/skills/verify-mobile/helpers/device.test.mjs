@@ -731,7 +731,11 @@ describe('chosenDeviceWebPort', () => {
   it('rejects ports above 65535 before the emulator starts', () => {
     assert.throws(
       () => chosenDeviceWebPort({ VERIFY_PORT: '65536' }),
-      /TCP port 1–65535/,
+      /integer from 1 to 65535/,
+    )
+    assert.throws(
+      () => chosenDeviceWebPort({ VERIFY_PORT: 'abc' }),
+      /got "abc"/,
     )
   })
 })
@@ -1252,7 +1256,7 @@ describe('stampDevMenuManifest', () => {
 })
 
 describe('helper-to-config version stamp', () => {
-  it('applies VERIFY_APK_VERSION_ENV to Expo version and extra.gitHead', () => {
+  it('applies VERIFY_APK_VERSION_ENV to Expo version and extra.gitHead', { skip: !hasMobileDeps }, () => {
     const stamp = 'a1b2c3d'
     const script = `
       import { createRequire } from 'node:module'

@@ -30,6 +30,23 @@ describe('e2e sign-in handle', () => {
     expect(screen.queryByTestId(E2E_SIGN_IN_TEST_ID)).toBeNull()
   })
 
+  it('is not rendered when no handler is supplied', async () => {
+    await render(
+      <SignInScreen
+        mode="sign-in"
+        error={null}
+        busy={false}
+        showApple
+        onGoogle={() => {}}
+        onApple={() => {}}
+        onToggleMode={() => {}}
+        showE2ESignIn
+      />,
+    )
+
+    expect(screen.queryByTestId(E2E_SIGN_IN_TEST_ID)).toBeNull()
+  })
+
   it('presses through to the auth action when shown', async () => {
     const onE2ESignIn = jest.fn()
     await render(

@@ -29,8 +29,38 @@ const statePath = join(runDir, 'state.json')
 const artifactsDir = join(skillDir, 'artifacts')
 const webDir = join(repoRoot, 'apps/web')
 
-const DEFAULT_PORT = Number(process.env.VERIFY_PORT ?? 3000)
-const BROWSER_PORT = Number(process.env.VERIFY_BROWSER_PORT ?? 3939)
+function requireTcpPort(raw, name, fallback) {
+  const source =
+    raw === undefined || raw === null || `${raw}`.trim() === ''
+      ? fallback
+      : `${raw}`.trim()
+  const port = Number(source)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(
+      `${name} must be an integer from 1 to 65535, got "${raw ?? ''}".`,
+    )
+  }
+  return port
+}
+
+function readTcpPortOrDie(raw, name, fallback) {
+  try {
+    return requireTcpPort(raw, name, fallback)
+  } catch (error) {
+    die(error instanceof Error ? error.message : String(error))
+  }
+}
+
+const DEFAULT_PORT = readTcpPortOrDie(
+  process.env.VERIFY_PORT,
+  'VERIFY_PORT',
+  3000,
+)
+const BROWSER_PORT = readTcpPortOrDie(
+  process.env.VERIFY_BROWSER_PORT,
+  'VERIFY_BROWSER_PORT',
+  3939,
+)
 const IDENTITIES = {
   public: null,
   data: 'e2e-user-with-data',
@@ -1125,6 +1155,7 @@ export {
   webBuildEnv,
   webRuntimeEnv,
   placeholderEnv,
+  requireTcpPort,
 }
 
 // Importing this file for locator tests must not run launch/doctor/cleanup.

@@ -28,7 +28,25 @@ const runDir = join(skillDir, '.run')
 const statePath = join(runDir, 'state.json')
 const artifactsDir = join(skillDir, 'artifacts')
 
-const DEFAULT_METRO_PORT = Number(process.env.VERIFY_METRO_PORT ?? 8081)
+function requireTcpPort(raw, name, fallback) {
+  const source =
+    raw === undefined || raw === null || `${raw}`.trim() === ''
+      ? fallback
+      : `${raw}`.trim()
+  const port = Number(source)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(
+      `${name} must be an integer from 1 to 65535, got "${raw ?? ''}".`,
+    )
+  }
+  return port
+}
+
+const DEFAULT_METRO_PORT = requireTcpPort(
+  process.env.VERIFY_METRO_PORT,
+  'VERIFY_METRO_PORT',
+  8081,
+)
 const EXIT_NOT_DRIVABLE = 2
 const METRO_READY_MARKER = 'packager-status:running'
 const APP_MARKER = 'Coffee Companion'
@@ -1693,11 +1711,7 @@ function listInstalledAvds() {
 function chosenDeviceWebPort(env = process.env) {
   const raw = `${env?.VERIFY_PORT ?? ''}`.trim()
   if (!raw) return DEFAULT_DEVICE_WEB_PORT
-  const port = Number(raw)
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error(`VERIFY_PORT must be a TCP port 1–65535, got ${raw}`)
-  }
-  return port
+  return requireTcpPort(raw, 'VERIFY_PORT')
 }
 
 function deviceApiUrl(port) {

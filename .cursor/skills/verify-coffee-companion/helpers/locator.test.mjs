@@ -8,6 +8,7 @@ import {
   webBuildEnv,
   webRuntimeEnv,
   placeholderEnv,
+  requireTcpPort,
 } from './control.mjs'
 
 function mockLocator(label, trail, { countValue = 1 } = {}) {
@@ -243,6 +244,24 @@ describe('resolveClickTarget', () => {
       ['getByRole', 'region', { name: 'Apple', exact: true }],
       ['count', 2],
     ])
+  })
+})
+
+describe('requireTcpPort', () => {
+  it('accepts the default when the value is missing', () => {
+    assert.equal(requireTcpPort(undefined, 'VERIFY_PORT', 3000), 3000)
+    assert.equal(requireTcpPort('', 'VERIFY_PORT', 3000), 3000)
+  })
+
+  it('rejects a non-integer VERIFY_PORT before launch work', () => {
+    assert.throws(
+      () => requireTcpPort('abc', 'VERIFY_PORT', 3000),
+      /VERIFY_PORT must be an integer from 1 to 65535, got "abc"/,
+    )
+    assert.throws(
+      () => requireTcpPort('65536', 'VERIFY_PORT', 3000),
+      /got "65536"/,
+    )
   })
 })
 

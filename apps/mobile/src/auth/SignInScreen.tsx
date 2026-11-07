@@ -107,7 +107,7 @@ export function SignInScreen({
           </Text>
         </Pressable>
       </View>
-      {showE2ESignIn ? (
+      {showE2ESignIn && onE2ESignIn ? (
         <Pressable
           accessibilityRole="button"
           testID={E2E_SIGN_IN_TEST_ID}

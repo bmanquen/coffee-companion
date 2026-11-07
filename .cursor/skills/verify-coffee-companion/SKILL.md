@@ -23,7 +23,7 @@ From the repo root:
 
 Launch does all of this, in order:
 
-1. Refuses if `.run/state.json` already records a live pid, or if `VERIFY_PORT` (default `3000`) is taken.
+1. Refuses if `.run/state.json` already records a live pid, or if `VERIFY_PORT` (default `3000`) is taken. A non-integer or out-of-range `VERIFY_PORT` / `VERIFY_BROWSER_PORT` fails immediately, before migrate/seed/build.
 2. Runs `pnpm install --frozen-lockfile` when `node_modules` is missing.
 3. Ensures a local Postgres database named `coffee_companion_test` via `helpers/ensure-postgres.sh`. That script is **verification scaffolding**: it may install Postgres and create the throwaway database. It starts whichever cluster `pg_lsclusters` lists (the Ubuntu `postgresql` package here is 16; CI's service container is 17 — majors may differ, the throwaway `*_test` database is what matters). Auth is `VERIFY_DATABASE_URL`, or `VERIFY_DB_PASSWORD`, or an ephemeral password generated at runtime. The connection string is written to `.run/database.url` (gitignored, mode 600). Stdout is only `ok host:port/db` — never a URI with a password. **Boundary (same as `packages/api/test/database.ts`):** host must be loopback (`127.0.0.1`, `localhost`, `::1`) and the database name must end with `_test`. `VERIFY_DATABASE_URL` and `VERIFY_DB_NAME` / `VERIFY_DB_HOST` are refused otherwise — a reachable non-test URL is not used.
 4. Applies migrations with `pnpm db:migrate` against that URL.
