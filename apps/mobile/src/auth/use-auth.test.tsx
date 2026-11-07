@@ -248,6 +248,23 @@ describe('useAuth', () => {
     })
   })
 
+  it('keeps the get-session error when cookie restore also fails', async () => {
+    process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
+    mocks.refetchClientSession.mockRejectedValueOnce(new Error('network'))
+    mocks.restoreSessionCookie.mockRejectedValueOnce(new Error('secure store'))
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signInE2E()
+    })
+
+    expect(mocks.restoreSessionCookie).toHaveBeenCalled()
+    expect(result.current.error).toEqual({
+      title: ERROR_SIGN_IN_FAILED,
+      body: 'network',
+    })
+  })
+
   it('does not write a cookie when the e2e persona is unset', async () => {
     delete process.env[E2E_USER_ENV]
     const { result } = await renderHook(() => useAuth())

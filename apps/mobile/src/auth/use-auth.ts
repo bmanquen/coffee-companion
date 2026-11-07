@@ -115,7 +115,14 @@ export function useAuth(): Auth {
             throw new Error('E2E get-session returned no session')
           }
         } catch (failed) {
-          await restoreSessionCookie(priorCookie)
+          try {
+            await restoreSessionCookie(priorCookie)
+          } catch (restoreFailed) {
+            logAuthFailure('sign-in', {
+              ...serverFailureDetail(restoreFailed),
+              message: failureMessage(restoreFailed),
+            })
+          }
           throw failed
         }
       }),
