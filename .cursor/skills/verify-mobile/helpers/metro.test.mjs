@@ -46,7 +46,7 @@ describe('bundleHasAppMarker', () => {
 describe('inspectMetro', () => {
   it(
     'uses /apps/mobile/index.bundle and the serializer EXPO_PUBLIC_API_URL',
-    { skip: !hasPortTool },
+    { skip: hasPortTool ? false : 'neither lsof nor ss is available' },
     async () => {
       const apiUrl = 'http://127.0.0.1:3910'
       const body = [

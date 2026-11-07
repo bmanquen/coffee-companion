@@ -1,4 +1,3 @@
-import '../src/lib/e2e-auth'
 import { e2eAuthAllowList } from '../src/lib/e2e-auth-allow-list'
 
 // Integration fixtures authenticate through the same bypass as HTTP E2E.

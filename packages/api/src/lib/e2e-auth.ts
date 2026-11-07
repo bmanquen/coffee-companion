@@ -26,16 +26,22 @@
 // `x-e2e-auth` because React Native fetch treats Cookie as forbidden and the
 // Expo client sets credentials: omit, so a SecureStore cookie map never
 // arrives as a Cookie header the way a browser document cookie does.
-import { e2eAuthAllowList } from './e2e-auth-allow-list'
+import {
+  E2E_USER_DELETE,
+  E2E_USER_EMPTY,
+  E2E_USER_FREE,
+  E2E_USER_WITH_DATA,
+  e2eAuthAllowList,
+} from './e2e-auth-allow-list'
 
 export const E2E_AUTH_COOKIE_NAME = 'e2e_auth'
 export const E2E_AUTH_HEADER = 'x-e2e-auth'
-export const E2E_USER_WITH_DATA = 'e2e-user-with-data'
-export const E2E_USER_EMPTY = 'e2e-user-empty'
-// Holds the same library as E2E_USER_WITH_DATA but no Grant, so the two of them
-// read the same rows on different Plans.
-export const E2E_USER_FREE = 'e2e-user-free'
-export const E2E_USER_DELETE = 'e2e-user-delete'
+export {
+  E2E_USER_DELETE,
+  E2E_USER_EMPTY,
+  E2E_USER_FREE,
+  E2E_USER_WITH_DATA,
+}
 
 export const E2E_AUTH_ALLOWED_NODE_ENVS = ['development', 'test'] as const
 
@@ -89,15 +95,6 @@ function e2eAuthUserId(headers: Headers): string | null {
   // A leftover or unknown cookie must not hide a valid x-e2e-auth header.
   if (fromCookie && e2eAuthAllowList.has(fromCookie)) return fromCookie
   return decodeE2EAuthValue(headers.get(E2E_AUTH_HEADER)?.trim())
-}
-
-for (const id of [
-  E2E_USER_WITH_DATA,
-  E2E_USER_EMPTY,
-  E2E_USER_FREE,
-  E2E_USER_DELETE,
-]) {
-  e2eAuthAllowList.add(id)
 }
 
 export function e2eBypassSession(headers: Headers): E2ESession | null {

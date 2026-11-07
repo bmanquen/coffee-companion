@@ -1142,7 +1142,7 @@ describe('inspectExpoAutolinking', () => {
     assert.match(report.problems[0], /pnpm/)
   })
 
-  it('finds expo-network from @better-auth/expo and requires it to be autolinked', { skip: !hasMobileDeps }, () => {
+  it('finds expo-network from @better-auth/expo and requires it to be autolinked', { skip: hasMobileDeps ? false : 'mobile dependencies are not installed' }, () => {
     const report = inspectExpoAutolinking()
     assert.ok(
       report.imported.includes('expo-network'),
@@ -1256,7 +1256,7 @@ describe('stampDevMenuManifest', () => {
 })
 
 describe('helper-to-config version stamp', () => {
-  it('applies VERIFY_APK_VERSION_ENV to Expo version and extra.gitHead', { skip: !hasMobileDeps }, () => {
+  it('applies VERIFY_APK_VERSION_ENV to Expo version and extra.gitHead', { skip: hasMobileDeps ? false : 'mobile dependencies are not installed' }, () => {
     const stamp = 'a1b2c3d'
     const script = `
       import { createRequire } from 'node:module'
@@ -2792,7 +2792,7 @@ describe('inspectMaestroFlows', () => {
     )
   })
 
-  it('runs maestro check-syntax on every flow', { skip: !hasMaestro }, () => {
+  it('runs maestro check-syntax on every flow', { skip: hasMaestro ? false : 'maestro CLI is not available' }, () => {
     const flowsDir = join(dirname(fileURLToPath(import.meta.url)), '../flows')
     const report = inspectMaestroFlows({ flowsDir })
     assert.equal(report.ok, true, report.problems.join('\n'))
@@ -2825,7 +2825,7 @@ describe('inspectMaestroFlows', () => {
     assert.deepEqual(report.problems, [])
   })
 
-  it('fails closed on an unknown tapOn timeout property', { skip: !hasMaestro }, () => {
+  it('fails closed on an unknown tapOn timeout property', { skip: hasMaestro ? false : 'maestro CLI is not available' }, () => {
     const root = mkdtempSync(join(tmpdir(), 'maestro-syntax-'))
     try {
       const flowPath = join(root, 'bad.yaml')
