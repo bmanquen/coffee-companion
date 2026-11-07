@@ -73,7 +73,9 @@ export async function pickBrewsMethod(page: Page, method: string) {
 // Per node rather than per document, because the feeds render through
 // useSuspenseQuery: the document hydrates around a boundary that is still
 // streaming, so a flag the app raised once would go up while the node under
-// test was still inert.
+// test was still inert. Pass one node (`.first()` when the locator may match
+// more than one) so a uniqueness check after this wait is the thing that
+// fails, not Playwright strict mode inside evaluate().
 export async function waitForHydration(node: Locator) {
   await expect(async () => {
     const hydrated = await node.evaluate((el) =>

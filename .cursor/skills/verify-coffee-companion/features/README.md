@@ -18,7 +18,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Treat every command as literal. Keep quoted names and flags unchanged.
 - Run browser actions through `helpers/control browser`.
 - The desktop table and the mobile card stack both render the same Coffee/Brew names. Scope list assertions with `helpers/control browser expect … --first` (or `div.lg\\:block table` / `.first()` in a raw spec) so one row does not count as two.
-- After a `page.goto`-style navigation, the first click can land before hydration. The control daemon retries clicks and waits for React's listener tag before `fill`; a raw Playwright spec must use `clickUntil` / `waitForHydration` from `apps/web/e2e/helpers.ts`.
+- After a `page.goto`-style navigation, the first click can land before hydration. The control daemon retries clicks and waits for React's listener tag before `fill`; a raw Playwright spec must use `clickUntil` / `waitForHydration` from `apps/web/e2e/helpers.ts`. Pass `.first()` into `waitForHydration` when the locator may match more than one node, then assert uniqueness separately.
 
 ## Proof and skip reporting
 

@@ -127,7 +127,7 @@ test('marketing pages render none of the authenticated app chrome', async ({
 }) => {
   for (const path of ['/', '/pricing']) {
     await page.goto(path)
-    await waitForHydration(page.getByRole('banner'))
+    await waitForHydration(page.getByRole('banner').first())
 
     // Exactly one banner — the marketing header. MobileHeader is also a
     // <header>, so a leak shows up as two rather than as a missing element,
