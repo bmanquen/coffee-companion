@@ -1,10 +1,7 @@
 import { db } from '../db'
 import { auth } from './auth'
-import {
-  E2E_AUTH_HEADER,
-  e2eBypassSession,
-  isDevOrTestRuntime,
-} from './e2e-auth'
+import { E2E_AUTH_HEADER, e2eBypassSession } from './e2e-auth'
+import { isDevOrTestRuntime } from './runtime-env'
 import { log } from './log'
 
 function shouldLogE2EGetSession(env: { NODE_ENV?: string } = process.env) {

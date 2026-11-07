@@ -1,4 +1,4 @@
-import { isDevOrTestRuntime } from './e2e-auth'
+import { isDevOrTestRuntime } from './runtime-env'
 
 export const APP_SCHEME_ORIGIN = 'coffeecompanion://'
 export const EXPO_DEV_ORIGIN = 'exp://'

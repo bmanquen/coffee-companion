@@ -33,17 +33,21 @@ import {
   E2E_USER_WITH_DATA,
   e2eAuthAllowList,
 } from './e2e-auth-allow-list'
+import {
+  E2E_AUTH_ALLOWED_NODE_ENVS,
+  isDevOrTestRuntime,
+} from './runtime-env'
 
 export const E2E_AUTH_COOKIE_NAME = 'e2e_auth'
 export const E2E_AUTH_HEADER = 'x-e2e-auth'
 export {
+  E2E_AUTH_ALLOWED_NODE_ENVS,
   E2E_USER_DELETE,
   E2E_USER_EMPTY,
   E2E_USER_FREE,
   E2E_USER_WITH_DATA,
+  isDevOrTestRuntime,
 }
-
-export const E2E_AUTH_ALLOWED_NODE_ENVS = ['development', 'test'] as const
 
 function makeSession(userId: string) {
   return {
@@ -71,10 +75,6 @@ function makeSession(userId: string) {
 }
 
 export type E2ESession = ReturnType<typeof makeSession>
-
-export function isDevOrTestRuntime(env: { NODE_ENV?: string } = process.env) {
-  return E2E_AUTH_ALLOWED_NODE_ENVS.some((allowed) => allowed === env.NODE_ENV)
-}
 
 function decodeE2EAuthValue(value: string | undefined): string | null {
   if (!value) return null

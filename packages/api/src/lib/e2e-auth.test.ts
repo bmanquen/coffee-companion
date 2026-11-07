@@ -6,7 +6,6 @@ import {
   E2E_USER_EMPTY,
   E2E_USER_WITH_DATA,
   e2eBypassSession,
-  isDevOrTestRuntime,
 } from './e2e-auth'
 
 describe('e2eBypassSession', () => {
@@ -124,14 +123,6 @@ describe('e2eBypassSession', () => {
           new Headers({ cookie: `e2e_auth=${E2E_USER_WITH_DATA}` }),
         )?.user.id,
       ).toBe(E2E_USER_WITH_DATA)
-    }
-  })
-
-  it('treats only development and test as dev-or-test runtimes', () => {
-    expect(isDevOrTestRuntime({ NODE_ENV: 'test' })).toBe(true)
-    expect(isDevOrTestRuntime({ NODE_ENV: 'development' })).toBe(true)
-    for (const nodeEnv of [undefined, 'production', 'staging'] as const) {
-      expect(isDevOrTestRuntime({ NODE_ENV: nodeEnv })).toBe(false)
     }
   })
 

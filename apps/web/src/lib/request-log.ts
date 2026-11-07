@@ -1,7 +1,5 @@
-import {
-  E2E_AUTH_HEADER,
-  isDevOrTestRuntime,
-} from '@coffee-companion/api/lib/e2e-auth'
+import { E2E_AUTH_HEADER } from '@coffee-companion/api/lib/e2e-auth'
+import { isDevOrTestRuntime } from '@coffee-companion/api/lib/runtime-env'
 import { REQUEST_ID_HEADER } from '@coffee-companion/api/lib/log'
 import { HEALTH_PATH } from './health'
 
