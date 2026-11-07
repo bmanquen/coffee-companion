@@ -106,9 +106,13 @@ function pidAlive(pid) {
   }
 }
 
+function selectedOrigin(env) {
+  const port = requireTcpPort(env.PORT, 'PORT', DEFAULT_PORT)
+  return `http://127.0.0.1:${port}`
+}
+
 function webBuildEnv(env) {
-  const port = env.PORT ?? DEFAULT_PORT
-  const origin = `http://127.0.0.1:${port}`
+  const origin = selectedOrigin(env)
   return {
     ...env,
     NODE_ENV: 'production',
@@ -118,8 +122,7 @@ function webBuildEnv(env) {
 }
 
 function webRuntimeEnv(env) {
-  const port = env.PORT ?? DEFAULT_PORT
-  const origin = `http://127.0.0.1:${port}`
+  const origin = selectedOrigin(env)
   return {
     ...env,
     NODE_ENV: 'test',

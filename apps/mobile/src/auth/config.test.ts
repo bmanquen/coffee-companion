@@ -23,7 +23,14 @@ describe('resolveApiBaseUrl', () => {
     expect(configuredApiUrl('http://127.0.0.1:3910')).toBe(
       'http://127.0.0.1:3910',
     )
-    expect(configuredApiUrl(undefined)).toBe(FALLBACK_API_URL)
+    const original = process.env.EXPO_PUBLIC_API_URL
+    delete process.env.EXPO_PUBLIC_API_URL
+    try {
+      expect(configuredApiUrl(undefined)).toBe(FALLBACK_API_URL)
+    } finally {
+      if (original === undefined) delete process.env.EXPO_PUBLIC_API_URL
+      else process.env.EXPO_PUBLIC_API_URL = original
+    }
     expect(configuredApiUrl('')).toBe(FALLBACK_API_URL)
     expect(apiUrlDevTag('http://127.0.0.1:3910')).toBe(
       `${API_URL_DEV_TAG_PREFIX}http://127.0.0.1:3910`,

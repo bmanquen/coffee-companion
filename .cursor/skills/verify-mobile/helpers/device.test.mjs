@@ -2743,6 +2743,8 @@ describe('sign-in-and-out flow', () => {
     assert.match(rest, /Fetch development servers/)
     assert.match(rest, /EXPO_DEV_CLIENT_URL/)
     assert.match(rest, /relaunchDeadlineMs/)
+    assert.match(rest, /This is the developer menu/)
+    assert.match(rest, /Runtime version/)
     assert.match(rest, /maestro\.copiedText == "Sign in"/)
     assert.match(rest, /takeScreenshot: signed-out-after-relaunch/)
     assert.doesNotMatch(rest, /clearState: true/)

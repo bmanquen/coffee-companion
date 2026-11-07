@@ -281,6 +281,13 @@ describe('webBuildEnv', () => {
     assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
     assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
   })
+
+  it('rejects an unvalidated PORT before baking the origin', () => {
+    assert.throws(
+      () => webBuildEnv({ PORT: 'abc' }),
+      /PORT must be an integer from 1 to 65535, got "abc"/,
+    )
+  })
 })
 
 describe('webRuntimeEnv', () => {
@@ -309,6 +316,13 @@ describe('webRuntimeEnv', () => {
       STRIPE_SECRET_KEY: 'sk_live_inherited',
     })
     assert.equal(env.STRIPE_SECRET_KEY, '')
+  })
+
+  it('rejects an unvalidated PORT before baking the origin', () => {
+    assert.throws(
+      () => webRuntimeEnv({ PORT: '65536' }),
+      /PORT must be an integer from 1 to 65535, got "65536"/,
+    )
   })
 })
 

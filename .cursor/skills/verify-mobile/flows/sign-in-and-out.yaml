@@ -91,7 +91,8 @@ appId: dev.offbyonelabs.coffeecompanion
 - takeScreenshot: signed-out-again
 # Sign-out must persist in SecureStore: relaunch without wiping data.
 # A failed Metro reconnect can land on the Expo launcher; reopen the deep link
-# until sign-in-screen or the same 60s deadline.
+# until sign-in-screen or the same 60s deadline. Overlays can cover the app
+# after that reconnect the same way they do on the first wait.
 - launchApp:
     clearState: false
 - evalScript: ${output.relaunchDeadlineMs = Date.now() + 60000}
@@ -110,6 +111,26 @@ appId: dev.offbyonelabs.coffeecompanion
             - openLink:
                 link: ${EXPO_DEV_CLIENT_URL}
                 browser: false
+      - runFlow:
+          label: Dismiss first-run Continue sheet after relaunch
+          when:
+            visible: "This is the developer menu.*"
+          commands:
+            - tapOn:
+                text: "Continue"
+      - runFlow:
+          label: Dismiss regular developer menu after relaunch
+          when:
+            visible: "Runtime version.*"
+          commands:
+            - tapOn:
+                text: "Close"
+                optional: true
+            - runFlow:
+                when:
+                  visible: "Go home"
+                commands:
+                  - pressKey: back
 - assertVisible:
     id: sign-in-screen
 - assertVisible:
