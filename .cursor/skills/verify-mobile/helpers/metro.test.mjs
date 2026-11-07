@@ -143,7 +143,7 @@ describe('waitForMetro', () => {
     }
   })
 
-  it('fails with the Metro log tail when the process is already dead', async () => {
+  it('fails with an empty-log message when the process is already dead', async () => {
     await assert.rejects(
       () =>
         waitForMetro({
@@ -153,7 +153,7 @@ describe('waitForMetro', () => {
           exit: { died: true },
           logPath: undefined,
         }),
-      /exited before/,
+      /exited before.*metro\.log is empty/s,
     )
   })
 
