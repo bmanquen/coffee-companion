@@ -55,6 +55,7 @@ function sanitizedExpoOrigin(value: string | null): string | undefined {
     url.hash = ''
     url.username = ''
     url.password = ''
+    if (url.host.length > 255) return undefined
     if (url.protocol === 'http:' || url.protocol === 'https:') {
       return url.origin
     }

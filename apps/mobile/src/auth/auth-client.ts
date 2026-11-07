@@ -1,7 +1,7 @@
 import { createAuthClient } from 'better-auth/react'
 import { expoClient } from '@better-auth/expo/client'
+import { invalidatePendingAuthFetches, loggedAuthFetch } from './auth-fetch'
 import { APP_SCHEME, apiBaseUrl } from './config'
-import { invalidatePendingAuthFetches, loggedAuthFetch } from './log'
 import { SESSION_STORAGE_PREFIX, sessionStore } from './session-store'
 import type { BetterAuthClientPlugin } from 'better-auth/client'
 

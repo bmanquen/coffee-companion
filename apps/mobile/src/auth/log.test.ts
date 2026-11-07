@@ -1,13 +1,15 @@
 import * as SecureStore from 'expo-secure-store'
+import {
+  invalidatePendingAuthFetches,
+  loggedAuthFetch,
+} from './auth-fetch'
 import { E2E_AUTH_HEADER, E2E_USER_WITH_DATA } from './e2e'
 import {
   AUTH_LOG_PREFIX,
   authRequestUrlForLog,
-  invalidatePendingAuthFetches,
   logApiBaseUrl,
   logAuthFailure,
   logAuthRequest,
-  loggedAuthFetch,
   serverFailureDetail,
 } from './log'
 import { writeE2EAuthCookie } from './session-store'
@@ -320,5 +322,49 @@ describe('loggedAuthFetch', () => {
     expect(log).toHaveBeenCalledWith(
       `${AUTH_LOG_PREFIX} request http://127.0.0.1:3910/api/auth/get-session status=200 headers=none e2e-auth=0 session=null`,
     )
+  })
+
+  it('replaces a get-session rejection that finished after sign-out invalidated the fetch', async () => {
+    let rejectPending!: (reason: Error) => void
+    const pending = new Promise<Response>((_resolve, reject) => {
+      rejectPending = reject
+    })
+    const impl = jest.fn(() => pending)
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+
+    const fetchPromise = loggedAuthFetch(
+      'http://127.0.0.1:3910/api/auth/get-session',
+      undefined,
+      true,
+      impl,
+    )
+    invalidatePendingAuthFetches()
+    rejectPending(new Error('network'))
+
+    const response = await fetchPromise
+    expect(await response.json()).toBeNull()
+    expect(log).toHaveBeenCalledWith(
+      `${AUTH_LOG_PREFIX} request http://127.0.0.1:3910/api/auth/get-session status=200 headers=none e2e-auth=0 session=null`,
+    )
+  })
+
+  it('still throws a stale rejection that is not get-session', async () => {
+    let rejectPending!: (reason: Error) => void
+    const pending = new Promise<Response>((_resolve, reject) => {
+      rejectPending = reject
+    })
+    const impl = jest.fn(() => pending)
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+
+    const fetchPromise = loggedAuthFetch(
+      'http://127.0.0.1:3910/api/auth/sign-out',
+      undefined,
+      true,
+      impl,
+    )
+    invalidatePendingAuthFetches()
+    rejectPending(new Error('network'))
+
+    await expect(fetchPromise).rejects.toThrow('network')
   })
 })

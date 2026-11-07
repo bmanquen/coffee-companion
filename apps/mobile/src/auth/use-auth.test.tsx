@@ -265,6 +265,41 @@ describe('useAuth', () => {
     })
   })
 
+  it('ignores a second e2e sign-in while the first refetch is in flight', async () => {
+    process.env[E2E_USER_ENV] = E2E_USER_WITH_DATA
+    let release!: (value: {
+      user: { name: string; email: string }
+    }) => void
+    mocks.refetchClientSession.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve
+        }),
+    )
+    const { result } = await renderHook(() => useAuth())
+
+    let first!: Promise<void>
+    let second!: Promise<void>
+    await act(() => {
+      first = result.current.signInE2E()
+      second = result.current.signInE2E()
+    })
+
+    expect(mocks.writeE2EAuthCookie).toHaveBeenCalledTimes(1)
+    expect(mocks.refetchClientSession).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      release({
+        user: { name: 'E2E Tester', email: 'e2e-user-with-data@example.com' },
+      })
+      await first
+      await second
+    })
+
+    expect(mocks.writeE2EAuthCookie).toHaveBeenCalledTimes(1)
+    expect(result.current.error).toBeNull()
+  })
+
   it('does not write a cookie when the e2e persona is unset', async () => {
     delete process.env[E2E_USER_ENV]
     const { result } = await renderHook(() => useAuth())

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { appleSignInAvailable, signInWithApple } from './apple'
 import { authClient, clearClientSession, refetchClientSession } from './auth-client'
 import {
@@ -59,8 +59,11 @@ export function useAuth(): Auth {
   const [mode, setMode] = useState<AuthMode>('sign-in')
   const [error, setError] = useState<AuthError | null>(null)
   const [busy, setBusy] = useState(false)
+  const inFlight = useRef(false)
 
   const run = async (action: () => Promise<void>) => {
+    if (inFlight.current) return
+    inFlight.current = true
     setError(null)
     setBusy(true)
     try {
@@ -89,6 +92,7 @@ export function useAuth(): Auth {
         ...(__DEV__ ? { body: message } : {}),
       })
     } finally {
+      inFlight.current = false
       setBusy(false)
     }
   }

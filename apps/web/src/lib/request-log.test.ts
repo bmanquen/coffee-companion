@@ -83,6 +83,20 @@ describe('requestRecord', () => {
     expect(requestRecord(invalid, 200, 8, 'req_2c')?.expoOrigin).toBeUndefined()
   })
 
+  it('drops an expo-origin whose host exceeds 255 characters', () => {
+    const oversized = new Request('https://app.test/api/auth/get-session', {
+      headers: { 'expo-origin': `coffeecompanion://${'a'.repeat(256)}` },
+    })
+    expect(requestRecord(oversized, 200, 8, 'req_2g')?.expoOrigin).toBeUndefined()
+
+    const allowed = new Request('https://app.test/api/auth/get-session', {
+      headers: { 'expo-origin': `coffeecompanion://${'a'.repeat(255)}` },
+    })
+    expect(requestRecord(allowed, 200, 8, 'req_2h')?.expoOrigin).toBe(
+      `coffeecompanion://${'a'.repeat(255)}`,
+    )
+  })
+
   it('records whether x-e2e-auth was present on get-session', () => {
     const request = new Request('https://app.test/api/auth/get-session', {
       headers: {
