@@ -1019,7 +1019,7 @@ async function runDaemon() {
         await target.waitFor({ state: 'visible', timeout: 15_000 })
         // An unhydrated fill sets the DOM value and React never hears it
         // (apps/web/e2e/helpers.ts waitForHydration). Wait for React's
-        // listener tag before typing.
+        // listener tag on the field and the layout outlet before typing.
         const start = Date.now()
         let hydrated = false
         while (Date.now() - start < 15_000) {
@@ -1036,12 +1036,24 @@ async function runDaemon() {
             'React never tagged this node. If the page is interactive in a browser, the tag has been renamed.',
           )
         }
-        await target.evaluate(
-          () =>
-            new Promise((resolve) => {
-              requestAnimationFrame(() => requestAnimationFrame(resolve))
-            }),
-        )
+        const outletStart = Date.now()
+        let outletTagged = false
+        while (Date.now() - outletStart < 15_000) {
+          outletTagged = await page
+            .locator('main')
+            .first()
+            .evaluate((el) =>
+              Object.keys(el).some((key) => key.startsWith('__reactProps$')),
+            )
+            .catch(() => false)
+          if (outletTagged) break
+          await sleep(50)
+        }
+        if (!outletTagged) {
+          throw new Error(
+            'React never tagged the page outlet. If the page is interactive in a browser, the tag has been renamed.',
+          )
+        }
         await target.fill(String(msg.value ?? ''), { timeout: 15_000 })
         return { value: msg.value }
       }

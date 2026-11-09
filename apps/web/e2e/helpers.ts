@@ -76,22 +76,26 @@ export async function pickBrewsMethod(page: Page, method: string) {
 // test was still inert. Pass one node (`.first()` when the locator may match
 // more than one) so a uniqueness check after this wait is the thing that
 // fails, not Playwright strict mode inside evaluate().
-export async function waitForHydration(node: Locator) {
+function isReactHostTagged(el: Element) {
+  return Object.keys(el).some((key) => key.startsWith('__reactProps$'))
+}
+
+async function waitUntilReactTagged(node: Locator, message: string) {
   await expect(async () => {
-    const hydrated = await node.evaluate((el) =>
-      Object.keys(el).some((key) => key.startsWith('__reactProps$')),
-    )
-    expect(
-      hydrated,
-      'React never tagged this node. If the page is interactive in a browser, the tag has been renamed.',
-    ).toBe(true)
+    expect(await node.evaluate(isReactHostTagged), message).toBe(true)
   }).toPass({ timeout: 30_000 })
-  // __reactProps$ can land during hydrateInstance before the commit flushes.
-  // Two animation frames wait for that paint so counts are not SSR leftovers.
-  await node.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      }),
+}
+
+export async function waitForHydration(node: Locator) {
+  await waitUntilReactTagged(
+    node,
+    'React never tagged this node. If the page is interactive in a browser, the tag has been renamed.',
+  )
+  // The tagged node can land during hydrateInstance while a sibling outlet is
+  // still uncommitted. Both layouts wrap <Outlet /> in <main>, so that host is
+  // the commit signal for counts that must not see SSR leftovers.
+  await waitUntilReactTagged(
+    node.page().locator('main').first(),
+    'React never tagged the page outlet. If the page is interactive in a browser, the tag has been renamed.',
   )
 }
