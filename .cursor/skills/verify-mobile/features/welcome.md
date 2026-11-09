@@ -28,7 +28,7 @@ Preconditions:
 
 ## Gotchas
 
-- This is not an iOS Simulator or Android emulator run. A green `drive welcome` does not prove pixels on a phone.
+- `drive welcome` is not an iOS Simulator or Android emulator run. A green `drive welcome` does not prove pixels on a phone. `verify-device` is the Android tier.
 - iOS requires macOS + Xcode. This Linux verification environment cannot start `expo start --ios`.
 - Android needs the SDK and an AVD. `launch-device` boots `verify-pixel` on `emulator-5554` unless `VERIFY_AVD` names another installed AVD. This skill does not install the SDK.
 - `testID` and `accessibilityLabel` live in `apps/mobile/src/welcome.ts`. Drive those handles, not coordinates or visible text.

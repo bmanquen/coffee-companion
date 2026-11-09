@@ -32,7 +32,7 @@ Preconditions:
 
 ## Gotchas
 
-- This is not an iOS Simulator or Android emulator run. A green `drive sign-in` does not prove the native Google or Apple UI, a development build, or a real session cookie.
+- `drive sign-in` (RNTL) is not an iOS Simulator or Android emulator run. A green `drive sign-in` does not prove the native Google or Apple UI. `verify-device` covers the Android development build with the E2E handle, not Google or Apple.
 - `@react-native-google-signin/google-signin` needs a development build (`expo-dev-client`). Expo Go cannot obtain a Google ID token. That pulls the dev-client build forward from the IAP stage.
 - Sign in with Apple needs an App ID `dev.offbyonelabs.coffeecompanion` with the capability enabled, and a real device or Simulator signed into an Apple ID. This Linux VM cannot do that.
 - Server token verification (Apple JWKS, authorization-code exchange, refresh-token persist) is covered by `packages/api` integration tests, not this drive.
