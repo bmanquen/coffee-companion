@@ -1929,7 +1929,15 @@ describe('ensureDeviceMetro', () => {
       const result = await ensureDeviceMetro(8081, {}, [], {
         stampEnv: () => {},
         listPids: () => [leftover.pid],
-        waitPort: async () => ({ status: 'ok', pids: [] }),
+        waitPort: async () => {
+          const gone = await waitForPidGone(leftover.pid, 2_000, { pollMs: 20 })
+          assert.equal(
+            gone.status,
+            'ok',
+            `leftover Metro pid ${leftover.pid} was still alive`,
+          )
+          return { status: 'ok', pids: [] }
+        },
         spawn: () => ({
           child: { pid: 42 },
           logPath: '/tmp/metro.log',
