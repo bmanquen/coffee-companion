@@ -32,6 +32,20 @@ function emptyStaleGetSessionResponse() {
   })
 }
 
+function isStaleGetSession(epoch: number, url: string) {
+  return epoch !== authFetchEpoch && isAuthGetSessionUrl(url)
+}
+
+async function emptyStaleGetSession(isDev: boolean) {
+  const returned = emptyStaleGetSessionResponse()
+  return {
+    returned,
+    sessionSummary: isDev
+      ? await sessionSummaryFromResponse(returned)
+      : undefined,
+  }
+}
+
 async function sessionSummaryFromResponse(response: Response): Promise<string> {
   try {
     const text = await response.clone().text()
@@ -88,28 +102,23 @@ export async function loggedAuthFetch(
   const epoch = authFetchEpoch
   try {
     const response = await impl(input as RequestInfo, next)
-    let returned =
-      epoch !== authFetchEpoch && isAuthGetSessionUrl(url)
-        ? emptyStaleGetSessionResponse()
-        : response
+    let returned = isStaleGetSession(epoch, url)
+      ? emptyStaleGetSessionResponse()
+      : response
     let sessionSummary = isDev
       ? await sessionSummaryFromResponse(returned)
       : undefined
     // Sign-out can bump the epoch while the summary clone is in flight.
-    if (epoch !== authFetchEpoch && isAuthGetSessionUrl(url)) {
-      returned = emptyStaleGetSessionResponse()
-      sessionSummary = isDev
-        ? await sessionSummaryFromResponse(returned)
-        : undefined
+    if (isStaleGetSession(epoch, url)) {
+      const stale = await emptyStaleGetSession(isDev)
+      returned = stale.returned
+      sessionSummary = stale.sessionSummary
     }
     logAuthRequest(url, returned.status, isDev, headerInfo, sessionSummary)
     return returned
   } catch (error) {
-    if (epoch !== authFetchEpoch && isAuthGetSessionUrl(url)) {
-      const returned = emptyStaleGetSessionResponse()
-      const sessionSummary = isDev
-        ? await sessionSummaryFromResponse(returned)
-        : undefined
+    if (isStaleGetSession(epoch, url)) {
+      const { returned, sessionSummary } = await emptyStaleGetSession(isDev)
       logAuthRequest(url, returned.status, isDev, headerInfo, sessionSummary)
       return returned
     }
