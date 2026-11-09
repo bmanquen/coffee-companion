@@ -108,6 +108,9 @@ import {
   verifyListenPorts,
   ownedVerifyListenPorts,
   metroPortClaim,
+  ownedPortListenerClaim,
+  recordedListenOwners,
+  stopListenersOnOwnedVerifyPorts,
   shouldRebuildApk,
   shouldClearAndroidBuildCache,
   ownedDevicePackage,
@@ -1786,6 +1789,110 @@ describe('metroPortClaim', () => {
   })
 })
 
+describe('ownedPortListenerClaim', () => {
+  it('stops a recorded pid and a helper in its process group', () => {
+    assert.deepEqual(
+      ownedPortListenerClaim([11], [11, 22], (pid) => (pid === 22 ? 11 : pid)),
+      { stop: [11, 22], foreign: [] },
+    )
+  })
+
+  it('leaves a later process on the recorded port as foreign', () => {
+    assert.deepEqual(
+      ownedPortListenerClaim([11], [99], (pid) => pid),
+      { stop: [], foreign: [99] },
+    )
+  })
+})
+
+describe('recordedListenOwners', () => {
+  it('uses Metro and expo pids on the Metro port and only webPid on web', () => {
+    const state = {
+      metroPid: 11,
+      metroPids: [11, 12],
+      expoPid: 41,
+      webPid: 31,
+      emulatorPid: 21,
+    }
+    assert.deepEqual(recordedListenOwners(state, 'metro'), [11, 12, 41])
+    assert.deepEqual(recordedListenOwners(state, 'web'), [31])
+  })
+})
+
+describe('stopListenersOnOwnedVerifyPorts', () => {
+  it('does not SIGTERM a foreign listener on a recorded Metro or web port', () => {
+    const foreignMetro = spawn('sleep', ['30'], {
+      stdio: 'ignore',
+      detached: true,
+    })
+    const foreignWeb = spawn('sleep', ['30'], {
+      stdio: 'ignore',
+      detached: true,
+    })
+    foreignMetro.unref()
+    foreignWeb.unref()
+    const reports = []
+    const stopped = []
+    try {
+      stopListenersOnOwnedVerifyPorts(
+        {
+          metroPid: 11,
+          port: 8081,
+          webPid: 31,
+          webPort: 3910,
+        },
+        stopped,
+        {},
+        {
+          listPids: (port) => {
+            if (port === 8081) return [foreignMetro.pid]
+            if (port === 3910) return [foreignWeb.pid]
+            return []
+          },
+          processGroupOf: (pid) => pid,
+          report: (message) => reports.push(message),
+        },
+      )
+      process.kill(foreignMetro.pid, 0)
+      process.kill(foreignWeb.pid, 0)
+      assert.deepEqual(stopped, [])
+      assert.equal(reports.length, 2)
+      assert.match(reports[0], new RegExp(String(foreignMetro.pid)))
+      assert.match(reports[1], new RegExp(String(foreignWeb.pid)))
+    } finally {
+      for (const child of [foreignMetro, foreignWeb]) {
+        try {
+          process.kill(-child.pid, 'SIGKILL')
+        } catch {
+          try {
+            process.kill(child.pid, 'SIGKILL')
+          } catch {
+            // already gone
+          }
+        }
+      }
+    }
+  })
+
+  it('still stops an orphaned helper in the recorded process group', () => {
+    const stopped = []
+    const reports = []
+    stopListenersOnOwnedVerifyPorts(
+      { metroPid: 11, metroPids: [11, 12], port: 8081 },
+      stopped,
+      {},
+      {
+        listPids: () => [12],
+        stopPid: (pid, kind, list) => list.push({ kind, pid }),
+        processGroupOf: () => null,
+        report: (message) => reports.push(message),
+      },
+    )
+    assert.deepEqual(stopped, [{ kind: 'metro', pid: 12 }])
+    assert.deepEqual(reports, [])
+  })
+})
+
 describe('verify-mobile usage defaults', () => {
   const skill = () =>
     readFileSync(
@@ -1831,6 +1938,10 @@ describe('verify-mobile usage defaults', () => {
     assert.match(usage, /refuse clearState when ownedPackage is false/)
     assert.match(usage, /refuse a clearState flow on an attached preexisting install before Expo/)
     assert.doesNotMatch(usage, /VERIFY_AVD=Pixel_7/)
+  })
+
+  it('documents cleanup leaves a later listener on a recorded port', () => {
+    assert.match(skill(), /later process on the same port is reported and left running/)
   })
 
   it('documents that a clearState flow is refused on a pre-existing attached install', () => {

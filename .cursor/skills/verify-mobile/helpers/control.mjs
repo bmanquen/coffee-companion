@@ -359,6 +359,22 @@ function portListenerPids(port) {
   return [...pids]
 }
 
+function processGroupId(pid) {
+  if (!pid) return null
+  try {
+    const pgid = Number(
+      `${
+        runCapture('ps', ['-o', 'pgid=', '-p', String(pid)], {
+          allowFail: true,
+        }).stdout ?? ''
+      }`.trim(),
+    )
+    return Number.isInteger(pgid) && pgid > 0 ? pgid : null
+  } catch {
+    return null
+  }
+}
+
 function portBusyMessage(port, pids, role = 'metro') {
   const pidList = pids.join(', ')
   if (role === 'web') {
@@ -2742,6 +2758,46 @@ function metroPortClaim(beforePids, currentPids) {
   }
 }
 
+function recordedListenOwners(state, kind) {
+  if (!state) return []
+  if (kind === 'web') return [state.webPid].filter(Boolean)
+  const pids = []
+  const seen = new Set()
+  for (const pid of [state.metroPid, ...(state.metroPids ?? []), state.expoPid]) {
+    if (!pid || seen.has(pid)) continue
+    seen.add(pid)
+    pids.push(pid)
+  }
+  return pids
+}
+
+function ownedPortListenerClaim(
+  owners,
+  listenerPids,
+  processGroupOf = processGroupId,
+) {
+  const owned = new Set((owners ?? []).filter(Boolean))
+  const stop = []
+  const foreign = []
+  for (const pid of listenerPids ?? []) {
+    if (!pid) continue
+    const pgid = processGroupOf(pid)
+    if (owned.has(pid) || (pgid && owned.has(pgid))) {
+      stop.push(pid)
+    } else {
+      foreign.push(pid)
+    }
+  }
+  return { stop, foreign }
+}
+
+function foreignPortListenerMessage(port, pids, kind) {
+  return (
+    `Port ${port} (${kind}) is held by pid(s) ${pids.join(', ')}, not this helper's recorded process. ` +
+    'Leaving that listener running.'
+  )
+}
+
 async function ensureDeviceMetro(
   port,
   extraEnv = {},
@@ -3527,18 +3583,9 @@ async function inspectMetro(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   if (listeners.length === 0) {
     problems.push(`nothing is listening on port ${state.port}`)
   } else if (state.metroPid && !listeners.includes(state.metroPid)) {
-    const groupMatch = listeners.some((pid) => {
-      try {
-        const pgid = Number(
-          runCapture('ps', ['-o', 'pgid=', '-p', String(pid)], {
-            allowFail: true,
-          }).stdout,
-        )
-        return pgid === state.metroPid
-      } catch {
-        return false
-      }
-    })
+    const groupMatch = listeners.some(
+      (pid) => processGroupId(pid) === state.metroPid,
+    )
     if (!groupMatch) {
       problems.push(
         `port ${state.port} is owned by pid(s) ${listeners.join(', ')}, not the launched Metro ${state.metroPid}`,
@@ -3952,11 +3999,25 @@ function stopListenersOnOwnedVerifyPorts(
   state,
   stopped = [],
   env = process.env,
+  {
+    listPids = portListenerPids,
+    stopPid = stopRecordedPid,
+    processGroupOf = processGroupId,
+    report = (message) => console.error(message),
+  } = {},
 ) {
   for (const { port, kind } of ownedVerifyListenPorts(state, env)) {
     if (!Number.isInteger(port) || port <= 0) continue
-    for (const pid of portListenerPids(port)) {
-      stopRecordedPid(pid, kind, stopped)
+    const claim = ownedPortListenerClaim(
+      recordedListenOwners(state, kind),
+      listPids(port),
+      processGroupOf,
+    )
+    for (const pid of claim.stop) {
+      stopPid(pid, kind, stopped)
+    }
+    if (claim.foreign.length > 0) {
+      report(foreignPortListenerMessage(port, claim.foreign, kind))
     }
   }
   return stopped
@@ -4130,6 +4191,9 @@ export {
   verifyListenPorts,
   ownedVerifyListenPorts,
   metroPortClaim,
+  ownedPortListenerClaim,
+  recordedListenOwners,
+  stopListenersOnOwnedVerifyPorts,
   serialWaitTick,
   waitForSerialReady,
   waitForSerialGone,
