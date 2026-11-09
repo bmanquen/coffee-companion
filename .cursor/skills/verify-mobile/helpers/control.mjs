@@ -1646,6 +1646,13 @@ function maestroCliEnv(env = process.env) {
   }
 }
 
+function maestroDriveRun({ bin, expoDevClientUrl, env = process.env } = {}) {
+  return {
+    command: bin,
+    env: { ...maestroCliEnv(env), EXPO_DEV_CLIENT_URL: expoDevClientUrl },
+  }
+}
+
 function resolveMaestroBin({ env = process.env, exists = existsSync } = {}) {
   const fromEnv = `${env.VERIFY_MAESTRO ?? ''}`.trim()
   if (fromEnv) return fromEnv
@@ -2761,8 +2768,9 @@ async function ensureDeviceMetro(
   if (claim.foreign.length > 0) {
     throw new Error(portBusyMessage(port, claim.foreign, 'metro'))
   }
+  const stoppedLeftovers = []
   for (const pid of claim.stop) {
-    stopRecordedPid(pid, 'metro')
+    stopRecordedPid(pid, 'metro', stoppedLeftovers)
   }
   const freed = await waitPort(port, PORT_FREE_TIMEOUT_MS)
   if (freed.status !== 'ok') {
@@ -3224,8 +3232,12 @@ async function cmdDriveDevice(flow) {
       scheme: state.scheme ?? readDevClientScheme(),
       metroPort: state.port ?? DEFAULT_METRO_PORT,
     })
+  const drive = maestroDriveRun({
+    bin: syntax.bin,
+    expoDevClientUrl: devClientUrl,
+  })
   const test = await runTee(
-    'maestro',
+    drive.command,
     maestroDeviceArgs({
       serial: state.serial,
       dest,
@@ -3235,7 +3247,7 @@ async function cmdDriveDevice(flow) {
     {
       logPath,
       cwd: shotDir,
-      env: { EXPO_DEV_CLIENT_URL: devClientUrl },
+      env: drive.env,
     },
   )
   writeFileSync(logPath, test.stdout ?? '')
@@ -4151,6 +4163,8 @@ export {
   deviceReadyProblems,
   maestroDeviceArgs,
   maestroCheckSyntaxArgs,
+  maestroCliEnv,
+  maestroDriveRun,
   resolveMaestroBin,
   listMaestroFlowPaths,
   inspectMaestroFlows,

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -140,6 +140,8 @@ import {
   deviceReadyProblems,
   maestroDeviceArgs,
   maestroCheckSyntaxArgs,
+  maestroCliEnv,
+  maestroDriveRun,
   resolveMaestroBin,
   listMaestroFlowPaths,
   inspectMaestroFlows,
@@ -1919,6 +1921,39 @@ describe('ensureDeviceMetro', () => {
     assert.deepEqual(events, ['spawn:42', 'wait'])
     assert.equal(result.metroPid, 42)
   })
+
+  it('stops a leftover Metro pid that appeared after the expo snapshot', async () => {
+    const leftover = spawn('sleep', ['30'], { stdio: 'ignore', detached: true })
+    leftover.unref()
+    try {
+      const result = await ensureDeviceMetro(8081, {}, [], {
+        stampEnv: () => {},
+        listPids: () => [leftover.pid],
+        waitPort: async () => ({ status: 'ok', pids: [] }),
+        spawn: () => ({
+          child: { pid: 42 },
+          logPath: '/tmp/metro.log',
+          exit: { died: false },
+        }),
+        wait: async () => ({ baseUrl: 'http://127.0.0.1:8081' }),
+        fetchBundle: async () => ({
+          url: 'http://127.0.0.1:8081/apps/mobile/index.bundle',
+          body: APP_MARKER,
+        }),
+      })
+      assert.equal(result.metroPid, 42)
+    } finally {
+      try {
+        process.kill(-leftover.pid, 'SIGKILL')
+      } catch {
+        try {
+          process.kill(leftover.pid, 'SIGKILL')
+        } catch {
+          // already gone
+        }
+      }
+    }
+  })
 })
 
 describe('ownedDevicePackage', () => {
@@ -2635,6 +2670,28 @@ describe('deviceReadyProblems', () => {
     })
     assert.ok(problems.some((problem) => /developer-menu onboarding/.test(problem)))
     assert.ok(!problems.some((problem) => /dev-client launcher/.test(problem)))
+  })
+})
+
+describe('maestroDriveRun', () => {
+  it('uses the resolved Maestro bin and CLI env for the test spawn', () => {
+    const url = expoDevClientUrl({
+      scheme: 'exp+coffee-companion',
+      metroPort: 8081,
+    })
+    const bin = '/home/you/.maestro/bin/maestro'
+    const drive = maestroDriveRun({
+      bin,
+      expoDevClientUrl: url,
+      env: { HOME: '/home/you', PATH: '/usr/bin' },
+    })
+    assert.equal(drive.command, bin)
+    assert.notEqual(drive.command, 'maestro')
+    assert.equal(drive.env.MAESTRO_CLI_NO_ANALYTICS, '1')
+    assert.equal(drive.env.MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED, 'true')
+    assert.equal(drive.env.EXPO_DEV_CLIENT_URL, url)
+    assert.equal(drive.env.HOME, '/home/you')
+    assert.deepEqual(maestroCliEnv({ HOME: '/home/you' }).MAESTRO_CLI_NO_ANALYTICS, '1')
   })
 })
 
