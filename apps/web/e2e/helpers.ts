@@ -80,9 +80,35 @@ function isReactHostTagged(el: Element) {
   return Object.keys(el).some((key) => key.startsWith('__reactProps$'))
 }
 
+type ReactFiber = {
+  return: ReactFiber | null
+  tag: number
+  stateNode: { current: unknown; pendingLanes: number } | null
+}
+
+// __reactProps$ is written in hydrateInstance, still in the render phase.
+// HostRoot.tag is 3; FiberRoot.current swaps to that fiber only in commit,
+// and pendingLanes is 0 once that commit (and any follow-up) has drained.
+function isReactCommitIdle(el: Element) {
+  const fiberKey = Object.keys(el).find((key) => key.startsWith('__reactFiber$'))
+  if (!fiberKey) return false
+  let fiber = (el as unknown as Record<string, ReactFiber | undefined>)[fiberKey]
+  if (!fiber) return false
+  while (fiber.return) fiber = fiber.return
+  if (fiber.tag !== 3) return false
+  const root = fiber.stateNode
+  return Boolean(root && root.current === fiber && root.pendingLanes === 0)
+}
+
 async function waitUntilReactTagged(node: Locator, message: string) {
   await expect(async () => {
     expect(await node.evaluate(isReactHostTagged), message).toBe(true)
+  }).toPass({ timeout: 30_000 })
+}
+
+async function waitUntilReactIdle(node: Locator, message: string) {
+  await expect(async () => {
+    expect(await node.evaluate(isReactCommitIdle), message).toBe(true)
   }).toPass({ timeout: 30_000 })
 }
 
@@ -93,9 +119,14 @@ export async function waitForHydration(node: Locator) {
   )
   // The tagged node can land during hydrateInstance while a sibling outlet is
   // still uncommitted. Both layouts wrap <Outlet /> in <main>, so that host is
-  // the commit signal for counts that must not see SSR leftovers.
+  // where we wait for commit before counts that must not see SSR leftovers.
+  const outlet = node.page().locator('main').first()
   await waitUntilReactTagged(
-    node.page().locator('main').first(),
+    outlet,
     'React never tagged the page outlet. If the page is interactive in a browser, the tag has been renamed.',
+  )
+  await waitUntilReactIdle(
+    outlet,
+    'React never committed the page outlet. If the page is interactive in a browser, the commit signal has changed.',
   )
 }

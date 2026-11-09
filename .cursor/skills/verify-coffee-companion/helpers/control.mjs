@@ -1019,7 +1019,8 @@ async function runDaemon() {
         await target.waitFor({ state: 'visible', timeout: 15_000 })
         // An unhydrated fill sets the DOM value and React never hears it
         // (apps/web/e2e/helpers.ts waitForHydration). Wait for React's
-        // listener tag on the field and the layout outlet before typing.
+        // listener tag on the field and the layout outlet, then for that
+        // outlet to finish commit, before typing.
         const start = Date.now()
         let hydrated = false
         while (Date.now() - start < 15_000) {
@@ -1052,6 +1053,35 @@ async function runDaemon() {
         if (!outletTagged) {
           throw new Error(
             'React never tagged the page outlet. If the page is interactive in a browser, the tag has been renamed.',
+          )
+        }
+        const outletIdleStart = Date.now()
+        let outletIdle = false
+        while (Date.now() - outletIdleStart < 15_000) {
+          outletIdle = await page
+            .locator('main')
+            .first()
+            .evaluate((el) => {
+              const fiberKey = Object.keys(el).find((key) =>
+                key.startsWith('__reactFiber$'),
+              )
+              if (!fiberKey) return false
+              let fiber = el[fiberKey]
+              if (!fiber) return false
+              while (fiber.return) fiber = fiber.return
+              if (fiber.tag !== 3) return false
+              const root = fiber.stateNode
+              return Boolean(
+                root && root.current === fiber && root.pendingLanes === 0,
+              )
+            })
+            .catch(() => false)
+          if (outletIdle) break
+          await sleep(50)
+        }
+        if (!outletIdle) {
+          throw new Error(
+            'React never committed the page outlet. If the page is interactive in a browser, the commit signal has changed.',
           )
         }
         await target.fill(String(msg.value ?? ''), { timeout: 15_000 })
