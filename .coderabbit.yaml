@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# Greptile-style CodeRabbit config: assertive reviews, a verdict-style
+# Greptile-style CodeRabbit config: chill reviews, a verdict-style
 # summary with a confidence score, and an approve/request-changes sign-off.
 
 language: en-US
@@ -7,9 +7,9 @@ tone_instructions: >-
   Be concise, direct, and constructive.
 
 reviews:
-  # "assertive" posts a thorough review inline rather than folding most
-  # comments into the summary.
-  profile: assertive
+  # "chill" posts balanced feedback rather than the more nitpicky
+  # assertive profile.
+  profile: chill
 
   # Legacy alias of reviews.auto_approvals.enabled. Both are true (same
   # value) so CodeRabbit requests changes on findings and auto-approves
