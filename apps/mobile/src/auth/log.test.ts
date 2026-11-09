@@ -324,6 +324,39 @@ describe('loggedAuthFetch', () => {
     )
   })
 
+  it('replaces a get-session body if sign-out happens while reading the session summary', async () => {
+    const impl = jest.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ user: { id: E2E_USER_WITH_DATA } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    )
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {})
+    const originalClone = Response.prototype.clone
+    jest.spyOn(Response.prototype, 'clone').mockImplementation(function () {
+      const cloned = originalClone.call(this)
+      const originalText = cloned.text.bind(cloned)
+      cloned.text = async () => {
+        invalidatePendingAuthFetches()
+        return originalText()
+      }
+      return cloned
+    })
+
+    const response = await loggedAuthFetch(
+      'http://127.0.0.1:3910/api/auth/get-session',
+      undefined,
+      true,
+      impl,
+    )
+    expect(await response.json()).toBeNull()
+    expect(log).toHaveBeenCalledWith(
+      `${AUTH_LOG_PREFIX} request http://127.0.0.1:3910/api/auth/get-session status=200 headers=none e2e-auth=0 session=null`,
+    )
+  })
+
   it('replaces a get-session rejection that finished after sign-out invalidated the fetch', async () => {
     let rejectPending!: (reason: Error) => void
     const pending = new Promise<Response>((_resolve, reject) => {

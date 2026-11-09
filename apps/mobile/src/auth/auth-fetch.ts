@@ -88,14 +88,20 @@ export async function loggedAuthFetch(
   const epoch = authFetchEpoch
   try {
     const response = await impl(input as RequestInfo, next)
-    const staleGetSession =
+    let returned =
       epoch !== authFetchEpoch && isAuthGetSessionUrl(url)
-    const returned = staleGetSession
-      ? emptyStaleGetSessionResponse()
-      : response
-    const sessionSummary = isDev
+        ? emptyStaleGetSessionResponse()
+        : response
+    let sessionSummary = isDev
       ? await sessionSummaryFromResponse(returned)
       : undefined
+    // Sign-out can bump the epoch while the summary clone is in flight.
+    if (epoch !== authFetchEpoch && isAuthGetSessionUrl(url)) {
+      returned = emptyStaleGetSessionResponse()
+      sessionSummary = isDev
+        ? await sessionSummaryFromResponse(returned)
+        : undefined
+    }
     logAuthRequest(url, returned.status, isDev, headerInfo, sessionSummary)
     return returned
   } catch (error) {

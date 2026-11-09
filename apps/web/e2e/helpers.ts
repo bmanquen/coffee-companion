@@ -82,13 +82,17 @@ function isReactHostTagged(el: Element) {
 
 type ReactFiber = {
   return: ReactFiber | null
+  alternate: ReactFiber | null
   tag: number
-  stateNode: { current: unknown; pendingLanes: number } | null
+  stateNode: { current: ReactFiber | null; pendingLanes: number } | null
 }
 
 // __reactProps$ is written in hydrateInstance, still in the render phase.
-// HostRoot.tag is 3; FiberRoot.current swaps to that fiber only in commit,
-// and pendingLanes is 0 once that commit (and any follow-up) has drained.
+// HostRoot.tag is 3. After a later render the node can still cache the
+// alternate HostRoot, so idleness is FiberRoot.current (or its alternate)
+// with pendingLanes 0 — not "this cached fiber is current". Keep this
+// predicate in lockstep with the fill wait in
+// .cursor/skills/verify-coffee-companion/helpers/control.mjs.
 function isReactCommitIdle(el: Element) {
   const fiberKey = Object.keys(el).find((key) => key.startsWith('__reactFiber$'))
   if (!fiberKey) return false
@@ -97,7 +101,11 @@ function isReactCommitIdle(el: Element) {
   while (fiber.return) fiber = fiber.return
   if (fiber.tag !== 3) return false
   const root = fiber.stateNode
-  return Boolean(root && root.current === fiber && root.pendingLanes === 0)
+  if (!root) return false
+  const current = root.current
+  if (!current || current.tag !== 3) return false
+  if (current !== fiber && current !== fiber.alternate) return false
+  return root.pendingLanes === 0
 }
 
 async function waitUntilReactTagged(node: Locator, message: string) {

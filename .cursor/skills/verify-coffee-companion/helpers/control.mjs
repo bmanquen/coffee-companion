@@ -1062,6 +1062,7 @@ async function runDaemon() {
             .locator('main')
             .first()
             .evaluate((el) => {
+              // Same predicate as apps/web/e2e/helpers.ts isReactCommitIdle.
               const fiberKey = Object.keys(el).find((key) =>
                 key.startsWith('__reactFiber$'),
               )
@@ -1071,9 +1072,13 @@ async function runDaemon() {
               while (fiber.return) fiber = fiber.return
               if (fiber.tag !== 3) return false
               const root = fiber.stateNode
-              return Boolean(
-                root && root.current === fiber && root.pendingLanes === 0,
-              )
+              if (!root) return false
+              const current = root.current
+              if (!current || current.tag !== 3) return false
+              if (current !== fiber && current !== fiber.alternate) {
+                return false
+              }
+              return root.pendingLanes === 0
             })
             .catch(() => false)
           if (outletIdle) break
