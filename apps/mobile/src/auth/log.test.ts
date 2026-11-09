@@ -335,7 +335,9 @@ describe('loggedAuthFetch', () => {
     )
     const log = jest.spyOn(console, 'log').mockImplementation(() => {})
     const originalClone = Response.prototype.clone
-    jest.spyOn(Response.prototype, 'clone').mockImplementation(function () {
+    jest.spyOn(Response.prototype, 'clone').mockImplementation(function (
+      this: Response,
+    ) {
       const cloned = originalClone.call(this)
       const originalText = cloned.text.bind(cloned)
       cloned.text = async () => {
