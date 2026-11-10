@@ -135,6 +135,7 @@ import {
   parseEmulatorAvdPids,
   avdBusyMessage,
   avdLockHeldMessage,
+  liveAvdHolders,
   releaseAvdLocksIfIdle,
   waitForPidGone,
   stopPidAndWait,
@@ -2837,6 +2838,42 @@ describe('ensureAvdFreeToBoot', () => {
   })
 })
 
+describe('liveAvdHolders', () => {
+  it('treats a live lock pid as a holder when the process table has no entry', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-avd-ps-miss-'))
+    const avdDir = join(root, 'Pixel_7.avd')
+    mkdirSync(avdDir)
+    writeFileSync(join(avdDir, 'multiinstance.lock'), '87011\n')
+    try {
+      const holders = liveAvdHolders('Pixel_7', {
+        env: { ANDROID_AVD_HOME: root },
+        psText: '',
+        alive: (pid) => pid === 87011,
+      })
+      assert.deepEqual(holders, [{ pid: 87011, command: '' }])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('ignores a live lock pid whose command is not emulator or qemu', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-avd-ps-reuse-'))
+    const avdDir = join(root, 'Pixel_7.avd')
+    mkdirSync(avdDir)
+    writeFileSync(join(avdDir, 'multiinstance.lock'), '87011\n')
+    try {
+      const holders = liveAvdHolders('Pixel_7', {
+        env: { ANDROID_AVD_HOME: root },
+        psText: '87011 sleep 30',
+        alive: () => true,
+      })
+      assert.deepEqual(holders, [])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('releaseAvdLocksIfIdle', () => {
   it('removes every *.lock under the AVD dir when no process is live', () => {
     const root = mkdtempSync(join(tmpdir(), 'verify-avd-idle-'))
@@ -2858,6 +2895,26 @@ describe('releaseAvdLocksIfIdle', () => {
       assert.equal(existsSync(join(avdDir, 'multiinstance.lock')), false)
       assert.equal(existsSync(join(avdDir, 'hardware-qemu.ini.lock')), false)
       assert.match(reports[0], /Removed stale AVD Pixel_7 lock/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('does not delete locks when a live lock pid is missing from ps', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-avd-ps-empty-'))
+    const avdDir = join(root, 'Pixel_7.avd')
+    mkdirSync(avdDir)
+    const multi = join(avdDir, 'multiinstance.lock')
+    writeFileSync(multi, '87011\n')
+    try {
+      const result = releaseAvdLocksIfIdle('Pixel_7', {
+        env: { ANDROID_AVD_HOME: root },
+        psText: '',
+        alive: (pid) => pid === 87011,
+      })
+      assert.deepEqual(result.removed, [])
+      assert.equal(result.holders[0]?.pid, 87011)
+      assert.equal(existsSync(multi), true)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

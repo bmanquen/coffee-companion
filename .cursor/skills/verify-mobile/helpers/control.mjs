@@ -701,8 +701,10 @@ function liveAvdHolders(avdName, opts = {}) {
   }
   for (const lock of inspectAvdLocks(avdName, opts)) {
     if (!lock.pid || !alive(lock.pid)) continue
-    const command = byPid.get(lock.pid) ?? ''
-    if (/emulator|qemu-system/.test(command)) add(lock.pid, command)
+    const command = byPid.get(lock.pid)
+    if (command === undefined || /emulator|qemu-system/.test(command)) {
+      add(lock.pid, command)
+    }
   }
   return holders
 }
