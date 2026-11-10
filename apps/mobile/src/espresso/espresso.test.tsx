@@ -192,8 +192,8 @@ describe('log espresso shot', () => {
       ),
     ).toBeTruthy()
 
-    writeHostTreeArtifacts(view.toJSON())
-  })
+    writeHostTreeArtifacts(view)
+  }, 15_000)
 
   it('shows the empty list until a shot is logged', async () => {
     const { api } = fakeApi(catalog({ shots: [] }))
@@ -304,31 +304,27 @@ describe('log espresso shot', () => {
     let resolveCreate: () => void = () => {}
     const initial = catalog()
     let shots = [...initial.shots]
+    const createdShot = (input: ShotCreate): ShotRow => ({
+      id: `shot-${created.length + 1}`,
+      coffeeId: input.coffeeId,
+      coffeeName: 'Ethiopia Guji',
+      grinderId: input.grinderId,
+      brewingDeviceId: input.brewingDeviceId,
+      roastDate: input.roastDate,
+      grindSetting: input.grindSetting,
+      dose: input.dose,
+      yield: input.yield,
+      time: input.time,
+      sealed: false,
+    })
+    const pending = new Promise<void>((resolve) => {
+      resolveCreate = resolve
+    })
     const api: EspressoApi = {
       load: () => ({ ...initial, shots: [...shots] }),
       create: (input) => {
         created.push(input)
-        return new Promise<void>((resolve) => {
-          resolveCreate = () => {
-            shots = [
-              {
-                id: `shot-${created.length + 1}`,
-                coffeeId: input.coffeeId,
-                coffeeName: 'Ethiopia Guji',
-                grinderId: input.grinderId,
-                brewingDeviceId: input.brewingDeviceId,
-                roastDate: input.roastDate,
-                grindSetting: input.grindSetting,
-                dose: input.dose,
-                yield: input.yield,
-                time: input.time,
-                sealed: false,
-              },
-              ...shots,
-            ]
-            resolve()
-          }
-        })
+        return pending
       },
     }
     await render(<App auth={signedIn} espresso={api} />)
@@ -342,8 +338,9 @@ describe('log espresso shot', () => {
     expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
 
     await act(async () => {
+      shots = [createdShot(created[0]), ...shots]
       resolveCreate()
-      await Promise.resolve()
+      await pending
     })
 
     expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()

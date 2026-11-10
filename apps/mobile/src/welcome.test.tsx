@@ -46,6 +46,6 @@ describe('App welcome screen', () => {
     expect(screen.getByTestId(SIGN_OUT_TEST_ID)).toHaveTextContent(SIGN_OUT)
     expect(screen.getByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
 
-    writeHostTreeArtifacts(view.toJSON())
+    writeHostTreeArtifacts(view)
   })
 })
