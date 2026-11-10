@@ -17,9 +17,15 @@ importers:
       '@better-auth/expo':
         specifier: 1.6.26
         version: 1.6.26(58746155a51d804e6694b62e694b5b6b)
+      '@coffee-companion/api':
+        specifier: workspace:*
+        version: link:../../packages/api
       '@react-native-google-signin/google-signin':
         specifier: ^16.0.0
         version: 16.1.5(expo@57.0.29)(react-native@0.86.3(@babel/core@7.29.0)(@react-native/jest-preset@0.86.3(@babel/core@7.29.0)(react@19.2.3))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
+      '@trpc/client':
+        specifier: ^11.12.0
+        version: 11.12.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
       better-auth:
         specifier: 1.6.26
         version: 1.6.26(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.166.8(crossws@0.4.12(srvx@1.0.3))(react-dom@19.2.4(react@19.2.3))(react@19.2.3)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.51.2)(tsx@4.21.0)(yaml@2.9.1)))(drizzle-kit@0.31.9)(mongodb@7.1.0)(pg@8.20.0)(react-dom@19.2.4(react@19.2.3))(react@19.2.3)(solid-js@1.9.11)(vitest@4.1.9)
@@ -56,13 +62,13 @@ importers:
       react-native:
         specifier: 0.86.3
         version: 0.86.3(@babel/core@7.29.0)(@react-native/jest-preset@0.86.3(@babel/core@7.29.0)(react@19.2.3))(@types/react@19.2.14)(react@19.2.3)
+      superjson:
+        specifier: ^2.2.6
+        version: 2.2.6
     devDependencies:
       '@babel/core':
         specifier: ^7.29.0
         version: 7.29.0
-      '@coffee-companion/api':
-        specifier: workspace:*
-        version: link:../../packages/api
       '@tanstack/eslint-config':
         specifier: ^0.3.4
         version: 0.3.4(@typescript-eslint/utils@8.57.0(eslint@10.5.0(jiti@2.6.1))(typescript@5.9.3))(eslint@10.5.0(jiti@2.6.1))(typescript@5.9.3)
