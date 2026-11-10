@@ -9,12 +9,52 @@ import {
   SESSION_COOKIE_KEY,
   e2eAuthUserFromCookieStore,
   sessionStore,
+  setSessionWriteGate,
 } from './session-store'
 
 let authFetchEpoch = 0
+let parsedAuthFetchEpoch: number | null = null
 
 export function invalidatePendingAuthFetches() {
   authFetchEpoch += 1
+}
+
+export function sessionWriteAllowed() {
+  if (parsedAuthFetchEpoch == null) return true
+  return parsedAuthFetchEpoch === authFetchEpoch
+}
+
+export function applySessionAtomSet<T extends { data?: unknown }>(
+  set: (value: T) => void,
+  value: T,
+) {
+  if (value.data != null && !sessionWriteAllowed()) return
+  set(value)
+}
+
+setSessionWriteGate(sessionWriteAllowed)
+
+function noteParsedAuthFetchEpoch(epoch: number) {
+  parsedAuthFetchEpoch = epoch
+}
+
+// expoClient and the session atom write after customFetchImpl returns.
+function attachEpochGuard(response: Response, epoch: number): Response {
+  const origJson = response.json.bind(response)
+  const origText = response.text.bind(response)
+  const origClone = response.clone.bind(response)
+  response.json = async () => {
+    const data = await origJson()
+    noteParsedAuthFetchEpoch(epoch)
+    return epoch !== authFetchEpoch ? null : data
+  }
+  response.text = async () => {
+    const text = await origText()
+    noteParsedAuthFetchEpoch(epoch)
+    return epoch !== authFetchEpoch ? 'null' : text
+  }
+  response.clone = () => attachEpochGuard(origClone(), epoch)
+  return response
 }
 
 function isAuthGetSessionUrl(url: string): boolean {
@@ -115,12 +155,12 @@ export async function loggedAuthFetch(
       sessionSummary = stale.sessionSummary
     }
     logAuthRequest(url, returned.status, isDev, headerInfo, sessionSummary)
-    return returned
+    return attachEpochGuard(returned, epoch)
   } catch (error) {
     if (isStaleGetSession(epoch, url)) {
       const { returned, sessionSummary } = await emptyStaleGetSession(isDev)
       logAuthRequest(url, returned.status, isDev, headerInfo, sessionSummary)
-      return returned
+      return attachEpochGuard(returned, epoch)
     }
     logAuthRequest(url, undefined, isDev, headerInfo)
     throw error

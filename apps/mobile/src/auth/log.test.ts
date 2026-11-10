@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store'
 import {
+  applySessionAtomSet,
   invalidatePendingAuthFetches,
   loggedAuthFetch,
 } from './auth-fetch'
@@ -12,7 +13,11 @@ import {
   logAuthRequest,
   serverFailureDetail,
 } from './log'
-import { writeE2EAuthCookie } from './session-store'
+import {
+  SESSION_DATA_KEY,
+  sessionStore,
+  writeE2EAuthCookie,
+} from './session-store'
 
 describe('logAuthFailure', () => {
   it('writes a prefixed code and message in development and stays silent in production', () => {
@@ -401,5 +406,96 @@ describe('loggedAuthFetch', () => {
     rejectPending(new Error('network'))
 
     await expect(fetchPromise).rejects.toThrow('network')
+  })
+
+  it('does not write a stale session to the cache or atom after sign-out mid-request', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+    const atom = { data: null as { user: { id: string } } | null }
+    const setAtom = (value: { data: { user: { id: string } } | null }) => {
+      atom.data = value.data
+    }
+    const sessionBody = JSON.stringify({ user: { id: E2E_USER_WITH_DATA } })
+    const sessionResponse = () =>
+      new Response(sessionBody, {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+
+    const first = await loggedAuthFetch(
+      'http://127.0.0.1:3910/api/auth/get-session',
+      undefined,
+      true,
+      jest.fn(() => Promise.resolve(sessionResponse())),
+    )
+    expect(await first.json()).toEqual({ user: { id: E2E_USER_WITH_DATA } })
+    sessionStore.setItem(SESSION_DATA_KEY, sessionBody)
+    applySessionAtomSet(setAtom, {
+      data: { user: { id: E2E_USER_WITH_DATA } },
+    })
+    expect(memory.get(SESSION_DATA_KEY)).toBe(sessionBody)
+    expect(atom.data).toEqual({ user: { id: E2E_USER_WITH_DATA } })
+
+    let release!: (value: Response) => void
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve
+    })
+    const fetchPromise = loggedAuthFetch(
+      'http://127.0.0.1:3910/api/auth/get-session',
+      undefined,
+      true,
+      jest.fn(() => pending),
+    )
+    invalidatePendingAuthFetches()
+    applySessionAtomSet(setAtom, { data: null })
+    memory.delete(SESSION_DATA_KEY)
+    release(sessionResponse())
+
+    const response = await fetchPromise
+    const data = await response.json()
+    sessionStore.setItem(SESSION_DATA_KEY, sessionBody)
+    applySessionAtomSet(setAtom, {
+      data: { user: { id: E2E_USER_WITH_DATA } },
+    })
+
+    expect(data).toBeNull()
+    expect(memory.get(SESSION_DATA_KEY)).toBeUndefined()
+    expect(atom.data).toBeNull()
+  })
+
+  it('writes the session cache and atom when the fetch epoch is still valid', async () => {
+    const impl = jest.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ user: { id: E2E_USER_WITH_DATA } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    )
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+    const atom = { data: null as { user: { id: string } } | null }
+    const setAtom = (value: { data: { user: { id: string } } | null }) => {
+      atom.data = value.data
+    }
+
+    const response = await loggedAuthFetch(
+      'http://127.0.0.1:3910/api/auth/get-session',
+      undefined,
+      true,
+      impl,
+    )
+    const data = await response.json()
+    sessionStore.setItem(
+      SESSION_DATA_KEY,
+      JSON.stringify({ user: { id: E2E_USER_WITH_DATA } }),
+    )
+    applySessionAtomSet(setAtom, {
+      data: { user: { id: E2E_USER_WITH_DATA } },
+    })
+
+    expect(data).toEqual({ user: { id: E2E_USER_WITH_DATA } })
+    expect(memory.get(SESSION_DATA_KEY)).toBe(
+      JSON.stringify({ user: { id: E2E_USER_WITH_DATA } }),
+    )
+    expect(atom.data).toEqual({ user: { id: E2E_USER_WITH_DATA } })
   })
 })

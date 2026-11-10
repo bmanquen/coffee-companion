@@ -115,6 +115,7 @@ import {
   shouldClearAndroidBuildCache,
   ownedDevicePackage,
   shouldUninstallStalePackage,
+  recordedOwnedPackage,
   shouldUninstallRecordedPackage,
   flowClearsAppState,
   shouldRunClearStateDeviceFlow,
@@ -1964,6 +1965,11 @@ describe('verify-mobile usage defaults', () => {
   it('documents that a clearState flow is refused on a pre-existing attached install', () => {
     const text = skill()
     assert.match(text, /ownedPackage. is false/)
+    assert.match(
+      text,
+      /Missing `ownedPackage` on an attached emulator is treated as not owned/,
+    )
+    assert.match(text, /false or missing on an attached emulator/)
     assert.match(text, /refuses before starting the web app or Expo/)
     assert.match(text, /launchApp. without .clearState/)
     assert.match(text, /session restore/)
@@ -2145,6 +2151,21 @@ describe('shouldUninstallStalePackage', () => {
   })
 })
 
+describe('recordedOwnedPackage', () => {
+  it('treats missing ownedPackage on an attached emulator as not owned', () => {
+    assert.equal(recordedOwnedPackage({ attachedEmulator: true }), false)
+    assert.equal(recordedOwnedPackage({ attachedEmulator: false }), true)
+    assert.equal(
+      recordedOwnedPackage({ attachedEmulator: true, ownedPackage: true }),
+      true,
+    )
+    assert.equal(
+      recordedOwnedPackage({ attachedEmulator: false, ownedPackage: false }),
+      false,
+    )
+  })
+})
+
 describe('shouldUninstallRecordedPackage', () => {
   it('uninstalls a recorded package unless an attached run found it already installed', () => {
     assert.equal(
@@ -2167,6 +2188,14 @@ describe('shouldUninstallRecordedPackage', () => {
         serial: DEVICE_SERIAL,
         androidPackage: ANDROID_PACKAGE,
         ownedPackage: false,
+      }),
+      false,
+    )
+    assert.equal(
+      shouldUninstallRecordedPackage({
+        serial: DEVICE_SERIAL,
+        androidPackage: ANDROID_PACKAGE,
+        attachedEmulator: true,
       }),
       false,
     )
@@ -2203,6 +2232,13 @@ describe('shouldRunClearStateDeviceFlow', () => {
         clearsState: true,
       }),
       true,
+    )
+    assert.equal(
+      shouldRunClearStateDeviceFlow({
+        ownedPackage: recordedOwnedPackage({ attachedEmulator: true }),
+        clearsState: true,
+      }),
+      false,
     )
   })
 
@@ -2850,6 +2886,15 @@ describe('lockPidGoneError', () => {
 })
 
 describe('lockPidMayBeLive', () => {
+  it('treats EPERM from kill as a live pid', () => {
+    const kill = () => {
+      const error = new Error('kill')
+      error.code = 'EPERM'
+      throw error
+    }
+    assert.equal(lockPidMayBeLive(87011, kill), true)
+  })
+
   it('is live for this process and gone after that pid exits', async () => {
     assert.equal(lockPidMayBeLive(process.pid), true)
     const child = spawn('sleep', ['30'], { stdio: 'ignore', detached: true })
@@ -2941,9 +2986,10 @@ describe('releaseAvdLocksIfIdle', () => {
       const result = releaseAvdLocksIfIdle('Pixel_7', {
         env: { ANDROID_AVD_HOME: root },
         psText: '',
-        alive: (pid) => {
-          if (pid !== 87011) return false
-          return !lockPidGoneError({ code: 'EPERM' })
+        kill: (pid) => {
+          const error = new Error('kill')
+          error.code = pid === 87011 ? 'EPERM' : 'ESRCH'
+          throw error
         },
       })
       assert.deepEqual(result.removed, [])

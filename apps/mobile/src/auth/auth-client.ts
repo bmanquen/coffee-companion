@@ -1,6 +1,10 @@
 import { createAuthClient } from 'better-auth/react'
 import { expoClient } from '@better-auth/expo/client'
-import { invalidatePendingAuthFetches, loggedAuthFetch } from './auth-fetch'
+import {
+  applySessionAtomSet,
+  invalidatePendingAuthFetches,
+  loggedAuthFetch,
+} from './auth-fetch'
 import { APP_SCHEME, apiBaseUrl } from './config'
 import { SESSION_STORAGE_PREFIX, sessionStore } from './session-store'
 import type { BetterAuthClientPlugin } from 'better-auth/client'
@@ -40,11 +44,22 @@ type SessionAtom = {
 
 // better-auth 1.6.26: useSession does not see a cookie-only bypass until this
 // store atom is refetched. Keep one cast so the e2e path test cannot drift.
+let guardedSessionAtom: SessionAtom | null = null
+
 export function sessionAtom() {
-  return (
+  const atom = (
     authClient as unknown as { $store: { atoms: { session: SessionAtom } } }
   ).$store.atoms.session
+  if (guardedSessionAtom !== atom) {
+    const inner = atom.set.bind(atom)
+    atom.set = (value) => applySessionAtomSet(inner, value)
+    guardedSessionAtom = atom
+  }
+  return atom
 }
+
+// Wrap atom.set before the first get-session can return.
+sessionAtom()
 
 // getSession does not notify useSession, and the bypass body has no Set-Cookie
 // for expoClient to pick up. Refetch the atom after writing the E2E cookie.

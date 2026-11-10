@@ -202,10 +202,10 @@ function lockPidGoneError(error) {
   return error?.code === 'ESRCH'
 }
 
-function lockPidMayBeLive(pid) {
+function lockPidMayBeLive(pid, kill = process.kill.bind(process)) {
   if (!pid) return false
   try {
-    process.kill(pid, 0)
+    kill(pid, 0)
     return true
   } catch (error) {
     return !lockPidGoneError(error)
@@ -700,7 +700,8 @@ function listProcessTable() {
 }
 
 function liveAvdHolders(avdName, opts = {}) {
-  const alive = opts.alive ?? lockPidMayBeLive
+  const kill = opts.kill ?? process.kill.bind(process)
+  const alive = opts.alive ?? ((pid) => lockPidMayBeLive(pid, kill))
   const rows = parseProcessTable(opts.psText ?? listProcessTable())
   const byPid = new Map(rows.map((row) => [row.pid, row.command]))
   const holders = []
@@ -1163,9 +1164,14 @@ function shouldUninstallStalePackage({
   return Boolean(ownedPackage && rebuild && installedVersion)
 }
 
+function recordedOwnedPackage(state) {
+  if (!state) return false
+  return state.ownedPackage ?? !state.attachedEmulator
+}
+
 function shouldUninstallRecordedPackage(state) {
   return Boolean(
-    state?.serial && state?.androidPackage && state.ownedPackage !== false,
+    state?.serial && state?.androidPackage && recordedOwnedPackage(state),
   )
 }
 
@@ -3377,7 +3383,7 @@ async function cmdDriveDevice(flow) {
   const state = requireState()
   if (
     !shouldRunClearStateDeviceFlow({
-      ownedPackage: state.ownedPackage,
+      ownedPackage: recordedOwnedPackage(state),
       clearsState: flowClearsAppState(readFileSync(flowPath, 'utf8')),
     })
   ) {
@@ -4334,6 +4340,7 @@ export {
   shouldClearAndroidBuildCache,
   ownedDevicePackage,
   shouldUninstallStalePackage,
+  recordedOwnedPackage,
   shouldUninstallRecordedPackage,
   flowClearsAppState,
   shouldRunClearStateDeviceFlow,

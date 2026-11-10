@@ -5,6 +5,26 @@ export const SESSION_STORAGE_PREFIX = 'coffee-companion'
 export const SESSION_COOKIE_KEY = `${SESSION_STORAGE_PREFIX}_cookie`
 export const SESSION_DATA_KEY = `${SESSION_STORAGE_PREFIX}_session_data`
 
+let explicitSessionWrites = 0
+let sessionWriteGate: () => boolean = () => true
+
+export function setSessionWriteGate(gate: () => boolean) {
+  sessionWriteGate = gate
+}
+
+export function withExplicitSessionWrite<T>(fn: () => T): T {
+  explicitSessionWrites += 1
+  try {
+    return fn()
+  } finally {
+    explicitSessionWrites -= 1
+  }
+}
+
+function isSessionStoreKey(key: string) {
+  return key === SESSION_COOKIE_KEY || key === SESSION_DATA_KEY
+}
+
 // expoClient's getCookie() JSON.parses this map into `name=value` headers.
 export function e2eAuthCookieStore(userId: string): string {
   return JSON.stringify({
@@ -29,7 +49,9 @@ export function e2eAuthUserFromCookieStore(raw: string | null): string | null {
 }
 
 export function writeE2EAuthCookie(userId: string): void {
-  sessionStore.setItem(SESSION_COOKIE_KEY, e2eAuthCookieStore(userId))
+  withExplicitSessionWrite(() => {
+    sessionStore.setItem(SESSION_COOKIE_KEY, e2eAuthCookieStore(userId))
+  })
 }
 
 export function readSessionCookie(): string | null {
@@ -41,13 +63,22 @@ export async function restoreSessionCookie(raw: string | null) {
     await SecureStore.deleteItemAsync(SESSION_COOKIE_KEY)
     return
   }
-  sessionStore.setItem(SESSION_COOKIE_KEY, raw)
+  withExplicitSessionWrite(() => {
+    sessionStore.setItem(SESSION_COOKIE_KEY, raw)
+  })
 }
 
 // Sync get/set: the Expo client plugin reads the cookie on every request.
 export const sessionStore = {
   getItem: (key: string) => SecureStore.getItem(key),
   setItem: (key: string, value: string) => {
+    if (
+      explicitSessionWrites === 0 &&
+      isSessionStoreKey(key) &&
+      !sessionWriteGate()
+    ) {
+      return
+    }
     SecureStore.setItem(key, value)
   },
 }
