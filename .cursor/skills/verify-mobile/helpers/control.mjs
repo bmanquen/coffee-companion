@@ -4037,12 +4037,14 @@ const DRIVES = {
     observed: {
       heading: 'Coffee Companion',
       listTestID: 'shot-list',
-      formTestID: 'shot-form',
       coffee: 'Ethiopia Guji',
       grind: 'verify-grind-7',
       dose: '18',
       yield: '36',
       time: '30',
+    },
+    handles: {
+      formTestID: 'shot-form',
     },
   },
 }
@@ -4097,6 +4099,7 @@ async function cmdDrive(feature) {
     capturedAt: new Date().toISOString(),
     artifacts: [treePath, treeJsonPath, join(dest, 'proof.json')],
     observed: recipe.observed,
+    ...(recipe.handles ? { handles: recipe.handles } : {}),
     note:
       'In-process React Native Testing Library render. No iOS simulator or Android emulator was attached. Native Google and Apple sheets were not presented.',
   }
