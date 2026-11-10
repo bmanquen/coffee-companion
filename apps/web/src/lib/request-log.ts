@@ -1,3 +1,5 @@
+import { E2E_AUTH_HEADER } from '@coffee-companion/api/lib/e2e-auth'
+import { isDevOrTestRuntime } from '@coffee-companion/api/lib/runtime-env'
 import { REQUEST_ID_HEADER } from '@coffee-companion/api/lib/log'
 import { HEALTH_PATH } from './health'
 
@@ -9,6 +11,8 @@ export type RequestRecord = {
   status: number
   duration: number
   requestId: string
+  expoOrigin?: string
+  e2eAuth?: boolean
 }
 
 export function requestId(request: Request): string {
@@ -24,7 +28,39 @@ export function requestRecord(
 ): RequestRecord | null {
   const path = new URL(request.url).pathname
   if (path.startsWith('/assets/') || SKIPPED_PATHS.has(path)) return null
-  return { method: request.method, path, status, duration, requestId: id }
+  const expoOrigin = sanitizedExpoOrigin(request.headers.get('expo-origin'))
+  const e2eAuth =
+    path.endsWith('/get-session') && isDevOrTestRuntime()
+      ? Boolean(request.headers.get(E2E_AUTH_HEADER)?.trim())
+      : undefined
+  return {
+    method: request.method,
+    path,
+    status,
+    duration,
+    requestId: id,
+    ...(expoOrigin ? { expoOrigin } : {}),
+    ...(e2eAuth !== undefined ? { e2eAuth } : {}),
+  }
+}
+
+function sanitizedExpoOrigin(value: string | null): string | undefined {
+  const trimmed = value?.trim()
+  if (!trimmed) return undefined
+  try {
+    const url = new URL(trimmed)
+    url.search = ''
+    url.hash = ''
+    url.username = ''
+    url.password = ''
+    if (url.host.length > 255) return undefined
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      return url.origin
+    }
+    return `${url.protocol}//${url.host}`
+  } catch {
+    return undefined
+  }
 }
 
 function withRequestIdHeader(response: Response, id: string): Response {

@@ -30,4 +30,36 @@ export default [
       '@typescript-eslint/require-await': 'off',
     },
   },
+  {
+    // The allow-list mutator lives under test/; runtime only reads the Set.
+    files: ['src/**/*.ts'],
+    ignores: [
+      'src/lib/e2e-auth.ts',
+      'src/**/*.test.ts',
+      'src/**/*.integration.test.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/e2e-auth-allow-list',
+                './**/e2e-auth-allow-list',
+                '../**/e2e-auth-allow-list',
+              ],
+              message:
+                'Mutate the E2E allow-list from packages/api/test/ only.',
+            },
+            {
+              group: ['**/test/*', '../test/*', '../../test/*'],
+              message:
+                'Runtime source cannot import packages/api/test helpers.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]

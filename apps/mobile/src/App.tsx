@@ -1,5 +1,8 @@
 import { StatusBar } from 'expo-status-bar'
+import { useEffect } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import { API_URL_DEV_TAG, apiBaseUrl } from './auth/config'
+import { logApiBaseUrl } from './auth/log'
 import { SignedInHome } from './auth/SignedInHome'
 import { SignInScreen } from './auth/SignInScreen'
 import { useAuth } from './auth/use-auth'
@@ -10,7 +13,11 @@ export function App({ auth }: { auth?: Auth }) {
 }
 
 function Live() {
-  return <Shell auth={useAuth()} />
+  const auth = useAuth()
+  useEffect(() => {
+    logApiBaseUrl(apiBaseUrl(), API_URL_DEV_TAG)
+  }, [])
+  return <Shell auth={auth} />
 }
 
 function Shell({ auth }: { auth: Auth }) {
@@ -42,6 +49,9 @@ function Shell({ auth }: { auth: Auth }) {
           onToggleMode={() =>
             auth.setMode(auth.mode === 'sign-in' ? 'sign-up' : 'sign-in')
           }
+          onE2ESignIn={() => {
+            void auth.signInE2E()
+          }}
         />
       )}
       <StatusBar style="auto" />

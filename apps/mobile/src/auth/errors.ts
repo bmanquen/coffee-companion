@@ -60,3 +60,18 @@ export function errorCode(error: unknown): string | null {
   if ('code' in error && typeof error.code === 'string') return error.code
   return null
 }
+
+export function failureMessage(caught: unknown): string {
+  if (caught instanceof Error) return caught.message || caught.name
+  if (typeof caught === 'string') return caught
+  if (
+    caught &&
+    typeof caught === 'object' &&
+    'message' in caught &&
+    typeof caught.message === 'string' &&
+    caught.message
+  ) {
+    return caught.message
+  }
+  return 'failed'
+}

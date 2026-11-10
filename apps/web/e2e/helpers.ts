@@ -73,15 +73,68 @@ export async function pickBrewsMethod(page: Page, method: string) {
 // Per node rather than per document, because the feeds render through
 // useSuspenseQuery: the document hydrates around a boundary that is still
 // streaming, so a flag the app raised once would go up while the node under
-// test was still inert.
-export async function waitForHydration(node: Locator) {
+// test was still inert. Pass one node (`.first()` when the locator may match
+// more than one) so a uniqueness check after this wait is the thing that
+// fails, not Playwright strict mode inside evaluate().
+function isReactHostTagged(el: Element) {
+  return Object.keys(el).some((key) => key.startsWith('__reactProps$'))
+}
+
+type ReactFiber = {
+  return: ReactFiber | null
+  alternate: ReactFiber | null
+  tag: number
+  stateNode: { current: ReactFiber | null; pendingLanes: number } | null
+}
+
+// __reactProps$ is written in hydrateInstance, still in the render phase.
+// HostRoot.tag is 3. After a later render the node can still cache the
+// alternate HostRoot, so idleness is FiberRoot.current (or its alternate)
+// with pendingLanes 0 — not "this cached fiber is current". Keep this
+// predicate in lockstep with the fill wait in
+// .cursor/skills/verify-coffee-companion/helpers/control.mjs.
+function isReactCommitIdle(el: Element) {
+  const fiberKey = Object.keys(el).find((key) => key.startsWith('__reactFiber$'))
+  if (!fiberKey) return false
+  let fiber = (el as unknown as Record<string, ReactFiber | undefined>)[fiberKey]
+  if (!fiber) return false
+  while (fiber.return) fiber = fiber.return
+  if (fiber.tag !== 3) return false
+  const root = fiber.stateNode
+  if (!root) return false
+  const current = root.current
+  if (!current || current.tag !== 3) return false
+  if (current !== fiber && current !== fiber.alternate) return false
+  return root.pendingLanes === 0
+}
+
+async function waitUntilReactTagged(node: Locator, message: string) {
   await expect(async () => {
-    const hydrated = await node.evaluate((el) =>
-      Object.keys(el).some((key) => key.startsWith('__reactProps$')),
-    )
-    expect(
-      hydrated,
-      'React never tagged this node. If the page is interactive in a browser, the tag has been renamed.',
-    ).toBe(true)
+    expect(await node.evaluate(isReactHostTagged), message).toBe(true)
   }).toPass({ timeout: 30_000 })
+}
+
+async function waitUntilReactIdle(node: Locator, message: string) {
+  await expect(async () => {
+    expect(await node.evaluate(isReactCommitIdle), message).toBe(true)
+  }).toPass({ timeout: 30_000 })
+}
+
+export async function waitForHydration(node: Locator) {
+  await waitUntilReactTagged(
+    node,
+    'React never tagged this node. If the page is interactive in a browser, the tag has been renamed.',
+  )
+  // The tagged node can land during hydrateInstance while a sibling outlet is
+  // still uncommitted. Both layouts wrap <Outlet /> in <main>, so that host is
+  // where we wait for commit before counts that must not see SSR leftovers.
+  const outlet = node.page().locator('main').first()
+  await waitUntilReactTagged(
+    outlet,
+    'React never tagged the page outlet. If the page is interactive in a browser, the tag has been renamed.',
+  )
+  await waitUntilReactIdle(
+    outlet,
+    'React never committed the page outlet. If the page is interactive in a browser, the commit signal has changed.',
+  )
 }

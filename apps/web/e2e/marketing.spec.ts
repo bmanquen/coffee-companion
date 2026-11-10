@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { waitForHydration } from './helpers'
 
 // The public marketing site, unauthenticated (the `public` project carries no
 // bypass cookie). Content assertions stay loose — they check the page says the
@@ -126,6 +127,7 @@ test('marketing pages render none of the authenticated app chrome', async ({
 }) => {
   for (const path of ['/', '/pricing']) {
     await page.goto(path)
+    await waitForHydration(page.getByRole('banner').first())
 
     // Exactly one banner — the marketing header. MobileHeader is also a
     // <header>, so a leak shows up as two rather than as a missing element,
@@ -142,8 +144,11 @@ test('the home page carries its canonical URL and social card tags', async ({
   page,
 }) => {
   await page.goto('/')
+  await waitForHydration(page.getByRole('heading', { level: 1 }))
 
   // Presence and shape only — the copy itself is free to change.
+  // One tag each: SSR and the hydrated client must advertise the same origin.
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(1)
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
     /^https?:\/\/.+\/$/,
@@ -157,6 +162,7 @@ test('the home page carries its canonical URL and social card tags', async ({
     /.+/,
   )
   // Raster, not SVG — every major unfurler drops an SVG og:image.
+  await expect(page.locator('meta[property="og:image"]')).toHaveCount(1)
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
     'content',
     /^https?:\/\/.+\.(png|jpg|jpeg)$/,

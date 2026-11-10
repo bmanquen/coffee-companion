@@ -26,7 +26,8 @@ import { loadTestDatabaseUrl } from '@coffee-companion/api/test/database'
 //     hosted/staging instance); Playwright does NOT start a local server.
 //   - otherwise         -> build and boot the app locally on PORT (used by CI).
 const PORT = 3000
-const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`
+// Match NITRO_HOST: localhost can resolve to ::1 first and miss an IPv4-only bind.
+const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${PORT}`
 const cookieDomain = new URL(baseURL).hostname
 
 // A local run seeds and boots against the test database named by
@@ -118,17 +119,29 @@ export default defineConfig({
     ? undefined
     : {
         command: 'node .output/server/index.mjs',
-        url: `http://localhost:${PORT}`,
+        url: `http://127.0.0.1:${PORT}`,
         // Never reuse: a server already on the port is a dev server on the
         // development database, without the auth bypass.
         reuseExistingServer: false,
         timeout: 120_000,
         // The server inherits the environment; we pin the test database
-        // resolved above and add the test-auth bypass + port.
+        // resolved above and add the test-auth bypass + port. NODE_ENV=test
+        // is required: the bypass only accepts test or development, and
+        // Nitro/the parent treat unset NODE_ENV as production after a
+        // production `vite build`.
         env: {
           DATABASE_URL: process.env.DATABASE_URL!,
           PORT: String(PORT),
           E2E_BYPASS_AUTH: 'true',
+          NODE_ENV: 'test',
+          HOST: '127.0.0.1',
+          NITRO_HOST: '127.0.0.1',
+          // Pin the canonical origin to the IPv4 probe. Unset SITE_URL makes
+          // SSR advertise localhost while the browser origin is 127.0.0.1,
+          // and HeadContent keeps both tags.
+          SITE_URL: `http://127.0.0.1:${PORT}`,
+          BETTER_AUTH_URL: `http://127.0.0.1:${PORT}`,
+          STRIPE_SECRET_KEY: '',
         },
       },
 })

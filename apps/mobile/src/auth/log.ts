@@ -40,6 +40,62 @@ export function serverFailureDetail(error: unknown): {
   }
 }
 
+function apiUrlTagForLog(tag: string): string {
+  const sep = tag.indexOf(':')
+  if (sep === -1) return authRequestUrlForLog(tag)
+  const rest = tag.slice(sep + 1)
+  if (!rest.includes('://') && !rest.startsWith('/')) return tag
+  return `${tag.slice(0, sep + 1)}${authRequestUrlForLog(rest)}`
+}
+
+export function logApiBaseUrl(
+  url: string,
+  tag?: string,
+  isDev = __DEV__,
+) {
+  if (!isDev) return
+  const extra = tag ? ` ${apiUrlTagForLog(tag)}` : ''
+  console.log(`${AUTH_LOG_PREFIX} api-url ${authRequestUrlForLog(url)}${extra}`)
+}
+
+function stripLogUrlUserinfo(url: string): string {
+  return url.replace(/^((?:[a-z][a-z\d+.-]*:)?\/\/)[^/?#]*@/i, '$1')
+}
+
+export function authRequestUrlForLog(url: string): string {
+  try {
+    const parsed = new URL(url)
+    const path = parsed.pathname === '/' ? '' : parsed.pathname
+    return `${parsed.origin}${path}`
+  } catch {
+    const withoutHash = url.split('#')[0] ?? url
+    const withoutUserinfo = stripLogUrlUserinfo(withoutHash)
+    const query = withoutUserinfo.indexOf('?')
+    return query === -1
+      ? withoutUserinfo
+      : withoutUserinfo.slice(0, query)
+  }
+}
+
+export function logAuthRequest(
+  url: string,
+  status?: number,
+  isDev = __DEV__,
+  headerInfo?: { names: Array<string>; e2eAuth: boolean },
+  sessionSummary?: string,
+) {
+  if (!isDev) return
+  if (!url) return
+  const parts = [`${AUTH_LOG_PREFIX} request ${authRequestUrlForLog(url)}`]
+  if (status != null) parts.push(`status=${status}`)
+  if (headerInfo) {
+    parts.push(`headers=${headerInfo.names.join(',') || 'none'}`)
+    parts.push(`e2e-auth=${headerInfo.e2eAuth ? '1' : '0'}`)
+  }
+  if (sessionSummary) parts.push(`session=${sessionSummary}`)
+  console.log(parts.join(' '))
+}
+
 export function logAuthFailure(
   kind: string,
   detail: {

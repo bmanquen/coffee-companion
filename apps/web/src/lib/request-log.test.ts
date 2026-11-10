@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
+import { E2E_AUTH_HEADER } from '@coffee-companion/api/lib/e2e-auth'
 import { REQUEST_ID_HEADER } from '@coffee-companion/api/lib/log'
 import { requestId, requestRecord, withRequestLog } from './request-log'
 
@@ -18,6 +19,119 @@ describe('requestRecord', () => {
       duration: 42,
       requestId: 'req_1',
     })
+  })
+
+  it('records expo-origin so native get-session lines can be told from host probes', () => {
+    const request = new Request('https://app.test/api/auth/get-session', {
+      headers: { 'expo-origin': 'coffeecompanion:///127.0.0.1:8081' },
+    })
+
+    expect(requestRecord(request, 200, 8, 'req_2')).toEqual({
+      method: 'GET',
+      path: '/api/auth/get-session',
+      status: 200,
+      duration: 8,
+      requestId: 'req_2',
+      expoOrigin: 'coffeecompanion://',
+      e2eAuth: false,
+    })
+  })
+
+  it('strips query, hash, and userinfo from expo-origin and drops an unparseable value', () => {
+    const withQuery = new Request('https://app.test/api/auth/get-session', {
+      headers: {
+        'expo-origin': 'coffeecompanion:///127.0.0.1:8081?token=secret#frag',
+      },
+    })
+    expect(requestRecord(withQuery, 200, 8, 'req_2b')?.expoOrigin).toBe(
+      'coffeecompanion://',
+    )
+
+    const withUserinfo = new Request('https://app.test/api/auth/get-session', {
+      headers: {
+        'expo-origin': 'https://user:secret@example.com/callback',
+      },
+    })
+    expect(requestRecord(withUserinfo, 200, 8, 'req_2d')?.expoOrigin).toBe(
+      'https://example.com',
+    )
+
+    const withHttpPath = new Request('https://app.test/api/auth/get-session', {
+      headers: {
+        'expo-origin': 'https://example.com/private/token',
+      },
+    })
+    expect(requestRecord(withHttpPath, 200, 8, 'req_2e')?.expoOrigin).toBe(
+      'https://example.com',
+    )
+
+    const withCustomPath = new Request('https://app.test/api/auth/get-session', {
+      headers: {
+        'expo-origin': 'coffeecompanion:///private/token',
+      },
+    })
+    expect(requestRecord(withCustomPath, 200, 8, 'req_2f')?.expoOrigin).toBe(
+      'coffeecompanion://',
+    )
+    expect(requestRecord(withCustomPath, 200, 8, 'req_2f')?.expoOrigin).not.toContain(
+      'token',
+    )
+
+    const invalid = new Request('https://app.test/api/auth/get-session', {
+      headers: { 'expo-origin': 'not a url' },
+    })
+    expect(requestRecord(invalid, 200, 8, 'req_2c')?.expoOrigin).toBeUndefined()
+  })
+
+  it('drops an expo-origin whose host exceeds 255 characters', () => {
+    const oversized = new Request('https://app.test/api/auth/get-session', {
+      headers: { 'expo-origin': `coffeecompanion://${'a'.repeat(256)}` },
+    })
+    expect(requestRecord(oversized, 200, 8, 'req_2g')?.expoOrigin).toBeUndefined()
+
+    const allowed = new Request('https://app.test/api/auth/get-session', {
+      headers: { 'expo-origin': `coffeecompanion://${'a'.repeat(255)}` },
+    })
+    expect(requestRecord(allowed, 200, 8, 'req_2h')?.expoOrigin).toBe(
+      `coffeecompanion://${'a'.repeat(255)}`,
+    )
+  })
+
+  it('records whether x-e2e-auth was present on get-session', () => {
+    const request = new Request('https://app.test/api/auth/get-session', {
+      headers: {
+        'expo-origin': 'coffeecompanion:///127.0.0.1:8081',
+        [E2E_AUTH_HEADER]: 'e2e-user-with-data',
+      },
+    })
+
+    expect(requestRecord(request, 200, 8, 'req_3')).toEqual({
+      method: 'GET',
+      path: '/api/auth/get-session',
+      status: 200,
+      duration: 8,
+      requestId: 'req_3',
+      expoOrigin: 'coffeecompanion://',
+      e2eAuth: true,
+    })
+  })
+
+  it('omits the e2e-auth flag outside development and test', () => {
+    const original = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      const request = new Request('https://app.test/api/auth/get-session', {
+        headers: {
+          'expo-origin': 'coffeecompanion:///127.0.0.1:8081',
+          [E2E_AUTH_HEADER]: 'e2e-user-with-data',
+        },
+      })
+      expect(requestRecord(request, 200, 8, 'req_3p')).not.toHaveProperty(
+        'e2eAuth',
+      )
+    } finally {
+      process.env.NODE_ENV = original
+    }
   })
 
   it('skips assets, the favicon, the manifest, and the health check', () => {

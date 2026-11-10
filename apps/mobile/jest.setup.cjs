@@ -30,15 +30,6 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
   },
 }))
 
-jest.mock('better-auth/react', () => ({
-  createAuthClient: () => ({
-    useSession: () => ({ data: null, isPending: false }),
-    signIn: { social: jest.fn(async () => ({ error: null })) },
-    signOut: jest.fn(async () => {}),
-    $fetch: jest.fn(async () => ({ error: null })),
-  }),
-}))
-
 jest.mock('@better-auth/expo/client', () => ({
   expoClient: () => ({}),
 }))

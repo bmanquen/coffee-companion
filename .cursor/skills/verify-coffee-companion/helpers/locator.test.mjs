@@ -5,6 +5,10 @@ import {
   locatorFrom,
   requireUniqueRegion,
   resolveClickTarget,
+  webBuildEnv,
+  webRuntimeEnv,
+  placeholderEnv,
+  requireTcpPort,
 } from './control.mjs'
 
 function mockLocator(label, trail, { countValue = 1 } = {}) {
@@ -240,5 +244,104 @@ describe('resolveClickTarget', () => {
       ['getByRole', 'region', { name: 'Apple', exact: true }],
       ['count', 2],
     ])
+  })
+})
+
+describe('requireTcpPort', () => {
+  it('accepts the default when the value is missing', () => {
+    assert.equal(requireTcpPort(undefined, 'VERIFY_PORT', 3000), 3000)
+    assert.equal(requireTcpPort('', 'VERIFY_PORT', 3000), 3000)
+  })
+
+  it('rejects a non-integer VERIFY_PORT before launch work', () => {
+    assert.throws(
+      () => requireTcpPort('abc', 'VERIFY_PORT', 3000),
+      /VERIFY_PORT must be an integer from 1 to 65535, got "abc"/,
+    )
+    assert.throws(
+      () => requireTcpPort('65536', 'VERIFY_PORT', 3000),
+      /got "65536"/,
+    )
+  })
+})
+
+describe('webBuildEnv', () => {
+  it('pins NODE_ENV=production and the selected-port origin without dropping the rest of the launch env', () => {
+    const env = webBuildEnv({
+      DATABASE_URL: 'postgres://local/test',
+      E2E_BYPASS_AUTH: 'true',
+      NODE_ENV: 'test',
+      PORT: '3910',
+      SITE_URL: 'https://preview.example',
+      BETTER_AUTH_URL: 'https://auth.example',
+    })
+    assert.equal(env.NODE_ENV, 'production')
+    assert.equal(env.DATABASE_URL, 'postgres://local/test')
+    assert.equal(env.E2E_BYPASS_AUTH, 'true')
+    assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
+    assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
+  })
+
+  it('rejects an unvalidated PORT before baking the origin', () => {
+    assert.throws(
+      () => webBuildEnv({ PORT: 'abc' }),
+      /PORT must be an integer from 1 to 65535, got "abc"/,
+    )
+  })
+})
+
+describe('webRuntimeEnv', () => {
+  it('pins NODE_ENV=test, loopback, and the selected-port origin for the spawned Nitro server', () => {
+    const env = webRuntimeEnv({
+      DATABASE_URL: 'postgres://local/test',
+      E2E_BYPASS_AUTH: 'true',
+      HOST: '0.0.0.0',
+      PORT: '3910',
+      SITE_URL: 'https://preview.example',
+      BETTER_AUTH_URL: 'https://auth.example',
+    })
+    assert.equal(env.NODE_ENV, 'test')
+    assert.equal(env.HOST, '127.0.0.1')
+    assert.equal(env.NITRO_HOST, '127.0.0.1')
+    assert.equal(env.DATABASE_URL, 'postgres://local/test')
+    assert.equal(env.E2E_BYPASS_AUTH, 'true')
+    assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
+    assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
+    assert.equal(env.STRIPE_SECRET_KEY, '')
+  })
+
+  it('clears STRIPE_SECRET_KEY even when the launch env inherited a live key', () => {
+    const env = webRuntimeEnv({
+      PORT: '3910',
+      STRIPE_SECRET_KEY: 'sk_live_inherited',
+    })
+    assert.equal(env.STRIPE_SECRET_KEY, '')
+  })
+
+  it('rejects an unvalidated PORT before baking the origin', () => {
+    assert.throws(
+      () => webRuntimeEnv({ PORT: '65536' }),
+      /PORT must be an integer from 1 to 65535, got "65536"/,
+    )
+  })
+})
+
+describe('placeholderEnv', () => {
+  it('pins SITE_URL and BETTER_AUTH_URL to the selected port even when the shell exported others', () => {
+    const previousSite = process.env.SITE_URL
+    const previousAuth = process.env.BETTER_AUTH_URL
+    process.env.SITE_URL = 'https://preview.example'
+    process.env.BETTER_AUTH_URL = 'https://auth.example'
+    try {
+      const env = placeholderEnv(3910)
+      assert.equal(env.SITE_URL, 'http://127.0.0.1:3910')
+      assert.equal(env.BETTER_AUTH_URL, 'http://127.0.0.1:3910')
+      assert.equal(env.STRIPE_SECRET_KEY, '')
+    } finally {
+      if (previousSite === undefined) delete process.env.SITE_URL
+      else process.env.SITE_URL = previousSite
+      if (previousAuth === undefined) delete process.env.BETTER_AUTH_URL
+      else process.env.BETTER_AUTH_URL = previousAuth
+    }
   })
 })

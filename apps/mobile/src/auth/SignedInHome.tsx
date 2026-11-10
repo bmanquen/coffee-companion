@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import {
+  SIGN_OUT_TEST_ID,
   WELCOME_A11Y_LABEL,
   WELCOME_HEADING_ROLE,
   WELCOME_HEADING_TEST_ID,
@@ -18,6 +19,7 @@ export function SignedInHome({
   return (
     <View
       accessibilityLabel={WELCOME_A11Y_LABEL}
+      collapsable={false}
       testID={WELCOME_SCREEN_TEST_ID}
       style={styles.container}
     >
@@ -28,7 +30,11 @@ export function SignedInHome({
         {welcomeMessage()}
       </Text>
       <Text>{name}</Text>
-      <Pressable accessibilityRole="button" onPress={onSignOut}>
+      <Pressable
+        accessibilityRole="button"
+        testID={SIGN_OUT_TEST_ID}
+        onPress={onSignOut}
+      >
         <Text>{SIGN_OUT}</Text>
       </Pressable>
     </View>

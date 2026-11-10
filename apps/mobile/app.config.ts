@@ -1,11 +1,55 @@
+import { execFileSync } from 'node:child_process'
 import type { ExpoConfig } from 'expo/config'
 
+export const GIT_SHORT_SHA_DIGITS = 7
+
+type GitRunner = (
+  file: string,
+  args: ReadonlyArray<string>,
+  options: { cwd: string; encoding: 'utf8' },
+) => string
+
+export function gitHeadShortSha(
+  cwd = process.cwd(),
+  run: GitRunner = execFileSync,
+): string {
+  return run('git', ['rev-parse', `--short=${GIT_SHORT_SHA_DIGITS}`, 'HEAD'], {
+    cwd,
+    encoding: 'utf8',
+  }).trim()
+}
+
+export const VERIFY_APK_VERSION_ENV = 'VERIFY_APK_VERSION'
+
+export const APP_VERSION = '1.0.0'
+
+export function resolveApkVersion(
+  env: { readonly [key: string]: string | undefined } = process.env,
+  gitSha: () => string = gitHeadShortSha,
+): string {
+  const fromEnv = `${env[VERIFY_APK_VERSION_ENV] ?? ''}`.trim()
+  if (fromEnv) return fromEnv
+  try {
+    return gitSha()
+  } catch {
+    return APP_VERSION
+  }
+}
+
+const verifyStamp = `${process.env[VERIFY_APK_VERSION_ENV] ?? ''}`.trim()
+const gitHead = resolveApkVersion()
 const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME
+
+// Expo 57 auto-opens the developer menu over the app; keep it closed for device E2E.
+export const DEV_CLIENT_PLUGIN_CONFIG = {
+  showMenuAtLaunch: false,
+  skipOnboarding: true,
+}
 
 const plugins: NonNullable<ExpoConfig['plugins']> = [
   'expo-secure-store',
   'expo-apple-authentication',
-  'expo-dev-client',
+  ['expo-dev-client', DEV_CLIENT_PLUGIN_CONFIG],
   'expo-web-browser',
 ]
 if (googleIosUrlScheme) {
@@ -19,7 +63,7 @@ const config: ExpoConfig = {
   name: 'Coffee Companion',
   slug: 'coffee-companion',
   scheme: 'coffeecompanion',
-  version: '1.0.0',
+  version: verifyStamp || APP_VERSION,
   orientation: 'portrait',
   // Template Expo icons. Adaptive background is neutral white — same as the
   // welcome screen. Replace artwork before any store build; do not invent brand.
@@ -41,6 +85,7 @@ const config: ExpoConfig = {
     predictiveBackGestureEnabled: false,
   },
   extra: {
+    gitHead,
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000',
     googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,

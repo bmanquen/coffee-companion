@@ -1,0 +1,141 @@
+appId: dev.offbyonelabs.coffeecompanion
+---
+- launchApp:
+    clearState: true
+# clearState cold-starts the Expo launcher; openLink only after that screen can take the intent.
+- extendedWaitUntil:
+    visible: "Fetch development servers"
+    timeout: 30000
+- openLink:
+    link: ${EXPO_DEV_CLIENT_URL}
+    browser: false
+- runFlow:
+    label: Re-open Metro deep link if still on the Expo launcher
+    when:
+      visible: "Fetch development servers"
+    commands:
+      - openLink:
+          link: ${EXPO_DEV_CLIENT_URL}
+          browser: false
+# The second openLink is still transitioning; fail only if the launcher stays.
+- extendedWaitUntil:
+    notVisible: "Fetch development servers"
+    timeout: 30000
+# Overlays can appear after the first check. Poll until sign-in-screen while dismissing them.
+# Maestro v1.40.3 shrinks lookup timeouts after the last mutating command, so a
+# times: N loop can finish before a slow load. evalScript counts as a mutation
+# and Date.now() is the wall-clock stop.
+- evalScript: ${output.signInDeadlineMs = Date.now() + 60000}
+- repeat:
+    while:
+      notVisible:
+        id: sign-in-screen
+      true: ${Date.now() < output.signInDeadlineMs}
+    commands:
+      - evalScript: ${output.signInWaitTick = Date.now()}
+      - runFlow:
+          label: Dismiss first-run Continue sheet
+          when:
+            visible: "This is the developer menu.*"
+          commands:
+            - tapOn:
+                text: "Continue"
+      - runFlow:
+          label: Dismiss regular developer menu
+          when:
+            visible: "Runtime version.*"
+          commands:
+            - tapOn:
+                text: "Close"
+                optional: true
+            - runFlow:
+                when:
+                  visible: "Go home"
+                commands:
+                  - pressKey: back
+      - assertVisible:
+          id: sign-in-screen
+          optional: true
+- assertVisible:
+    id: sign-in-screen
+- assertVisible:
+    id: sign-in-heading
+- copyTextFrom:
+    id: sign-in-heading
+- assertTrue: ${maestro.copiedText == "Sign in"}
+- takeScreenshot: signed-out
+- tapOn:
+    id: e2e-sign-in
+# get-session is a network hop; an immediate visible check would fail before the session lands.
+- extendedWaitUntil:
+    visible:
+      id: welcome-screen
+    timeout: 60000
+- assertVisible:
+    id: welcome-heading
+- copyTextFrom:
+    id: welcome-heading
+- assertTrue: ${maestro.copiedText == "Coffee Companion"}
+- takeScreenshot: signed-in
+- tapOn:
+    id: sign-out
+- extendedWaitUntil:
+    visible:
+      id: sign-in-screen
+    timeout: 60000
+- assertVisible:
+    id: sign-in-heading
+- copyTextFrom:
+    id: sign-in-heading
+- assertTrue: ${maestro.copiedText == "Sign in"}
+- takeScreenshot: signed-out-again
+# Sign-out must persist in SecureStore: relaunch without wiping data.
+# A failed Metro reconnect can land on the Expo launcher; reopen the deep link
+# until sign-in-screen or the same 60s deadline. Overlays can cover the app
+# after that reconnect the same way they do on the first wait.
+- launchApp:
+    clearState: false
+- evalScript: ${output.relaunchDeadlineMs = Date.now() + 60000}
+- repeat:
+    while:
+      notVisible:
+        id: sign-in-screen
+      true: ${Date.now() < output.relaunchDeadlineMs}
+    commands:
+      - evalScript: ${output.relaunchWaitTick = Date.now()}
+      - runFlow:
+          label: Re-open Metro deep link if relaunch landed on the Expo launcher
+          when:
+            visible: "Fetch development servers"
+          commands:
+            - openLink:
+                link: ${EXPO_DEV_CLIENT_URL}
+                browser: false
+      - runFlow:
+          label: Dismiss first-run Continue sheet after relaunch
+          when:
+            visible: "This is the developer menu.*"
+          commands:
+            - tapOn:
+                text: "Continue"
+      - runFlow:
+          label: Dismiss regular developer menu after relaunch
+          when:
+            visible: "Runtime version.*"
+          commands:
+            - tapOn:
+                text: "Close"
+                optional: true
+            - runFlow:
+                when:
+                  visible: "Go home"
+                commands:
+                  - pressKey: back
+- assertVisible:
+    id: sign-in-screen
+- assertVisible:
+    id: sign-in-heading
+- copyTextFrom:
+    id: sign-in-heading
+- assertTrue: ${maestro.copiedText == "Sign in"}
+- takeScreenshot: signed-out-after-relaunch

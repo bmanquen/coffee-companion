@@ -20,12 +20,17 @@ import {
   SIGN_UP_WITH_APPLE,
   SIGN_UP_WITH_GOOGLE,
 } from './copy'
+import { E2E_USER_ENV } from './e2e'
 import {
+  E2E_SIGN_IN_TEST_ID,
   SIGN_IN_A11Y_LABEL,
+  SIGN_IN_APPLE_TEST_ID,
   SIGN_IN_ERROR_TEST_ID,
+  SIGN_IN_GOOGLE_TEST_ID,
   SIGN_IN_HEADING_TEST_ID,
   SIGN_IN_NO_ACCOUNT_TEST_ID,
   SIGN_IN_SCREEN_TEST_ID,
+  SIGN_IN_TOGGLE_TEST_ID,
   SignInScreen,
 } from './SignInScreen'
 import type { Auth } from './use-auth'
@@ -41,30 +46,44 @@ function signedOut(overrides: Partial<Auth> = {}): Auth {
     setMode: () => {},
     signInGoogle: async () => {},
     signInApple: async () => {},
+    signInE2E: async () => {},
     signOut: async () => {},
     ...overrides,
   }
 }
 
 describe('sign-in screen', () => {
+  const originalE2EUser = process.env[E2E_USER_ENV]
+
+  beforeEach(() => {
+    delete process.env[E2E_USER_ENV]
+  })
+
+  afterEach(() => {
+    if (originalE2EUser === undefined) delete process.env[E2E_USER_ENV]
+    else process.env[E2E_USER_ENV] = originalE2EUser
+  })
+
   it('shows the heading, both provider buttons, and the no-account line', async () => {
     const view = await render(<App auth={signedOut()} />)
 
-    expect(screen.getByTestId(SIGN_IN_SCREEN_TEST_ID)).toBeTruthy()
+    const signInHost = screen.getByTestId(SIGN_IN_SCREEN_TEST_ID)
+    expect(signInHost.props.collapsable).toBe(false)
+    expect(signInHost.props.testID).toBe(SIGN_IN_SCREEN_TEST_ID)
     expect(screen.getByLabelText(SIGN_IN_A11Y_LABEL)).toBeTruthy()
     expect(screen.getByRole('header', { name: APP_NAME })).toBeTruthy()
     expect(screen.getByRole('header', { name: SIGN_IN_HEADING })).toBeTruthy()
     expect(screen.getByTestId(SIGN_IN_HEADING_TEST_ID)).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: SIGN_IN_WITH_GOOGLE }),
-    ).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: SIGN_IN_WITH_APPLE }),
-    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: SIGN_IN_WITH_GOOGLE })).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_GOOGLE_TEST_ID)).toBeTruthy()
+    expect(screen.getByRole('button', { name: SIGN_IN_WITH_APPLE })).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_APPLE_TEST_ID)).toBeTruthy()
     expect(screen.getByTestId(SIGN_IN_NO_ACCOUNT_TEST_ID)).toBeTruthy()
     expect(screen.getByText(NO_ACCOUNT_PROMPT)).toBeTruthy()
     expect(screen.getByRole('button', { name: NO_ACCOUNT_ACTION })).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_TOGGLE_TEST_ID)).toBeTruthy()
     expect(screen.queryByRole('button', { name: SIGN_OUT })).toBeNull()
+    expect(screen.queryByTestId(E2E_SIGN_IN_TEST_ID)).toBeNull()
 
     writeHostTreeArtifacts(view.toJSON())
   })
@@ -72,10 +91,10 @@ describe('sign-in screen', () => {
   it('hides Sign in with Apple on Android', async () => {
     await render(<App auth={signedOut({ showApple: false })} />)
 
-    expect(
-      screen.getByRole('button', { name: SIGN_IN_WITH_GOOGLE }),
-    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: SIGN_IN_WITH_GOOGLE })).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_GOOGLE_TEST_ID)).toBeTruthy()
     expect(screen.queryByRole('button', { name: SIGN_IN_WITH_APPLE })).toBeNull()
+    expect(screen.queryByTestId(SIGN_IN_APPLE_TEST_ID)).toBeNull()
   })
 
   it('switches to sign-up copy from the no-account line', async () => {
@@ -110,16 +129,19 @@ describe('sign-in screen', () => {
     )
 
     expect(screen.getByRole('header', { name: SIGN_UP_HEADING })).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: SIGN_UP_WITH_GOOGLE }),
-    ).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: SIGN_UP_WITH_APPLE }),
-    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: SIGN_UP_WITH_GOOGLE })).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_GOOGLE_TEST_ID)).toHaveTextContent(
+      SIGN_UP_WITH_GOOGLE,
+    )
+    expect(screen.getByRole('button', { name: SIGN_UP_WITH_APPLE })).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_APPLE_TEST_ID)).toHaveTextContent(
+      SIGN_UP_WITH_APPLE,
+    )
     expect(screen.getByText(HAS_ACCOUNT_PROMPT)).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: HAS_ACCOUNT_ACTION }),
-    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: HAS_ACCOUNT_ACTION })).toBeTruthy()
+    expect(screen.getByTestId(SIGN_IN_TOGGLE_TEST_ID)).toHaveTextContent(
+      HAS_ACCOUNT_ACTION,
+    )
   })
 
   it('renders each sign-in error the user can hit', async () => {

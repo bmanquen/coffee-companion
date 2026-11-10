@@ -29,8 +29,38 @@ const statePath = join(runDir, 'state.json')
 const artifactsDir = join(skillDir, 'artifacts')
 const webDir = join(repoRoot, 'apps/web')
 
-const DEFAULT_PORT = Number(process.env.VERIFY_PORT ?? 3000)
-const BROWSER_PORT = Number(process.env.VERIFY_BROWSER_PORT ?? 3939)
+function requireTcpPort(raw, name, fallback) {
+  const source =
+    raw === undefined || raw === null || `${raw}`.trim() === ''
+      ? fallback
+      : `${raw}`.trim()
+  const port = Number(source)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(
+      `${name} must be an integer from 1 to 65535, got "${raw ?? ''}".`,
+    )
+  }
+  return port
+}
+
+function readTcpPortOrDie(raw, name, fallback) {
+  try {
+    return requireTcpPort(raw, name, fallback)
+  } catch (error) {
+    die(error instanceof Error ? error.message : String(error))
+  }
+}
+
+const DEFAULT_PORT = readTcpPortOrDie(
+  process.env.VERIFY_PORT,
+  'VERIFY_PORT',
+  3000,
+)
+const BROWSER_PORT = readTcpPortOrDie(
+  process.env.VERIFY_BROWSER_PORT,
+  'VERIFY_BROWSER_PORT',
+  3939,
+)
 const IDENTITIES = {
   public: null,
   data: 'e2e-user-with-data',
@@ -73,6 +103,38 @@ function pidAlive(pid) {
     return true
   } catch {
     return false
+  }
+}
+
+function selectedOrigin(env) {
+  const port = requireTcpPort(env.PORT, 'PORT', DEFAULT_PORT)
+  return `http://127.0.0.1:${port}`
+}
+
+function webBuildEnv(env) {
+  const origin = selectedOrigin(env)
+  return {
+    ...env,
+    NODE_ENV: 'production',
+    BETTER_AUTH_URL: origin,
+    SITE_URL: origin,
+  }
+}
+
+function webRuntimeEnv(env) {
+  const origin = selectedOrigin(env)
+  return {
+    ...env,
+    NODE_ENV: 'test',
+    HOST: '127.0.0.1',
+    NITRO_HOST: '127.0.0.1',
+    // Always the selected port. A shell SITE_URL / BETTER_AUTH_URL would
+    // otherwise bake marketing tags and the auth base URL for the wrong origin.
+    BETTER_AUTH_URL: origin,
+    SITE_URL: origin,
+    // Empty, not omitted: a shell STRIPE_SECRET_KEY would otherwise enable
+    // billing or crash launch on an incomplete Stripe config.
+    STRIPE_SECRET_KEY: '',
   }
 }
 
@@ -142,15 +204,17 @@ function refuseIfPortBusy(port) {
 }
 
 function placeholderEnv(port) {
+  const origin = `http://127.0.0.1:${port}`
   return {
     BETTER_AUTH_SECRET:
       process.env.BETTER_AUTH_SECRET ?? randomBytes(32).toString('hex'),
-    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? `http://127.0.0.1:${port}`,
+    BETTER_AUTH_URL: origin,
     GOOGLE_CLIENT_ID:
       process.env.GOOGLE_CLIENT_ID ?? `verify-${randomBytes(8).toString('hex')}`,
     GOOGLE_CLIENT_SECRET:
       process.env.GOOGLE_CLIENT_SECRET ?? randomBytes(32).toString('hex'),
-    SITE_URL: process.env.SITE_URL ?? `http://127.0.0.1:${port}`,
+    SITE_URL: origin,
+    STRIPE_SECRET_KEY: '',
   }
 }
 
@@ -220,10 +284,13 @@ async function cmdLaunch() {
 
   // Always rebuild. An existence-only check would serve a stale .output after
   // a branch switch or source edit and invalidate the proof. The production
-  // build is ~15s here; correctness beats reuse.
+  // build is ~15s here; correctness beats reuse. Pin NODE_ENV=production so a
+  // shell NODE_ENV=test cannot leak into the Vite client bundle.
   const serverEntry = join(webDir, '.output/server/index.mjs')
   console.error('Building the production web app…')
-  run('pnpm', ['--filter', 'coffee-companion', 'build'], { env })
+  run('pnpm', ['--filter', 'coffee-companion', 'build'], {
+    env: webBuildEnv(env),
+  })
   if (!existsSync(serverEntry)) {
     die(`Build did not produce ${serverEntry}`)
   }
@@ -232,7 +299,9 @@ async function cmdLaunch() {
   const logFd = openSync(logPath, 'w')
   const server = spawn('node', [serverEntry], {
     cwd: webDir,
-    env: { ...process.env, ...env },
+    // Production *build* above; test *runtime* so the bypass guard can fire.
+    // Pin loopback so Nitro does not inherit an unspecified HOST.
+    env: { ...process.env, ...webRuntimeEnv(env) },
     stdio: ['ignore', logFd, logFd],
     detached: true,
   })
@@ -950,7 +1019,8 @@ async function runDaemon() {
         await target.waitFor({ state: 'visible', timeout: 15_000 })
         // An unhydrated fill sets the DOM value and React never hears it
         // (apps/web/e2e/helpers.ts waitForHydration). Wait for React's
-        // listener tag before typing.
+        // listener tag on the field and the layout outlet, then for that
+        // outlet to finish commit, before typing.
         const start = Date.now()
         let hydrated = false
         while (Date.now() - start < 15_000) {
@@ -965,6 +1035,58 @@ async function runDaemon() {
         if (!hydrated) {
           throw new Error(
             'React never tagged this node. If the page is interactive in a browser, the tag has been renamed.',
+          )
+        }
+        const outletStart = Date.now()
+        let outletTagged = false
+        while (Date.now() - outletStart < 15_000) {
+          outletTagged = await page
+            .locator('main')
+            .first()
+            .evaluate((el) =>
+              Object.keys(el).some((key) => key.startsWith('__reactProps$')),
+            )
+            .catch(() => false)
+          if (outletTagged) break
+          await sleep(50)
+        }
+        if (!outletTagged) {
+          throw new Error(
+            'React never tagged the page outlet. If the page is interactive in a browser, the tag has been renamed.',
+          )
+        }
+        const outletIdleStart = Date.now()
+        let outletIdle = false
+        while (Date.now() - outletIdleStart < 15_000) {
+          outletIdle = await page
+            .locator('main')
+            .first()
+            .evaluate((el) => {
+              // Same predicate as apps/web/e2e/helpers.ts isReactCommitIdle.
+              const fiberKey = Object.keys(el).find((key) =>
+                key.startsWith('__reactFiber$'),
+              )
+              if (!fiberKey) return false
+              let fiber = el[fiberKey]
+              if (!fiber) return false
+              while (fiber.return) fiber = fiber.return
+              if (fiber.tag !== 3) return false
+              const root = fiber.stateNode
+              if (!root) return false
+              const current = root.current
+              if (!current || current.tag !== 3) return false
+              if (current !== fiber && current !== fiber.alternate) {
+                return false
+              }
+              return root.pendingLanes === 0
+            })
+            .catch(() => false)
+          if (outletIdle) break
+          await sleep(50)
+        }
+        if (!outletIdle) {
+          throw new Error(
+            'React never committed the page outlet. If the page is interactive in a browser, the commit signal has changed.',
           )
         }
         await target.fill(String(msg.value ?? ''), { timeout: 15_000 })
@@ -1080,6 +1202,10 @@ export {
   assertOneRegion,
   requireUniqueRegion,
   resolveClickTarget,
+  webBuildEnv,
+  webRuntimeEnv,
+  placeholderEnv,
+  requireTcpPort,
 }
 
 // Importing this file for locator tests must not run launch/doctor/cleanup.
