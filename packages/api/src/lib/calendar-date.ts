@@ -6,6 +6,10 @@ import { z } from 'zod'
 export const calendarDateSchema = z.iso.date()
 export type CalendarDate = z.infer<typeof calendarDateSchema>
 
+export function isCalendarDate(value: string): boolean {
+  return calendarDateSchema.safeParse(value).success
+}
+
 function parts(value: string): [number, number, number] {
   const [year, month, day] = value.split('-').map(Number)
   return [year, month, day]

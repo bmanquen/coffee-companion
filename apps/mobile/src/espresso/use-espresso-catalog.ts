@@ -56,6 +56,7 @@ function reducer(state: State, action: Action): State {
         reloadToken: state.reloadToken + 1,
       }
     case 'saveStarted':
+      if (state.busy) return state
       return { ...state, busy: true, saveError: null }
     case 'saveSucceeded':
       return { ...state, busy: false, saveError: null }
@@ -69,6 +70,8 @@ function reducer(state: State, action: Action): State {
 export function useEspressoCatalog(api: EspressoApi) {
   const [state, dispatch] = useReducer(reducer, initial)
   const loadSeq = useRef(0)
+  const saveInFlight = useRef(false)
+  const saveSeq = useRef(0)
 
   const runLoad = useCallback(() => {
     const seq = ++loadSeq.current
@@ -105,15 +108,22 @@ export function useEspressoCatalog(api: EspressoApi) {
 
   const save = useCallback(
     (input: ShotCreate, onSuccess?: () => void) => {
+      if (saveInFlight.current) return
+      saveInFlight.current = true
+      const seq = ++saveSeq.current
       dispatch({ type: 'saveStarted' })
       runMaybePromise(
         () => api.create(input),
         () => {
+          saveInFlight.current = false
+          if (seq !== saveSeq.current) return
           dispatch({ type: 'saveSucceeded' })
           onSuccess?.()
           runLoad()
         },
         (error) => {
+          saveInFlight.current = false
+          if (seq !== saveSeq.current) return
           dispatch({
             type: 'saveFailed',
             error: apiErrorMessage(error, ERROR_SAVE_FAILED),

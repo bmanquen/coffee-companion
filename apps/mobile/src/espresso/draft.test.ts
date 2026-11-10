@@ -96,6 +96,13 @@ describe('parseShotDraft', () => {
     if (parsed.ok) return
     expect(parsed.errors).toEqual({ roastDate: 'Use YYYY-MM-DD' })
   })
+
+  it('rejects a roast date that is not a real calendar day', () => {
+    const parsed = parseShotDraft({ ...valid, roastDate: '2026-02-30' })
+    expect(parsed.ok).toBe(false)
+    if (parsed.ok) return
+    expect(parsed.errors).toEqual({ roastDate: 'Use YYYY-MM-DD' })
+  })
 })
 
 describe('applyCoffeePrefill', () => {

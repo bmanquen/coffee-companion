@@ -4032,7 +4032,7 @@ const DRIVES = {
       'Coffee Companion',
       'shot-list',
       'Ethiopia Guji',
-      'verify-grind-7',
+      'Grind verify-grind-7',
     ],
     observed: {
       heading: 'Coffee Companion',
