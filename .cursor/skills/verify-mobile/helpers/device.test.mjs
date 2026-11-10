@@ -129,10 +129,13 @@ import {
   pidGoneTick,
   stopSignalTick,
   parseLockPid,
+  avdHome,
   avdLockPaths,
   avdLockTick,
   parseEmulatorAvdPids,
   avdBusyMessage,
+  avdLockHeldMessage,
+  releaseAvdLocksIfIdle,
   waitForPidGone,
   stopPidAndWait,
   waitForAvdLocksReleased,
@@ -1944,6 +1947,17 @@ describe('verify-mobile usage defaults', () => {
     assert.match(skill(), /later process on the same port is reported and left running/)
   })
 
+  it('documents stale AVD locks are removed only when no emulator holds them', () => {
+    assert.match(
+      skill(),
+      /leftover `\*\.lock` files under the AVD directory/,
+    )
+    assert.match(skill(), /ANDROID_AVD_HOME/)
+    assert.match(skill(), /ANDROID_USER_HOME/)
+    assert.match(skill(), /lock-wait timeout names its pid and command/)
+    assert.match(skill(), /a live holder is not deleted/)
+  })
+
   it('documents that a clearState flow is refused on a pre-existing attached install', () => {
     const text = skill()
     assert.match(text, /ownedPackage. is false/)
@@ -2566,12 +2580,40 @@ describe('avdBusyMessage', () => {
   })
 })
 
+describe('avdHome', () => {
+  it('prefers ANDROID_AVD_HOME over ANDROID_USER_HOME', () => {
+    assert.equal(
+      avdHome({
+        ANDROID_AVD_HOME: '/tmp/avds',
+        ANDROID_USER_HOME: '/tmp/user',
+      }),
+      '/tmp/avds',
+    )
+  })
+
+  it('uses ANDROID_USER_HOME/avd when ANDROID_AVD_HOME is unset', () => {
+    assert.equal(avdHome({ ANDROID_USER_HOME: '/tmp/user' }), '/tmp/user/avd')
+  })
+
+  it('defaults to ~/.android/avd', () => {
+    assert.equal(avdHome({}, '/home/me'), '/home/me/.android/avd')
+  })
+})
+
 describe('avdLockPaths', () => {
   it('points at the AVD lock files under ANDROID_AVD_HOME', () => {
     const paths = avdLockPaths('verify-pixel', { ANDROID_AVD_HOME: '/tmp/avd-home' })
     assert.deepEqual(paths, [
       '/tmp/avd-home/verify-pixel.avd/hardware-qemu.ini.lock',
       '/tmp/avd-home/verify-pixel.avd/multiinstance.lock',
+    ])
+  })
+
+  it('points at the AVD lock files under ANDROID_USER_HOME', () => {
+    const paths = avdLockPaths('Pixel_7', { ANDROID_USER_HOME: '/tmp/user' })
+    assert.deepEqual(paths, [
+      '/tmp/user/avd/Pixel_7.avd/hardware-qemu.ini.lock',
+      '/tmp/user/avd/Pixel_7.avd/multiinstance.lock',
     ])
   })
 })
@@ -2677,6 +2719,8 @@ describe('ensureAvdFreeToBoot', () => {
     const result = await ensureAvdFreeToBoot('verify-pixel', {
       ourPid: 11,
       listPids: () => [11, leftoverAlive ? 22 : null].filter(Boolean),
+      listHolders: () => [],
+      listLockFiles: () => [],
       alive: (pid) => (pid === 11 ? ourAlive : leftoverAlive),
       signal: (pid, sig) => {
         signals.push([pid, sig])
@@ -2703,6 +2747,8 @@ describe('ensureAvdFreeToBoot', () => {
         ensureAvdFreeToBoot('verify-pixel', {
           ourPid: null,
           listPids: () => [87011],
+          listHolders: () => [{ pid: 87011, command: 'emulator -avd verify-pixel' }],
+          listLockFiles: () => [],
           alive: () => true,
           inspectLocks: () => [{ name: 'multiinstance.lock', exists: true }],
           sleep: async () => {},
@@ -2712,6 +2758,147 @@ describe('ensureAvdFreeToBoot', () => {
         }),
       /87011/,
     )
+  })
+
+  it('removes stale AVD lock files when no emulator is live', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-avd-stale-'))
+    const avdDir = join(root, 'Pixel_7.avd')
+    mkdirSync(avdDir)
+    writeFileSync(join(avdDir, 'multiinstance.lock'), '1\n')
+    writeFileSync(join(avdDir, 'hardware-qemu.ini.lock'), '1\n')
+    mkdirSync(join(avdDir, 'snapshot.lock'))
+    const reports = []
+    try {
+      const result = await ensureAvdFreeToBoot('Pixel_7', {
+        env: { ANDROID_AVD_HOME: root },
+        listPids: () => [],
+        listHolders: () => [],
+        alive: () => false,
+        psText: '',
+        sleep: async () => {},
+        now: () => 1,
+        lockTimeoutMs: 5,
+        report: (message) => reports.push(message),
+      })
+      assert.equal(result.status, 'ok')
+      assert.equal(existsSync(join(avdDir, 'multiinstance.lock')), false)
+      assert.equal(existsSync(join(avdDir, 'hardware-qemu.ini.lock')), false)
+      assert.equal(existsSync(join(avdDir, 'snapshot.lock')), false)
+      assert.equal(reports.length, 1)
+      assert.match(reports[0], /multiinstance.lock/)
+      assert.match(reports[0], /hardware-qemu.ini.lock/)
+      assert.match(reports[0], /snapshot.lock/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('does not delete AVD locks when an emulator process holds the AVD', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-avd-held-'))
+    const avdDir = join(root, 'Pixel_7.avd')
+    mkdirSync(avdDir)
+    const multi = join(avdDir, 'multiinstance.lock')
+    const qemu = join(avdDir, 'hardware-qemu.ini.lock')
+    writeFileSync(multi, '87011\n')
+    writeFileSync(qemu, '87011\n')
+    let t = 0
+    try {
+      await assert.rejects(
+        () =>
+          ensureAvdFreeToBoot('Pixel_7', {
+            env: { ANDROID_AVD_HOME: root },
+            listPids: () => [],
+            listHolders: () => [
+              {
+                pid: 87011,
+                command: '/sdk/emulator/qemu-system-aarch64 -avd Pixel_7',
+              },
+            ],
+            alive: () => true,
+            inspectLocks: () => [
+              { name: 'multiinstance.lock', exists: true },
+              { name: 'hardware-qemu.ini.lock', exists: true },
+            ],
+            sleep: async () => {},
+            now: () => ++t,
+            lockTimeoutMs: 3,
+          }),
+        (error) => {
+          assert.match(error.message, /87011/)
+          assert.match(error.message, /qemu-system-aarch64/)
+          return true
+        },
+      )
+      assert.equal(existsSync(multi), true)
+      assert.equal(existsSync(qemu), true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('releaseAvdLocksIfIdle', () => {
+  it('removes every *.lock under the AVD dir when no process is live', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-avd-idle-'))
+    const avdDir = join(root, 'Pixel_7.avd')
+    mkdirSync(avdDir)
+    writeFileSync(join(avdDir, 'multiinstance.lock'), '1\n')
+    mkdirSync(join(avdDir, 'hardware-qemu.ini.lock'))
+    const reports = []
+    try {
+      const result = releaseAvdLocksIfIdle('Pixel_7', {
+        env: { ANDROID_AVD_HOME: root },
+        holders: [],
+        report: (message) => reports.push(message),
+      })
+      assert.deepEqual(result.removed.sort(), [
+        'hardware-qemu.ini.lock',
+        'multiinstance.lock',
+      ])
+      assert.equal(existsSync(join(avdDir, 'multiinstance.lock')), false)
+      assert.equal(existsSync(join(avdDir, 'hardware-qemu.ini.lock')), false)
+      assert.match(reports[0], /Removed stale AVD Pixel_7 lock/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves lock files in place when a process holds the AVD', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-avd-busy-'))
+    const avdDir = join(root, 'Pixel_7.avd')
+    mkdirSync(avdDir)
+    const multi = join(avdDir, 'multiinstance.lock')
+    writeFileSync(multi, '87011\n')
+    const reports = []
+    try {
+      const result = releaseAvdLocksIfIdle('Pixel_7', {
+        env: { ANDROID_AVD_HOME: root },
+        holders: [
+          {
+            pid: 87011,
+            command: '/sdk/emulator/emulator -avd Pixel_7 -port 5554',
+          },
+        ],
+        report: (message) => reports.push(message),
+      })
+      assert.deepEqual(result.removed, [])
+      assert.equal(existsSync(multi), true)
+      assert.deepEqual(reports, [])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('avdLockHeldMessage', () => {
+  it('names the holder pid and command', () => {
+    const message = avdLockHeldMessage('Pixel_7', ['multiinstance.lock'], [
+      { pid: 87011, command: 'qemu-system-aarch64 -avd Pixel_7' },
+    ])
+    assert.match(message, /Pixel_7/)
+    assert.match(message, /multiinstance.lock/)
+    assert.match(message, /87011/)
+    assert.match(message, /qemu-system-aarch64/)
   })
 })
 

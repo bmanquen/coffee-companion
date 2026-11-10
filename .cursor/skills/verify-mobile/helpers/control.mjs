@@ -592,10 +592,13 @@ function parseLockPid(text) {
   return match ? Number(match[1]) : null
 }
 
-function avdHome(env = process.env) {
-  const override = `${env.ANDROID_AVD_HOME ?? ''}`.trim()
-  if (override) return override
-  return join(homedir(), '.android', 'avd')
+function avdHome(env = process.env, home = homedir()) {
+  // ANDROID_AVD_HOME wins over ANDROID_USER_HOME/avd, matching the emulator.
+  const avdOverride = `${env.ANDROID_AVD_HOME ?? ''}`.trim()
+  if (avdOverride) return avdOverride
+  const userHome = `${env.ANDROID_USER_HOME ?? ''}`.trim()
+  if (userHome) return join(userHome, 'avd')
+  return join(home, '.android', 'avd')
 }
 
 function avdLockDir(avdName, env = process.env) {
@@ -604,7 +607,27 @@ function avdLockDir(avdName, env = process.env) {
 
 function avdLockPaths(avdName, env = process.env) {
   const dir = avdLockDir(avdName, env)
-  return AVD_LOCK_NAMES.map((name) => join(dir, name))
+  const names = new Set(AVD_LOCK_NAMES)
+  try {
+    for (const name of readdirSync(dir)) {
+      if (name.endsWith('.lock')) names.add(name)
+    }
+  } catch {
+    // AVD dir missing
+  }
+  return [...names].sort().map((name) => join(dir, name))
+}
+
+function listAvdLockFiles(avdName, env = process.env) {
+  const dir = avdLockDir(avdName, env)
+  try {
+    return readdirSync(dir)
+      .filter((name) => name.endsWith('.lock'))
+      .sort()
+      .map((name) => join(dir, name))
+  } catch {
+    return []
+  }
 }
 
 function readLockPid(path) {
@@ -628,24 +651,31 @@ function avdLockTick({ locks = [] }) {
   return { status: 'wait', locks: held.map((lock) => lock.name) }
 }
 
-function parseEmulatorAvdPids(psText, avdName) {
-  const pids = []
-  const avd = `${avdName ?? ''}`
-  if (!avd) return pids
+function parseProcessTable(psText) {
+  const rows = []
   for (const line of `${psText ?? ''}`.split('\n')) {
     const match = line.match(/^\s*(\d+)\s+(\S.*)$/)
     if (!match) continue
-    const cmd = match[2]
-    if (!/emulator|qemu-system/.test(cmd)) continue
-    if (
-      cmd.includes(`-avd ${avd}`) ||
-      cmd.includes(`@${avd}`) ||
-      cmd.includes(`/${avd}.avd`)
-    ) {
-      pids.push(Number(match[1]))
-    }
+    rows.push({ pid: Number(match[1]), command: match[2] })
   }
-  return pids
+  return rows
+}
+
+function processHoldsAvd(command, avdName) {
+  const avd = `${avdName ?? ''}`
+  const cmd = `${command ?? ''}`
+  if (!avd || !/emulator|qemu-system/.test(cmd)) return false
+  return (
+    cmd.includes(`-avd ${avd}`) ||
+    cmd.includes(`@${avd}`) ||
+    cmd.includes(`/${avd}.avd`)
+  )
+}
+
+function parseEmulatorAvdPids(psText, avdName) {
+  return parseProcessTable(psText)
+    .filter((row) => processHoldsAvd(row.command, avdName))
+    .map((row) => row.pid)
 }
 
 function listProcessTable() {
@@ -655,16 +685,78 @@ function listProcessTable() {
   return `${result.stdout ?? ''}`
 }
 
-function runningAvdPids(avdName, opts = {}) {
+function liveAvdHolders(avdName, opts = {}) {
   const alive = opts.alive ?? pidAlive
-  const fromLocks = inspectAvdLocks(avdName, opts)
-    .map((lock) => lock.pid)
-    .filter((pid) => pid && alive(pid))
-  const fromPs = parseEmulatorAvdPids(
-    opts.psText ?? listProcessTable(),
-    avdName,
-  ).filter((pid) => alive(pid))
-  return [...new Set([...fromLocks, ...fromPs])]
+  const rows = parseProcessTable(opts.psText ?? listProcessTable())
+  const byPid = new Map(rows.map((row) => [row.pid, row.command]))
+  const holders = []
+  const seen = new Set()
+  const add = (pid, command) => {
+    if (!pid || seen.has(pid) || !alive(pid)) return
+    seen.add(pid)
+    holders.push({ pid, command: command ?? '' })
+  }
+  for (const row of rows) {
+    if (processHoldsAvd(row.command, avdName)) add(row.pid, row.command)
+  }
+  for (const lock of inspectAvdLocks(avdName, opts)) {
+    if (!lock.pid || !alive(lock.pid)) continue
+    const command = byPid.get(lock.pid) ?? ''
+    if (/emulator|qemu-system/.test(command)) add(lock.pid, command)
+  }
+  return holders
+}
+
+function runningAvdPids(avdName, opts = {}) {
+  return liveAvdHolders(avdName, opts).map((holder) => holder.pid)
+}
+
+function removeStaleAvdLocks(avdName, opts = {}) {
+  const paths = (
+    opts.listLockFiles ?? (() => listAvdLockFiles(avdName, opts.env))
+  )()
+  const remove =
+    opts.removeLock ??
+    ((path) => rmSync(path, { force: true, recursive: true }))
+  const removed = []
+  for (const path of paths) {
+    try {
+      remove(path)
+      removed.push(basename(path))
+    } catch {
+      // already gone
+    }
+  }
+  return removed
+}
+
+function avdLockHeldMessage(avdName, locks, holders) {
+  const lockList = (locks ?? []).join(', ')
+  if (!holders?.length) {
+    return `Timed out waiting for AVD ${avdName} locks to release (${lockList}).`
+  }
+  const listed = holders
+    .map((holder) =>
+      holder.command ? `${holder.pid} (${holder.command})` : `${holder.pid}`,
+    )
+    .join(', ')
+  return (
+    `Timed out waiting for AVD ${avdName} locks to release (${lockList}); ` +
+    `held by pid ${listed}.`
+  )
+}
+
+function releaseAvdLocksIfIdle(avdName, opts = {}) {
+  const holders =
+    opts.holders ??
+    (opts.listHolders ?? (() => liveAvdHolders(avdName, opts)))()
+  if (holders.length > 0) return { removed: [], holders }
+  const removed = removeStaleAvdLocks(avdName, opts)
+  if (removed.length > 0) {
+    const report = opts.report ?? ((message) => console.error(message))
+    report(`Removed stale AVD ${avdName} lock(s): ${removed.join(', ')}.`)
+  }
+  return { removed, holders: [] }
 }
 
 function avdBusyMessage(avdName, pids) {
@@ -2126,6 +2218,9 @@ async function ensureAvdFreeToBoot(avdName, opts = {}) {
       )
     }
   }
+  const holdersNow = () =>
+    (opts.listHolders ?? (() => liveAvdHolders(avdName, opts)))()
+  releaseAvdLocksIfIdle(avdName, { ...opts, holders: holdersNow() })
   const locks = await waitForAvdLocksReleased(
     avdName,
     opts.lockTimeoutMs ?? AVD_LOCK_TIMEOUT_MS,
@@ -2134,9 +2229,7 @@ async function ensureAvdFreeToBoot(avdName, opts = {}) {
   const still = pidsNow()
   if (still.length > 0) throw new Error(avdBusyMessage(avdName, still))
   if (locks.status !== 'ok') {
-    throw new Error(
-      `Timed out waiting for AVD ${avdName} locks to release (${(locks.locks ?? []).join(', ')}).`,
-    )
+    throw new Error(avdLockHeldMessage(avdName, locks.locks, holdersNow()))
   }
   return { status: 'ok' }
 }
@@ -2166,6 +2259,7 @@ async function killEmulatorSerial({
     )
   }
   if (avdName) {
+    releaseAvdLocksIfIdle(avdName, waitOpts)
     await waitForAvdLocksReleased(
       avdName,
       waitOpts.lockTimeoutMs ?? AVD_LOCK_TIMEOUT_MS,
@@ -4203,10 +4297,14 @@ export {
   pidGoneTick,
   stopSignalTick,
   parseLockPid,
+  avdHome,
   avdLockPaths,
   avdLockTick,
   parseEmulatorAvdPids,
   avdBusyMessage,
+  avdLockHeldMessage,
+  liveAvdHolders,
+  releaseAvdLocksIfIdle,
   waitForPidGone,
   stopPidAndWait,
   waitForAvdLocksReleased,
