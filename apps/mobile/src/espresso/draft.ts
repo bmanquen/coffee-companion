@@ -1,3 +1,4 @@
+import { isCalendarDate } from '@coffee-companion/api/lib/calendar-date'
 import { formatBrewRatio } from '@coffee-companion/brew-display'
 import {
   ENTER_A_GRIND_SETTING,
@@ -87,7 +88,10 @@ export function parseShotDraft(draft: ShotDraft): ParseResult {
 
   let roastDate: string | null = null
   if (draft.roastDate.length > 0) {
-    if (!CALENDAR_DATE_PATTERN.test(draft.roastDate)) {
+    if (
+      !CALENDAR_DATE_PATTERN.test(draft.roastDate) ||
+      !isCalendarDate(draft.roastDate)
+    ) {
       errors.roastDate = USE_CALENDAR_DATE
     } else {
       roastDate = draft.roastDate

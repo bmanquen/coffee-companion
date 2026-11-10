@@ -26,7 +26,7 @@ Preconditions:
 
 - **Log a Shot.** Run `helpers/control drive espresso`. The drive opens `testID=select-trigger-coffee`, chooses `testID=select-option-ethiopia-guji` on the sheet, fills the recipe fields, and saves. The host tree after save contains `shot-list`, `Ethiopia Guji`, and `Grind verify-grind-7`. The create payload includes coffee id `00000000-0000-4000-8000-000000000001`, dose `18`, yield `36`, time `30`, and grind `verify-grind-7`.
 - **Device (where an AVD exists).** Run `helpers/control drive-device log-espresso`. Maestro opens the Coffee picker by `select-trigger-coffee` and chooses `select-option-ethiopia-guji`.
-- **Proof.** `drive espresso` writes `artifacts/<run>/espresso/tree.txt`, `tree.json`, and `proof.json`. `tree.txt` must show `Coffee Companion`, `shot-list`, and `verify-grind-7`. There is no device screenshot from this harness.
+- **Proof.** `drive espresso` writes `artifacts/<run>/espresso/tree.txt`, `tree.json`, and `proof.json`. `tree.txt` must show `Coffee Companion`, `shot-list`, and `Grind verify-grind-7`. There is no device screenshot from this harness.
 
 ## Gotchas
 

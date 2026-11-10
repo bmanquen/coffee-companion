@@ -11,20 +11,24 @@ import {
   BACK,
   EMPTY_SHOTS,
   ERROR_LOAD_FAILED,
+  ERROR_SAVE_FAILED,
   LABEL_COFFEE,
   LABEL_DOSE,
   LABEL_GRIND,
+  LABEL_ROAST_DATE,
   LABEL_TIME,
   LABEL_YIELD,
   LOADING_SHOTS,
   LOG,
   LOG_ESPRESSO_HEADING,
   LOG_SHOT,
+  LOG_TEST_ID,
   SEALED_SHOT,
   SELECT_COFFEE_ERROR,
   SHOT_FORM_TEST_ID,
   SHOT_LIST_TEST_ID,
   TRY_AGAIN,
+  USE_CALENDAR_DATE,
 } from './copy'
 import type { EspressoApi, EspressoCatalog, ShotCreate, ShotRow } from './types'
 import type { Auth } from '../auth/use-auth'
@@ -34,6 +38,7 @@ const GRINDER = '00000000-0000-4000-8000-000000000003'
 const ESP_DEVICE = '00000000-0000-4000-8000-000000000005'
 const GRIND_MARKER = 'verify-grind-7'
 const TRPC_FORBIDDEN = 'FORBIDDEN'
+const TRPC_INTERNAL = 'INTERNAL_SERVER_ERROR'
 
 const signedIn: Auth = {
   session: {
@@ -256,6 +261,98 @@ describe('log espresso shot', () => {
 
     expect(screen.getByText(message)).toBeTruthy()
     expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
+  })
+
+  it('shows the fallback when save fails with a non-allowlisted code', async () => {
+    const { api } = fakeApi(catalog(), {
+      create: () => {
+        throw Object.assign(new Error('{"issues":[{"code":"invalid_date"}]}'), {
+          data: { code: TRPC_INTERNAL },
+        })
+      },
+    })
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe('1.5')
+    await press(LOG)
+
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
+    expect(screen.queryByText('{"issues":[{"code":"invalid_date"}]}')).toBeNull()
+    expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
+  })
+
+  it('names an impossible roast date without calling create', async () => {
+    const { api, created } = fakeApi(catalog())
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await fireEvent.changeText(
+      screen.getByLabelText(LABEL_ROAST_DATE),
+      '2026-02-30',
+    )
+    await enterRecipe()
+    await press(LOG)
+
+    expect(screen.getByText(USE_CALENDAR_DATE)).toBeTruthy()
+    expect(created).toHaveLength(0)
+    expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
+  })
+
+  it('logs one shot when Log is pressed twice', async () => {
+    const created: Array<ShotCreate> = []
+    let resolveCreate: () => void = () => {}
+    const initial = catalog()
+    let shots = [...initial.shots]
+    const api: EspressoApi = {
+      load: () => ({ ...initial, shots: [...shots] }),
+      create: (input) => {
+        created.push(input)
+        return new Promise<void>((resolve) => {
+          resolveCreate = () => {
+            shots = [
+              {
+                id: `shot-${created.length + 1}`,
+                coffeeId: input.coffeeId,
+                coffeeName: 'Ethiopia Guji',
+                grinderId: input.grinderId,
+                brewingDeviceId: input.brewingDeviceId,
+                roastDate: input.roastDate,
+                grindSetting: input.grindSetting,
+                dose: input.dose,
+                yield: input.yield,
+                time: input.time,
+                sealed: false,
+              },
+              ...shots,
+            ]
+            resolve()
+          }
+        })
+      },
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
+    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
+
+    expect(created).toHaveLength(1)
+    expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
+
+    await act(async () => {
+      resolveCreate()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+    expect(created).toHaveLength(1)
+    expect(
+      screen.getByText(
+        `Grind ${GRIND_MARKER} · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s`,
+      ),
+    ).toBeTruthy()
   })
 
   it('returns to the list without saving when Back is pressed', async () => {
