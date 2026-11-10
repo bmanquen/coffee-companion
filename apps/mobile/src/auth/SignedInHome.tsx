@@ -1,14 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { apiErrorMessage } from '../api-error'
 import { ShotForm } from '../espresso/ShotForm'
 import { ShotList } from '../espresso/ShotList'
-import {
-  ERROR_LOAD_FAILED,
-  ERROR_SAVE_FAILED,
-  TRY_AGAIN,
-} from '../espresso/copy'
-import { idleEspressoApi, runMaybePromise } from '../espresso/types'
+import { TRY_AGAIN } from '../espresso/copy'
+import { idleEspressoApi } from '../espresso/types'
+import { useEspressoCatalog } from '../espresso/use-espresso-catalog'
 import {
   SIGN_OUT_TEST_ID,
   WELCOME_A11Y_LABEL,
@@ -18,7 +14,7 @@ import {
   welcomeMessage,
 } from '../welcome'
 import { SIGN_OUT } from './copy'
-import type { EspressoApi, EspressoCatalog, ShotCreate } from '../espresso/types'
+import type { EspressoApi } from '../espresso/types'
 
 type Screen = 'list' | 'form'
 
@@ -32,72 +28,16 @@ export function SignedInHome({
   espresso?: EspressoApi
 }) {
   const [screen, setScreen] = useState<Screen>('list')
-  const [catalog, setCatalog] = useState<EspressoCatalog | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const loadSeq = useRef(0)
-  const loadingRef = useRef(true)
-
-  const showCatalog = useCallback((next: EspressoCatalog) => {
-    loadingRef.current = false
-    setCatalog(next)
-    setLoadError(null)
-    setLoading(false)
-  }, [])
-
-  const failLoad = useCallback((error: unknown) => {
-    loadingRef.current = false
-    setLoadError(apiErrorMessage(error, ERROR_LOAD_FAILED))
-    setLoading(false)
-  }, [])
-
-  const beginLoad = useCallback(() => {
-    const seq = ++loadSeq.current
-    loadingRef.current = true
-    setLoadError(null)
-    setLoading(true)
-    runMaybePromise(
-      () => espresso.load(),
-      (next) => {
-        // A newer load replaces this one; a late failure must not hide that catalog.
-        if (seq !== loadSeq.current) return
-        showCatalog(next)
-      },
-      (error) => {
-        if (seq !== loadSeq.current) return
-        failLoad(error)
-      },
-    )
-  }, [espresso, showCatalog, failLoad])
-
-  const reload = useCallback(() => {
-    if (loadingRef.current) return
-    beginLoad()
-  }, [beginLoad])
-
-  useEffect(() => {
-    beginLoad()
-  }, [beginLoad])
-
-  const save = (input: ShotCreate) => {
-    setBusy(true)
-    setSaveError(null)
-    runMaybePromise(
-      () => espresso.create(input),
-      () => {
-        setSaveError(null)
-        setScreen('list')
-        setBusy(false)
-        reload()
-      },
-      (error) => {
-        setSaveError(apiErrorMessage(error, ERROR_SAVE_FAILED))
-        setBusy(false)
-      },
-    )
-  }
+  const {
+    catalog,
+    loading,
+    loadError,
+    busy,
+    saveError,
+    reload,
+    save,
+    clearSaveError,
+  } = useEspressoCatalog(espresso)
 
   return (
     <View
@@ -140,10 +80,12 @@ export function SignedInHome({
           busy={busy}
           error={saveError}
           onBack={() => {
-            setSaveError(null)
+            clearSaveError()
             setScreen('list')
           }}
-          onSubmit={save}
+          onSubmit={(input) => {
+            save(input, () => setScreen('list'))
+          }}
         />
       ) : (
         <ShotList
@@ -152,7 +94,7 @@ export function SignedInHome({
           failed={loadError != null}
           onLogShot={() => {
             if (!catalog) return
-            setSaveError(null)
+            clearSaveError()
             setScreen('form')
           }}
         />
