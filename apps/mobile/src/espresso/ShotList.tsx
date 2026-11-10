@@ -1,7 +1,7 @@
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -11,6 +11,7 @@ import {
   ESPRESSO_HEADING,
   LOADING_SHOTS,
   LOG_SHOT,
+  LOG_SHOT_TEST_ID,
   SHOT_LIST_A11Y_LABEL,
   SHOT_LIST_TEST_ID,
   SHOT_ROW_TEST_ID_PREFIX,
@@ -30,43 +31,49 @@ export function ShotList({
   onLogShot: () => void
 }) {
   const canLog = !loading && !failed && shots != null
+  const rows = failed ? [] : (shots ?? [])
 
   return (
-    <ScrollView
+    <FlatList
       accessibilityLabel={SHOT_LIST_A11Y_LABEL}
       testID={SHOT_LIST_TEST_ID}
       style={styles.list}
       contentContainerStyle={styles.content}
-    >
-      <View style={styles.header}>
-        <Text accessibilityRole="header">{ESPRESSO_HEADING}</Text>
-        <Pressable
-          accessibilityRole="button"
-          disabled={!canLog}
-          onPress={onLogShot}
-        >
-          <Text>{LOG_SHOT}</Text>
-        </Pressable>
-      </View>
-      {loading && shots == null ? (
-        <View accessibilityLabel={LOADING_SHOTS}>
-          <ActivityIndicator />
-        </View>
-      ) : failed ? null : shots == null || shots.length === 0 ? (
-        <Text>{EMPTY_SHOTS}</Text>
-      ) : (
-        shots.map((shot) => (
-          <View
-            key={shot.id}
-            testID={`${SHOT_ROW_TEST_ID_PREFIX}${shot.id}`}
-            style={styles.row}
+      data={rows}
+      extraData={`${loading}:${failed}`}
+      keyExtractor={(shot) => shot.id}
+      ListHeaderComponent={
+        <View style={styles.header}>
+          <Text accessibilityRole="header">{ESPRESSO_HEADING}</Text>
+          <Pressable
+            accessibilityRole="button"
+            testID={LOG_SHOT_TEST_ID}
+            disabled={!canLog}
+            onPress={onLogShot}
           >
-            <Text>{shot.coffeeName}</Text>
-            <Text>{shotSummary(shot)}</Text>
+            <Text>{LOG_SHOT}</Text>
+          </Pressable>
+        </View>
+      }
+      ListEmptyComponent={
+        loading && shots == null ? (
+          <View accessibilityLabel={LOADING_SHOTS}>
+            <ActivityIndicator />
           </View>
-        ))
+        ) : failed ? null : (
+          <Text>{EMPTY_SHOTS}</Text>
+        )
+      }
+      renderItem={({ item }) => (
+        <View
+          testID={`${SHOT_ROW_TEST_ID_PREFIX}${item.id}`}
+          style={styles.row}
+        >
+          <Text>{item.coffeeName}</Text>
+          <Text>{shotSummary(item)}</Text>
+        </View>
       )}
-    </ScrollView>
+    />
   )
 }
 

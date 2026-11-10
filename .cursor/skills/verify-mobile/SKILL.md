@@ -144,7 +144,7 @@ Stable handles (use these, not coordinates or visible text):
 
 - Welcome (signed in): `testID=welcome-screen`, `accessibilityLabel=Welcome`. Heading `Coffee Companion` (`testID=welcome-heading`). Button `testID=sign-out`. Espresso list `testID=shot-list`.
 - Sign-in (signed out): `testID=sign-in-screen`, `accessibilityLabel=Sign in`. Brand header `Coffee Companion`. Heading `Sign in` (`testID=sign-in-heading`). Buttons `testID=sign-in-google`, `testID=sign-in-apple` (iOS), `testID=sign-in-toggle`. Error `testID=sign-in-error`. Dev-only E2E handle `testID=e2e-sign-in` when `EXPO_PUBLIC_E2E_USER` is set.
-- Espresso (signed in): `testID=shot-list`, button `Log Shot`, form `testID=shot-form` heading `Log Espresso Shot`. Fields `Coffee`, `Grinder`, `Brewing Device`, `Dose (g)`, `Yield (g)`, `Time (s)`, `Grind Setting`. Submit `Log`. Sealed row copy `Sealed — Subscribe to Pro to read this brew`.
+- Espresso (signed in): `testID=shot-list`, button `testID=log-shot`. Form `testID=shot-form` heading `Log Espresso Shot`. Coffee / Grinder / Brewing Device are tap-to-open sheets (`testID=select-trigger-coffee`, `select-sheet-coffee`, `select-search-coffee`, `select-option-<slug>`). Recipe fields `testID=field-dose-g`, `field-yield-g`, `field-time-s`, `field-grind-setting`. Submit `testID=shot-form-log`. Sealed row copy `Sealed — Subscribe to Pro to read this brew`.
 
 The same queries as a raw Jest file. This renders in-process and does not check Metro — only `helpers/control drive <feature>` does:
 
@@ -213,7 +213,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | `helpers/control doctor` | Metro checks after `launch`; `maestro check-syntax` on `flows/`; after `launch-device` also APK SHA, bundle `cc-api-url:http://127.0.0.1:<web>`, `adb reverse --list` for the Metro and web ports (defaults 8081 and 3910), host `get-session` with native E2E headers whose body contains the e2e user, and no Expo launcher or developer menu in the foreground |
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
-| `helpers/control drive espresso` | Confirm Metro is answering, then pick a Coffee, log a Shot, and read it on the list |
+| `helpers/control drive espresso` | Confirm Metro is answering, then open the Coffee picker, choose an option, log a Shot, and read it on the list |
 | `helpers/control drive-device <flow>` | Re-apply adb reverse, refuse a `clearState` flow when `ownedPackage` is false, print host preflight OK/FAIL and device OK/SKIP/WARN, then `Running Maestro flow <flow>` on `emulator-5554`; copy screenshots to `artifacts/`; print `PASS`/`FAIL artifacts at …` (exit non-zero on fail) |
 | `helpers/control verify-device [flow]` | One shot: cleanup → launch-device → doctor → drive-device. Refuses a `clearState` flow on an attached preexisting install before Expo. Leaves the instance up if doctor or drive-device fails. |
 | `helpers/control cleanup` | Stop recorded pids and leftover listeners that still belong to this helper; report a later process on those ports without signalling it; `emu kill`, wait for the pid/group (SIGTERM then SIGKILL), wait for the serial and AVD locks; uninstall the package only when this run owns it; keep artifacts |

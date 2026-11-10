@@ -2,9 +2,16 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { App } from '../App'
 import { writeHostTreeArtifacts } from '../test/host-tree'
 import {
+  selectOptionTestId,
+  selectSearchTestId,
+  selectSheetTestId,
+  selectTriggerTestId,
+} from '../ui/fields'
+import {
   BACK,
   EMPTY_SHOTS,
   ERROR_LOAD_FAILED,
+  LABEL_COFFEE,
   LABEL_DOSE,
   LABEL_GRIND,
   LABEL_TIME,
@@ -123,8 +130,15 @@ async function openForm() {
   expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
 }
 
+async function pickSelect(label: string, optionName: string) {
+  await fireEvent.press(screen.getByTestId(selectTriggerTestId(label)))
+  expect(screen.getByTestId(selectSheetTestId(label))).toBeTruthy()
+  await fireEvent.press(screen.getByTestId(selectOptionTestId(optionName)))
+  expect(screen.queryByTestId(selectSheetTestId(label))).toBeNull()
+}
+
 async function pickCoffee() {
-  await press('Ethiopia Guji')
+  await pickSelect(LABEL_COFFEE, 'Ethiopia Guji')
   expect(screen.getByDisplayValue('2026-05-01')).toBeTruthy()
 }
 
@@ -326,6 +340,32 @@ describe('log espresso shot', () => {
     resolveRetry(empty)
     expect(await screen.findByText(EMPTY_SHOTS)).toBeTruthy()
     expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull()
+  })
+
+  it('filters coffee options in the picker by search', async () => {
+    const kenya = '00000000-0000-4000-8000-000000000099'
+    const { api } = fakeApi(
+      catalog({
+        coffees: [
+          { id: COFFEE, name: 'Ethiopia Guji' },
+          { id: kenya, name: 'Kenya AA' },
+        ],
+      }),
+    )
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await fireEvent.press(screen.getByTestId(selectTriggerTestId(LABEL_COFFEE)))
+
+    expect(screen.getByTestId(selectOptionTestId('Ethiopia Guji'))).toBeTruthy()
+    expect(screen.getByTestId(selectOptionTestId('Kenya AA'))).toBeTruthy()
+
+    await fireEvent.changeText(
+      screen.getByTestId(selectSearchTestId(LABEL_COFFEE)),
+      'Kenya',
+    )
+
+    expect(screen.queryByTestId(selectOptionTestId('Ethiopia Guji'))).toBeNull()
+    expect(screen.getByTestId(selectOptionTestId('Kenya AA'))).toBeTruthy()
   })
 
   it('keeps a loaded list when an earlier load fails late', async () => {

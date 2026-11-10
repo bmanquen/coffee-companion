@@ -1,10 +1,13 @@
+export { SEALED_SHOT } from '@coffee-companion/brew-display'
+
 export const ESPRESSO_HEADING = 'Espresso'
 export const LOG_SHOT = 'Log Shot'
+export const LOG_SHOT_TEST_ID = 'log-shot'
 export const LOG_ESPRESSO_HEADING = 'Log Espresso Shot'
 export const LOG = 'Log'
+export const LOG_TEST_ID = 'shot-form-log'
 export const BACK = 'Back'
 export const EMPTY_SHOTS = 'No espresso shots yet.'
-export const SEALED_SHOT = 'Sealed — Subscribe to Pro to read this brew'
 export const LOADING_SHOTS = 'Loading shots'
 
 export const SELECT_COFFEE = 'Select Coffee'

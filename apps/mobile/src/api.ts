@@ -3,6 +3,8 @@ import superjson from 'superjson'
 import { getSessionCookie } from './auth/auth-client'
 import { apiBaseUrl } from './auth/config'
 import { espressoDevicesFrom } from './espresso/devices'
+import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server'
+import type { TRPCRouter } from '@coffee-companion/api/trpc/router'
 import type {
   EspressoApi,
   EspressoCatalog,
@@ -10,32 +12,9 @@ import type {
   ShotRow,
 } from './espresso/types'
 
-type CoffeeRecord = { id: string; name: string }
-type GrinderRecord = { id: string; name: string }
-type DeviceRecord = { id: string; name: string; type: { name: string } }
-type ShotRecord = {
-  id: string
-  coffeeId: string
-  coffee: { name: string }
-  grinderId: string | null
-  brewingDeviceId: string | null
-  roastDate: string | null
-  grindSetting: string | null
-  dose: string | null
-  yield: string | null
-  time: number | null
-  sealed: boolean
-}
-
-type TrpcLike = {
-  coffee: { getAll: { query: () => Promise<Array<CoffeeRecord>> } }
-  grinder: { list: { query: () => Promise<Array<GrinderRecord>> } }
-  brewingDevice: { list: { query: () => Promise<Array<DeviceRecord>> } }
-  espressoShot: {
-    getAll: { query: () => Promise<Array<ShotRecord>> }
-    create: { mutate: (input: ShotCreate) => Promise<{ id: string }> }
-  }
-}
+type RouterOutputs = inferRouterOutputs<TRPCRouter>
+type ShotCreateInput = inferRouterInputs<TRPCRouter>['espressoShot']['create']
+type ShotRecord = RouterOutputs['espressoShot']['getAll'][number]
 
 function sessionHeaders(): Record<string, string> {
   const cookie = getSessionCookie()
@@ -59,7 +38,7 @@ function toShotRow(shot: ShotRecord): ShotRow {
 }
 
 export function createLiveEspressoApi(): EspressoApi {
-  const client = createTRPCClient({
+  const client = createTRPCClient<TRPCRouter>({
     links: [
       httpBatchLink({
         url: `${apiBaseUrl()}/api/trpc`,
@@ -67,7 +46,7 @@ export function createLiveEspressoApi(): EspressoApi {
         headers: sessionHeaders,
       }),
     ],
-  }) as unknown as TrpcLike
+  })
 
   return {
     async load(): Promise<EspressoCatalog> {
@@ -85,7 +64,8 @@ export function createLiveEspressoApi(): EspressoApi {
       }
     },
     async create(input: ShotCreate): Promise<void> {
-      await client.espressoShot.create.mutate(input)
+      const payload: ShotCreateInput = input
+      await client.espressoShot.create.mutate(payload)
     },
   }
 }
