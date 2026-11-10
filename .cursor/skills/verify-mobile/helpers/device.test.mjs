@@ -136,6 +136,8 @@ import {
   avdBusyMessage,
   avdLockHeldMessage,
   liveAvdHolders,
+  lockPidGoneError,
+  lockPidMayBeLive,
   releaseAvdLocksIfIdle,
   waitForPidGone,
   stopPidAndWait,
@@ -2838,6 +2840,35 @@ describe('ensureAvdFreeToBoot', () => {
   })
 })
 
+describe('lockPidGoneError', () => {
+  it('treats only ESRCH as proof the lock pid is gone', () => {
+    assert.equal(lockPidGoneError({ code: 'ESRCH' }), true)
+    assert.equal(lockPidGoneError({ code: 'EPERM' }), false)
+    assert.equal(lockPidGoneError({ code: 'EACCES' }), false)
+    assert.equal(lockPidGoneError({}), false)
+  })
+})
+
+describe('lockPidMayBeLive', () => {
+  it('is live for this process and gone after that pid exits', async () => {
+    assert.equal(lockPidMayBeLive(process.pid), true)
+    const child = spawn('sleep', ['30'], { stdio: 'ignore', detached: true })
+    child.unref()
+    try {
+      process.kill(child.pid, 'SIGKILL')
+    } catch {
+      try {
+        process.kill(-child.pid, 'SIGKILL')
+      } catch {
+        // already gone
+      }
+    }
+    const gone = await waitForPidGone(child.pid, 2_000, { pollMs: 20 })
+    assert.equal(gone.status, 'ok')
+    assert.equal(lockPidMayBeLive(child.pid), false)
+  })
+})
+
 describe('liveAvdHolders', () => {
   it('treats a live lock pid as a holder when the process table has no entry', () => {
     const root = mkdtempSync(join(tmpdir(), 'verify-avd-ps-miss-'))
@@ -2895,6 +2926,29 @@ describe('releaseAvdLocksIfIdle', () => {
       assert.equal(existsSync(join(avdDir, 'multiinstance.lock')), false)
       assert.equal(existsSync(join(avdDir, 'hardware-qemu.ini.lock')), false)
       assert.match(reports[0], /Removed stale AVD Pixel_7 lock/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('does not delete locks when lock pid liveness is inconclusive', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-avd-eperm-'))
+    const avdDir = join(root, 'Pixel_7.avd')
+    mkdirSync(avdDir)
+    const multi = join(avdDir, 'multiinstance.lock')
+    writeFileSync(multi, '87011\n')
+    try {
+      const result = releaseAvdLocksIfIdle('Pixel_7', {
+        env: { ANDROID_AVD_HOME: root },
+        psText: '',
+        alive: (pid) => {
+          if (pid !== 87011) return false
+          return !lockPidGoneError({ code: 'EPERM' })
+        },
+      })
+      assert.deepEqual(result.removed, [])
+      assert.equal(result.holders[0]?.pid, 87011)
+      assert.equal(existsSync(multi), true)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

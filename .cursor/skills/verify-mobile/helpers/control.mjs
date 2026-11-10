@@ -198,6 +198,20 @@ function pidAlive(pid) {
   }
 }
 
+function lockPidGoneError(error) {
+  return error?.code === 'ESRCH'
+}
+
+function lockPidMayBeLive(pid) {
+  if (!pid) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return !lockPidGoneError(error)
+  }
+}
+
 function run(command, args, opts = {}) {
   const result = spawnSync(command, args, {
     cwd: opts.cwd ?? repoRoot,
@@ -686,7 +700,7 @@ function listProcessTable() {
 }
 
 function liveAvdHolders(avdName, opts = {}) {
-  const alive = opts.alive ?? pidAlive
+  const alive = opts.alive ?? lockPidMayBeLive
   const rows = parseProcessTable(opts.psText ?? listProcessTable())
   const byPid = new Map(rows.map((row) => [row.pid, row.command]))
   const holders = []
@@ -4306,6 +4320,8 @@ export {
   avdBusyMessage,
   avdLockHeldMessage,
   liveAvdHolders,
+  lockPidGoneError,
+  lockPidMayBeLive,
   releaseAvdLocksIfIdle,
   waitForPidGone,
   stopPidAndWait,
