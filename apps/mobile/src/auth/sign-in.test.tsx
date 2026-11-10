@@ -85,7 +85,7 @@ describe('sign-in screen', () => {
     expect(screen.queryByRole('button', { name: SIGN_OUT })).toBeNull()
     expect(screen.queryByTestId(E2E_SIGN_IN_TEST_ID)).toBeNull()
 
-    writeHostTreeArtifacts(view.toJSON())
+    writeHostTreeArtifacts(view)
   })
 
   it('hides Sign in with Apple on Android', async () => {
