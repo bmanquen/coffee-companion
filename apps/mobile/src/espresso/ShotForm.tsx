@@ -14,6 +14,7 @@ import {
   LABEL_YIELD,
   LOG,
   LOG_ESPRESSO_HEADING,
+  LOG_TEST_ID,
   SELECT_COFFEE,
   SELECT_DEVICE,
   SELECT_GRINDER,
@@ -145,6 +146,7 @@ export function ShotForm({
       ) : null}
       <Pressable
         accessibilityRole="button"
+        testID={LOG_TEST_ID}
         disabled={busy}
         onPress={() => {
           const parsed = parseShotDraft(draft)

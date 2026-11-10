@@ -1,23 +1,45 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+// FlatList's test-renderer tree can cycle through children; skip repeats.
+function jsonSafe(value: unknown) {
+  const seen = new WeakSet<object>()
+  return JSON.stringify(
+    value,
+    (_key, current) => {
+      if (typeof current === 'object' && current !== null) {
+        if (seen.has(current)) return undefined
+        seen.add(current)
+      }
+      return current
+    },
+    2,
+  )
+}
+
 export function writeHostTreeArtifacts(tree: unknown) {
   const dest = process.env.VERIFY_MOBILE_ARTIFACTS
   if (!dest) return
   mkdirSync(dest, { recursive: true })
-  writeFileSync(join(dest, 'tree.json'), `${JSON.stringify(tree, null, 2)}\n`)
+  writeFileSync(join(dest, 'tree.json'), `${jsonSafe(tree)}\n`)
   writeFileSync(join(dest, 'tree.txt'), formatHostTree(tree))
 }
 
-export function formatHostTree(node: unknown, indent = 0): string {
+export function formatHostTree(
+  node: unknown,
+  indent = 0,
+  seen = new WeakSet<object>(),
+): string {
   if (node == null) return ''
   if (typeof node === 'string' || typeof node === 'number') {
     return `${' '.repeat(indent)}${node}\n`
   }
   if (Array.isArray(node)) {
-    return node.map((child) => formatHostTree(child, indent)).join('')
+    return node.map((child) => formatHostTree(child, indent, seen)).join('')
   }
   if (typeof node !== 'object') return ''
+  if (seen.has(node)) return ''
+  seen.add(node)
 
   const element = node as {
     type?: unknown
@@ -38,5 +60,5 @@ export function formatHostTree(node: unknown, indent = 0): string {
     .filter(Boolean)
     .join(' ')
   const line = `${' '.repeat(indent)}${role}${extras ? ` ${extras}` : ''}\n`
-  return line + formatHostTree(element.children, indent + 2)
+  return line + formatHostTree(element.children, indent + 2, seen)
 }

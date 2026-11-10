@@ -1,4 +1,4 @@
-import { formatBrewRatio } from '../brew-ratio'
+import { formatBrewRatio } from '@coffee-companion/brew-display'
 import {
   ENTER_A_GRIND_SETTING,
   ENTER_A_NUMBER,

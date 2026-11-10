@@ -4045,6 +4045,11 @@ const DRIVES = {
     },
     handles: {
       formTestID: 'shot-form',
+      logShotTestID: 'log-shot',
+      coffeeTriggerTestID: 'select-trigger-coffee',
+      coffeeSheetTestID: 'select-sheet-coffee',
+      coffeeOptionTestID: 'select-option-ethiopia-guji',
+      coffeeSearchTestID: 'select-search-coffee',
     },
   },
 }
