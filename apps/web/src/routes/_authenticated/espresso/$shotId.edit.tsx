@@ -61,7 +61,10 @@ function EditEspressoShot() {
   const updateShot = useMutation(
     trpc.espressoShot.update.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
+        queryClient.invalidateQueries(trpc.espressoShot.getRecent.queryFilter())
+        queryClient.invalidateQueries(
+          trpc.espressoShot.getLatestUnsealed.queryFilter(),
+        )
         queryClient.invalidateQueries(
           trpc.espressoShot.getById.queryOptions(shotId),
         )

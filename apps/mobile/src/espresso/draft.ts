@@ -28,7 +28,7 @@ export type ShotDraft = {
 export type FieldErrors = Partial<Record<keyof ShotDraft, string>>
 
 export type ParseResult =
-  | { ok: true; value: ShotCreate }
+  | { ok: true; value: Omit<ShotCreate, 'idempotencyKey'> }
   | { ok: false; errors: FieldErrors }
 
 const UUID_PATTERN =
@@ -121,9 +121,8 @@ export function parseShotDraft(draft: ShotDraft): ParseResult {
 export function applyCoffeePrefill(
   draft: ShotDraft,
   coffeeId: string,
-  shots: Array<ShotRow>,
+  latest: ShotRow | null,
 ): ShotDraft {
-  const latest = shots.find((shot) => shot.coffeeId === coffeeId && !shot.sealed)
   if (!latest?.grinderId || !latest.brewingDeviceId) {
     return coffeeId === draft.coffeeId
       ? draft

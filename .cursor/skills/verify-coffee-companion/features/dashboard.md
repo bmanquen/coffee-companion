@@ -4,7 +4,7 @@ The dashboard is the signed-in home: one method picker and that method's brew fe
 
 ## Sub-features
 
-- `dashboard-open` renders at `/dashboard` and is where `/` sends a signed-in visitor. The espresso feed shows a Ratio column.
+- `dashboard-open` renders at `/dashboard` and is where `/` sends a signed-in visitor. The espresso feed shows a Ratio column. More than 20 loaded espresso Shots shows a `Load more` button under the feed.
 - `dashboard-chrome` shows the signed-in shell (Open menu, Account menu) and not `Sign in with Google`.
 - `dashboard-picker` lists every method alphabetically and switches the feed.
 - `dashboard-deeplink` honours `?method=` on load and keeps it across reload and back.
@@ -42,6 +42,6 @@ Preconditions:
 - Options include last-brewed relative time (`just now`, `2d ago`, `No brews yet`). Match option names with `/AeroPress/` (or the method word), not the exact full string.
 - Cold Brew has no seeded brews on `data`. Deep-link it; do not expect a row.
 - `Open menu` is desktop-only (`hidden lg:inline-flex`). At a mobile viewport use `Primary` nav or `Account menu` instead.
-- The feed pages at five. Sealed Free brews are not on page one — that proof belongs in [Plans and Shelf](./plans-and-shelf.md).
+- The feed pages at five client-side. Sealed Free brews are not on page one — that proof belongs in [Plans and Shelf](./plans-and-shelf.md). Espresso also loads 20 from the server; `Load more` appears under the feed when more exist. Seeded `data` is under 20, so the default recipe does not click it.
 - Dashboard feeds are reference-only. Edit, delete, and Dialed-in toggles live on Brews.
 - `expect --text` without `--first` fails strict mode on names the table and the card stack both show (`Standard`, coffee names).

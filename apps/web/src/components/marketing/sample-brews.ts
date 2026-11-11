@@ -77,6 +77,7 @@ function sampleShot(
     grinder,
     brewingDevice,
     ...overrides,
+    idempotencyKey: overrides.idempotencyKey ?? null,
   }
 }
 

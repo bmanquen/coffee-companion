@@ -145,6 +145,7 @@ beforeAll(async () => {
       yield: '36',
       time: 30,
       grindSetting: '21',
+      idempotencyKey: crypto.randomUUID(),
     })
   ).id
 

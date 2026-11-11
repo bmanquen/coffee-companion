@@ -100,6 +100,7 @@ async function logShot(
     yield: '36',
     time: 30,
     grindSetting,
+      idempotencyKey: crypto.randomUUID(),
   })
 }
 

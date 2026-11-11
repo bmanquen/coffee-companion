@@ -116,6 +116,7 @@ beforeAll(async () => {
       dose: '17',
       yield: '34',
       time: 30,
+      idempotencyKey: crypto.randomUUID(),
     })
   ).id
   sealedBrewIds.aeropressBrew = (
@@ -173,6 +174,7 @@ beforeAll(async () => {
       yield: '36',
       time: 30,
       grindSetting: '18',
+      idempotencyKey: crypto.randomUUID(),
     })
   }
 
@@ -202,6 +204,7 @@ beforeAll(async () => {
       yield: '44',
       time: 28,
       grindSetting: 'other-grind',
+      idempotencyKey: crypto.randomUUID(),
     })
   ).id
 })
@@ -218,7 +221,7 @@ describe('account.export', () => {
   })
 
   it('includes a Free user’s Sealed Brews in full, for every method', async () => {
-    const espressoFeed = await asUser.espressoShot.getAll()
+    const espressoFeed = (await asUser.espressoShot.getRecent({ limit: 50, offset: 0 })).items
     const sealedOnFeed = espressoFeed.find(
       (shot) => shot.id === sealedId('espressoShot'),
     )
@@ -295,6 +298,7 @@ describe('account.export', () => {
       yield: '40',
       time: 25,
       grindSetting: 'cross-user',
+      idempotencyKey: crypto.randomUUID(),
     })
 
     const exported = await asUser.account.export()

@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { dashboardMethods } from '@/components/dashboard/methods'
-import { createTestProviders } from '@/test/providers'
+import { Dashboard } from './dashboard'
+import type * as ReactRouter from '@tanstack/react-router'
+import type { ReactNode } from 'react'
+import type { DashboardMethod } from '@/components/dashboard/methods'
 import {
   makeAeropressBrew,
   makeColdBrewBrew,
@@ -10,10 +12,9 @@ import {
   makeRecentCoffee,
   makeRecentShot,
 } from '@/test/factories'
-import { Dashboard } from './dashboard'
-import type * as ReactRouter from '@tanstack/react-router'
-import type { ReactNode } from 'react'
-import type { DashboardMethod } from '@/components/dashboard/methods'
+import { seedEspressoShotPage } from '@/test/espresso-shots'
+import { dashboardMethods } from '@/components/dashboard/methods'
+import { createTestProviders } from '@/test/providers'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
@@ -58,9 +59,8 @@ vi.mock('@/components/ui/command', () => ({
   ),
 }))
 
-// Seed every method's getAll so any tab can render; each defaults to empty and
-// is overridden per test. Espresso accepts the bare-array shorthand the older
-// tests already pass.
+// Seed every method's history so any tab can render; each defaults to empty and
+// is overridden per test. Espresso is a paged getRecent result.
 function seed(
   shots: Array<ReturnType<typeof makeRecentShot>>,
   others: {
@@ -72,7 +72,7 @@ function seed(
 ) {
   const providers = createTestProviders()
   const { queryClient, trpc } = providers
-  queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), shots)
+  seedEspressoShotPage(queryClient, trpc, shots)
   queryClient.setQueryData(
     trpc.pouroverBrew.getAll.queryKey(),
     others.pourover ?? [],

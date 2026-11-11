@@ -83,6 +83,7 @@ describe('espressoShot.create', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     expect(shot.userId).toBe(USER_A)
     expect(shot.dose).toBe('18')
@@ -99,6 +100,7 @@ describe('espressoShot.create', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     expect(shot.roastDate).toBe('2026-05-01')
     expect(typeof shot.roastDate).toBe('string')
@@ -118,6 +120,7 @@ describe('espressoShot.create', () => {
         yield: '36',
         time: 30,
         grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
       }),
     ).rejects.toThrow(/Espresso/)
   })
@@ -132,6 +135,7 @@ describe('espressoShot.create', () => {
         yield: '36',
         time: 30,
         grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
       }),
     ).rejects.toThrow(/not found/i)
   })
@@ -147,6 +151,7 @@ describe('espressoShot.getById', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     const shot = await asA.espressoShot.getById(created.id)
     expect(shot.id).toBe(created.id)
@@ -168,6 +173,7 @@ describe('espressoShot.getById', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     await expect(asB.espressoShot.getById(created.id)).rejects.toThrow(
       /not found/i,
@@ -185,6 +191,7 @@ describe('espressoShot.update', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     const updated = await asA.espressoShot.update({
       id: created.id,
@@ -210,6 +217,7 @@ describe('espressoShot.update', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     const updated = await asA.espressoShot.update({
       id: created.id,
@@ -238,6 +246,7 @@ describe('espressoShot.update', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     await expect(
       asA.espressoShot.update({
@@ -277,6 +286,7 @@ describe('espressoShot.update', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     await expect(
       asB.espressoShot.update({
@@ -303,6 +313,7 @@ describe('espressoShot.delete', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     const deleted = await asA.espressoShot.delete(created.id)
     expect(deleted.id).toBe(created.id)
@@ -321,6 +332,7 @@ describe('espressoShot.delete', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     await asA.dialedInBrew.set({
       brewingMethod: 'espresso',
@@ -349,6 +361,7 @@ describe('espressoShot.delete', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     await expect(asB.espressoShot.delete(created.id)).rejects.toThrow(
       /not found/i,
@@ -357,9 +370,71 @@ describe('espressoShot.delete', () => {
   })
 })
 
-describe('espressoShot.getAll / getRecent', () => {
+describe('espressoShot.create idempotency', () => {
+  it('returns the existing row when the same key is reused', async () => {
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    const first = await asA.espressoShot.create(input)
+    const second = await asA.espressoShot.create({
+      ...input,
+      dose: '22',
+    })
+    expect(second.id).toBe(first.id)
+    expect(second.dose).toBe('18')
+    const page = await asA.espressoShot.getRecent({ limit: 50, offset: 0 })
+    expect(page.items.filter((shot) => shot.id === first.id)).toHaveLength(1)
+  })
+
+  it('does not return another user’s row for the same key', async () => {
+    const idempotencyKey = crypto.randomUUID()
+    const shared = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    const forA = await asA.espressoShot.create(shared)
+    const coffeeB = await createCoffeeFor(asB, uniqFor(USER_B))(
+      uniqFor(USER_B)('Other Guji'),
+    )
+    const grinderB = await asB.grinder.create({
+      name: uniqFor(USER_B)('Niche'),
+      brand: 'Niche',
+    })
+    const deviceB = await asB.brewingDevice.create({
+      name: uniqFor(USER_B)('Linea Mini'),
+      brand: 'La Marzocco',
+      typeId: await findOrCreateDeviceType(ESPRESSO_DEVICE_TYPE),
+    })
+    const forB = await asB.espressoShot.create({
+      ...shared,
+      coffeeId: coffeeB.id,
+      grinderId: grinderB.id,
+      brewingDeviceId: deviceB.id,
+    })
+    expect(forB.id).not.toBe(forA.id)
+    expect(forB.userId).toBe(USER_B)
+    expect((await asA.espressoShot.getById(forA.id)).id).toBe(forA.id)
+    await expect(asB.espressoShot.getById(forA.id)).rejects.toThrow(/not found/i)
+  })
+})
+
+describe('espressoShot.getRecent', () => {
   it('returns the user shots with relations', async () => {
-    const shots = await asA.espressoShot.getAll()
+    const shots = (await asA.espressoShot.getRecent({ limit: 50, offset: 0 })).items
     expect(shots.length).toBeGreaterThanOrEqual(1)
     expect(shots.every((s) => s.userId === USER_A)).toBe(true)
     expect(shots[0].coffee).toBeTruthy()
@@ -376,6 +451,7 @@ describe('espressoShot.getAll / getRecent', () => {
         yield: '36',
         time: 30,
         grindSetting: '1.5',
+        idempotencyKey: crypto.randomUUID(),
       })
     }
     const page1 = await asA.espressoShot.getRecent({ limit: 2, offset: 0 })
@@ -384,6 +460,52 @@ describe('espressoShot.getAll / getRecent', () => {
 
     const page2 = await asA.espressoShot.getRecent({ limit: 2, offset: 2 })
     expect(page2.items.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('espressoShot.getLatestUnsealed', () => {
+  it('returns the newest unsealed shot for that coffee', async () => {
+    const coffee = await createCoffee(uniq('Prefill Coffee'))
+    await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '16',
+      yield: '32',
+      time: 28,
+      grindSetting: 'old',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const latest = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: 'new',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const found = await asA.espressoShot.getLatestUnsealed({
+      coffeeId: coffee.id,
+    })
+    expect(found?.id).toBe(latest.id)
+    expect(found?.grindSetting).toBe('new')
+  })
+
+  it('returns null when that coffee has no shot', async () => {
+    const coffee = await createCoffee(uniq('No Shots'))
+    const found = await asA.espressoShot.getLatestUnsealed({
+      coffeeId: coffee.id,
+    })
+    expect(found).toBeNull()
+  })
+
+  it('does not return another user’s shot', async () => {
+    const found = await asB.espressoShot.getLatestUnsealed({
+      coffeeId: coffeeAId,
+    })
+    expect(found).toBeNull()
   })
 })
 
@@ -398,6 +520,7 @@ describe('espressoShot.getDialedIn', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     // A second, non-dialed shot for the same coffee must be excluded.
     const otherShot = await asA.espressoShot.create({
@@ -408,6 +531,7 @@ describe('espressoShot.getDialedIn', () => {
       yield: '40',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     await asA.dialedInBrew.set({
       brewingMethod: 'espresso',
@@ -446,6 +570,7 @@ describe('espressoShot.getDialedIn', () => {
         yield: '36',
         time: 30,
         grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
       })
       await asA.dialedInBrew.set({
         brewingMethod: 'espresso',

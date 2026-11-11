@@ -284,10 +284,15 @@ export const espressoShots = pgTable(
     dose: numeric(),
     yield: numeric(),
     time: integer(),
+    idempotencyKey: uuid('idempotency_key'),
   },
   (table) => [
     index('espresso_shots_user_idx').on(table.userId),
     index('espresso_shots_user_coffee_idx').on(table.userId, table.coffeeId),
+    uniqueIndex('espresso_shots_user_idempotency_idx').on(
+      table.userId,
+      table.idempotencyKey,
+    ),
   ],
 )
 

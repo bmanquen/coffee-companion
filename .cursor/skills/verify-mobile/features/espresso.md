@@ -13,6 +13,7 @@ A signed-in user logs an Espresso Shot from the home list: pick a Coffee, enter 
 - Open the app while signed in. The Espresso list is the home screen.
 - Choose `Log Shot`.
 - After save, the new Shot is the first row on that list.
+- The list loads the first 20 Shots. Scrolling to the end fetches the next page.
 
 ## Driving it with control
 
@@ -33,6 +34,7 @@ Preconditions:
 - This is not an iOS Simulator or Android emulator run. A green `drive espresso` does not prove pixels on a phone.
 - Native Google and Apple sheets are not presented. The session is the same injected `Auth` the welcome drive uses.
 - The live tRPC client is not exercised here. The request proof is the `create` payload the screen submitted to the injected API.
-- Prefill only copies grinder, device, and roast date from the latest unsealed Shot. Dose, yield, time, and grind stay blank until typed.
+- Prefill only copies grinder, device, and roast date from the latest unsealed Shot (a dedicated query, not the first list page). Dose, yield, time, and grind stay blank until typed. The injected catalog's latest Shot is on the first page, so the drive does not need to scroll.
+- The list is paged (20). The injected catalog in this drive has one Shot, so `onEndReached` is not exercised here.
 - Brewing Device options are Espresso-type only. An AeroPress device in the catalog must not appear.
 - `testID` and `accessibilityLabel` live in `apps/mobile/src/espresso/copy.ts` and `apps/mobile/src/ui/fields.tsx`. Drive those handles, not coordinates. Open a picker by `select-trigger-*`, then choose `select-option-<id>` on the sheet. Coffee options include the roaster when one is set (`Ethiopia Guji · Sey`) so same-named coffees stay distinct.

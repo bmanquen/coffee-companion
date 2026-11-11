@@ -9,6 +9,7 @@ import {
 import {
   EMPTY_SHOTS,
   ESPRESSO_HEADING,
+  LOADING_MORE_SHOTS,
   LOADING_SHOTS,
   LOG_SHOT,
   LOG_SHOT_TEST_ID,
@@ -22,13 +23,17 @@ import type { ShotRow } from './types'
 export function ShotList({
   shots,
   loading,
+  loadingMore,
   failed,
   onLogShot,
+  onEndReached,
 }: {
   shots: Array<ShotRow> | null
   loading: boolean
+  loadingMore: boolean
   failed: boolean
   onLogShot: () => void
+  onEndReached: () => void
 }) {
   const canLog = !loading && !failed && shots != null
   const rows = failed ? [] : (shots ?? [])
@@ -40,8 +45,10 @@ export function ShotList({
       style={styles.list}
       contentContainerStyle={styles.content}
       data={rows}
-      extraData={`${loading}:${failed}`}
+      extraData={`${loading}:${failed}:${loadingMore}`}
       keyExtractor={(shot) => shot.id}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.4}
       ListHeaderComponent={
         <View style={styles.header}>
           <Text accessibilityRole="header">{ESPRESSO_HEADING}</Text>
@@ -63,6 +70,13 @@ export function ShotList({
         ) : failed ? null : (
           <Text>{EMPTY_SHOTS}</Text>
         )
+      }
+      ListFooterComponent={
+        loadingMore ? (
+          <View accessibilityLabel={LOADING_MORE_SHOTS}>
+            <ActivityIndicator />
+          </View>
+        ) : null
       }
       renderItem={({ item }) => (
         <View
