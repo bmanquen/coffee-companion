@@ -58,6 +58,7 @@ export function Field({
   error,
   keyboardType = 'default',
   multiline = false,
+  disabled = false,
 }: {
   label: string
   value: string
@@ -65,15 +66,18 @@ export function Field({
   error?: string
   keyboardType?: 'default' | 'decimal-pad' | 'number-pad'
   multiline?: boolean
+  disabled?: boolean
 }) {
   return (
     <View style={styles.field}>
       <Text>{label}</Text>
       <TextInput
         accessibilityLabel={label}
+        accessibilityState={disabled ? { disabled: true } : undefined}
         testID={fieldTestId(label)}
         value={value}
-        onChangeText={onChange}
+        editable={!disabled}
+        onChangeText={disabled ? undefined : onChange}
         keyboardType={keyboardType}
         multiline={multiline}
         style={[styles.input, multiline ? styles.multiline : null]}
@@ -90,6 +94,7 @@ export function SelectField({
   placeholder,
   onChange,
   error,
+  disabled = false,
 }: {
   label: string
   value: string
@@ -97,6 +102,7 @@ export function SelectField({
   placeholder: string
   onChange: (id: string) => void
   error?: string
+  disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -121,8 +127,11 @@ export function SelectField({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={selectTriggerA11yLabel(label, selectedText)}
+        accessibilityState={disabled ? { disabled: true } : undefined}
         testID={selectTriggerTestId(label)}
+        disabled={disabled}
         onPress={() => {
+          if (disabled) return
           setQuery('')
           setOpen(true)
         }}

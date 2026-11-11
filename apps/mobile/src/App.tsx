@@ -43,6 +43,8 @@ function Shell({ auth, espresso }: { auth: Auth; espresso: EspressoApi }) {
         </View>
       ) : auth.session ? (
         <SignedInHome
+          key={auth.session.user.id}
+          userId={auth.session.user.id}
           name={auth.session.user.name}
           espresso={espresso}
           onSignOut={() => {
