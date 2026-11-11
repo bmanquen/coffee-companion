@@ -144,7 +144,7 @@ Stable handles (use these, not coordinates or visible text):
 
 - Welcome (signed in): `testID=welcome-screen`, `accessibilityLabel=Welcome`. Heading `Coffee Companion` (`testID=welcome-heading`). Button `testID=sign-out`. Espresso list `testID=shot-list`.
 - Sign-in (signed out): `testID=sign-in-screen`, `accessibilityLabel=Sign in`. Brand header `Coffee Companion`. Heading `Sign in` (`testID=sign-in-heading`). Buttons `testID=sign-in-google`, `testID=sign-in-apple` (iOS), `testID=sign-in-toggle`. Error `testID=sign-in-error`. Dev-only E2E handle `testID=e2e-sign-in` when `EXPO_PUBLIC_E2E_USER` is set.
-- Espresso (signed in): `testID=shot-list`, button `testID=log-shot`. Form `testID=shot-form` heading `Log Espresso Shot`. Coffee / Grinder / Brewing Device are tap-to-open sheets (`testID=select-trigger-coffee`, `select-sheet-coffee`, `select-search-coffee`, `select-option-<slug>`). Recipe fields `testID=field-dose-g`, `field-yield-g`, `field-time-s`, `field-grind-setting`. Submit `testID=shot-form-log`. Sealed row copy `Sealed — Subscribe to Pro to read this brew`.
+- Espresso (signed in): `testID=shot-list`, button `testID=log-shot`. Form `testID=shot-form` heading `Log Espresso Shot`. Coffee / Grinder / Brewing Device are tap-to-open sheets (`testID=select-trigger-coffee`, `select-sheet-coffee`, `select-search-coffee`, `select-option-<id>`). Recipe fields `testID=field-dose-g`, `field-yield-g`, `field-time-s`, `field-grind-setting`. Submit `testID=shot-form-log`. Sealed row copy `Sealed — Subscribe to Pro to read this brew`.
 
 The same queries as a raw Jest file. This renders in-process and does not check Metro — only `helpers/control drive <feature>` does:
 

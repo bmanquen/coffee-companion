@@ -45,4 +45,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 
 - [Welcome screen](./welcome.md) is the signed-in home: the `Coffee Companion` heading, Espresso list, and Sign Out. Shortcut: `helpers/control drive welcome`. Device: `helpers/control drive-device sign-in-and-out`.
 - [Sign-in screen](./sign-in.md) is the signed-out home: Google, Apple on iOS, sign-up, the error copy, and the hidden E2E handle. Shortcut: `helpers/control drive sign-in`. Device: `helpers/control drive-device sign-in-and-out`.
-- [Log an Espresso Shot](./espresso.md) is pick a Coffee, enter Shot settings, save, and see the Shot in the list. Shortcut: `helpers/control drive espresso`. Device: `helpers/control drive-device log-espresso` (opens `select-trigger-coffee` and chooses `select-option-ethiopia-guji`).
+- [Log an Espresso Shot](./espresso.md) is pick a Coffee, enter Shot settings, save, and see the Shot in the list. Shortcut: `helpers/control drive espresso`. Device: `helpers/control drive-device log-espresso` (opens `select-trigger-coffee` and chooses `select-option-00000000-0000-4000-8000-000000000001`).

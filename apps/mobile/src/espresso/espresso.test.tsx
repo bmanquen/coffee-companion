@@ -5,8 +5,10 @@ import {
   selectOptionTestId,
   selectSearchTestId,
   selectSheetTestId,
+  selectTriggerA11yLabel,
   selectTriggerTestId,
 } from '../ui/fields'
+import { consumeHardwareBack } from './ShotForm'
 import {
   BACK,
   EMPTY_SHOTS,
@@ -37,6 +39,7 @@ const COFFEE = '00000000-0000-4000-8000-000000000001'
 const GRINDER = '00000000-0000-4000-8000-000000000003'
 const ESP_DEVICE = '00000000-0000-4000-8000-000000000005'
 const GRIND_MARKER = 'verify-grind-7'
+const LOGGED_RECIPE = `Grind ${GRIND_MARKER} · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s`
 const TRPC_FORBIDDEN = 'FORBIDDEN'
 const TRPC_INTERNAL = 'INTERNAL_SERVER_ERROR'
 
@@ -135,15 +138,15 @@ async function openForm() {
   expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
 }
 
-async function pickSelect(label: string, optionName: string) {
+async function pickSelect(label: string, optionId: string) {
   await fireEvent.press(screen.getByTestId(selectTriggerTestId(label)))
   expect(screen.getByTestId(selectSheetTestId(label))).toBeTruthy()
-  await fireEvent.press(screen.getByTestId(selectOptionTestId(optionName)))
+  await fireEvent.press(screen.getByTestId(selectOptionTestId(optionId)))
   expect(screen.queryByTestId(selectSheetTestId(label))).toBeNull()
 }
 
 async function pickCoffee() {
-  await pickSelect(LABEL_COFFEE, 'Ethiopia Guji')
+  await pickSelect(LABEL_COFFEE, COFFEE)
   expect(screen.getByDisplayValue('2026-05-01')).toBeTruthy()
 }
 
@@ -186,11 +189,7 @@ describe('log espresso shot', () => {
       notes: null,
     })
 
-    expect(
-      screen.getByText(
-        `Grind ${GRIND_MARKER} · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s`,
-      ),
-    ).toBeTruthy()
+    expect(screen.getByText(LOGGED_RECIPE)).toBeTruthy()
 
     writeHostTreeArtifacts(view)
   }, 15_000)
@@ -217,6 +216,10 @@ describe('log espresso shot', () => {
     expect(screen.getAllByText('Enter a number')).toHaveLength(3)
     expect(screen.getByText('Enter a grind setting')).toBeTruthy()
     expect(created).toHaveLength(0)
+
+    await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '18')
+    expect(screen.getAllByText('Enter a number')).toHaveLength(2)
+    expect(screen.getByText(SELECT_COFFEE_ERROR)).toBeTruthy()
   })
 
   it('shows a sealed shot without its settings', async () => {
@@ -345,11 +348,7 @@ describe('log espresso shot', () => {
 
     expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
     expect(created).toHaveLength(1)
-    expect(
-      screen.getByText(
-        `Grind ${GRIND_MARKER} · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s`,
-      ),
-    ).toBeTruthy()
+    expect(screen.getByText(LOGGED_RECIPE)).toBeTruthy()
   })
 
   it('returns to the list without saving when Back is pressed', async () => {
@@ -450,16 +449,197 @@ describe('log espresso shot', () => {
     await openForm()
     await fireEvent.press(screen.getByTestId(selectTriggerTestId(LABEL_COFFEE)))
 
-    expect(screen.getByTestId(selectOptionTestId('Ethiopia Guji'))).toBeTruthy()
-    expect(screen.getByTestId(selectOptionTestId('Kenya AA'))).toBeTruthy()
+    expect(screen.getByTestId(selectOptionTestId(COFFEE))).toBeTruthy()
+    expect(screen.getByTestId(selectOptionTestId(kenya))).toBeTruthy()
 
     await fireEvent.changeText(
       screen.getByTestId(selectSearchTestId(LABEL_COFFEE)),
       'Kenya',
     )
 
+    expect(screen.queryByTestId(selectOptionTestId(COFFEE))).toBeNull()
+    expect(screen.getByTestId(selectOptionTestId(kenya))).toBeTruthy()
+  })
+
+  it('distinguishes same-named coffees by roaster and option id', async () => {
+    const sey = '00000000-0000-4000-8000-000000000011'
+    const heart = '00000000-0000-4000-8000-000000000012'
+    const { api } = fakeApi(
+      catalog({
+        coffees: [
+          {
+            id: sey,
+            name: 'Ethiopia Guji',
+            label: 'Ethiopia Guji · Sey',
+          },
+          {
+            id: heart,
+            name: 'Ethiopia Guji',
+            label: 'Ethiopia Guji · Heart',
+          },
+        ],
+        shots: [],
+      }),
+    )
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await fireEvent.press(screen.getByTestId(selectTriggerTestId(LABEL_COFFEE)))
+
+    expect(screen.getByLabelText('Ethiopia Guji · Sey')).toBeTruthy()
+    expect(screen.getByLabelText('Ethiopia Guji · Heart')).toBeTruthy()
+    expect(screen.getByText('Ethiopia Guji · Sey')).toBeTruthy()
+    expect(screen.getByText('Ethiopia Guji · Heart')).toBeTruthy()
+    expect(screen.getByTestId(selectOptionTestId(sey))).toBeTruthy()
+    expect(screen.getByTestId(selectOptionTestId(heart))).toBeTruthy()
     expect(screen.queryByTestId(selectOptionTestId('Ethiopia Guji'))).toBeNull()
-    expect(screen.getByTestId(selectOptionTestId('Kenya AA'))).toBeTruthy()
+
+    await fireEvent.changeText(
+      screen.getByTestId(selectSearchTestId(LABEL_COFFEE)),
+      'Heart',
+    )
+
+    expect(screen.queryByTestId(selectOptionTestId(sey))).toBeNull()
+    expect(screen.getByTestId(selectOptionTestId(heart))).toBeTruthy()
+  })
+
+  it('names the coffee trigger with the selected option', async () => {
+    const { api } = fakeApi(catalog())
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+
+    expect(
+      screen.getByLabelText(
+        selectTriggerA11yLabel(LABEL_COFFEE, 'Select Coffee'),
+      ),
+    ).toBeTruthy()
+
+    await pickCoffee()
+
+    expect(
+      screen.getByLabelText(
+        selectTriggerA11yLabel(LABEL_COFFEE, 'Ethiopia Guji'),
+      ),
+    ).toBeTruthy()
+  })
+
+  it('clears the save error when a field is edited', async () => {
+    const message =
+      'This Brew is Sealed. Subscribe to read and edit it again.'
+    const { api } = fakeApi(catalog(), {
+      create: () => {
+        throw Object.assign(new Error(message), {
+          data: { code: TRPC_FORBIDDEN },
+        })
+      },
+    })
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe('1.5')
+    await press(LOG)
+
+    expect(screen.getByText(message)).toBeTruthy()
+
+    await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '17')
+
+    expect(screen.queryByText(message)).toBeNull()
+    expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
+  })
+
+  it('clears the save error when Coffee is changed', async () => {
+    const kenya = '00000000-0000-4000-8000-000000000099'
+    const message =
+      'This Brew is Sealed. Subscribe to read and edit it again.'
+    const { api } = fakeApi(
+      catalog({
+        coffees: [
+          { id: COFFEE, name: 'Ethiopia Guji' },
+          { id: kenya, name: 'Kenya AA' },
+        ],
+      }),
+      {
+        create: () => {
+          throw Object.assign(new Error(message), {
+            data: { code: TRPC_FORBIDDEN },
+          })
+        },
+      },
+    )
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe('1.5')
+    await press(LOG)
+
+    expect(screen.getByText(message)).toBeTruthy()
+
+    await pickSelect(LABEL_COFFEE, kenya)
+
+    expect(screen.queryByText(message)).toBeNull()
+    expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
+  })
+
+  it('does not leave the form when Back is pressed during save', async () => {
+    const created: Array<ShotCreate> = []
+    let resolveCreate: () => void = () => {}
+    const initial = catalog()
+    let shots = [...initial.shots]
+    const pending = new Promise<void>((resolve) => {
+      resolveCreate = resolve
+    })
+    const api: EspressoApi = {
+      load: () => ({ ...initial, shots: [...shots] }),
+      create: (input) => {
+        created.push(input)
+        return pending
+      },
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
+
+    expect(screen.getByRole('button', { name: BACK })).toBeDisabled()
+    await fireEvent.press(screen.getByRole('button', { name: BACK }))
+    expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
+    expect(screen.queryByTestId(SHOT_LIST_TEST_ID)).toBeNull()
+
+    await act(async () => {
+      shots = [
+        {
+          id: 'shot-new',
+          coffeeId: created[0].coffeeId,
+          coffeeName: 'Ethiopia Guji',
+          grinderId: created[0].grinderId,
+          brewingDeviceId: created[0].brewingDeviceId,
+          roastDate: created[0].roastDate,
+          grindSetting: created[0].grindSetting,
+          dose: created[0].dose,
+          yield: created[0].yield,
+          time: created[0].time,
+          sealed: false,
+        },
+        ...shots,
+      ]
+      resolveCreate()
+      await pending
+    })
+
+    expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+    expect(screen.getByText(LOGGED_RECIPE)).toBeTruthy()
+  })
+
+  it('does not go back on hardware back during save', () => {
+    const onBack = jest.fn()
+    expect(consumeHardwareBack(true, onBack)).toBe(true)
+    expect(onBack).not.toHaveBeenCalled()
+  })
+
+  it('goes back on hardware back when nothing is pending', () => {
+    const onBack = jest.fn()
+    expect(consumeHardwareBack(false, onBack)).toBe(true)
+    expect(onBack).toHaveBeenCalledTimes(1)
   })
 
   it('keeps a loaded list when an earlier load fails late', async () => {

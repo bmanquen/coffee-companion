@@ -1,3 +1,4 @@
+import { coffeeOptionLabel } from '@coffee-companion/brew-display'
 import { createTRPCClient, httpBatchLink } from '@trpc/client'
 import superjson from 'superjson'
 import { getSessionCookie } from './auth/auth-client'
@@ -57,7 +58,11 @@ export function createLiveEspressoApi(): EspressoApi {
         client.espressoShot.getAll.query(),
       ])
       return {
-        coffees: coffees.map(({ id, name }) => ({ id, name })),
+        coffees: coffees.map((coffee) => ({
+          id: coffee.id,
+          name: coffee.name,
+          label: coffeeOptionLabel(coffee),
+        })),
         grinders: grinders.map(({ id, name }) => ({ id, name })),
         devices: espressoDevicesFrom(devices),
         shots: shots.map(toShotRow),

@@ -4032,7 +4032,7 @@ const DRIVES = {
       'Coffee Companion',
       'shot-list',
       'Ethiopia Guji',
-      'Grind verify-grind-7',
+      'Grind verify-grind-7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s',
     ],
     observed: {
       heading: 'Coffee Companion',
@@ -4048,7 +4048,7 @@ const DRIVES = {
       logShotTestID: 'log-shot',
       coffeeTriggerTestID: 'select-trigger-coffee',
       coffeeSheetTestID: 'select-sheet-coffee',
-      coffeeOptionTestID: 'select-option-ethiopia-guji',
+      coffeeOptionTestID: 'select-option-00000000-0000-4000-8000-000000000001',
       coffeeSearchTestID: 'select-search-coffee',
     },
   },
