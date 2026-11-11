@@ -106,6 +106,7 @@ export function ShotForm({
         options={catalog.coffees}
         placeholder={SELECT_COFFEE}
         error={fieldErrors.coffeeId}
+        disabled={busy}
         onChange={(coffeeId) => {
           onClearError()
           setFieldErrors({})
@@ -120,6 +121,7 @@ export function ShotForm({
         options={catalog.grinders}
         placeholder={SELECT_GRINDER}
         error={fieldErrors.grinderId}
+        disabled={busy}
         onChange={(id) => setField('grinderId', id)}
       />
       <SelectField
@@ -128,12 +130,14 @@ export function ShotForm({
         options={catalog.devices}
         placeholder={SELECT_DEVICE}
         error={fieldErrors.brewingDeviceId}
+        disabled={busy}
         onChange={(id) => setField('brewingDeviceId', id)}
       />
       <Field
         label={LABEL_ROAST_DATE}
         value={draft.roastDate}
         error={fieldErrors.roastDate}
+        disabled={busy}
         onChange={(value) => setField('roastDate', value)}
       />
       <Field
@@ -141,6 +145,7 @@ export function ShotForm({
         value={draft.dose}
         keyboardType="decimal-pad"
         error={fieldErrors.dose}
+        disabled={busy}
         onChange={(value) => setField('dose', value)}
       />
       <Field
@@ -148,6 +153,7 @@ export function ShotForm({
         value={draft.yield}
         keyboardType="decimal-pad"
         error={fieldErrors.yield}
+        disabled={busy}
         onChange={(value) => setField('yield', value)}
       />
       <Field
@@ -155,18 +161,21 @@ export function ShotForm({
         value={draft.time}
         keyboardType="number-pad"
         error={fieldErrors.time}
+        disabled={busy}
         onChange={(value) => setField('time', value)}
       />
       <Field
         label={LABEL_GRIND}
         value={draft.grindSetting}
         error={fieldErrors.grindSetting}
+        disabled={busy}
         onChange={(value) => setField('grindSetting', value)}
       />
       <Field
         label={LABEL_NOTES}
         value={draft.notes}
         multiline
+        disabled={busy}
         onChange={(value) => setField('notes', value)}
       />
       {error ? (

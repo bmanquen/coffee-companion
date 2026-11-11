@@ -15,7 +15,11 @@ import type { Auth } from './auth/use-auth'
 
 const signedIn: Auth = {
   session: {
-    user: { name: 'Ada Lovelace', email: 'ada@example.com' },
+    user: {
+      id: 'user-ada',
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+    },
   },
   loading: false,
   busy: false,

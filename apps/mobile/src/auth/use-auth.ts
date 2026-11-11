@@ -28,7 +28,7 @@ import {
 export type AuthMode = 'sign-in' | 'sign-up'
 
 export type AuthSession = {
-  user: { name: string; email: string }
+  user: { id: string; name: string; email: string }
 }
 
 export type AuthError = {

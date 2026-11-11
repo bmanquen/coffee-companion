@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native'
 import { App } from '../App'
+import { SignedInHome } from '../auth/SignedInHome'
 import { writeHostTreeArtifacts } from '../test/host-tree'
 import {
   selectOptionTestId,
@@ -38,6 +39,8 @@ import type { Auth } from '../auth/use-auth'
 const COFFEE = '00000000-0000-4000-8000-000000000001'
 const GRINDER = '00000000-0000-4000-8000-000000000003'
 const ESP_DEVICE = '00000000-0000-4000-8000-000000000005'
+const ADA_ID = 'user-ada'
+const ALAN_ID = 'user-alan'
 const GRIND_MARKER = 'verify-grind-7'
 const LOGGED_RECIPE = `Grind ${GRIND_MARKER} · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s`
 const TRPC_FORBIDDEN = 'FORBIDDEN'
@@ -45,7 +48,11 @@ const TRPC_INTERNAL = 'INTERNAL_SERVER_ERROR'
 
 const signedIn: Auth = {
   session: {
-    user: { name: 'Ada Lovelace', email: 'ada@example.com' },
+    user: {
+      id: ADA_ID,
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+    },
   },
   loading: false,
   busy: false,
@@ -642,6 +649,176 @@ describe('log espresso shot', () => {
     const onBack = jest.fn()
     expect(consumeHardwareBack(false, onBack)).toBe(true)
     expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloads the catalog when the signed-in user changes, even if the api object does not', async () => {
+    let owner = ADA_ID
+    const api: EspressoApi = {
+      load: () =>
+        Promise.resolve(
+          owner === ADA_ID
+            ? catalog({ shots: [seedShot({ coffeeName: 'Ada House' })] })
+            : catalog({ shots: [seedShot({ coffeeName: 'Alan House' })] }),
+        ),
+      create: async () => {},
+    }
+    const view = await render(
+      <App auth={signedIn} espresso={api} />,
+    )
+    expect(await screen.findByText('Ada House')).toBeTruthy()
+
+    owner = ALAN_ID
+    await view.rerender(
+      <App
+        auth={{
+          ...signedIn,
+          session: {
+            user: {
+              id: ALAN_ID,
+              name: 'Ada Lovelace',
+              email: 'alan@example.com',
+            },
+          },
+        }}
+        espresso={api}
+      />,
+    )
+
+    expect(await screen.findByText('Alan House')).toBeTruthy()
+    expect(screen.queryByText('Ada House')).toBeNull()
+  })
+
+  it('does not apply a previous user load after the signed-in user changes', async () => {
+    let resolveAda: (catalog: EspressoCatalog) => void = () => {}
+    const adaLoad = new Promise<EspressoCatalog>((resolve) => {
+      resolveAda = resolve
+    })
+    let owner = ADA_ID
+    const adaCatalog = catalog({
+      shots: [seedShot({ coffeeName: 'Ada House' })],
+    })
+    const alanCatalog = catalog({
+      shots: [seedShot({ coffeeName: 'Alan House' })],
+    })
+    const api: EspressoApi = {
+      load: () => (owner === ADA_ID ? adaLoad : Promise.resolve(alanCatalog)),
+      create: async () => {},
+    }
+    const view = await render(
+      <SignedInHome
+        userId={ADA_ID}
+        name="Ada Lovelace"
+        espresso={api}
+        onSignOut={() => {}}
+      />,
+    )
+
+    owner = ALAN_ID
+    await view.rerender(
+      <SignedInHome
+        userId={ALAN_ID}
+        name="Ada Lovelace"
+        espresso={api}
+        onSignOut={() => {}}
+      />,
+    )
+    expect(await screen.findByText('Alan House')).toBeTruthy()
+
+    await act(async () => {
+      resolveAda(adaCatalog)
+      await adaLoad
+    })
+
+    expect(screen.getByText('Alan House')).toBeTruthy()
+    expect(screen.queryByText('Ada House')).toBeNull()
+  })
+
+  it('does not apply a previous user save after the signed-in user changes', async () => {
+    let resolveCreate: () => void = () => {}
+    const pending = new Promise<void>((resolve) => {
+      resolveCreate = resolve
+    })
+    let owner = ADA_ID
+    let loads = 0
+    const api: EspressoApi = {
+      load: () => {
+        loads += 1
+        return Promise.resolve(
+          owner === ADA_ID
+            ? catalog({ shots: [seedShot({ coffeeName: 'Ada House' })] })
+            : catalog({ shots: [seedShot({ coffeeName: 'Alan House' })] }),
+        )
+      },
+      create: () => pending,
+    }
+    const view = await render(
+      <SignedInHome
+        userId={ADA_ID}
+        name="Ada Lovelace"
+        espresso={api}
+        onSignOut={() => {}}
+      />,
+    )
+    expect(await screen.findByText('Ada House')).toBeTruthy()
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
+
+    owner = ALAN_ID
+    await view.rerender(
+      <SignedInHome
+        userId={ALAN_ID}
+        name="Ada Lovelace"
+        espresso={api}
+        onSignOut={() => {}}
+      />,
+    )
+    expect(await screen.findByText('Alan House')).toBeTruthy()
+    const loadsAfterSwitch = loads
+
+    await act(async () => {
+      resolveCreate()
+      await pending
+    })
+
+    expect(loads).toBe(loadsAfterSwitch)
+    expect(screen.getByText('Alan House')).toBeTruthy()
+    expect(screen.queryByText('Ada House')).toBeNull()
+    expect(screen.queryByTestId(SHOT_FORM_TEST_ID)).toBeNull()
+  })
+
+  it('does not edit fields or open the coffee picker while a save is in flight', async () => {
+    let resolveCreate: () => void = () => {}
+    const pending = new Promise<void>((resolve) => {
+      resolveCreate = resolve
+    })
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog()),
+      create: () => pending,
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
+
+    expect(screen.getByLabelText(LABEL_DOSE)).toBeDisabled()
+    expect(
+      screen.getByTestId(selectTriggerTestId(LABEL_COFFEE)),
+    ).toBeDisabled()
+
+    await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '99')
+    expect(screen.getByDisplayValue('18')).toBeTruthy()
+    expect(screen.queryByDisplayValue('99')).toBeNull()
+
+    await fireEvent.press(screen.getByTestId(selectTriggerTestId(LABEL_COFFEE)))
+    expect(screen.queryByTestId(selectSheetTestId(LABEL_COFFEE))).toBeNull()
+
+    await act(async () => {
+      resolveCreate()
+      await pending
+    })
   })
 
   it('keeps a loaded list when an earlier load fails late', async () => {

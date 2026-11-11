@@ -21,6 +21,7 @@ type Action =
   | { type: 'saveSucceeded' }
   | { type: 'saveFailed'; error: string }
   | { type: 'saveErrorCleared' }
+  | { type: 'reset' }
 
 const initial: State = {
   status: 'loading',
@@ -51,36 +52,53 @@ function reducer(state: State, action: Action): State {
       return { ...state, busy: false, saveError: action.error }
     case 'saveErrorCleared':
       return state.saveError ? { ...state, saveError: null } : state
+    case 'reset':
+      return initial
   }
 }
 
-export function useEspressoCatalog(api: EspressoApi) {
+export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const [state, dispatch] = useReducer(reducer, initial)
   const loadSeq = useRef(0)
   const saveInFlight = useRef(false)
+  const activeUser = useRef(userId)
 
   const runLoad = useCallback(() => {
     const seq = ++loadSeq.current
+    const forUser = userId
     dispatch({ type: 'loadStarted' })
     void api.load().then(
       (catalog) => {
         // A newer load replaces this one; a late failure must not hide that catalog.
-        if (seq !== loadSeq.current) return
+        if (seq !== loadSeq.current || forUser !== activeUser.current) return
         dispatch({ type: 'loadSucceeded', catalog })
       },
       (error) => {
-        if (seq !== loadSeq.current) return
+        if (seq !== loadSeq.current || forUser !== activeUser.current) return
         dispatch({
           type: 'loadFailed',
           error: apiErrorMessage(error, ERROR_LOAD_FAILED),
         })
       },
     )
-  }, [api])
+  }, [api, userId])
 
   useEffect(() => {
+    if (activeUser.current !== userId) {
+      activeUser.current = userId
+      saveInFlight.current = false
+      loadSeq.current += 1
+      dispatch({ type: 'reset' })
+    }
     runLoad()
-  }, [runLoad])
+  }, [runLoad, userId])
+
+  useEffect(() => {
+    return () => {
+      activeUser.current = ''
+      loadSeq.current += 1
+    }
+  }, [])
 
   const loading = state.status === 'loading'
   const reload = useCallback(() => {
@@ -91,16 +109,19 @@ export function useEspressoCatalog(api: EspressoApi) {
     (input: ShotCreate, onSuccess?: () => void) => {
       if (saveInFlight.current) return
       saveInFlight.current = true
+      const forUser = userId
       dispatch({ type: 'saveStarted' })
       void api.create(input).then(
         () => {
           saveInFlight.current = false
+          if (forUser !== activeUser.current) return
           dispatch({ type: 'saveSucceeded' })
           onSuccess?.()
           runLoad()
         },
         (error) => {
           saveInFlight.current = false
+          if (forUser !== activeUser.current) return
           dispatch({
             type: 'saveFailed',
             error: apiErrorMessage(error, ERROR_SAVE_FAILED),
@@ -108,7 +129,7 @@ export function useEspressoCatalog(api: EspressoApi) {
         },
       )
     },
-    [api, runLoad],
+    [api, runLoad, userId],
   )
 
   const clearSaveError = useCallback(() => {

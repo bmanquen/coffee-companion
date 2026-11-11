@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { ShotForm } from '../espresso/ShotForm'
 import { ShotList } from '../espresso/ShotList'
@@ -20,10 +20,12 @@ type Screen = 'list' | 'form'
 
 export function SignedInHome({
   name,
+  userId,
   onSignOut,
   espresso = idleEspressoApi,
 }: {
   name: string
+  userId: string
   onSignOut: () => void
   espresso?: EspressoApi
 }) {
@@ -37,7 +39,11 @@ export function SignedInHome({
     reload,
     save,
     clearSaveError,
-  } = useEspressoCatalog(espresso)
+  } = useEspressoCatalog(espresso, userId)
+
+  useEffect(() => {
+    setScreen('list')
+  }, [userId])
 
   return (
     <View
