@@ -55,7 +55,7 @@ export function ShotForm({
   busy: boolean
   error: string | null
   onBack: () => void
-  onClearError?: () => void
+  onClearError: () => void
   onSubmit: (input: ShotCreate) => void
 }) {
   const [draft, setDraft] = useState<ShotDraft>(emptyShotDraft)
@@ -69,7 +69,7 @@ export function ShotForm({
   }, [busy, onBack])
 
   const setField = (key: keyof ShotDraft, value: string) => {
-    onClearError?.()
+    onClearError()
     setDraft((current) => ({ ...current, [key]: value }))
     setFieldErrors((current) => {
       if (!current[key]) return current
@@ -90,10 +90,7 @@ export function ShotForm({
         accessibilityRole="button"
         accessibilityState={{ disabled: busy }}
         disabled={busy}
-        onPress={() => {
-          if (busy) return
-          onBack()
-        }}
+        onPress={onBack}
       >
         <Text>{BACK}</Text>
       </Pressable>
@@ -110,7 +107,7 @@ export function ShotForm({
         placeholder={SELECT_COFFEE}
         error={fieldErrors.coffeeId}
         onChange={(coffeeId) => {
-          onClearError?.()
+          onClearError()
           setFieldErrors({})
           setDraft((current) =>
             applyCoffeePrefill(current, coffeeId, catalog.shots),
