@@ -88,7 +88,7 @@ describe('E2E sign-in path', () => {
       expect(screen.getByTestId(E2E_SIGN_IN_TEST_ID)).toBeTruthy()
     })
 
-    fireEvent.press(screen.getByRole('button', { name: E2E_SIGN_IN }))
+    await fireEvent.press(screen.getByRole('button', { name: E2E_SIGN_IN }))
 
     await waitFor(() => {
       expect(screen.getByTestId(WELCOME_SCREEN_TEST_ID)).toBeTruthy()
