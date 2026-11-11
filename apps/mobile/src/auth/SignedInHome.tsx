@@ -83,6 +83,7 @@ export function SignedInHome({
             clearSaveError()
             setScreen('list')
           }}
+          onClearError={clearSaveError}
           onSubmit={(input) => {
             save(input, () => setScreen('list'))
           }}

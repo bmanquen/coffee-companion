@@ -44,18 +44,20 @@ export function writeHostTreeArtifacts(view: { toJSON: () => unknown }) {
 export function formatHostTree(
   node: unknown,
   indent = 0,
-  seen = new WeakSet<object>(),
+  ancestors: Array<object> = [],
 ): string {
   if (node == null) return ''
   if (typeof node === 'string' || typeof node === 'number') {
     return `${' '.repeat(indent)}${node}\n`
   }
   if (Array.isArray(node)) {
-    return node.map((child) => formatHostTree(child, indent, seen)).join('')
+    return node
+      .map((child) => formatHostTree(child, indent, ancestors))
+      .join('')
   }
   if (typeof node !== 'object') return ''
-  if (seen.has(node)) return ''
-  seen.add(node)
+  if (ancestors.includes(node)) return ''
+  ancestors.push(node)
 
   const element = node as {
     type?: unknown
@@ -76,5 +78,7 @@ export function formatHostTree(
     .filter(Boolean)
     .join(' ')
   const line = `${' '.repeat(indent)}${role}${extras ? ` ${extras}` : ''}\n`
-  return line + formatHostTree(element.children, indent + 2, seen)
+  const body = formatHostTree(element.children, indent + 2, ancestors)
+  ancestors.pop()
+  return line + body
 }

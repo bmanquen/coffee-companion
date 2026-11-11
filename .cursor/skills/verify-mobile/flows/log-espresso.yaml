@@ -70,7 +70,7 @@ appId: dev.offbyonelabs.coffeecompanion
 - assertVisible:
     id: select-sheet-coffee
 - tapOn:
-    id: select-option-ethiopia-guji
+    id: select-option-00000000-0000-4000-8000-000000000001
 - tapOn:
     id: field-dose-g
 - inputText: "18"
@@ -87,9 +87,10 @@ appId: dev.offbyonelabs.coffeecompanion
 - tapOn:
     id: shot-form-log
 - extendedWaitUntil:
-    visible:
-      id: shot-list
+    visible: "Grind 7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"
     timeout: 30000
+- assertVisible:
+    text: "Grind 7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"
 - assertVisible:
     id: shot-list
 - takeScreenshot: espresso-logged

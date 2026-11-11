@@ -36,8 +36,19 @@ export function selectSearchTestId(label: string) {
   return `select-search-${fieldSlug(label)}`
 }
 
-export function selectOptionTestId(name: string) {
-  return `select-option-${fieldSlug(name)}`
+export function selectOptionTestId(id: string) {
+  return `select-option-${fieldSlug(id)}`
+}
+
+export function selectTriggerA11yLabel(
+  label: string,
+  selectedOrPlaceholder: string,
+) {
+  return `${label}, ${selectedOrPlaceholder}`
+}
+
+function optionText(option: { name: string; label?: string }) {
+  return option.label ?? option.name
 }
 
 export function Field({
@@ -82,7 +93,7 @@ export function SelectField({
 }: {
   label: string
   value: string
-  options: Array<{ id: string; name: string }>
+  options: Array<{ id: string; name: string; label?: string }>
   placeholder: string
   onChange: (id: string) => void
   error?: string
@@ -90,11 +101,12 @@ export function SelectField({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const selected = options.find((option) => option.id === value)
+  const selectedText = selected ? optionText(selected) : placeholder
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return options
     return options.filter((option) =>
-      option.name.toLowerCase().includes(needle),
+      optionText(option).toLowerCase().includes(needle),
     )
   }, [options, query])
 
@@ -108,7 +120,7 @@ export function SelectField({
       <Text>{label}</Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label}
+        accessibilityLabel={selectTriggerA11yLabel(label, selectedText)}
         testID={selectTriggerTestId(label)}
         onPress={() => {
           setQuery('')
@@ -117,7 +129,7 @@ export function SelectField({
         style={styles.input}
       >
         <Text style={selected ? styles.value : styles.placeholder}>
-          {selected?.name ?? placeholder}
+          {selectedText}
         </Text>
       </Pressable>
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -156,21 +168,24 @@ export function SelectField({
                 keyExtractor={(option) => option.id}
                 keyboardShouldPersistTaps="handled"
                 ListEmptyComponent={<Text>{NO_RESULTS}</Text>}
-                renderItem={({ item }) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={item.name}
-                    accessibilityState={{ selected: item.id === value }}
-                    testID={selectOptionTestId(item.name)}
-                    onPress={() => {
-                      onChange(item.id)
-                      close()
-                    }}
-                    style={styles.option}
-                  >
-                    <Text>{item.name}</Text>
-                  </Pressable>
-                )}
+                renderItem={({ item }) => {
+                  const text = optionText(item)
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={text}
+                      accessibilityState={{ selected: item.id === value }}
+                      testID={selectOptionTestId(item.id)}
+                      onPress={() => {
+                        onChange(item.id)
+                        close()
+                      }}
+                      style={styles.option}
+                    >
+                      <Text>{text}</Text>
+                    </Pressable>
+                  )
+                }}
               />
             </View>
           </View>

@@ -1,5 +1,11 @@
-import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native'
+import { useEffect, useState } from 'react'
+import {
+  BackHandler,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+} from 'react-native'
 import { ErrorBanner, Field, SelectField } from '../ui/fields'
 import {
   BACK,
@@ -31,23 +37,39 @@ import {
 import type { FieldErrors, ShotDraft } from './draft'
 import type { EspressoCatalog, ShotCreate } from './types'
 
+export function consumeHardwareBack(busy: boolean, onBack: () => void) {
+  if (busy) return true
+  onBack()
+  return true
+}
+
 export function ShotForm({
   catalog,
   busy,
   error,
   onBack,
+  onClearError,
   onSubmit,
 }: {
   catalog: EspressoCatalog
   busy: boolean
   error: string | null
   onBack: () => void
+  onClearError?: () => void
   onSubmit: (input: ShotCreate) => void
 }) {
   const [draft, setDraft] = useState<ShotDraft>(emptyShotDraft)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () =>
+      consumeHardwareBack(busy, onBack),
+    )
+    return () => sub.remove()
+  }, [busy, onBack])
+
   const setField = (key: keyof ShotDraft, value: string) => {
+    onClearError?.()
     setDraft((current) => ({ ...current, [key]: value }))
     setFieldErrors((current) => {
       if (!current[key]) return current
@@ -64,7 +86,15 @@ export function ShotForm({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.form}
     >
-      <Pressable accessibilityRole="button" onPress={onBack}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busy }}
+        disabled={busy}
+        onPress={() => {
+          if (busy) return
+          onBack()
+        }}
+      >
         <Text>{BACK}</Text>
       </Pressable>
       <Text
@@ -80,6 +110,7 @@ export function ShotForm({
         placeholder={SELECT_COFFEE}
         error={fieldErrors.coffeeId}
         onChange={(coffeeId) => {
+          onClearError?.()
           setFieldErrors({})
           setDraft((current) =>
             applyCoffeePrefill(current, coffeeId, catalog.shots),
