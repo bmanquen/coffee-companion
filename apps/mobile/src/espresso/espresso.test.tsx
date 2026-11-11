@@ -96,35 +96,37 @@ function fakeApi(
   const created: Array<ShotCreate> = []
   let shots = [...initial.shots]
   const api: EspressoApi = {
-    load: () => {
-      const next = { ...initial, shots: [...shots] }
-      return hooks.load ? hooks.load(next) : next
-    },
-    create: (input) => {
-      if (hooks.create) {
-        hooks.create(input)
-        return
-      }
-      created.push(input)
-      shots = [
-        {
-          id: `shot-${created.length + 1}`,
-          coffeeId: input.coffeeId,
-          coffeeName:
-            initial.coffees.find((coffee) => coffee.id === input.coffeeId)
-              ?.name ?? 'Unknown coffee',
-          grinderId: input.grinderId,
-          brewingDeviceId: input.brewingDeviceId,
-          roastDate: input.roastDate,
-          grindSetting: input.grindSetting,
-          dose: input.dose,
-          yield: input.yield,
-          time: input.time,
-          sealed: false,
-        },
-        ...shots,
-      ]
-    },
+    load: () =>
+      Promise.resolve().then(() => {
+        const next = { ...initial, shots: [...shots] }
+        return hooks.load ? hooks.load(next) : next
+      }),
+    create: (input) =>
+      Promise.resolve().then(() => {
+        if (hooks.create) {
+          hooks.create(input)
+          return
+        }
+        created.push(input)
+        shots = [
+          {
+            id: `shot-${created.length + 1}`,
+            coffeeId: input.coffeeId,
+            coffeeName:
+              initial.coffees.find((coffee) => coffee.id === input.coffeeId)
+                ?.name ?? 'Unknown coffee',
+            grinderId: input.grinderId,
+            brewingDeviceId: input.brewingDeviceId,
+            roastDate: input.roastDate,
+            grindSetting: input.grindSetting,
+            dose: input.dose,
+            yield: input.yield,
+            time: input.time,
+            sealed: false,
+          },
+          ...shots,
+        ]
+      }),
   }
   return { api, created }
 }
@@ -324,7 +326,7 @@ describe('log espresso shot', () => {
       resolveCreate = resolve
     })
     const api: EspressoApi = {
-      load: () => ({ ...initial, shots: [...shots] }),
+      load: () => Promise.resolve({ ...initial, shots: [...shots] }),
       create: (input) => {
         created.push(input)
         return pending
@@ -411,14 +413,14 @@ describe('log espresso shot', () => {
     let loads = 0
     const empty = catalog({ shots: [] })
     const api: EspressoApi = {
-      load: () => {
+      load: async () => {
         loads += 1
         if (loads === 1) throw new Error('Network request failed')
         return new Promise<EspressoCatalog>((resolve) => {
           resolveRetry = resolve
         })
       },
-      create: () => {},
+      create: async () => {},
     }
     await render(<App auth={signedIn} espresso={api} />)
 
@@ -588,7 +590,7 @@ describe('log espresso shot', () => {
       resolveCreate = resolve
     })
     const api: EspressoApi = {
-      load: () => ({ ...initial, shots: [...shots] }),
+      load: () => Promise.resolve({ ...initial, shots: [...shots] }),
       create: (input) => {
         created.push(input)
         return pending
@@ -649,7 +651,7 @@ describe('log espresso shot', () => {
         new Promise<EspressoCatalog>((_, reject) => {
           rejectFirst = reject
         }),
-      create: () => {},
+      create: async () => {},
     }
     const { api: second } = fakeApi(catalog({ shots: [] }))
     const view = await render(<App auth={signedIn} espresso={first} />)
