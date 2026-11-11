@@ -1,16 +1,31 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-// FlatList's test-renderer tree can cycle through children; skip repeats.
-function jsonSafe(value: unknown) {
+function isGraphNode(value: object) {
+  return (
+    !Array.isArray(value) &&
+    ('_owner' in value || 'return' in value || 'stateNode' in value)
+  )
+}
+
+export function jsonSafe(value: unknown) {
+  const ancestors: Array<object> = []
   const seen = new WeakSet<object>()
   return JSON.stringify(
     value,
-    (_key, current) => {
-      if (typeof current === 'object' && current !== null) {
-        if (seen.has(current)) return undefined
-        seen.add(current)
+    function (this: unknown, _key, current) {
+      if (typeof current !== 'object' || current === null) return current
+      while (
+        ancestors.length > 0 &&
+        ancestors[ancestors.length - 1] !== this
+      ) {
+        ancestors.pop()
       }
+      if (ancestors.includes(current)) return undefined
+      // Fiber owner/return graphs are DAGs; walking them again explodes the dump.
+      if (seen.has(current) && isGraphNode(current)) return undefined
+      seen.add(current)
+      ancestors.push(current)
       return current
     },
     2,
