@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   BackHandler,
   Pressable,
@@ -34,8 +34,9 @@ import {
   emptyShotDraft,
   parseShotDraft,
 } from './draft'
+import { newIdempotencyKey } from './idempotency'
 import type { FieldErrors, ShotDraft } from './draft'
-import type { EspressoCatalog, ShotCreate } from './types'
+import type { EspressoCatalog, ShotCreate, ShotRow } from './types'
 
 export function consumeHardwareBack(busy: boolean, onBack: () => void) {
   if (busy) return true
@@ -50,6 +51,7 @@ export function ShotForm({
   onBack,
   onClearError,
   onSubmit,
+  loadPrefill,
 }: {
   catalog: EspressoCatalog
   busy: boolean
@@ -57,9 +59,12 @@ export function ShotForm({
   onBack: () => void
   onClearError: () => void
   onSubmit: (input: ShotCreate) => void
+  loadPrefill: (coffeeId: string) => Promise<ShotRow | null>
 }) {
   const [draft, setDraft] = useState<ShotDraft>(emptyShotDraft)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [idempotencyKey] = useState(newIdempotencyKey)
+  const prefillSeq = useRef(0)
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () =>
@@ -110,8 +115,19 @@ export function ShotForm({
         onChange={(coffeeId) => {
           onClearError()
           setFieldErrors({})
-          setDraft((current) =>
-            applyCoffeePrefill(current, coffeeId, catalog.shots),
+          const seq = ++prefillSeq.current
+          setDraft((current) => ({ ...current, coffeeId }))
+          void loadPrefill(coffeeId).then(
+            (latest) => {
+              if (seq !== prefillSeq.current) return
+              setDraft((current) =>
+                applyCoffeePrefill(current, coffeeId, latest),
+              )
+            },
+            () => {
+              if (seq !== prefillSeq.current) return
+              setDraft((current) => applyCoffeePrefill(current, coffeeId, null))
+            },
           )
         }}
       />
@@ -191,7 +207,7 @@ export function ShotForm({
             setFieldErrors(parsed.errors)
             return
           }
-          onSubmit(parsed.value)
+          onSubmit({ ...parsed.value, idempotencyKey })
         }}
       >
         <Text>{LOG}</Text>

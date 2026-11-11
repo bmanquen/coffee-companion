@@ -1,3 +1,4 @@
+import { ESPRESSO_SHOT_PAGE_SIZE } from '@coffee-companion/api/lib/espresso'
 import { coffeeOptionLabel } from '@coffee-companion/brew-display'
 import { createTRPCClient, httpBatchLink } from '@trpc/client'
 import superjson from 'superjson'
@@ -10,12 +11,13 @@ import type {
   EspressoApi,
   EspressoCatalog,
   ShotCreate,
+  ShotPage,
   ShotRow,
 } from './espresso/types'
 
 type RouterOutputs = inferRouterOutputs<TRPCRouter>
 type ShotCreateInput = inferRouterInputs<TRPCRouter>['espressoShot']['create']
-type ShotRecord = RouterOutputs['espressoShot']['getAll'][number]
+type ShotRecord = RouterOutputs['espressoShot']['getRecent']['items'][number]
 
 function sessionHeaders(): Record<string, string> {
   const cookie = getSessionCookie()
@@ -51,11 +53,14 @@ export function createLiveEspressoApi(): EspressoApi {
 
   return {
     async load(): Promise<EspressoCatalog> {
-      const [coffees, grinders, devices, shots] = await Promise.all([
+      const [coffees, grinders, devices, page] = await Promise.all([
         client.coffee.getAll.query(),
         client.grinder.list.query(),
         client.brewingDevice.list.query(),
-        client.espressoShot.getAll.query(),
+        client.espressoShot.getRecent.query({
+          limit: ESPRESSO_SHOT_PAGE_SIZE,
+          offset: 0,
+        }),
       ])
       return {
         coffees: coffees.map((coffee) => ({
@@ -65,8 +70,22 @@ export function createLiveEspressoApi(): EspressoApi {
         })),
         grinders: grinders.map(({ id, name }) => ({ id, name })),
         devices: espressoDevicesFrom(devices),
-        shots: shots.map(toShotRow),
+        shots: page.items.map(toShotRow),
+        total: page.total,
       }
+    },
+    async listShots(offset: number): Promise<ShotPage> {
+      const page = await client.espressoShot.getRecent.query({
+        limit: ESPRESSO_SHOT_PAGE_SIZE,
+        offset,
+      })
+      return { items: page.items.map(toShotRow), total: page.total }
+    },
+    async loadPrefill(coffeeId: string): Promise<ShotRow | null> {
+      const shot = await client.espressoShot.getLatestUnsealed.query({
+        coffeeId,
+      })
+      return shot ? toShotRow(shot) : null
     },
     async create(input: ShotCreate): Promise<void> {
       const payload: ShotCreateInput = input

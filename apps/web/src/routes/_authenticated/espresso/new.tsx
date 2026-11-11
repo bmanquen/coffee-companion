@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
+import { useState } from 'react'
 import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
 import { brewsLogLocation } from '@/components/brews/methods'
@@ -32,10 +33,6 @@ export const Route = createFileRoute('/_authenticated/espresso/new')({
     await context.queryClient.ensureQueryData(
       context.trpc.brewingDevice.list.queryOptions(),
     )
-    // Used to prefill the form from the coffee's most recent shot.
-    await context.queryClient.ensureQueryData(
-      context.trpc.espressoShot.getAll.queryOptions(),
-    )
   },
   component: NewEspressoShot,
 })
@@ -45,12 +42,12 @@ function NewEspressoShot() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
+  const [idempotencyKey, setIdempotencyKey] = useState(() =>
+    crypto.randomUUID(),
+  )
+
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
   const coffee = useSearchSelectResource(coffees)
-
-  const { data: shots } = useSuspenseQuery(
-    trpc.espressoShot.getAll.queryOptions(),
-  )
 
   const { data: grinders } = useSuspenseQuery(trpc.grinder.list.queryOptions())
   const grinder = useSearchSelectResource(grinders)
@@ -62,7 +59,11 @@ function NewEspressoShot() {
   const createShot = useMutation(
     trpc.espressoShot.create.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
+        queryClient.invalidateQueries(trpc.espressoShot.getRecent.queryFilter())
+        queryClient.invalidateQueries(
+          trpc.espressoShot.getLatestUnsealed.queryFilter(),
+        )
+        setIdempotencyKey(crypto.randomUUID())
         track('brew_logged', { method: 'espresso' })
         navigate(brewsLogLocation('espresso'))
       },
@@ -87,7 +88,10 @@ function NewEspressoShot() {
       onChange: insertEspressoShotSchema as never,
     },
     onSubmit: async ({ value }) => {
-      await submitFormMutation(form, createShot.mutateAsync, value)
+      await submitFormMutation(form, createShot.mutateAsync, {
+        ...value,
+        idempotencyKey,
+      })
     },
   })
 
@@ -108,14 +112,20 @@ function NewEspressoShot() {
             // recent shot. The recipe (dose/yield/time/grind) is left blank so
             // it's entered fresh each shot.
             onChange: ({ value }) => {
-              // A Sealed shot carries no settings to carry forward.
-              const latest = shots.find(
-                (s) => s.coffeeId === value && !s.sealed,
-              )
-              if (!latest?.grinderId || !latest.brewingDeviceId) return
-              form.setFieldValue('grinderId', latest.grinderId)
-              form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
-              form.setFieldValue('roastDate', latest.roastDate)
+              if (!value) return
+              void queryClient
+                .fetchQuery({
+                  ...trpc.espressoShot.getLatestUnsealed.queryOptions({
+                    coffeeId: value,
+                  }),
+                  staleTime: Infinity,
+                })
+                .then((latest) => {
+                  if (!latest?.grinderId || !latest.brewingDeviceId) return
+                  form.setFieldValue('grinderId', latest.grinderId)
+                  form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
+                  form.setFieldValue('roastDate', latest.roastDate)
+                })
             },
           }}
         >

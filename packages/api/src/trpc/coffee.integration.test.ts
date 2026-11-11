@@ -526,6 +526,7 @@ describe('coffee.getAll dialed-in', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
 
     await asA.dialedInBrew.set({

@@ -34,10 +34,27 @@ jest.mock('@better-auth/expo/client', () => ({
   expoClient: () => ({}),
 }))
 
-jest.mock('@trpc/client', () => ({
-  createTRPCClient: () => ({}),
-  httpBatchLink: () => ({}),
-}))
+jest.mock('@trpc/client', () => {
+  const query = (value) => ({
+    query: () => Promise.resolve(value),
+    mutate: () => Promise.resolve(value),
+  })
+  const emptyPage = { items: [], total: 0 }
+  return {
+    createTRPCClient: () => ({
+      coffee: { getAll: query([]) },
+      grinder: { list: query([]) },
+      brewingDevice: { list: query([]) },
+      espressoShot: {
+        getAll: query([]),
+        getRecent: query(emptyPage),
+        getLatestUnsealed: query(null),
+        create: query({}),
+      },
+    }),
+    httpBatchLink: () => ({}),
+  }
+})
 
 jest.mock('superjson', () => ({
   __esModule: true,

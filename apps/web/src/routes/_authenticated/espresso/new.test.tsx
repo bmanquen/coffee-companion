@@ -8,14 +8,15 @@ import {
 import { describe, expect, it, vi } from 'vitest'
 import { Route } from './new'
 import { useFieldContext } from '@/hooks/form-context'
-import { createTestProviders } from '@/test/providers'
-import { trpcSuccess } from '@/test/trpc-response'
+import { seedLatestUnsealed } from '@/test/espresso-shots'
 import {
   makeBrewingDevice,
   makeCoffee,
   makeGrinder,
   makeRecentShot,
 } from '@/test/factories'
+import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 
 const COFFEE = '00000000-0000-4000-8000-000000000001'
 const GRINDER = '00000000-0000-4000-8000-000000000003'
@@ -85,7 +86,10 @@ function seeded() {
     }),
     makeBrewingDevice({ id: AERO_DEVICE, name: 'AeroPress Go' }),
   ])
-  qc.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+  seedLatestUnsealed(
+    qc,
+    trpc,
+    COFFEE,
     makeRecentShot({
       id: 'shot-1',
       coffeeId: COFFEE,
@@ -93,7 +97,7 @@ function seeded() {
       brewingDeviceId: ESP_DEVICE,
       roastDate: '2026-05-01',
     }),
-  ])
+  )
   qc.setQueryData(
     trpc.dialedInBrew.get.queryKey({
       coffeeId: COFFEE,
@@ -106,6 +110,12 @@ function seeded() {
 }
 
 const NewEspressoShot = Route.options.component!
+
+function createCalls(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
+  return fetchSpy.mock.calls.filter((call) =>
+    String(call[0]).includes('espressoShot.create'),
+  )
+}
 
 describe('NewEspressoShot form', () => {
   it('offers only Espresso-type brewing devices', () => {
@@ -123,7 +133,7 @@ describe('NewEspressoShot form', () => {
     ).toBeNull()
   })
 
-  it('surfaces the Dialed-in Brew for the prefilled device', () => {
+  it('surfaces the Dialed-in Brew for the prefilled device', async () => {
     const { queryClient, trpc, Wrapper } = seeded()
     queryClient.setQueryData(
       trpc.dialedInBrew.get.queryKey({
@@ -156,7 +166,7 @@ describe('NewEspressoShot form', () => {
     })
 
     expect(
-      screen.getByRole('status', { name: 'Dialed-in for Linea Mini' }),
+      await screen.findByRole('status', { name: 'Dialed-in for Linea Mini' }),
     ).toBeTruthy()
     expect(
       screen.getByText(
@@ -165,7 +175,7 @@ describe('NewEspressoShot form', () => {
     ).toBeTruthy()
   })
 
-  it('prefills grinder and device from the coffee’s latest shot', () => {
+  it('prefills grinder and device from the coffee’s latest shot', async () => {
     const { Wrapper } = seeded()
     render(<NewEspressoShot />, { wrapper: Wrapper })
 
@@ -173,12 +183,11 @@ describe('NewEspressoShot form', () => {
       target: { value: COFFEE },
     })
 
-    // Prefill selects the grinder + device options (shown by their labels).
-    expect(screen.getByDisplayValue('Niche Zero')).toBeTruthy()
+    expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
     expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
   })
 
-  it('auto-fills roast date as the same calendar day', () => {
+  it('auto-fills roast date as the same calendar day', async () => {
     const { Wrapper } = seeded()
     render(<NewEspressoShot />, { wrapper: Wrapper })
 
@@ -186,7 +195,7 @@ describe('NewEspressoShot form', () => {
       target: { value: COFFEE },
     })
 
-    expect(screen.getByText('May 1st, 2026')).toBeTruthy()
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
     expect(screen.queryByText('April 30th, 2026')).toBeNull()
   })
 
@@ -201,6 +210,7 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '18' },
       })
@@ -216,10 +226,12 @@ describe('NewEspressoShot form', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 
-      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
-      const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('espressoShot.create')
-      const body = String(init?.body ?? '')
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      const createCall = createCalls(fetchSpy)[0]
+      expect(String(createCall[0])).toContain('espressoShot.create')
+      const body = String(
+        (createCall[1] as RequestInit | undefined)?.body ?? '',
+      )
       expect(body).toContain('18')
       expect(body).toContain('36')
       expect(body).toContain(COFFEE)
@@ -235,6 +247,59 @@ describe('NewEspressoShot form', () => {
         to: '/brews',
         search: { method: 'espresso' },
       })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('retries a lost create with the same idempotency key', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValue(trpcSuccess())
+    try {
+      const { Wrapper } = seeded()
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
+
+      const keys = createCalls(fetchSpy).map((call) => {
+        const init = call[1] as RequestInit | undefined
+        return String(init?.body ?? '').match(
+          /"idempotencyKey"\s*:\s*"([^"]+)"/,
+        )?.[1]
+      })
+      expect(keys[0]).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      )
+      expect(keys[0]).toBe(keys[1])
     } finally {
       fetchSpy.mockRestore()
     }

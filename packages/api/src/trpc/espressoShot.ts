@@ -42,16 +42,6 @@ async function assertEspressoDevice(brewingDeviceId: string, userId: string) {
 }
 
 export const espressoShotRouter = createTRPCRouter({
-  getAll: authedProcedure.query(({ ctx }) =>
-    sealBrewsWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
-      db.query.espressoShots.findMany({
-        where: { userId: ctx.session.user.id },
-        orderBy: { createdAt: 'desc' },
-        with: withRelations,
-      }),
-    ),
-  ),
-
   getRecent: authedProcedure
     .input(
       z.object({ limit: z.number().min(1).max(50), offset: z.number().min(0) }),
@@ -74,6 +64,26 @@ export const espressoShotRouter = createTRPCRouter({
         return { items, total }
       }),
     ),
+
+  getLatestUnsealed: authedProcedure
+    .input(z.object({ coffeeId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const shots = await sealBrewsWithDialedIn(
+        ctx.session.user.id,
+        ctx.shelf,
+        () =>
+          db.query.espressoShots.findMany({
+            where: {
+              userId: ctx.session.user.id,
+              coffeeId: input.coffeeId,
+            },
+            orderBy: { createdAt: 'desc' },
+            with: withRelations,
+            limit: 20,
+          }),
+      )
+      return shots.find((shot) => !shot.sealed) ?? null
+    }),
 
   // Dialed-in shots, most recent first. An optional limit caps the result;
   // omitting it returns every one. A Sealed one is blanked like any other Brew
@@ -109,17 +119,34 @@ export const espressoShotRouter = createTRPCRouter({
   ),
 
   create: authedProcedure
-    .input(insertEspressoShotSchema)
+    .input(insertEspressoShotSchema.extend({ idempotencyKey: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       await assertEspressoDevice(input.brewingDeviceId, ctx.session.user.id)
 
       await stampFallenBrews(ctx.session.user.id, ctx.plan)
 
-      const [shot] = await db
+      const inserted = await db
         .insert(espressoShots)
         .values({ ...input, userId: ctx.session.user.id })
+        .onConflictDoNothing({
+          target: [espressoShots.userId, espressoShots.idempotencyKey],
+        })
         .returning()
-      return shot
+      if (inserted[0]) return inserted[0]
+
+      const existing = await db.query.espressoShots.findFirst({
+        where: {
+          userId: ctx.session.user.id,
+          idempotencyKey: input.idempotencyKey,
+        },
+      })
+      if (!existing) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Could not save this shot',
+        })
+      }
+      return existing
     }),
 
   update: authedProcedure

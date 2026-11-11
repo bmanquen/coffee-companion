@@ -8,9 +8,13 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EspressoBrewsSection } from './espresso-brews-section'
 import type * as ReactRouter from '@tanstack/react-router'
+import {
+  ESPRESSO_SHOT_PAGE_SIZE,
+  seedEspressoShotPage,
+} from '@/test/espresso-shots'
+import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
 import { createTestProviders } from '@/test/providers'
 import { trpcSuccess } from '@/test/trpc-response'
-import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
 
 const mocks = vi.hoisted(() => ({ track: vi.fn() }))
 
@@ -53,7 +57,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 describe('EspressoBrewsSection', () => {
   it('shows the empty state when there are no shots', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [])
+    seedEspressoShotPage(queryClient, trpc, [])
 
     render(<EspressoBrewsSection />, { wrapper: Wrapper })
 
@@ -62,7 +66,7 @@ describe('EspressoBrewsSection', () => {
 
   it('renders shots with dose and yield', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({ id: 's1', dose: '18', yield: '36' }),
     ])
 
@@ -79,7 +83,7 @@ describe('EspressoBrewsSection', () => {
 
   it('filters shots by the free-text filter', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         coffeeId: 'c1',
@@ -108,7 +112,7 @@ describe('EspressoBrewsSection', () => {
 
   it('renders the recipe columns', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         dose: '18',
@@ -131,7 +135,7 @@ describe('EspressoBrewsSection', () => {
 
   it('shows the computed ratio as its own card-summary field', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({ id: 's1', dose: '18', yield: '36' }),
     ])
 
@@ -147,7 +151,7 @@ describe('EspressoBrewsSection', () => {
 
   it('shows no ratio when dose is missing', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({ id: 's1', dose: null, yield: '36' }),
     ])
 
@@ -160,7 +164,7 @@ describe('EspressoBrewsSection', () => {
 
   it('does not leave an empty ratio slot on the card when there is no ratio', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({ id: 's1', dose: null, yield: '36' }),
     ])
 
@@ -174,7 +178,7 @@ describe('EspressoBrewsSection', () => {
 
   it('shows no ratio when yield is missing', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({ id: 's1', dose: '18', yield: null }),
     ])
 
@@ -187,7 +191,7 @@ describe('EspressoBrewsSection', () => {
 
   it('falls back to a dash for missing recipe values', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         dose: null,
@@ -209,7 +213,7 @@ describe('EspressoBrewsSection', () => {
 
   it('highlights the dialed-in row and not the others', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         isDialedIn: true,
@@ -235,7 +239,7 @@ describe('EspressoBrewsSection', () => {
 
   it('links each row to its edit page and the header to the new-shot form', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({ id: 's1' }),
     ])
 
@@ -256,7 +260,7 @@ describe('EspressoBrewsSection', () => {
 
   it('reflects each shot’s dialed-in state on the crosshair toggle', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         isDialedIn: true,
@@ -286,7 +290,7 @@ describe('EspressoBrewsSection', () => {
 
   it('opens a delete confirmation dialog naming the coffee', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
@@ -312,7 +316,7 @@ describe('EspressoBrewsSection', () => {
       .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
-      queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+      seedEspressoShotPage(queryClient, trpc, [
         makeRecentShot({
           id: 's1',
           isDialedIn: false,
@@ -348,7 +352,7 @@ describe('EspressoBrewsSection', () => {
       .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
-      queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+      seedEspressoShotPage(queryClient, trpc, [
         makeRecentShot({
           id: 's1',
           isDialedIn: true,
@@ -380,7 +384,7 @@ describe('EspressoBrewsSection', () => {
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       const shot = makeRecentShot({ id: 's1' })
-      queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [shot])
+      seedEspressoShotPage(queryClient, trpc, [shot])
       queryClient.setQueryData(trpc.dialedInBrew.list.queryKey(), [])
 
       render(<EspressoBrewsSection />, { wrapper: Wrapper })
@@ -417,7 +421,7 @@ describe('EspressoBrewsSection', () => {
 
   it('expands a desktop row on click to reveal the brew detail', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         coffeeId: 'c1',
@@ -449,7 +453,7 @@ describe('EspressoBrewsSection', () => {
 
   it('keeps only one desktop row expanded at a time (accordion)', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedEspressoShotPage(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         coffeeId: 'c1',
@@ -487,7 +491,7 @@ describe('EspressoBrewsSection', () => {
     )
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
-      queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+      seedEspressoShotPage(queryClient, trpc, [
         makeRecentShot({
           id: 's1',
           isDialedIn: false,
@@ -516,5 +520,39 @@ describe('EspressoBrewsSection', () => {
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+
+  it('loads the next page when Load more is pressed', async () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+      makeRecentShot({
+        id: `s${index}`,
+        coffeeId: `c${index}`,
+        coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
+      }),
+    )
+    seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+    seedEspressoShotPage(
+      queryClient,
+      trpc,
+      [
+        makeRecentShot({
+          id: 's-next',
+          coffeeId: 'c-next',
+          coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+        }),
+      ],
+      first.length + 1,
+      ESPRESSO_SHOT_PAGE_SIZE,
+    )
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('Coffee 0')).toBeTruthy()
+    expect(table.queryByText('Coffee extra')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    expect(await table.findByText('Coffee extra')).toBeTruthy()
   })
 })

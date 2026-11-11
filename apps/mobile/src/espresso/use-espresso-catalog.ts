@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { apiErrorMessage } from '../api-error'
 import { ERROR_LOAD_FAILED, ERROR_SAVE_FAILED } from './copy'
-import type { EspressoApi, EspressoCatalog, ShotCreate } from './types'
+import type { EspressoApi, EspressoCatalog, ShotCreate, ShotRow } from './types'
 
 type LoadStatus = 'loading' | 'loaded' | 'failed'
 
@@ -11,6 +11,7 @@ type State = {
   loadError: string | null
   busy: boolean
   saveError: string | null
+  loadingMore: boolean
 }
 
 type Action =
@@ -22,6 +23,10 @@ type Action =
   | { type: 'saveFailed'; error: string }
   | { type: 'saveErrorCleared' }
   | { type: 'reset' }
+  | { type: 'loadMoreStarted' }
+  | { type: 'shotsRefreshed'; shots: Array<ShotRow>; total: number }
+  | { type: 'shotsAppended'; shots: Array<ShotRow>; total: number }
+  | { type: 'loadMoreFailed' }
 
 const initial: State = {
   status: 'loading',
@@ -29,6 +34,7 @@ const initial: State = {
   loadError: null,
   busy: false,
   saveError: null,
+  loadingMore: false,
 }
 
 function reducer(state: State, action: Action): State {
@@ -54,6 +60,36 @@ function reducer(state: State, action: Action): State {
       return state.saveError ? { ...state, saveError: null } : state
     case 'reset':
       return initial
+    case 'loadMoreStarted':
+      return { ...state, loadingMore: true }
+    case 'shotsRefreshed':
+      if (!state.catalog) return state
+      return {
+        ...state,
+        catalog: {
+          ...state.catalog,
+          shots: action.shots,
+          total: action.total,
+        },
+      }
+    case 'shotsAppended': {
+      if (!state.catalog) return { ...state, loadingMore: false }
+      const seen = new Set(state.catalog.shots.map((shot) => shot.id))
+      return {
+        ...state,
+        loadingMore: false,
+        catalog: {
+          ...state.catalog,
+          shots: [
+            ...state.catalog.shots,
+            ...action.shots.filter((shot) => !seen.has(shot.id)),
+          ],
+          total: action.total,
+        },
+      }
+    }
+    case 'loadMoreFailed':
+      return { ...state, loadingMore: false }
   }
 }
 
@@ -84,26 +120,43 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   }, [api, userId])
 
   useEffect(() => {
-    if (activeUser.current !== userId) {
-      activeUser.current = userId
+    const previousUser = activeUser.current
+    activeUser.current = userId
+    if (previousUser !== userId) {
       saveInFlight.current = false
       loadSeq.current += 1
       dispatch({ type: 'reset' })
     }
     runLoad()
-  }, [runLoad, userId])
-
-  useEffect(() => {
     return () => {
-      activeUser.current = ''
       loadSeq.current += 1
     }
-  }, [])
+  }, [runLoad, userId])
 
   const loading = state.status === 'loading'
   const reload = useCallback(() => {
     if (!loading) runLoad()
   }, [loading, runLoad])
+
+  const refreshFirstPage = useCallback(
+    (forUser: string) => {
+      void api.listShots(0).then(
+        (page) => {
+          if (forUser !== activeUser.current) return
+          dispatch({
+            type: 'shotsRefreshed',
+            shots: page.items,
+            total: page.total,
+          })
+        },
+        () => {
+          if (forUser !== activeUser.current) return
+          runLoad()
+        },
+      )
+    },
+    [api, runLoad],
+  )
 
   const save = useCallback(
     (input: ShotCreate, onSuccess?: () => void) => {
@@ -117,7 +170,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
           if (forUser !== activeUser.current) return
           dispatch({ type: 'saveSucceeded' })
           onSuccess?.()
-          runLoad()
+          refreshFirstPage(forUser)
         },
         (error) => {
           saveInFlight.current = false
@@ -129,7 +182,40 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
         },
       )
     },
-    [api, runLoad, userId],
+    [api, refreshFirstPage, userId],
+  )
+
+  const loadMore = useCallback(() => {
+    const catalog = state.catalog
+    if (
+      state.loadingMore ||
+      !catalog ||
+      catalog.shots.length >= catalog.total
+    ) {
+      return
+    }
+    const forUser = userId
+    const offset = catalog.shots.length
+    dispatch({ type: 'loadMoreStarted' })
+    void api.listShots(offset).then(
+      (page) => {
+        if (forUser !== activeUser.current) return
+        dispatch({
+          type: 'shotsAppended',
+          shots: page.items,
+          total: page.total,
+        })
+      },
+      () => {
+        if (forUser !== activeUser.current) return
+        dispatch({ type: 'loadMoreFailed' })
+      },
+    )
+  }, [api, state.catalog, state.loadingMore, userId])
+
+  const loadPrefill = useCallback(
+    (coffeeId: string) => api.loadPrefill(coffeeId),
+    [api],
   )
 
   const clearSaveError = useCallback(() => {
@@ -139,10 +225,13 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   return {
     catalog: state.catalog,
     loading,
+    loadingMore: state.loadingMore,
     loadError: state.status === 'failed' ? state.loadError : null,
     busy: state.busy,
     saveError: state.saveError,
     reload,
+    loadMore,
+    loadPrefill,
     save,
     clearSaveError,
   }

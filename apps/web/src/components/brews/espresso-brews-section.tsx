@@ -1,8 +1,4 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
@@ -31,6 +27,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
+import { useEspressoShotPages } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 
 type Shot = {
@@ -63,7 +60,10 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
   const deleteShot = useMutation(
     trpc.espressoShot.delete.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
+        queryClient.invalidateQueries(trpc.espressoShot.getRecent.queryFilter())
+        queryClient.invalidateQueries(
+          trpc.espressoShot.getLatestUnsealed.queryFilter(),
+        )
         queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
         invalidateDeviceDialedInQueries(queryClient, trpc)
       },
@@ -150,10 +150,7 @@ const columns = [
 // page's section components (heading + add button + filters + table).
 export function EspressoBrewsSection() {
   'use no memo'
-  const trpc = useTRPC()
-  const { data: shots } = useSuspenseQuery(
-    trpc.espressoShot.getAll.queryOptions(),
-  )
+  const { items: shots, hasMore, loadingMore, loadMore } = useEspressoShotPages()
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -240,6 +237,18 @@ export function EspressoBrewsSection() {
               brewLogRowClass(row.original.sealed, row.original.isDialedIn)
             }
           />
+          {hasMore ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loadingMore}
+              onClick={() => {
+                void loadMore()
+              }}
+            >
+              Load more
+            </Button>
+          ) : null}
         </>
       )}
     </Card>

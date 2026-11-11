@@ -15,6 +15,7 @@ import {
   isDashboardMethod,
   resolveSelectedMethod,
 } from '@/components/dashboard/methods'
+import { espressoShotPageInput } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
@@ -28,13 +29,16 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
       typeof search.method === 'string' ? search.method : undefined
     return isDashboardMethod(method) ? { method } : {}
   },
-  // Warm every method's full brew history so any tab renders server-side
-  // instead of flashing a spinner when selected. Each feed reads its own with
-  // useSuspenseQuery. The session is guaranteed by the _authenticated layout.
+  // Warm the first espresso page and the other methods' full histories so any
+  // tab renders server-side instead of flashing a spinner when selected. Each
+  // feed reads its own with useSuspenseQuery. The session is guaranteed by the
+  // _authenticated layout.
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(
-        context.trpc.espressoShot.getAll.queryOptions(),
+        context.trpc.espressoShot.getRecent.queryOptions(
+          espressoShotPageInput(),
+        ),
       ),
       context.queryClient.ensureQueryData(
         context.trpc.pouroverBrew.getAll.queryOptions(),
@@ -60,9 +64,10 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
 // supply the recency fallback when no method is in the URL.
 function DashboardContainer() {
   const trpc = useTRPC()
-  const { data: espresso } = useSuspenseQuery(
-    trpc.espressoShot.getAll.queryOptions(),
+  const { data: espressoPage } = useSuspenseQuery(
+    trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
   )
+  const espresso = espressoPage.items
   const { data: pourover } = useSuspenseQuery(
     trpc.pouroverBrew.getAll.queryOptions(),
   )

@@ -185,6 +185,7 @@ export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
   .omit({
     id: true,
     userId: true,
+    idempotencyKey: true,
   })
   .extend({
     dose: decimalString(),

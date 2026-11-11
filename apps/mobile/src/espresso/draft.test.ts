@@ -107,7 +107,7 @@ describe('parseShotDraft', () => {
 
 describe('applyCoffeePrefill', () => {
   it('carries grinder, device, and roast date from the latest unsealed shot', () => {
-    const next = applyCoffeePrefill(emptyShotDraft(), COFFEE, [shot()])
+    const next = applyCoffeePrefill(emptyShotDraft(), COFFEE, shot())
     expect(next).toEqual(
       expect.objectContaining({
         coffeeId: COFFEE,
@@ -121,9 +121,11 @@ describe('applyCoffeePrefill', () => {
   })
 
   it('does not prefill from a sealed shot', () => {
-    const next = applyCoffeePrefill(emptyShotDraft(), COFFEE, [
+    const next = applyCoffeePrefill(
+      emptyShotDraft(),
+      COFFEE,
       shot({ sealed: true, grinderId: null, brewingDeviceId: null }),
-    ])
+    )
     expect(next.grinderId).toBe('')
     expect(next.brewingDeviceId).toBe('')
   })
@@ -135,7 +137,7 @@ describe('applyCoffeePrefill', () => {
       coffeeId: COFFEE,
       roastDate: '2026-05-01',
     }
-    const next = applyCoffeePrefill(draft, other, [shot()])
+    const next = applyCoffeePrefill(draft, other, null)
     expect(next.coffeeId).toBe(other)
     expect(next.roastDate).toBe('')
   })

@@ -1,4 +1,3 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
 import type { EspressoShotWithRelations } from '@/types'
 import {
@@ -8,7 +7,8 @@ import {
 import { ratioColumn } from '@/components/brews/brew-ratio'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { expanderColumn } from '@/components/data-table'
-import { useTRPC } from '@/integrations/trpc/react'
+import { Button } from '@/components/ui/button'
+import { useEspressoShotPages } from '@/hooks/use-espresso-shot-pages'
 
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 
@@ -49,24 +49,35 @@ const columns = [
   expanderColumn<EspressoShotWithRelations>(),
 ]
 
-// The Espresso tab of the dashboard: the full espresso Shot history as a
-// reference-only feed. Loads the method's getAll and hands it to BrewFeed.
+// The Espresso tab of the dashboard: paged Shot history as a reference-only
+// feed. Hands loaded pages to BrewFeed and offers Load more for the rest.
 export function EspressoBrewFeed() {
-  const trpc = useTRPC()
-  const { data: shots } = useSuspenseQuery(
-    trpc.espressoShot.getAll.queryOptions(),
-  )
+  const { items, hasMore, loadingMore, loadMore } = useEspressoShotPages()
 
   return (
-    <BrewFeed
-      title="Espresso"
-      brews={shots}
-      columns={columns}
-      renderDetails={(row) => renderBrewDetails(row.original)}
-      newTo="/espresso/new"
-      logLabel="Log Shot"
-      emptyMessage="No espresso shots yet."
-      emptyLinkLabel="Log your first shot"
-    />
+    <>
+      <BrewFeed
+        title="Espresso"
+        brews={items}
+        columns={columns}
+        renderDetails={(row) => renderBrewDetails(row.original)}
+        newTo="/espresso/new"
+        logLabel="Log Shot"
+        emptyMessage="No espresso shots yet."
+        emptyLinkLabel="Log your first shot"
+      />
+      {hasMore ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={loadingMore}
+          onClick={() => {
+            void loadMore()
+          }}
+        >
+          Load more
+        </Button>
+      ) : null}
+    </>
   )
 }

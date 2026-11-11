@@ -37,8 +37,11 @@ export function SignedInHome({
     busy,
     saveError,
     reload,
+    loadMore,
+    loadPrefill,
     save,
     clearSaveError,
+    loadingMore,
   } = useEspressoCatalog(espresso, userId)
 
   useEffect(() => {
@@ -85,6 +88,7 @@ export function SignedInHome({
           catalog={catalog}
           busy={busy}
           error={saveError}
+          loadPrefill={loadPrefill}
           onBack={() => {
             clearSaveError()
             setScreen('list')
@@ -98,7 +102,9 @@ export function SignedInHome({
         <ShotList
           shots={catalog?.shots ?? null}
           loading={loading}
+          loadingMore={loadingMore}
           failed={loadError != null}
+          onEndReached={loadMore}
           onLogShot={() => {
             if (!catalog) return
             clearSaveError()

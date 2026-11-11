@@ -85,6 +85,7 @@ beforeAll(async () => {
       yield: '36',
       time: 28,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
     shots.push(shot.id)
   }
@@ -160,7 +161,7 @@ const subscriptionRowCount = async () =>
       .where(eq(subscription.referenceId, BUYER))
   ).length
 const sealedShotIds = async () =>
-  (await asBuyer.espressoShot.getAll())
+  (await asBuyer.espressoShot.getRecent({ limit: 50, offset: 0 })).items
     .filter((shot) => shot.sealed)
     .map((shot) => shot.id)
 
@@ -204,7 +205,7 @@ describe('the Stripe webhook', () => {
   })
 
   it('reopens everything Sealed while the buyer was on Free', async () => {
-    const all = await asBuyer.espressoShot.getAll()
+    const all = (await asBuyer.espressoShot.getRecent({ limit: 50, offset: 0 })).items
 
     expect(all.every((shot) => shot.sealed === false)).toBe(true)
     expect(all.every((shot) => shot.dose === '18')).toBe(true)

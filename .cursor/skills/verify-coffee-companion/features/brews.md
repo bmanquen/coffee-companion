@@ -4,7 +4,7 @@ Brews is the log of every Shot and Brew, switched by a searchable brewing-method
 
 ## Sub-features
 
-- `brews-espresso` shows the Espresso log (default) with Ethiopia Guji on `data`, and a Ratio column (computed 1:x from dose and yield).
+- `brews-espresso` shows the Espresso log (default) with Ethiopia Guji on `data`, and a Ratio column (computed 1:x from dose and yield). More than 20 Shots shows a `Load more` button.
 - `brews-aeropress` switches the method select to AeroPress and shows the Standard dialed-in brew.
 - `brews-log-espresso` logs a Shot from `/espresso/new` (coffee select prefills grinder and device).
 - `brews-log-aeropress` logs an AeroPress brew from `/aeropress/new`.
@@ -56,4 +56,5 @@ Preconditions:
 - Dose, yield, time, and grind are required. They have labels, not the old `18.0` / `36.0` placeholders. Number fields are spinbuttons; `fill --label "Dose (g)"` is the handle (same as e2e `getByLabel`).
 - Pour Over, French Press, and Cold Brew have `/…/new` forms too; this map's live recipe starts with Espresso and AeroPress because those are what the seed fills. Drive the others when the change is about those methods. `/brews?method=pourover` (and the other values) opens that log directly.
 - Identity `free` Seals off-Shelf rows on this page. Do not treat missing grind settings on Sumatra Lintong / Brazil Cerrado as a logging bug — see [Plans and Shelf](./plans-and-shelf.md).
+- The Espresso log pages at 20. Seeded `data` is under that, so the default recipe does not click `Load more`. Prefill on `/espresso/new` uses the latest unsealed Shot for that coffee, not the first log page.
 - `clickUntil` applies on `/espresso/new`: `Select Coffee` is in the SSR HTML before the handler attaches.

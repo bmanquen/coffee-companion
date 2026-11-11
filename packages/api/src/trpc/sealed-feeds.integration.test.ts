@@ -107,6 +107,7 @@ beforeAll(async () => {
       dose: '18',
       yield: '36',
       time: 30,
+      idempotencyKey: crypto.randomUUID(),
     })
   ).id
   sealedBrewIds.aeropressBrew = (
@@ -195,6 +196,7 @@ beforeAll(async () => {
       yield: '36',
       time: 30,
       grindSetting: '18',
+      idempotencyKey: crypto.randomUUID(),
     })
   }
 
@@ -215,6 +217,7 @@ beforeAll(async () => {
       brewingDeviceId: espressoDevice,
       yield: '42',
       time: 28,
+      idempotencyKey: crypto.randomUUID(),
     })
   ).id
   readableBrewIds.aeropressBrew = (
@@ -299,11 +302,27 @@ const readableId = (method: MethodKey) => {
   return id
 }
 
+async function historyItems(method: MethodKey) {
+  switch (method) {
+    case 'espressoShot':
+      return (await asUser.espressoShot.getRecent({ limit: 50, offset: 0 }))
+        .items
+    case 'aeropressBrew':
+      return asUser.aeropressBrew.getAll()
+    case 'pouroverBrew':
+      return asUser.pouroverBrew.getAll()
+    case 'frenchpressBrew':
+      return asUser.frenchpressBrew.getAll()
+    case 'coldBrewBrew':
+      return asUser.coldBrewBrew.getAll()
+  }
+}
+
 describe.each(methods)('%s feeds', (method) => {
   const feedFor = () => asUser[method]
 
-  it('withholds a Sealed brew from getAll', async () => {
-    const all = await feedFor().getAll()
+  it('withholds a Sealed brew from the history feed', async () => {
+    const all = await historyItems(method)
     const brew = all.find((row) => row.id === sealedId(method))
 
     expect(brew?.sealed).toBe(true)
@@ -340,6 +359,16 @@ describe.each(methods)('%s feeds', (method) => {
   })
 })
 
+describe('espressoShot.getLatestUnsealed', () => {
+  it('does not return a Sealed shot', async () => {
+    const sealed = await asUser.espressoShot.getById(sealedId('espressoShot'))
+    const found = await asUser.espressoShot.getLatestUnsealed({
+      coffeeId: sealed.coffeeId,
+    })
+    expect(found).toBeNull()
+  })
+})
+
 describe('the enumeration itself', () => {
   const paths = Object.keys(trpcRouter._def.procedures)
 
@@ -354,7 +383,13 @@ describe('the enumeration itself', () => {
   })
 
   it('covers every read each of those routers exposes', () => {
-    const asserted = new Set(['getAll', 'getRecent', 'getById', 'getDialedIn'])
+    const asserted = new Set([
+      'getAll',
+      'getRecent',
+      'getById',
+      'getDialedIn',
+      'getLatestUnsealed',
+    ])
 
     for (const method of methods) {
       const reads = paths

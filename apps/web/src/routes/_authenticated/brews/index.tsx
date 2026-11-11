@@ -8,6 +8,7 @@ import { FrenchpressBrewsSection } from '@/components/brews/frenchpress-brews-se
 import { isBrewMethod, resolveBrewMethod } from '@/components/brews/methods'
 import { PouroverBrewsSection } from '@/components/brews/pourover-brews-section'
 import { H1 } from '@/components/typography/h1'
+import { espressoShotPageInput } from '@/hooks/use-espresso-shot-pages'
 
 export const Route = createFileRoute('/_authenticated/brews/')({
   // The selected method lives in the URL so a shared or bookmarked link opens
@@ -21,7 +22,7 @@ export const Route = createFileRoute('/_authenticated/brews/')({
   },
   loader: ({ context }) => {
     context.queryClient.ensureQueryData(
-      context.trpc.espressoShot.getAll.queryOptions(),
+      context.trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
     )
     context.queryClient.ensureQueryData(
       context.trpc.aeropressBrew.getAll.queryOptions(),

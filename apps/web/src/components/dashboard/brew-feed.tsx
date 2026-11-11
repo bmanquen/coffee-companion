@@ -28,8 +28,8 @@ type BrewRow = {
   sealed: boolean
 }
 
-// The dashboard's reference-only per-method Brew feed. Given a method's full
-// brew history (from its getAll), it renders a glanceable, paginated feed of
+// The dashboard's reference-only per-method Brew feed. Given the rows already
+// loaded for that method, it renders a glanceable, paginated feed of
 // cards with the dialed-in Brew highlighted, a "dialed-in only" toggle and a
 // by-coffee filter (both applied across the whole history before pagination),
 // and a per-method log button. It carries no edit/delete/dialed-in controls —
