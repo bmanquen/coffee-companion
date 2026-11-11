@@ -50,7 +50,7 @@ function reducer(state: State, action: Action): State {
     case 'saveFailed':
       return { ...state, busy: false, saveError: action.error }
     case 'saveErrorCleared':
-      return { ...state, saveError: null }
+      return state.saveError ? { ...state, saveError: null } : state
   }
 }
 
