@@ -111,7 +111,7 @@ describe('sign-in screen', () => {
       />,
     )
 
-    fireEvent.press(screen.getByRole('button', { name: NO_ACCOUNT_ACTION }))
+    await fireEvent.press(screen.getByRole('button', { name: NO_ACCOUNT_ACTION }))
     expect(setMode).toHaveBeenCalledWith('sign-up')
   })
 
@@ -225,8 +225,8 @@ describe('sign-in screen', () => {
       />,
     )
 
-    fireEvent.press(screen.getByRole('button', { name: SIGN_IN_WITH_GOOGLE }))
-    fireEvent.press(screen.getByRole('button', { name: SIGN_IN_WITH_APPLE }))
+    await fireEvent.press(screen.getByRole('button', { name: SIGN_IN_WITH_GOOGLE }))
+    await fireEvent.press(screen.getByRole('button', { name: SIGN_IN_WITH_APPLE }))
     expect(onGoogle).toHaveBeenCalledTimes(1)
     expect(onApple).toHaveBeenCalledTimes(1)
   })
