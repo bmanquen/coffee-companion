@@ -29,9 +29,6 @@ importers:
       '@trpc/client':
         specifier: ^11.28.2
         version: 11.28.6(@trpc/server@11.28.6(typescript@5.9.3))(typescript@5.9.3)
-      '@trpc/server':
-        specifier: ^11.28.2
-        version: 11.28.6(typescript@5.9.3)
       better-auth:
         specifier: 1.7.25
         version: 1.7.25(@opentelemetry/api@1.10.0)(@tanstack/react-start@1.169.5(esbuild@0.28.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rollup@4.68.5)(vite@7.3.7(@types/node@25.5.0)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(drizzle-kit@1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(@opentelemetry/api@1.10.0)(@sinclair/typebox@0.34.52)(@types/mssql@9.1.9)(@types/pg@8.23.1)(mssql@11.0.1)(pg@8.23.1)(zod@4.6.7)))(drizzle-orm@1.0.0-rc.5(@opentelemetry/api@1.10.0)(@sinclair/typebox@0.34.52)(@types/mssql@9.1.9)(@types/pg@8.23.1)(mssql@11.0.1)(pg@8.23.1)(zod@4.6.7))(mongodb@7.1.0)(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(solid-js@1.9.19)(vitest@4.1.12(@opentelemetry/api@1.10.0)(@types/node@25.5.0)(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@7.3.7(@types/node@25.5.0)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))
@@ -81,6 +78,9 @@ importers:
       '@testing-library/react-native':
         specifier: ^14.1.0
         version: 14.1.0(jest@29.7.0(@types/node@25.5.0))(react-native@0.86.3(@babel/core@7.29.13)(@react-native/jest-preset@0.86.3(@babel/core@7.29.13)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)(test-renderer@1.3.1(@types/react@19.3.0)(react@19.3.1))
+      '@trpc/server':
+        specifier: ^11.28.2
+        version: 11.28.6(typescript@5.9.3)
       '@types/jest':
         specifier: ^29.5.14
         version: 29.5.14

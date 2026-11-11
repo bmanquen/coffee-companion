@@ -25,16 +25,13 @@ describe('apiErrorMessage', () => {
     ).toBe('Shot not found')
   })
 
-  it('uses the API message when the device is not espresso', () => {
+  it('falls back for BAD_REQUEST, which can carry raw Zod JSON', () => {
     expect(
       apiErrorMessage(
-        trpcError(
-          TRPC_BAD_REQUEST,
-          'Espresso shots require an Espresso brewing device',
-        ),
+        trpcError(TRPC_BAD_REQUEST, '[{"code":"invalid_type"}]'),
         FALLBACK,
       ),
-    ).toBe('Espresso shots require an Espresso brewing device')
+    ).toBe(FALLBACK)
   })
 
   it('falls back for a non-allowlisted tRPC code', () => {

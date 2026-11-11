@@ -37,47 +37,13 @@ export type EspressoCatalog = {
   shots: Array<ShotRow>
 }
 
-export type MaybePromise<T> = T | Promise<T>
-
 export type EspressoApi = {
-  load: () => MaybePromise<EspressoCatalog>
-  create: (input: ShotCreate) => MaybePromise<void>
-}
-
-function isThenable<T>(value: T | Promise<T>): value is Promise<T> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'then' in value &&
-    typeof value.then === 'function'
-  )
-}
-
-export function runMaybePromise<T>(
-  produce: () => T | Promise<T>,
-  onValue: (value: T) => void,
-  onError: (error: unknown) => void,
-): void {
-  try {
-    const value = produce()
-    if (isThenable(value)) {
-      void value.then(onValue, onError)
-      return
-    }
-    onValue(value)
-  } catch (error) {
-    onError(error)
-  }
+  load: () => Promise<EspressoCatalog>
+  create: (input: ShotCreate) => Promise<void>
 }
 
 export const idleEspressoApi: EspressoApi = {
-  load: () => ({
-    coffees: [],
-    grinders: [],
-    devices: [],
-    shots: [],
-  }),
-  create: () => {
-    throw new Error('Espresso API is not configured')
-  },
+  load: () =>
+    Promise.resolve({ coffees: [], grinders: [], devices: [], shots: [] }),
+  create: () => Promise.reject(new Error('Espresso API is not configured')),
 }

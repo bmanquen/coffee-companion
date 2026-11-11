@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { apiErrorMessage } from '../api-error'
 import { ERROR_LOAD_FAILED, ERROR_SAVE_FAILED } from './copy'
-import { runMaybePromise } from './types'
 import type { EspressoApi, EspressoCatalog, ShotCreate } from './types'
 
 type LoadStatus = 'loading' | 'loaded' | 'failed'
@@ -12,14 +11,12 @@ type State = {
   loadError: string | null
   busy: boolean
   saveError: string | null
-  reloadToken: number
 }
 
 type Action =
   | { type: 'loadStarted' }
   | { type: 'loadSucceeded'; catalog: EspressoCatalog }
   | { type: 'loadFailed'; error: string }
-  | { type: 'reload' }
   | { type: 'saveStarted' }
   | { type: 'saveSucceeded' }
   | { type: 'saveFailed'; error: string }
@@ -31,7 +28,6 @@ const initial: State = {
   loadError: null,
   busy: false,
   saveError: null,
-  reloadToken: 0,
 }
 
 function reducer(state: State, action: Action): State {
@@ -47,16 +43,7 @@ function reducer(state: State, action: Action): State {
       }
     case 'loadFailed':
       return { ...state, status: 'failed', loadError: action.error }
-    case 'reload':
-      if (state.status === 'loading') return state
-      return {
-        ...state,
-        status: 'loading',
-        loadError: null,
-        reloadToken: state.reloadToken + 1,
-      }
     case 'saveStarted':
-      if (state.busy) return state
       return { ...state, busy: true, saveError: null }
     case 'saveSucceeded':
       return { ...state, busy: false, saveError: null }
@@ -71,13 +58,11 @@ export function useEspressoCatalog(api: EspressoApi) {
   const [state, dispatch] = useReducer(reducer, initial)
   const loadSeq = useRef(0)
   const saveInFlight = useRef(false)
-  const saveSeq = useRef(0)
 
   const runLoad = useCallback(() => {
     const seq = ++loadSeq.current
     dispatch({ type: 'loadStarted' })
-    runMaybePromise(
-      () => api.load(),
+    void api.load().then(
       (catalog) => {
         // A newer load replaces this one; a late failure must not hide that catalog.
         if (seq !== loadSeq.current) return
@@ -97,33 +82,25 @@ export function useEspressoCatalog(api: EspressoApi) {
     runLoad()
   }, [runLoad])
 
-  useEffect(() => {
-    if (state.reloadToken === 0) return
-    runLoad()
-  }, [state.reloadToken, runLoad])
-
+  const loading = state.status === 'loading'
   const reload = useCallback(() => {
-    dispatch({ type: 'reload' })
-  }, [])
+    if (!loading) runLoad()
+  }, [loading, runLoad])
 
   const save = useCallback(
     (input: ShotCreate, onSuccess?: () => void) => {
       if (saveInFlight.current) return
       saveInFlight.current = true
-      const seq = ++saveSeq.current
       dispatch({ type: 'saveStarted' })
-      runMaybePromise(
-        () => api.create(input),
+      void api.create(input).then(
         () => {
           saveInFlight.current = false
-          if (seq !== saveSeq.current) return
           dispatch({ type: 'saveSucceeded' })
           onSuccess?.()
           runLoad()
         },
         (error) => {
           saveInFlight.current = false
-          if (seq !== saveSeq.current) return
           dispatch({
             type: 'saveFailed',
             error: apiErrorMessage(error, ERROR_SAVE_FAILED),
@@ -140,7 +117,7 @@ export function useEspressoCatalog(api: EspressoApi) {
 
   return {
     catalog: state.catalog,
-    loading: state.status === 'loading',
+    loading,
     loadError: state.status === 'failed' ? state.loadError : null,
     busy: state.busy,
     saveError: state.saveError,
