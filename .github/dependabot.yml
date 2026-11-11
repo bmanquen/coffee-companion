@@ -1,0 +1,36 @@
+version: 2
+updates:
+  - package-ecosystem: npm          # handles pnpm-lock.yaml
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+      production-dependencies:
+        dependency-type: production
+        update-types: [minor, patch]
+    ignore:
+      # Expo pins these to the SDK version — upgrade them with `npx expo install --fix`
+      - dependency-name: "expo"
+        update-types: [version-update:semver-major]
+      - dependency-name: "expo-*"
+        update-types: [version-update:semver-major]
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+        update-types: [version-update:semver-major]
+      - dependency-name: "react"
+        update-types: [version-update:semver-major]
+      - dependency-name: "react-dom"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
