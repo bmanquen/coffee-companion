@@ -17,15 +17,13 @@ export { ESPRESSO_SHOT_PAGE_SIZE, ESPRESSO_SHOT_Q_MAX }
 export const ESPRESSO_LOAD_MORE_FAILED =
   "We couldn't load more shots. Try again."
 
-export const ESPRESSO_LOAD_FAILED =
-  "We couldn't load your shots. Try again."
+export const ESPRESSO_LOAD_FAILED = "We couldn't load your shots. Try again."
 
 export const ESPRESSO_LOADING_SHOTS = 'Loading shots'
 
 export const ESPRESSO_COFFEES_LOAD_FAILED =
   "We couldn't load your coffees. Try again."
 
-// First-page refetch drops appended pages (generation follows dataUpdatedAt).
 // Extra pages are only read through loadMore's fetchQuery, so this window
 // expires a cached cursor page without an observer refetching it on its own.
 export const ESPRESSO_SHOT_STALE_TIME_MS = 30_000
@@ -61,9 +59,7 @@ export function espressoShotPageInput(
   return input
 }
 
-export function useEspressoShotPages(
-  filters: EspressoShotPageFilters = {},
-) {
+export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const first = useQuery({
@@ -80,16 +76,41 @@ export function useEspressoShotPages(
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const loadMoreSeq = useRef(0)
-  const generation = first.dataUpdatedAt
+  const firstPageFetch = useRef(false)
   const filterKey = `${filters.coffeeId ?? ''}\0${filters.q?.trim() ?? ''}\0${filters.dialedIn ? '1' : ''}`
 
-  useEffect(() => {
+  const dropExtraPages = useCallback(() => {
     loadMoreSeq.current += 1
     setExtra([])
     setExtraCursor(undefined)
     setLoadMoreError(null)
     setLoadingMore(false)
-  }, [generation, filterKey])
+  }, [])
+
+  // Extra pages are a local copy of cursor fetches. A filter change or a
+  // completed first-page fetch is a new listing; a cache patch or a failed
+  // refetch is not.
+  useEffect(() => {
+    dropExtraPages()
+  }, [dropExtraPages, filterKey])
+
+  useEffect(() => {
+    if (first.isFetching) {
+      firstPageFetch.current = true
+      return
+    }
+    if (firstPageFetch.current && first.isSuccess) {
+      firstPageFetch.current = false
+      dropExtraPages()
+      return
+    }
+    firstPageFetch.current = false
+  }, [dropExtraPages, first.isFetching, first.isSuccess])
+
+  useEffect(() => {
+    if (first.isPlaceholderData) return
+    if (first.data && first.data.nextCursor == null) dropExtraPages()
+  }, [dropExtraPages, first.data, first.isPlaceholderData])
 
   const pageItems = first.data?.items ?? NO_SHOTS
   const filterPending = first.isPlaceholderData && first.isFetching
@@ -132,9 +153,11 @@ export function useEspressoShotPages(
     }
   }, [filters, loadingMore, nextCursor, queryClient, trpc])
 
-  const retry = useCallback(() => {
-    void first.refetch()
-  }, [first])
+  const retry = useCallback(() => first.refetch(), [first])
+
+  const removeShot = useCallback((shotId: string) => {
+    setExtra((current) => current.filter((shot) => shot.id !== shotId))
+  }, [])
 
   return {
     items,
@@ -146,5 +169,6 @@ export function useEspressoShotPages(
     loadError,
     stale,
     retry,
+    removeShot,
   }
 }

@@ -1025,6 +1025,69 @@ describe('EspressoBrewsSection', () => {
     }
   })
 
+  it('removes a loaded-more shot when refetch after delete fails', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      if (String(input).includes('espressoShot.delete')) {
+        return Promise.resolve(trpcSuccess())
+      }
+      return Promise.reject(new Error('Network request failed'))
+    })
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+        makeRecentShot({
+          id: espressoShotFixtureId(index),
+          coffeeId: `c${index}`,
+          coffee: makeRecentCoffee({
+            id: `c${index}`,
+            name: `Coffee ${index}`,
+          }),
+        }),
+      )
+      const kept = makeRecentShot({
+        id: espressoShotFixtureId(100),
+        coffeeId: 'c-kept',
+        coffee: makeRecentCoffee({ id: 'c-kept', name: 'Coffee kept' }),
+      })
+      const removed = makeRecentShot({
+        id: espressoShotFixtureId(101),
+        coffeeId: 'c-removed',
+        coffee: makeRecentCoffee({ id: 'c-removed', name: 'Coffee removed' }),
+      })
+      seedLog(queryClient, trpc, first, first.length + 2)
+      seedLog(queryClient, trpc, [kept, removed], first.length + 2, {
+        cursor: espressoShotCursor(first[first.length - 1]),
+      })
+      queryClient.setQueryData(trpc.dialedInBrew.list.queryKey(), [])
+
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+      const table = within(screen.getByRole('table'))
+      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+      expect(await table.findByText('Coffee kept')).toBeTruthy()
+      expect(table.getByText('Coffee removed')).toBeTruthy()
+
+      const removedRow = table.getByText('Coffee removed').closest('tr')
+      expect(removedRow).toBeTruthy()
+      fireEvent.click(
+        within(removedRow as HTMLElement).getByRole('button', {
+          name: 'Delete shot',
+        }),
+      )
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: 'Delete',
+        }),
+      )
+
+      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(table.getByText('Coffee 0')).toBeTruthy()
+      expect(table.getByText('Coffee kept')).toBeTruthy()
+      expect(table.queryByText('Coffee removed')).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('deletes the original shot when a refetch inserts a row ahead of an open dialog', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
