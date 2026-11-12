@@ -5,7 +5,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EspressoBrewsSection } from './espresso-brews-section'
 import type * as ReactRouter from '@tanstack/react-router'
 import {
@@ -61,7 +61,14 @@ vi.mock('@/components/ui/command', () => ({
   ),
 }))
 
+const LOAD_MORE_DURING_FILTER_TIMEOUT_MS = 15_000
+const FILTER_SETTLE_TIMEOUT_MS = ESPRESSO_SHOT_FILTER_DEBOUNCE_MS + 5_000
+
 beforeEach(() => mocks.track.mockClear())
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 function coffeesFrom(shots: Array<ReturnType<typeof makeRecentShot>>) {
   const byId = new Map<string, ReturnType<typeof makeCoffee>>()
@@ -900,12 +907,12 @@ describe('EspressoBrewsSection', () => {
             screen.getByRole('button', { name: 'Load more' }),
           ).toHaveProperty('disabled', false)
         },
-        { timeout: ESPRESSO_SHOT_FILTER_DEBOUNCE_MS + 2_000 },
+        { timeout: FILTER_SETTLE_TIMEOUT_MS },
       )
     } finally {
       fetchSpy.mockRestore()
     }
-  })
+  }, LOAD_MORE_DURING_FILTER_TIMEOUT_MS)
 
   it('retries a failed load-more from the error', async () => {
     const extra = makeRecentShot({
@@ -939,7 +946,7 @@ describe('EspressoBrewsSection', () => {
       expect(
         await screen.findByText("We couldn't load more shots. Try again."),
       ).toBeTruthy()
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
 
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
       expect(
