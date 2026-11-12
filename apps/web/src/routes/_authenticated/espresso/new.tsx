@@ -22,6 +22,7 @@ import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 import { submitFormMutation } from '@/lib/form-error'
+import { createIdempotencyKey } from '@/lib/idempotency-key'
 
 export const Route = createFileRoute('/_authenticated/espresso/new')({
   loader: async ({ context }) => {
@@ -55,7 +56,7 @@ export function NewEspressoShot() {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const idempotencyKey = useRef(crypto.randomUUID())
+  const idempotencyKey = useRef(createIdempotencyKey())
   const lastSubmitted = useRef<string | null>(null)
   const prefillSeq = useRef(0)
   const prefillCoffeeId = useRef('')
@@ -81,7 +82,7 @@ export function NewEspressoShot() {
         queryClient.invalidateQueries(
           trpc.espressoShot.getLatestUnsealed.queryFilter(),
         )
-        idempotencyKey.current = crypto.randomUUID()
+        idempotencyKey.current = createIdempotencyKey()
         lastSubmitted.current = null
         track('brew_logged', { method: 'espresso' })
         navigate(brewsLogLocation('espresso'))
@@ -112,7 +113,7 @@ export function NewEspressoShot() {
         lastSubmitted.current != null &&
         lastSubmitted.current !== fingerprint
       ) {
-        idempotencyKey.current = crypto.randomUUID()
+        idempotencyKey.current = createIdempotencyKey()
       }
       lastSubmitted.current = fingerprint
       saveGen.current += 1

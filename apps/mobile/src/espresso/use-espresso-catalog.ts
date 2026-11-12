@@ -144,10 +144,16 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const refreshSeq = useRef(0)
   const pageSeq = useRef(0)
   const refreshPending = useRef(false)
+  const loadMoreInFlight = useRef(false)
+
+  const invalidatePagedLoads = useCallback(() => {
+    pageSeq.current += 1
+    loadMoreInFlight.current = false
+  }, [])
 
   const runLoad = useCallback(() => {
     const seq = ++loadSeq.current
-    pageSeq.current += 1
+    invalidatePagedLoads()
     const forUser = userId
     dispatch({ type: 'loadStarted' })
     void api.load().then(
@@ -164,7 +170,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
         })
       },
     )
-  }, [api, userId])
+  }, [api, invalidatePagedLoads, userId])
 
   useEffect(() => {
     const previousUser = activeUser.current
@@ -172,7 +178,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     if (previousUser !== userId) {
       saveInFlight.current = false
       loadSeq.current += 1
-      pageSeq.current += 1
+      invalidatePagedLoads()
       refreshPending.current = false
       dispatch({ type: 'reset' })
     }
@@ -180,7 +186,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     return () => {
       loadSeq.current += 1
     }
-  }, [runLoad, userId])
+  }, [invalidatePagedLoads, runLoad, userId])
 
   const loading = state.status === 'loading'
   const reload = useCallback(() => {
@@ -190,7 +196,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const refreshFirstPage = useCallback(
     (forUser: string) => {
       const seq = ++refreshSeq.current
-      pageSeq.current += 1
+      invalidatePagedLoads()
       refreshPending.current = true
       dispatch({ type: 'pageInvalidated' })
       void api.listShots().then(
@@ -215,7 +221,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
         },
       )
     },
-    [api, runLoad],
+    [api, invalidatePagedLoads, runLoad],
   )
 
   const save = useCallback(
@@ -249,6 +255,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const loadMore = useCallback(() => {
     const catalog = state.catalog
     if (
+      loadMoreInFlight.current ||
       refreshPending.current ||
       state.status === 'loading' ||
       state.loadingMore ||
@@ -260,10 +267,12 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     const forUser = userId
     const seq = pageSeq.current
     const cursor = catalog.nextCursor
+    loadMoreInFlight.current = true
     dispatch({ type: 'loadMoreStarted' })
     void api.listShots(cursor).then(
       (page) => {
         if (forUser !== activeUser.current || seq !== pageSeq.current) return
+        loadMoreInFlight.current = false
         dispatch({
           type: 'shotsAppended',
           shots: page.items,
@@ -273,6 +282,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
       },
       (error) => {
         if (forUser !== activeUser.current || seq !== pageSeq.current) return
+        loadMoreInFlight.current = false
         dispatch({
           type: 'loadMoreFailed',
           error: apiErrorMessage(error, ERROR_LOAD_MORE_FAILED),

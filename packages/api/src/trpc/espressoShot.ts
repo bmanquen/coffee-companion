@@ -11,6 +11,7 @@ import {
   sealBrewsWithDialedIn,
 } from '../lib/dialed-in-brew'
 import {
+  ESPRESSO_CURSOR_TIMESTAMP_FORMAT,
   ESPRESSO_DEVICE_TYPE,
   ESPRESSO_SHOT_Q_MAX,
   decodeEspressoShotCursor,
@@ -113,11 +114,16 @@ function settingsReadable(shelf: Shelf) {
   )
 }
 
+function cursorTimestamp(createdAt: string) {
+  return sql`${createdAt}::timestamp`
+}
+
 function afterCursor(cursor: EspressoShotCursorKey) {
+  const createdAt = cursorTimestamp(cursor.createdAt)
   return or(
-    lt(espressoShots.createdAt, cursor.createdAt),
+    lt(espressoShots.createdAt, createdAt),
     and(
-      eq(espressoShots.createdAt, cursor.createdAt),
+      eq(espressoShots.createdAt, createdAt),
       lt(espressoShots.id, cursor.id),
     ),
   )
@@ -200,7 +206,12 @@ async function loadRecentPage(
     eq(dialedInBrews.brewingMethod, 'espresso'),
   )
   const pageQuery = db
-    .select({ id: espressoShots.id, createdAt: espressoShots.createdAt })
+    .select({
+      id: espressoShots.id,
+      createdAt: sql<string>`to_char(${espressoShots.createdAt}, ${ESPRESSO_CURSOR_TIMESTAMP_FORMAT})`.as(
+        'created_at',
+      ),
+    })
     .from(espressoShots)
     .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
     .leftJoin(roasters, eq(roasters.id, coffees.roasterId))

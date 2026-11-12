@@ -33,11 +33,25 @@ type Trpc = {
 
 export { ESPRESSO_SHOT_PAGE_SIZE }
 
+const ISO_MILLISECOND_PATTERN =
+  /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})\.(\d{3})Z$/
+
+function cursorTimestampFromDate(createdAt: Date): string {
+  const match = ISO_MILLISECOND_PATTERN.exec(createdAt.toISOString())
+  if (!match) {
+    throw new Error('createdAt is not a UTC millisecond timestamp')
+  }
+  return `${match[1]} ${match[2]}.${match[3]}000`
+}
+
 export function espressoShotCursor(shot: {
   createdAt: Date
   id: string
 }): EspressoShotCursor {
-  return encodeEspressoShotCursor(shot)
+  return encodeEspressoShotCursor({
+    createdAt: cursorTimestampFromDate(shot.createdAt),
+    id: shot.id,
+  })
 }
 
 export function seedEspressoShotPage(

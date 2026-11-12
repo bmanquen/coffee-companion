@@ -21,24 +21,28 @@ export const Route = createFileRoute('/_authenticated/brews/')({
     return isBrewMethod(method) ? { method } : {}
   },
   loader: ({ context }) => {
-    context.queryClient.ensureQueryData(
-      context.trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
-    )
-    context.queryClient.ensureQueryData(
-      context.trpc.coffee.getAll.queryOptions(),
-    )
-    context.queryClient.ensureQueryData(
-      context.trpc.aeropressBrew.getAll.queryOptions(),
-    )
-    context.queryClient.ensureQueryData(
-      context.trpc.pouroverBrew.getAll.queryOptions(),
-    )
-    context.queryClient.ensureQueryData(
-      context.trpc.frenchpressBrew.getAll.queryOptions(),
-    )
-    context.queryClient.ensureQueryData(
-      context.trpc.coldBrewBrew.getAll.queryOptions(),
-    )
+    context.queryClient
+      .ensureQueryData(
+        context.trpc.espressoShot.getRecent.queryOptions(
+          espressoShotPageInput(),
+        ),
+      )
+      .catch(() => {})
+    context.queryClient
+      .ensureQueryData(context.trpc.coffee.getAll.queryOptions())
+      .catch(() => {})
+    context.queryClient
+      .ensureQueryData(context.trpc.aeropressBrew.getAll.queryOptions())
+      .catch(() => {})
+    context.queryClient
+      .ensureQueryData(context.trpc.pouroverBrew.getAll.queryOptions())
+      .catch(() => {})
+    context.queryClient
+      .ensureQueryData(context.trpc.frenchpressBrew.getAll.queryOptions())
+      .catch(() => {})
+    context.queryClient
+      .ensureQueryData(context.trpc.coldBrewBrew.getAll.queryOptions())
+      .catch(() => {})
   },
   component: BrewsIndex,
 })

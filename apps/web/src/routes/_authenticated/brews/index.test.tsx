@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Brews } from './index'
+import { Brews, Route } from './index'
 import type * as ReactRouter from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { seedCoffees, seedEspressoShotPage } from '@/test/espresso-shots'
@@ -109,5 +109,33 @@ describe('Brews method select', () => {
 
     expect(screen.getByText('Log Brew')).toBeTruthy()
     expect(screen.queryByText('Log Shot')).toBeNull()
+  })
+})
+
+describe('Brews loader', () => {
+  it('keeps loading the route when coffee.getAll rejects', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    const rejections: Array<unknown> = []
+    const onUnhandled = (reason: unknown) => {
+      rejections.push(reason)
+    }
+    process.on('unhandledRejection', onUnhandled)
+    try {
+      const { queryClient, trpc } = createTestProviders()
+      const loader = Route.options.loader
+      expect(loader).toBeTypeOf('function')
+      expect(
+        loader?.({
+          context: { queryClient, trpc },
+        } as never),
+      ).toBeUndefined()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(rejections).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+      fetchSpy.mockRestore()
+    }
   })
 })
