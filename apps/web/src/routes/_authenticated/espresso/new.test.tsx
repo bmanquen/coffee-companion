@@ -742,6 +742,89 @@ describe('NewEspressoShot form', () => {
     }
   })
 
+  it('does not apply a pre-save prefill after a later coffee is chosen', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    queryClient.removeQueries({
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+    })
+    let resolvePrefill: (shot: ReturnType<typeof makeRecentShot>) => void =
+      () => {}
+    const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+      (resolve) => {
+        resolvePrefill = resolve
+      },
+    )
+    void queryClient.prefetchQuery({
+      ...trpc.espressoShot.getLatestUnsealed.queryOptions({
+        coffeeId: COFFEE,
+      }),
+      queryFn: () => pending,
+    })
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        throw new Error('Network request failed')
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
+        target: { value: ESP_DEVICE },
+      })
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE_B },
+      })
+      expect(await screen.findByText('April 1st, 2026')).toBeTruthy()
+
+      resolvePrefill(
+        makeRecentShot({
+          id: 'shot-1',
+          coffeeId: COFFEE,
+          grinderId: GRINDER,
+          brewingDeviceId: ESP_DEVICE,
+          roastDate: '2026-05-01',
+        }),
+      )
+      await act(async () => {
+        await pending
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      expect(screen.getByText('April 1st, 2026')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('does not prefill from Try again while a create is pending', async () => {
     const providers = seeded()
     const { queryClient, trpc, Wrapper, fetchSpy } = providers

@@ -1491,6 +1491,67 @@ describe('log espresso shot', () => {
     expect(await screen.findByDisplayValue('2026-04-01')).toBeTruthy()
   })
 
+  it('does not apply a pre-save prefill after a later coffee is chosen', async () => {
+    let resolvePrefill: (shot: ShotRow | null) => void = () => {}
+    const pendingPrefill = new Promise<ShotRow | null>((resolve) => {
+      resolvePrefill = resolve
+    })
+    const created: Array<ShotCreate> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () =>
+        Promise.resolve(
+          catalog({
+            coffees: [
+              { id: COFFEE, name: 'Ethiopia Guji' },
+              { id: COFFEE_B, name: 'Colombia Huila' },
+            ],
+            grinders: [
+              { id: GRINDER, name: 'Niche Zero' },
+              { id: GRINDER_B, name: 'P64' },
+            ],
+          }),
+        ),
+      loadPrefill: (coffeeId) => {
+        if (coffeeId === COFFEE_B) {
+          return Promise.resolve(
+            seedShot({
+              coffeeId: COFFEE_B,
+              coffeeName: 'Colombia Huila',
+              roastDate: '2026-04-01',
+              grinderId: GRINDER_B,
+            }),
+          )
+        }
+        return pendingPrefill
+      },
+      create: (input) =>
+        Promise.resolve().then(() => {
+          created.push(input)
+          throw new Error('Network request failed')
+        }),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    await press(LOG)
+    expect(created).toHaveLength(1)
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
+
+    await pickSelect(LABEL_COFFEE, COFFEE_B)
+    expect(await screen.findByDisplayValue('2026-04-01')).toBeTruthy()
+
+    await act(async () => {
+      resolvePrefill(seedShot())
+      await pendingPrefill
+    })
+    expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
+    expect(screen.getByDisplayValue('2026-04-01')).toBeTruthy()
+  })
+
   it('does not report the stored shot after a failed save is edited and retried', async () => {
     const stored: Array<ShotRow> = []
     const keys: Array<string> = []
