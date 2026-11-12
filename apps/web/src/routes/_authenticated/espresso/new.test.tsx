@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -595,7 +596,10 @@ describe('NewEspressoShot form', () => {
           roastDate: '2026-05-01',
         }),
       )
-      await pending
+      await act(async () => {
+        await pending
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
       expect(screen.queryByText('May 1st, 2026')).toBeNull()
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
@@ -769,7 +773,11 @@ describe('NewEspressoShot form', () => {
     const log = await screen.findByRole('button', { name: 'Logging…' })
     expect(log).toHaveProperty('disabled', true)
     expect(log.getAttribute('aria-busy')).toBe('true')
-    finishCreate?.()
+    const completeCreate = await waitFor(() => {
+      expect(finishCreate).toBeTypeOf('function')
+      return finishCreate as () => void
+    })
+    completeCreate()
     expect(await screen.findByRole('button', { name: 'Log' })).toBeTruthy()
   })
 })
