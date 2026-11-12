@@ -1407,6 +1407,38 @@ describe('log espresso shot', () => {
     expect(screen.getByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
   })
 
+  it('does not prefill from Try again while a create is pending', async () => {
+    let prefillCalls = 0
+    let settleCreate: () => void = () => {}
+    const pendingCreate = new Promise<void>((resolve) => {
+      settleCreate = resolve
+    })
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      loadPrefill: () => {
+        prefillCalls += 1
+        return Promise.reject(new Error('Network request failed'))
+      },
+      create: () => pendingCreate,
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    expect(await screen.findByTestId(SHOT_FORM_PREFILL_ERROR_TEST_ID)).toBeTruthy()
+    expect(prefillCalls).toBe(1)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    await press(LOG)
+    await press(TRY_AGAIN)
+    expect(prefillCalls).toBe(1)
+    await act(async () => {
+      settleCreate()
+      await pendingCreate
+    })
+  })
+
   it('prefills from Try again after a failed save', async () => {
     let prefillCalls = 0
     const created: Array<ShotCreate> = []

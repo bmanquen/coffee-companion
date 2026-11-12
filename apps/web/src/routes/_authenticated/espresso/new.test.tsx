@@ -869,10 +869,8 @@ describe('NewEspressoShot form', () => {
         target: { value: '1.5' },
       })
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
-      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
-      expect(prefillCalls(fetchSpy)).toHaveLength(1)
-
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
       expect(prefillCalls(fetchSpy)).toHaveLength(1)
     } finally {
       resolveCreate(trpcSuccess())

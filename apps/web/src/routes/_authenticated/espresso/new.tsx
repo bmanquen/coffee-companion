@@ -63,7 +63,7 @@ export function NewEspressoShot() {
   const keepPrefill = useRef<PrefillKeep>({})
   const applyingPrefill = useRef(false)
   const saveGen = useRef(0)
-  const saveAttempted = useRef(false)
+  const saveInFlight = useRef(false)
   const [prefillError, setPrefillError] = useState(false)
 
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
@@ -117,7 +117,6 @@ export function NewEspressoShot() {
         idempotencyKey.current = createIdempotencyKey()
       }
       lastSubmitted.current = fingerprint
-      saveAttempted.current = true
       saveGen.current += 1
       await submitFormMutation(form, createShot.mutateAsync, {
         ...value,
@@ -139,7 +138,7 @@ export function NewEspressoShot() {
     if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
       return
     }
-    if (saveAttempted.current || startedSaveGen !== saveGen.current) return
+    if (startedSaveGen !== saveGen.current) return
     const keep = keepPrefill.current
     applyingPrefill.current = true
     if (latest?.grinderId && !keep.grinderId) {
@@ -155,7 +154,7 @@ export function NewEspressoShot() {
   }
 
   const requestPrefill = (coffeeId: string) => {
-    if (createShot.isPending || saveAttempted.current) return
+    if (saveInFlight.current) return
     const seq = ++prefillSeq.current
     const startedSaveGen = saveGen.current
     prefillCoffeeId.current = coffeeId
@@ -192,7 +191,10 @@ export function NewEspressoShot() {
         className="w-full max-w-md flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault()
-          form.handleSubmit()
+          saveInFlight.current = true
+          void form.handleSubmit().finally(() => {
+            saveInFlight.current = false
+          })
         }}
       >
         <form.AppField
@@ -228,8 +230,6 @@ export function NewEspressoShot() {
                 form.setFieldValue('brewingDeviceId', '')
               }
               applyingPrefill.current = false
-              // A failed save must not lock out a later coffee choice.
-              saveAttempted.current = false
               requestPrefill(value)
             },
           }}
@@ -311,8 +311,6 @@ export function NewEspressoShot() {
               type="button"
               variant="outline"
               onClick={() => {
-                // Retry is a new lookup, not a completion of the pre-save one.
-                saveAttempted.current = false
                 if (prefillCoffeeId.current) {
                   requestPrefill(prefillCoffeeId.current)
                 }
