@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -11,6 +13,8 @@ import {
 
 const SEARCH_PLACEHOLDER = 'Search...'
 const NO_RESULTS = 'No results found.'
+const KEYBOARD_AVOIDING_BEHAVIOR =
+  Platform.OS === 'ios' ? 'padding' : undefined
 
 export function fieldSlug(label: string) {
   return label
@@ -34,6 +38,10 @@ export function selectSheetTestId(label: string) {
 
 export function selectSearchTestId(label: string) {
   return `select-search-${fieldSlug(label)}`
+}
+
+export function selectKeyboardTestId(label: string) {
+  return `select-keyboard-${fieldSlug(label)}`
 }
 
 export function selectOptionTestId(id: string) {
@@ -149,7 +157,11 @@ export function SelectField({
           animationType="slide"
           onRequestClose={close}
         >
-          <View style={styles.overlay}>
+          <KeyboardAvoidingView
+            behavior={KEYBOARD_AVOIDING_BEHAVIOR}
+            testID={selectKeyboardTestId(label)}
+            style={styles.overlay}
+          >
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Dismiss ${label}`}
@@ -197,7 +209,7 @@ export function SelectField({
                 }}
               />
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       ) : null}
     </View>

@@ -10,6 +10,7 @@ import { App } from '../App'
 import { SignedInHome } from '../auth/SignedInHome'
 import { writeHostTreeArtifacts } from '../test/host-tree'
 import {
+  selectKeyboardTestId,
   selectOptionTestId,
   selectSearchTestId,
   selectSheetTestId,
@@ -612,6 +613,22 @@ describe('log espresso shot', () => {
 
     expect(screen.queryByTestId(selectOptionTestId(sey))).toBeNull()
     expect(screen.getByTestId(selectOptionTestId(heart))).toBeTruthy()
+  })
+
+  it('raises the picker sheet above the keyboard', async () => {
+    const { api } = fakeApi(catalog())
+    const view = await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await fireEvent.press(screen.getByTestId(selectTriggerTestId(LABEL_COFFEE)))
+
+    const search = screen.getByTestId(selectSearchTestId(LABEL_COFFEE))
+    await fireEvent(search, 'focus')
+
+    expect(screen.getByTestId(selectKeyboardTestId(LABEL_COFFEE))).toBeTruthy()
+    expect(screen.getByTestId(selectSheetTestId(LABEL_COFFEE))).toBeTruthy()
+
+    const pickerDest = process.env.VERIFY_MOBILE_PICKER_KEYBOARD_ARTIFACTS
+    if (pickerDest) writeHostTreeArtifacts(view, pickerDest)
   })
 
   it('names the coffee trigger with the selected option', async () => {
@@ -1757,6 +1774,74 @@ describe('log espresso shot', () => {
     )
     expect(screen.queryByText(ERROR_LOAD_MORE_FAILED)).toBeNull()
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
+  })
+
+  it('does not request the same next page twice before a render', async () => {
+    const all = Array.from({ length: 25 }, (_, index) =>
+      seedShot({
+        id: `shot-${index}`,
+        coffeeName: `Coffee ${index}`,
+      }),
+    )
+    let attempts = 0
+    let resolveFirst:
+      | ((page: {
+          items: Array<ShotRow>
+          total: number
+          nextCursor: ShotCursor | null
+        }) => void)
+      | null = null
+    const api: EspressoApi = {
+      load: () =>
+        Promise.resolve(
+          catalog({ shots: all.slice(0, 20), total: all.length }),
+        ),
+      listShots: (cursor) => {
+        if (!cursor) {
+          return Promise.resolve({
+            items: all.slice(0, 20),
+            total: all.length,
+            nextCursor: pageCursor(all[19].id),
+          })
+        }
+        attempts += 1
+        if (attempts === 1) {
+          return new Promise((resolve) => {
+            resolveFirst = resolve
+          })
+        }
+        return Promise.resolve({
+          items: [all[21]],
+          total: all.length,
+          nextCursor: null,
+        })
+      },
+      loadPrefill: () => Promise.resolve(seedShot()),
+      create: async () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    expect(screen.getByText('Coffee 0')).toBeTruthy()
+
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    expect(attempts).toBe(1)
+    expect(resolveFirst).toBeTruthy()
+    expect(screen.queryByText(ERROR_LOAD_MORE_FAILED)).toBeNull()
+
+    await act(async () => {
+      resolveFirst?.({
+        items: [all[20]],
+        total: all.length,
+        nextCursor: pageCursor(all[20].id),
+      })
+      await Promise.resolve()
+    })
+    expect(screen.queryByText(ERROR_LOAD_MORE_FAILED)).toBeNull()
+    expect(attempts).toBe(1)
+
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    await waitFor(() => expect(attempts).toBe(2))
+    expect(screen.queryByText(ERROR_LOAD_MORE_FAILED)).toBeNull()
   })
 
   it('names same-name coffees with their roaster in the list', async () => {

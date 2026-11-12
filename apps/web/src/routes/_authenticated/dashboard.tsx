@@ -73,11 +73,11 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
 // supply the recency fallback when no method is in the URL.
 export function DashboardContainer() {
   const trpc = useTRPC()
-  const { data: espressoPage } = useQuery({
+  const espressoQuery = useQuery({
     ...trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
     staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
   })
-  const espresso = espressoPage?.items ?? []
+  const espresso = espressoQuery.data?.items ?? []
   const { data: pourover } = useSuspenseQuery(
     trpc.pouroverBrew.getAll.queryOptions(),
   )
@@ -102,7 +102,13 @@ export function DashboardContainer() {
     { method: 'coldbrew', brews: coldbrew },
   ]
 
-  const selectedMethod = resolveSelectedMethod(method, feeds)
+  // Recency needs the espresso page. Until it settles, hold Espresso so an
+  // empty pending feed cannot lose to Pour Over and then flip back.
+  const selectedMethod = isDashboardMethod(method)
+    ? method
+    : espressoQuery.isPending
+      ? 'espresso'
+      : resolveSelectedMethod(undefined, feeds)
 
   return (
     <Dashboard

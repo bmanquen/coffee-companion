@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes, espressoShots } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
@@ -687,6 +687,53 @@ describe('espressoShot.getRecent', () => {
     expect(new Set(refreshed).size).toBe(refreshed.length)
     expect(refreshed[0]).toBe(inserted.id)
     expect(refreshed).toEqual(expect.arrayContaining([...created, inserted.id]))
+  })
+
+  it('pages every shot that shares a millisecond', async () => {
+    const coffee = await createCoffee(uniq('Same Millisecond Coffee'))
+    const sameMs = '2026-06-01 12:00:00.123456'
+    const laterMicro = '2026-06-01 12:00:00.123457'
+    const earlierMicro = '2026-06-01 12:00:00.123455'
+    const nextMs = '2026-06-01 12:00:00.124000'
+    const rows = [
+      { id: crypto.randomUUID(), createdAt: sameMs },
+      { id: crypto.randomUUID(), createdAt: sameMs },
+      { id: crypto.randomUUID(), createdAt: sameMs },
+      { id: crypto.randomUUID(), createdAt: laterMicro },
+      { id: crypto.randomUUID(), createdAt: earlierMicro },
+      { id: crypto.randomUUID(), createdAt: nextMs },
+    ]
+    await db.insert(espressoShots).values(
+      rows.map((row) => ({
+        id: row.id,
+        userId: USER_A,
+        coffeeId: coffee.id,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: '1.5',
+        createdAt: sql`${row.createdAt}::timestamp`,
+      })),
+    )
+
+    const collected: Array<string> = []
+    let cursor: string | undefined
+    for (;;) {
+      const page = await asA.espressoShot.getRecent({
+        limit: 2,
+        coffeeId: coffee.id,
+        cursor,
+      })
+      collected.push(...page.items.map((shot) => shot.id))
+      if (!page.nextCursor) break
+      cursor = page.nextCursor
+    }
+
+    expect(collected).toHaveLength(rows.length)
+    expect(new Set(collected).size).toBe(rows.length)
+    expect([...collected].sort()).toEqual([...rows.map((row) => row.id)].sort())
   })
 
   it('rejects a malformed cursor', async () => {

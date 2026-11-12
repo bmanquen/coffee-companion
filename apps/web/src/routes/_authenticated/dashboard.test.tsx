@@ -841,6 +841,88 @@ describe('Dashboard', () => {
     }
   })
 
+  it('holds the recency default until the first espresso page settles', async () => {
+    type EspressoPage = {
+      items: Array<ReturnType<typeof makeRecentShot>>
+      total: number
+      nextCursor: null
+    }
+    let resolvePage: ((page: EspressoPage) => void) | null = null
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+          createdAt: new Date('2026-06-02T08:00:00.000Z'),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      void queryClient.prefetchQuery({
+        ...trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
+        queryFn: () =>
+          new Promise<EspressoPage>((resolve) => {
+            resolvePage = resolve
+          }),
+      })
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findByText(ESPRESSO_LOADING_SHOTS)).toBeTruthy()
+      expect(screen.queryByText('Kenya AA')).toBeNull()
+      expect(screen.queryByText('Pour Over')).toBeNull()
+
+      const shot = makeRecentShot({
+        coffee: makeRecentCoffee({ name: 'Ethiopia Guji' }),
+        createdAt: new Date('2026-06-03T08:00:00.000Z'),
+      })
+      await act(async () => {
+        resolvePage?.({ items: [shot], total: 1, nextCursor: null })
+      })
+      expect(await screen.findAllByText('Ethiopia Guji')).not.toHaveLength(0)
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+      expect(screen.queryByText('Kenya AA')).toBeNull()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('uses an explicit URL method before espresso settles', async () => {
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockReturnValue({ method: 'pourover' })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      void queryClient.prefetchQuery({
+        ...trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
+        queryFn: () => new Promise<never>(() => {}),
+      })
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findAllByText('Kenya AA')).not.toHaveLength(0)
+      expect(screen.getByRole('button', { name: 'Pour Over' })).toBeTruthy()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
   it('shows the espresso feed retry when getRecent fails with no cached page', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')

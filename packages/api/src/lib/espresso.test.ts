@@ -33,20 +33,27 @@ describe('normalizeDecimal', () => {
 
 describe('espresso shot cursor', () => {
   const key = {
-    createdAt: new Date('2026-05-01T12:00:00.000Z'),
+    createdAt: '2026-05-01 12:00:00.123456',
     id: '00000000-0000-4000-8000-000000000001',
   }
 
-  it('round-trips the last row key', () => {
+  it('round-trips a microsecond timestamp', () => {
     expect(decodeEspressoShotCursor(encodeEspressoShotCursor(key))).toEqual(key)
   })
 
-  it('rejects a malformed token', () => {
+  it('rejects a millisecond ISO stamp and a malformed token', () => {
     expect(decodeEspressoShotCursor('not-a-cursor')).toBeNull()
     expect(decodeEspressoShotCursor('')).toBeNull()
     expect(
       decodeEspressoShotCursor(
-        Buffer.from('2026-05-01T12:00:00.000Z\0not-a-uuid', 'utf8').toString(
+        Buffer.from(`2026-05-01T12:00:00.123Z\0${key.id}`, 'utf8').toString(
+          'base64url',
+        ),
+      ),
+    ).toBeNull()
+    expect(
+      decodeEspressoShotCursor(
+        Buffer.from('2026-05-01 12:00:00.123456\0not-a-uuid', 'utf8').toString(
           'base64url',
         ),
       ),

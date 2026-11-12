@@ -9,19 +9,24 @@ export const ESPRESSO_SHOT_Q_MAX = 100
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Postgres timestamp is microseconds; JS Date is milliseconds. The cursor
+// carries created_at as this to_char text so paging never drops same-ms rows.
+export const ESPRESSO_CURSOR_TIMESTAMP_FORMAT = 'YYYY-MM-DD HH24:MI:SS.US'
+export const ESPRESSO_CURSOR_TIMESTAMP_PATTERN =
+  /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$/
+
 // Opaque next-page token. Clients pass it back as-is and never parse it.
 export type EspressoShotCursor = string
 
 type EspressoShotCursorKey = {
-  createdAt: Date
+  createdAt: string
   id: string
 }
 
 export function encodeEspressoShotCursor(key: EspressoShotCursorKey): string {
-  return Buffer.from(
-    `${key.createdAt.toISOString()}\0${key.id}`,
-    'utf8',
-  ).toString('base64url')
+  return Buffer.from(`${key.createdAt}\0${key.id}`, 'utf8').toString(
+    'base64url',
+  )
 }
 
 export function decodeEspressoShotCursor(
@@ -35,12 +40,10 @@ export function decodeEspressoShotCursor(
   }
   const sep = payload.indexOf('\0')
   if (sep <= 0) return null
-  const stamped = payload.slice(0, sep)
+  const createdAt = payload.slice(0, sep)
   const id = payload.slice(sep + 1)
-  const createdAt = new Date(stamped)
   if (
-    Number.isNaN(createdAt.getTime()) ||
-    createdAt.toISOString() !== stamped ||
+    !ESPRESSO_CURSOR_TIMESTAMP_PATTERN.test(createdAt) ||
     !UUID_PATTERN.test(id)
   ) {
     return null
