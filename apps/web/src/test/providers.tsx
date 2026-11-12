@@ -7,22 +7,28 @@ import type { ReactNode } from 'react'
 import type { TRPCRouter } from '@coffee-companion/api/trpc/router'
 import { TRPCProvider } from '@/integrations/trpc/react'
 
-// A throwaway client; tests pre-seed the query cache so it's never called.
-const trpcClient = createTRPCClient<TRPCRouter>({
-  links: [
-    httpBatchStreamLink({
-      transformer: superjson,
-      url: 'http://localhost/api/trpc',
-    }),
-  ],
-})
+type FetchFn = typeof fetch
 
 // Builds an isolated QueryClient + matching tRPC proxy and a Wrapper that
 // provides both (with a Suspense boundary for useSuspenseQuery). Seed the cache
 // via `queryClient.setQueryData(trpc.x.y.queryKey(input), data)`.
-export function createTestProviders() {
+//
+// Fetch is looked up at request time so a later spyOn(globalThis, 'fetch')
+// still intercepts the real tRPC transport. Pass `fetch` to inject a mock
+// without racing a shared module-level client.
+export function createTestProviders(options?: { fetch?: FetchFn }) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
+  })
+  const trpcClient = createTRPCClient<TRPCRouter>({
+    links: [
+      httpBatchStreamLink({
+        transformer: superjson,
+        url: 'http://localhost/api/trpc',
+        fetch: (input, init) =>
+          (options?.fetch ?? globalThis.fetch)(input, init),
+      }),
+    ],
   })
   const trpc = createTRPCOptionsProxy<TRPCRouter>({
     client: trpcClient,

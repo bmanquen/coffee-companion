@@ -104,6 +104,8 @@ function reducer(state: State, action: Action): State {
       if (!state.catalog) return { ...state, loadingMore: false }
       return {
         ...state,
+        status: 'loaded',
+        loadError: null,
         loadingMore: false,
         loadMoreError: null,
         catalog: {
@@ -138,13 +140,15 @@ function reducer(state: State, action: Action): State {
 
 export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const [state, dispatch] = useReducer(reducer, initial)
-  const loadSeq = useRef(0)
+  const catalogSeq = useRef(0)
   const saveInFlight = useRef(false)
   const activeUser = useRef(userId)
   const refreshSeq = useRef(0)
   const pageSeq = useRef(0)
   const refreshPending = useRef(false)
   const loadMoreInFlight = useRef(false)
+  const catalogRef = useRef(state.catalog)
+  catalogRef.current = state.catalog
 
   const invalidatePagedLoads = useCallback(() => {
     pageSeq.current += 1
@@ -152,18 +156,19 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   }, [])
 
   const runLoad = useCallback(() => {
-    const seq = ++loadSeq.current
+    const seq = ++catalogSeq.current
     invalidatePagedLoads()
     const forUser = userId
     dispatch({ type: 'loadStarted' })
     void api.load().then(
       (catalog) => {
-        // A newer load replaces this one; a late failure must not hide that catalog.
-        if (seq !== loadSeq.current || forUser !== activeUser.current) return
+        // A newer load or refresh replaces this one; a late failure must not
+        // hide that catalog.
+        if (seq !== catalogSeq.current || forUser !== activeUser.current) return
         dispatch({ type: 'loadSucceeded', catalog })
       },
       (error) => {
-        if (seq !== loadSeq.current || forUser !== activeUser.current) return
+        if (seq !== catalogSeq.current || forUser !== activeUser.current) return
         dispatch({
           type: 'loadFailed',
           error: apiErrorMessage(error, ERROR_LOAD_FAILED),
@@ -177,14 +182,14 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     activeUser.current = userId
     if (previousUser !== userId) {
       saveInFlight.current = false
-      loadSeq.current += 1
+      catalogSeq.current += 1
       invalidatePagedLoads()
       refreshPending.current = false
       dispatch({ type: 'reset' })
     }
     runLoad()
     return () => {
-      loadSeq.current += 1
+      catalogSeq.current += 1
     }
   }, [invalidatePagedLoads, runLoad, userId])
 
@@ -205,6 +210,9 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
             return
           }
           refreshPending.current = false
+          // A catalog-backed refresh is newer than any in-flight full load.
+          // With no catalog yet, leave catalogSeq alone so that load can settle.
+          if (catalogRef.current) catalogSeq.current += 1
           dispatch({
             type: 'shotsRefreshed',
             shots: page.items,

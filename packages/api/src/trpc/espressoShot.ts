@@ -358,33 +358,48 @@ export const espressoShotRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertEspressoDevice(input.brewingDeviceId, ctx.session.user.id)
 
-      await stampFallenBrews(ctx.session.user.id, ctx.plan)
-
-      const inserted = await db
-        .insert(espressoShots)
-        .values({ ...input, userId: ctx.session.user.id })
-        .onConflictDoNothing({
-          target: [espressoShots.userId, espressoShots.idempotencyKey],
-        })
-        .returning()
-      if (!inserted[0]) {
-        const existing = await db.query.espressoShots.findFirst({
-          where: {
-            userId: ctx.session.user.id,
-            idempotencyKey: input.idempotencyKey,
-          },
-        })
-        if (!existing) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Could not save this shot',
-          })
-        }
+      const existing = await db.query.espressoShots.findFirst({
+        where: {
+          userId: ctx.session.user.id,
+          idempotencyKey: input.idempotencyKey,
+        },
+      })
+      if (existing) {
         if (!shotMatchesReplay(existing, input)) {
           throw new TRPCError({
             code: TRPC_CONFLICT,
             message: SHOT_REPLAY_CONFLICT,
           })
+        }
+      } else {
+        await stampFallenBrews(ctx.session.user.id, ctx.plan)
+
+        const inserted = await db
+          .insert(espressoShots)
+          .values({ ...input, userId: ctx.session.user.id })
+          .onConflictDoNothing({
+            target: [espressoShots.userId, espressoShots.idempotencyKey],
+          })
+          .returning()
+        if (!inserted[0]) {
+          const raced = await db.query.espressoShots.findFirst({
+            where: {
+              userId: ctx.session.user.id,
+              idempotencyKey: input.idempotencyKey,
+            },
+          })
+          if (!raced) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Could not save this shot',
+            })
+          }
+          if (!shotMatchesReplay(raced, input)) {
+            throw new TRPCError({
+              code: TRPC_CONFLICT,
+              message: SHOT_REPLAY_CONFLICT,
+            })
+          }
         }
       }
       return sealBrewWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {

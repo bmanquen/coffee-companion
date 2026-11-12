@@ -16,6 +16,7 @@ import {
   resolveSelectedMethod,
 } from '@/components/dashboard/methods'
 import {
+  ESPRESSO_COFFEES_STALE_TIME_MS,
   ESPRESSO_SHOT_STALE_TIME_MS,
   espressoShotPageInput,
 } from '@/hooks/use-espresso-shot-pages'
@@ -39,14 +40,18 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
   // _authenticated layout.
   loader: async ({ context }) => {
     void context.queryClient
-      .prefetchQuery(context.trpc.coffee.getAll.queryOptions())
+      .prefetchQuery({
+        ...context.trpc.coffee.getAll.queryOptions(),
+        staleTime: ESPRESSO_COFFEES_STALE_TIME_MS,
+      })
       .catch(() => {})
     void context.queryClient
-      .prefetchQuery(
-        context.trpc.espressoShot.getRecent.queryOptions(
+      .prefetchQuery({
+        ...context.trpc.espressoShot.getRecent.queryOptions(
           espressoShotPageInput(),
         ),
-      )
+        staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
+      })
       .catch(() => {})
     await Promise.all([
       context.queryClient.ensureQueryData(
@@ -102,11 +107,11 @@ export function DashboardContainer() {
     { method: 'coldbrew', brews: coldbrew },
   ]
 
-  // Recency needs the espresso page. Until it settles, hold Espresso so an
-  // empty pending feed cannot lose to Pour Over and then flip back.
+  // Recency needs the espresso page. Until it settles — and while a failed
+  // empty load still owes a retry — hold Espresso so Pour Over cannot hide it.
   const selectedMethod = isDashboardMethod(method)
     ? method
-    : espressoQuery.isPending
+    : espressoQuery.isPending || (espressoQuery.isError && espresso.length === 0)
       ? 'espresso'
       : resolveSelectedMethod(undefined, feeds)
 

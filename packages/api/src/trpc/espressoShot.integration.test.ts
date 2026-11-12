@@ -2,7 +2,10 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { eq, inArray, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes, espressoShots } from '../db/schema'
-import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
+import {
+  ESPRESSO_DEVICE_TYPE,
+  encodeEspressoShotCursor,
+} from '../lib/espresso'
 import {
   UNKNOWN_UUID,
   callerFor,
@@ -14,6 +17,7 @@ import { TRPC_BAD_REQUEST, TRPC_CONFLICT } from './espressoShot'
 
 const USER_A = 'espresso-user-a'
 const USER_B = 'espresso-user-b'
+const USER_REPLAY_STAMP = 'espresso-user-replay-stamp'
 const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
 const uniq = uniqFor(USER_A)
@@ -38,7 +42,7 @@ async function findOrCreateDeviceType(name: string): Promise<string> {
   return row.id
 }
 
-seedUsers([USER_A, USER_B], async () => {
+seedUsers([USER_A, USER_B, USER_REPLAY_STAMP], async () => {
   if (createdTypeIds.length) {
     await db
       .delete(brewingDeviceTypes)
@@ -392,6 +396,90 @@ describe('espressoShot.create idempotency', () => {
     expect(page.items.filter((shot) => shot.id === first.id)).toHaveLength(1)
   })
 
+  it('does not stamp again when a displacing shot is replayed', async () => {
+    const as = callerFor(USER_REPLAY_STAMP)
+    const uniqReplay = uniqFor(USER_REPLAY_STAMP)
+    const createReplayCoffee = createCoffeeFor(as, uniqReplay)
+    const typeId = await findOrCreateDeviceType(ESPRESSO_DEVICE_TYPE)
+    const device = await as.brewingDevice.create({
+      name: uniqReplay('Linea Mini'),
+      brand: 'La Marzocco',
+      typeId,
+    })
+    const grinder = await as.grinder.create({
+      name: uniqReplay('Niche'),
+      brand: 'Niche',
+    })
+
+    const coffees: Array<string> = []
+    for (let index = 0; index < 5; index += 1) {
+      coffees.push((await createReplayCoffee(uniqReplay(`Shelf ${index}`))).id)
+    }
+
+    const logOn = (coffeeId: string, idempotencyKey = crypto.randomUUID()) =>
+      as.espressoShot.create({
+        coffeeId,
+        grinderId: grinder.id,
+        brewingDeviceId: device.id,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: '1.5',
+        idempotencyKey,
+      })
+
+    const firstWave: Array<string> = []
+    for (const coffeeId of coffees) {
+      firstWave.push((await logOn(coffeeId)).id)
+    }
+    await createReplayCoffee(uniqReplay('Shelf 5'))
+
+    const replayKey = crypto.randomUUID()
+    const lifted = await logOn(coffees[0], replayKey)
+
+    const stampsBefore = await db
+      .select({
+        id: espressoShots.id,
+        sealedAt: espressoShots.sealedAt,
+      })
+      .from(espressoShots)
+      .where(eq(espressoShots.userId, USER_REPLAY_STAMP))
+
+    const replayed = await as.espressoShot.create({
+      coffeeId: coffees[0],
+      grinderId: grinder.id,
+      brewingDeviceId: device.id,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: replayKey,
+    })
+    expect(replayed.id).toBe(lifted.id)
+
+    const stampsAfter = await db
+      .select({
+        id: espressoShots.id,
+        sealedAt: espressoShots.sealedAt,
+      })
+      .from(espressoShots)
+      .where(eq(espressoShots.userId, USER_REPLAY_STAMP))
+
+    const displaced = stampsBefore.find((row) => row.id === firstWave[1])
+    expect(displaced?.sealedAt).toBeNull()
+    expect(
+      stampsAfter.map((row) => ({
+        id: row.id,
+        sealedAt: row.sealedAt?.getTime() ?? null,
+      })),
+    ).toEqual(
+      stampsBefore.map((row) => ({
+        id: row.id,
+        sealedAt: row.sealedAt?.getTime() ?? null,
+      })),
+    )
+  })
+
   it('rejects a reused key when the shot fields differ', async () => {
     const idempotencyKey = crypto.randomUUID()
     const input = {
@@ -739,6 +827,16 @@ describe('espressoShot.getRecent', () => {
   it('rejects a malformed cursor', async () => {
     await expect(
       asA.espressoShot.getRecent({ limit: 2, cursor: 'not-a-cursor' }),
+    ).rejects.toMatchObject({ code: TRPC_BAD_REQUEST })
+  })
+
+  it('rejects a cursor with an out-of-range timestamp', async () => {
+    const cursor = encodeEspressoShotCursor({
+      createdAt: '2026-99-99 12:00:00.123456',
+      id: '00000000-0000-4000-8000-000000000001',
+    })
+    await expect(
+      asA.espressoShot.getRecent({ limit: 2, cursor }),
     ).rejects.toMatchObject({ code: TRPC_BAD_REQUEST })
   })
 

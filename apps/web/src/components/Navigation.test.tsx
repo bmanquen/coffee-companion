@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import Navigation from './Navigation'
 import type { ReactNode } from 'react'
+import { SIGN_OUT_FAILED } from '@/hooks/use-sign-out'
 
 function renderNav(ui: ReactNode) {
   const queryClient = new QueryClient({
@@ -19,7 +20,7 @@ const authState = vi.hoisted(() => ({
 const interactOutside = vi.hoisted(() => ({ prevented: 0 }))
 const mocks = vi.hoisted(() => ({
   signInSocial: vi.fn(),
-  signOut: vi.fn(),
+  signOut: vi.fn(async () => ({})),
   navigate: vi.fn(),
   resetAnalytics: vi.fn(),
   setSentryUser: vi.fn(),
@@ -117,6 +118,20 @@ describe('Navigation', () => {
       mocks.signOut.mock.invocationCallOrder[0],
     )
     expect(mocks.navigate).toHaveBeenCalledWith({ to: '/' })
+  })
+
+  it('shows an error when sign-out fails', async () => {
+    authState.session = { user: { name: 'Test User', image: null } }
+    mocks.navigate.mockClear()
+    mocks.signOut.mockResolvedValueOnce({ error: { message: 'nope' } })
+    renderNav(<Navigation open setOpen={() => {}} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }))
+    })
+
+    expect(screen.getByRole('alert').textContent).toBe(SIGN_OUT_FAILED)
+    expect(mocks.navigate).not.toHaveBeenCalled()
   })
 
   it('takes the user to their account from their avatar and name', () => {

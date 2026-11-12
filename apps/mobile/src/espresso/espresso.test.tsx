@@ -43,7 +43,9 @@ import {
   SEALED_SHOT,
   SELECT_COFFEE_ERROR,
   SELECT_DEVICE,
+  SELECT_DEVICE_ERROR,
   SELECT_GRINDER,
+  SELECT_GRINDER_ERROR,
   SHOT_FORM_PREFILL_ERROR_TEST_ID,
   SHOT_FORM_TEST_ID,
   SHOT_LIST_TEST_ID,
@@ -326,6 +328,35 @@ describe('log espresso shot', () => {
     await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '18')
     expect(screen.getAllByText('Enter a number')).toHaveLength(2)
     expect(screen.getByText(SELECT_COFFEE_ERROR)).toBeTruthy()
+  })
+
+  it('clears only the coffee error when a coffee is selected', async () => {
+    const { api } = fakeApi(catalog({ shots: [] }))
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await press(LOG)
+    expect(screen.getByText(SELECT_COFFEE_ERROR)).toBeTruthy()
+    expect(screen.getByText(SELECT_GRINDER_ERROR)).toBeTruthy()
+    expect(screen.getByText(SELECT_DEVICE_ERROR)).toBeTruthy()
+
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    expect(screen.queryByText(SELECT_COFFEE_ERROR)).toBeNull()
+    expect(screen.getByText(SELECT_GRINDER_ERROR)).toBeTruthy()
+    expect(screen.getByText(SELECT_DEVICE_ERROR)).toBeTruthy()
+  })
+
+  it('clears grinder and device errors when prefill fills them', async () => {
+    const { api } = fakeApi(catalog())
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await press(LOG)
+    expect(screen.getByText(SELECT_GRINDER_ERROR)).toBeTruthy()
+    expect(screen.getByText(SELECT_DEVICE_ERROR)).toBeTruthy()
+
+    await pickCoffee()
+    expect(screen.queryByText(SELECT_COFFEE_ERROR)).toBeNull()
+    expect(screen.queryByText(SELECT_GRINDER_ERROR)).toBeNull()
+    expect(screen.queryByText(SELECT_DEVICE_ERROR)).toBeNull()
   })
 
   it('shows a sealed shot without its settings', async () => {
@@ -1133,6 +1164,13 @@ describe('log espresso shot', () => {
     await waitFor(() => expect(cursors).toContain(pageCursor('shot-19')))
     expect(cursors).not.toContain('shot-19')
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
+    await waitFor(() =>
+      expect(screen.getByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-20`)).toBeTruthy(),
+    )
+    for (const index of [20, 21, 22, 23, 24]) {
+      expect(screen.getByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-${index}`)).toBeTruthy()
+      expect(screen.getByText(`Coffee ${index}`)).toBeTruthy()
+    }
   })
 
   it('prefills from the coffee query even when that shot is not on the first page', async () => {
@@ -1367,6 +1405,39 @@ describe('log espresso shot', () => {
     await press(LOG)
     expect(created).toHaveLength(1)
     expect(screen.getByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+  })
+
+  it('does not prefill from Try again after a save has started', async () => {
+    let prefillCalls = 0
+    const created: Array<ShotCreate> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      loadPrefill: () => {
+        prefillCalls += 1
+        return Promise.reject(new Error('Network request failed'))
+      },
+      create: (input) =>
+        Promise.resolve().then(() => {
+          created.push(input)
+          throw new Error('Network request failed')
+        }),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    expect(await screen.findByTestId(SHOT_FORM_PREFILL_ERROR_TEST_ID)).toBeTruthy()
+    expect(prefillCalls).toBe(1)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    await press(LOG)
+    expect(created).toHaveLength(1)
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
+
+    await press(TRY_AGAIN)
+    expect(prefillCalls).toBe(1)
+    expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
   })
 
   it('does not report the stored shot after a failed save is edited and retried', async () => {
@@ -1774,6 +1845,13 @@ describe('log espresso shot', () => {
     )
     expect(screen.queryByText(ERROR_LOAD_MORE_FAILED)).toBeNull()
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
+    await waitFor(() =>
+      expect(screen.getByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-20`)).toBeTruthy(),
+    )
+    for (const index of [20, 21, 22, 23, 24]) {
+      expect(screen.getByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-${index}`)).toBeTruthy()
+      expect(screen.getByText(`Coffee ${index}`)).toBeTruthy()
+    }
   })
 
   it('does not request the same next page twice before a render', async () => {

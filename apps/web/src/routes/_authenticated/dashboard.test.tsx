@@ -13,6 +13,7 @@ import type { ReactNode } from 'react'
 import type { DashboardMethod } from '@/components/dashboard/methods'
 import { dashboardMethods } from '@/components/dashboard/methods'
 import {
+  ESPRESSO_COFFEES_LOAD_FAILED,
   ESPRESSO_LOADING_SHOTS,
   ESPRESSO_LOAD_FAILED,
   ESPRESSO_SHOT_PAGE_SIZE,
@@ -20,6 +21,7 @@ import {
 } from '@/hooks/use-espresso-shot-pages'
 import {
   espressoShotCursor,
+  espressoShotFixtureId,
   seedCoffees,
   seedEspressoShotPage,
 } from '@/test/espresso-shots'
@@ -404,7 +406,7 @@ describe('Dashboard', () => {
   it('keeps the table page when more shots append, and resets it when the filter changes', async () => {
     const shots = Array.from({ length: 6 }, (_, i) =>
       makeRecentShot({
-        id: `s${i}`,
+        id: espressoShotFixtureId(i),
         coffeeId: `c${i}`,
         coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
       }),
@@ -466,7 +468,7 @@ describe('Dashboard', () => {
   it('clamps the table page when loaded shots shrink', async () => {
     const shots = Array.from({ length: 6 }, (_, i) =>
       makeRecentShot({
-        id: `s${i}`,
+        id: espressoShotFixtureId(i),
         coffeeId: `c${i}`,
         coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
       }),
@@ -532,7 +534,7 @@ describe('Dashboard', () => {
   it('pages through the feed client-side', async () => {
     const shots = Array.from({ length: 6 }, (_, i) =>
       makeRecentShot({
-        id: `s${i}`,
+        id: espressoShotFixtureId(i),
         coffeeId: `c${i}`,
         coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
       }),
@@ -774,7 +776,7 @@ describe('Dashboard', () => {
     try {
       const shots = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
         makeRecentShot({
-          id: `s${index}`,
+          id: espressoShotFixtureId(index),
           coffeeId: `c${index}`,
           coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
         }),
@@ -949,6 +951,72 @@ describe('Dashboard', () => {
       fetchSpy.mockRestore()
       searchSpy.mockRestore()
       navigateSpy.mockRestore()
+    }
+  })
+
+  it('keeps Espresso selected when its empty feed fails so retry stays visible', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [])
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+      expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('shows shot and coffee retries independently when both loads fail', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      render(
+        <Dashboard
+          selectedMethod="espresso"
+          onSelectMethod={vi.fn()}
+          feeds={[
+            { method: 'espresso', brews: [] },
+            { method: 'pourover', brews: [] },
+            { method: 'frenchpress', brews: [] },
+            { method: 'aeropress', brews: [] },
+            { method: 'coldbrew', brews: [] },
+          ]}
+          now={NOW}
+        />,
+        { wrapper: Wrapper },
+      )
+      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(await screen.findByText(ESPRESSO_COFFEES_LOAD_FAILED)).toBeTruthy()
+      expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(
+        2,
+      )
+    } finally {
+      fetchSpy.mockRestore()
     }
   })
 })

@@ -74,6 +74,12 @@ appId: dev.offbyonelabs.coffeecompanion
     id: select-sheet-coffee
 - tapOn:
     id: select-option-00000000-0000-4000-8000-000000000001
+- extendedWaitUntil:
+    visible: "Niche Zero"
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "Linea Mini"
+    timeout: 15000
 - tapOn:
     id: field-dose-g
 - inputText: "18"

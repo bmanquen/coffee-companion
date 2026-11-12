@@ -35,6 +35,7 @@ import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import {
   ESPRESSO_COFFEES_LOAD_FAILED,
+  ESPRESSO_COFFEES_STALE_TIME_MS,
   ESPRESSO_LOADING_SHOTS,
   ESPRESSO_SHOT_FILTER_DEBOUNCE_MS,
   ESPRESSO_SHOT_Q_MAX,
@@ -66,12 +67,31 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
   return <BrewDialedInCell brewingMethod="espresso" brew={row.original} />
 }
 
+type ShotPage = {
+  items: Array<Shot>
+  total: number
+  nextCursor: string | null
+}
+
 function ActionsCell({ row }: CellContext<Shot, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const deleteShot = useMutation(
     trpc.espressoShot.delete.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (_deleted, shotId) => {
+        queryClient.setQueriesData(
+          trpc.espressoShot.getRecent.queryFilter(),
+          (page: ShotPage | undefined) => {
+            if (!page) return page
+            const items = page.items.filter((shot) => shot.id !== shotId)
+            if (items.length === page.items.length) return page
+            return {
+              ...page,
+              items,
+              total: Math.max(0, page.total - 1),
+            }
+          },
+        )
         queryClient.invalidateQueries(trpc.espressoShot.getRecent.queryFilter())
         queryClient.invalidateQueries(
           trpc.espressoShot.getLatestUnsealed.queryFilter(),
@@ -166,7 +186,7 @@ export function EspressoBrewsSection() {
   const trpc = useTRPC()
   const coffeesQuery = useQuery({
     ...trpc.coffee.getAll.queryOptions(),
-    staleTime: Infinity,
+    staleTime: ESPRESSO_COFFEES_STALE_TIME_MS,
   })
   const coffees = coffeesQuery.data ?? []
   const [sorting, setSorting] = useState<SortingState>([])
@@ -211,6 +231,7 @@ export function EspressoBrewsSection() {
     onSortingChange: setSorting,
     onExpandedChange: expansion.onExpandedChange,
     enableSorting: false,
+    getRowId: (shot) => shot.id,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getExpandedRowModel: getExpandedRowModel(),

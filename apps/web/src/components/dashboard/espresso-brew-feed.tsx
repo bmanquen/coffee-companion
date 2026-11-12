@@ -14,6 +14,7 @@ import { EspressoShotPager } from '@/components/brews/espresso-shot-pager'
 import { Button } from '@/components/ui/button'
 import {
   ESPRESSO_COFFEES_LOAD_FAILED,
+  ESPRESSO_COFFEES_STALE_TIME_MS,
   ESPRESSO_LOADING_SHOTS,
   useEspressoShotPages,
 } from '@/hooks/use-espresso-shot-pages'
@@ -64,7 +65,7 @@ export function EspressoBrewFeed() {
   const trpc = useTRPC()
   const coffeesQuery = useQuery({
     ...trpc.coffee.getAll.queryOptions(),
-    staleTime: Infinity,
+    staleTime: ESPRESSO_COFFEES_STALE_TIME_MS,
   })
   const coffees = coffeesQuery.data ?? []
   const [coffeeId, setCoffeeId] = useState('')
@@ -110,27 +111,30 @@ export function EspressoBrewFeed() {
         }
         coffeeFilter={{ value: coffeeId, onChange: setCoffeeId }}
         banner={
-          loadError && items.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              <p role="alert">{loadError}</p>
-              <Button type="button" variant="outline" onClick={retry}>
-                Try again
-              </Button>
-            </div>
-          ) : coffeesQuery.isError && coffees.length === 0 ? (
-            <div className="flex flex-col gap-2">
-              <p role="alert">{ESPRESSO_COFFEES_LOAD_FAILED}</p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  void coffeesQuery.refetch()
-                }}
-              >
-                Try again
-              </Button>
-            </div>
-          ) : undefined
+          <>
+            {loadError && items.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <p role="alert">{loadError}</p>
+                <Button type="button" variant="outline" onClick={retry}>
+                  Try again
+                </Button>
+              </div>
+            ) : null}
+            {coffeesQuery.isError && coffees.length === 0 ? (
+              <div className="flex flex-col gap-2">
+                <p role="alert">{ESPRESSO_COFFEES_LOAD_FAILED}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    void coffeesQuery.refetch()
+                  }}
+                >
+                  Try again
+                </Button>
+              </div>
+            ) : null}
+          </>
         }
         dialedInFilter={{ value: dialedInOnly, onChange: setDialedInOnly }}
         stale={stale}
