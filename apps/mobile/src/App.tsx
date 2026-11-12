@@ -21,17 +21,20 @@ export function App({
   return auth ? (
     <Shell auth={auth} espresso={espresso ?? idleEspressoApi} />
   ) : (
-    <Live />
+    <Live espresso={espresso} />
   )
 }
 
-function Live() {
+function Live({ espresso }: { espresso?: EspressoApi }) {
   const auth = useAuth()
-  const espresso = useMemo(() => createLiveEspressoApi(), [])
+  const liveEspresso = useMemo(
+    () => espresso ?? createLiveEspressoApi(),
+    [espresso],
+  )
   useEffect(() => {
     logApiBaseUrl(apiBaseUrl(), API_URL_DEV_TAG)
   }, [])
-  return <Shell auth={auth} espresso={espresso} />
+  return <Shell auth={auth} espresso={liveEspresso} />
 }
 
 function Shell({ auth, espresso }: { auth: Auth; espresso: EspressoApi }) {

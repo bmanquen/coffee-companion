@@ -43,7 +43,7 @@ jest.mock('@trpc/client', () => {
     query: () => Promise.resolve(value),
     mutate: () => Promise.resolve(value),
   })
-  const emptyPage = { items: [], total: 0 }
+  const emptyPage = { items: [], total: 0, nextCursor: null }
   return {
     createTRPCClient: () => ({
       coffee: { getAll: query([]) },
