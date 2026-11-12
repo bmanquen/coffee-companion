@@ -13,7 +13,11 @@ import {
   seedUsers,
   uniqFor,
 } from '../../test/trpc'
-import { TRPC_BAD_REQUEST, TRPC_CONFLICT } from './espressoShot'
+import {
+  SHOT_IDEMPOTENCY_DELETED,
+  TRPC_BAD_REQUEST,
+  TRPC_CONFLICT,
+} from './espressoShot'
 
 const USER_A = 'espresso-user-a'
 const USER_B = 'espresso-user-b'
@@ -478,6 +482,34 @@ describe('espressoShot.create idempotency', () => {
         sealedAt: row.sealedAt?.getTime() ?? null,
       })),
     )
+  })
+
+  it('does not recreate a shot when the same key is retried after delete', async () => {
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    const created = await asA.espressoShot.create(input)
+    await asA.espressoShot.delete(created.id)
+    const afterDelete = await asA.espressoShot.getRecent({ limit: 50 })
+
+    await expect(asA.espressoShot.create(input)).rejects.toMatchObject({
+      code: TRPC_CONFLICT,
+      message: SHOT_IDEMPOTENCY_DELETED,
+    })
+
+    const afterRetry = await asA.espressoShot.getRecent({ limit: 50 })
+    expect(afterRetry.items.map((shot) => shot.id)).toEqual(
+      afterDelete.items.map((shot) => shot.id),
+    )
+    expect(afterRetry.items.some((shot) => shot.id === created.id)).toBe(false)
   })
 
   it('rejects a reused key when the shot fields differ', async () => {

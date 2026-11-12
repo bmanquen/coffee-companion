@@ -209,6 +209,35 @@ describe('NewEspressoShot form', () => {
     ).toBeNull()
   })
 
+  it('leaves brewing device blank when the last shot was not espresso', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper } = providers
+    seedLatestUnsealed(
+      queryClient,
+      trpc,
+      COFFEE,
+      makeRecentShot({
+        id: 'shot-1',
+        coffeeId: COFFEE,
+        grinderId: GRINDER,
+        brewingDeviceId: AERO_DEVICE,
+        roastDate: '2026-05-01',
+      }),
+    )
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+    expect(screen.getByDisplayValue('Niche Zero')).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Brewing Device' })).toHaveProperty(
+      'value',
+      '',
+    )
+  })
+
   it('surfaces the Dialed-in Brew for the prefilled device', async () => {
     const { queryClient, trpc, Wrapper } = seeded()
     queryClient.setQueryData(
@@ -438,7 +467,7 @@ describe('NewEspressoShot form', () => {
       expect(keys[0]).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[1]).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[0]).not.toBe(keys[1])
-      expect(bodies[1]).toContain('22')
+      expect(bodies[1]).toMatch(/"dose"\s*:\s*"22"/)
       expect(bodies[1]).not.toMatch(/"dose"\s*:\s*"18"/)
     } finally {
       fetchSpy.mockRestore()
@@ -820,6 +849,72 @@ describe('NewEspressoShot form', () => {
       })
       expect(screen.queryByText('May 1st, 2026')).toBeNull()
       expect(screen.getByText('April 1st, 2026')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('prefills the coffee chosen during a pending save once the save fails', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let rejectCreate: (reason: Error) => void = () => {}
+    const pendingCreate = new Promise<Response>((_resolve, reject) => {
+      rejectCreate = reject
+    })
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isCreateCall(call)) return pendingCreate
+      return serveFromCache(providers)(...call)
+    })
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
+        target: { value: ESP_DEVICE },
+      })
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      const prefillsDuringSave = prefillCalls(fetchSpy).length
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE_B },
+      })
+      expect(prefillCalls(fetchSpy)).toHaveLength(prefillsDuringSave)
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      expect(screen.queryByText('April 1st, 2026')).toBeNull()
+
+      rejectCreate(new Error('Network request failed'))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(await screen.findByText('April 1st, 2026')).toBeTruthy()
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      const coffeeIds = prefillCalls(fetchSpy).map((call) =>
+        coffeeIdFromCall(call),
+      )
+      expect(coffeeIds.at(-1)).toBe(COFFEE_B)
     } finally {
       fetchSpy.mockRestore()
     }

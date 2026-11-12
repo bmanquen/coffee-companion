@@ -56,6 +56,9 @@ const shotInput: ShotCreate = {
   idempotencyKey: '00000000-0000-4000-8000-000000000099',
 }
 
+const ADA = 'user-ada'
+const ALAN = 'user-alan'
+
 describe('useEspressoCatalog', () => {
   it('keeps a pending full load when a refresh succeeds before any catalog exists', async () => {
     let resolveLoad: (value: EspressoCatalog) => void = () => {}
@@ -286,5 +289,63 @@ describe('useEspressoCatalog', () => {
       'Page two',
     ])
     expect(result.current.loading).toBe(false)
+  })
+
+  it('does not apply a save that started before the signed-in user changed and changed back', async () => {
+    let resolveCreate: () => void = () => {}
+    const pending = new Promise<void>((resolve) => {
+      resolveCreate = resolve
+    })
+    const listCursors: Array<ShotCursor | null | undefined> = []
+    const api: EspressoApi = {
+      load: () =>
+        Promise.resolve(catalog({ shots: [shot({ coffeeName: 'House' })] })),
+      listShots: (cursor) => {
+        listCursors.push(cursor)
+        return Promise.resolve({
+          items: [shot({ id: 'shot-refresh', coffeeName: 'From save' })],
+          total: 1,
+          nextCursor: null,
+        })
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: () => pending,
+    }
+    const onSuccess = jest.fn()
+    const { result, rerender } = await renderHook(
+      ({ userId }: { userId: string }) => useEspressoCatalog(api, userId),
+      { initialProps: { userId: ADA } },
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      result.current.save(shotInput, onSuccess)
+      await Promise.resolve()
+    })
+    expect(result.current.busy).toBe(true)
+
+    await act(async () => {
+      rerender({ userId: ALAN })
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => {
+      rerender({ userId: ADA })
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const listsAfterReturn = listCursors.length
+
+    await act(async () => {
+      resolveCreate()
+      await pending
+      await Promise.resolve()
+    })
+
+    expect(onSuccess).not.toHaveBeenCalled()
+    expect(listCursors).toHaveLength(listsAfterReturn)
+    expect(result.current.catalog?.shots[0]?.coffeeName).toBe('House')
+    expect(result.current.busy).toBe(false)
+    expect(result.current.saveError).toBeNull()
   })
 })

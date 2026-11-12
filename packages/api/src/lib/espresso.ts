@@ -78,3 +78,9 @@ export function normalizeDecimal(value: string | null | undefined): string | nul
 // espresso shots. Pure helper so it can be unit tested without a database.
 export const isEspressoDevice = (device: { type: { name: string } }): boolean =>
   device.type.name === ESPRESSO_DEVICE_TYPE
+
+export const SHOT_REPLAY_CONFLICT =
+  'This shot was already saved with different settings.'
+
+export const SHOT_IDEMPOTENCY_DELETED =
+  'This shot was already saved and then deleted.'

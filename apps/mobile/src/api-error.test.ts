@@ -1,3 +1,4 @@
+import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
 import {
   TRPC_CONFLICT,
   TRPC_FORBIDDEN,
@@ -33,6 +34,15 @@ describe('apiErrorMessage', () => {
     expect(
       apiErrorMessage(trpcError(TRPC_CONFLICT, REPLAY_CONFLICT), FALLBACK),
     ).toBe(REPLAY_CONFLICT)
+  })
+
+  it('uses the API message when a deleted shot is retried', () => {
+    expect(
+      apiErrorMessage(
+        trpcError(TRPC_CONFLICT, SHOT_IDEMPOTENCY_DELETED),
+        FALLBACK,
+      ),
+    ).toBe(SHOT_IDEMPOTENCY_DELETED)
   })
 
   it('falls back for BAD_REQUEST, which can carry raw Zod JSON', () => {

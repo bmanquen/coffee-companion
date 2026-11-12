@@ -35,6 +35,7 @@ import {
 } from './copy'
 import {
   applyCoffeePrefill,
+  decimalFieldText,
   emptyShotDraft,
   parseShotDraft,
 } from './draft'
@@ -79,6 +80,7 @@ export function ShotForm({
   const keepPrefill = useRef<PrefillKeep>({})
   const saveGen = useRef(0)
   const saveInFlight = useRef(false)
+  const prefillQueued = useRef(false)
   const draftRef = useRef(draft)
   draftRef.current = draft
 
@@ -89,21 +91,19 @@ export function ShotForm({
     return () => sub.remove()
   }, [busy, onBack])
 
-  useEffect(() => {
-    if (error) saveInFlight.current = false
-  }, [error])
-
   const setField = (key: keyof ShotDraft, value: string) => {
     onClearError()
+    const next =
+      key === 'dose' || key === 'yield' ? decimalFieldText(value) : value
     if (key === 'grinderId' || key === 'brewingDeviceId' || key === 'roastDate') {
       keepPrefill.current = { ...keepPrefill.current, [key]: true }
     }
-    setDraft((current) => ({ ...current, [key]: value }))
+    setDraft((current) => ({ ...current, [key]: next }))
     setFieldErrors((current) => {
       if (!current[key]) return current
-      const next = { ...current }
-      delete next[key]
-      return next
+      const remaining = { ...current }
+      delete remaining[key]
+      return remaining
     })
   }
 
@@ -144,12 +144,15 @@ export function ShotForm({
     })
   }
 
-  const requestPrefill = (coffeeId: string) => {
-    if (saveInFlight.current || busy) return
-    const seq = ++prefillSeq.current
+  const loadPrefillFor = (coffeeId: string) => {
+    if (!coffeeId) return
+    if (saveInFlight.current || busy) {
+      prefillQueued.current = true
+      return
+    }
+    prefillQueued.current = false
+    const seq = prefillSeq.current
     const startedSaveGen = saveGen.current
-    prefillCoffeeId.current = coffeeId
-    setPrefillError(false)
     void loadPrefill(coffeeId).then(
       (latest) => applyPrefill(coffeeId, seq, latest, startedSaveGen),
       () => {
@@ -161,6 +164,21 @@ export function ShotForm({
       },
     )
   }
+
+  const requestPrefill = (coffeeId: string) => {
+    prefillSeq.current += 1
+    prefillCoffeeId.current = coffeeId
+    setPrefillError(false)
+    loadPrefillFor(coffeeId)
+  }
+
+  useEffect(() => {
+    if (!error) return
+    saveInFlight.current = false
+    if (prefillQueued.current && prefillCoffeeId.current) {
+      loadPrefillFor(prefillCoffeeId.current)
+    }
+  }, [error])
 
   return (
     <ScrollView

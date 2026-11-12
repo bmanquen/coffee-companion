@@ -37,6 +37,10 @@ const DECIMAL_PATTERN = /^\d+(\.\d+)?$/
 const WHOLE_NUMBER_PATTERN = /^\d+$/
 const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
+export function decimalFieldText(value: string): string {
+  return value.replace(/,/g, '.')
+}
+
 export function emptyShotDraft(): ShotDraft {
   return {
     coffeeId: '',
