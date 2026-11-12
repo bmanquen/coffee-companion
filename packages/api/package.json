@@ -46,23 +46,23 @@
     "./test/database": "./test/database.ts"
   },
   "dependencies": {
-    "@better-auth/expo": "1.6.26",
-    "@better-auth/stripe": "1.6.26",
-    "@trpc/server": "^11.8.1",
-    "better-auth": "^1.6.26",
-    "jose": "^6.1.3",
+    "@better-auth/expo": "1.7.18",
+    "@better-auth/stripe": "1.7.18",
+    "@trpc/server": "^11.26.0",
+    "better-auth": "^1.7.18",
+    "jose": "^6.2.17",
     "dotenv": "^17.2.3",
     "drizzle-orm": "1.0.0-beta.18-7eb39f0",
     "drizzle-zod": "^0.8.3",
-    "pg": "^8.16.3",
-    "resend": "^6.18.1",
+    "pg": "^8.23.1",
+    "resend": "^6.37.0",
     "stripe": "^22.4.0",
     "superjson": "^2.2.6",
-    "zod": "^4.3.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tanstack/eslint-config": "^0.3.4",
-    "@types/pg": "^8.16.0",
+    "@types/pg": "^8.23.1",
     "@vitest/coverage-v8": "^4.1.9",
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "1.0.0-beta.18-7eb39f0",
