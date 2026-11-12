@@ -25,6 +25,7 @@ export const ESPRESSO_LOADING_SHOTS = 'Loading shots'
 export type EspressoShotPageFilters = {
   coffeeId?: string
   q?: string
+  dialedIn?: boolean
 }
 
 export function espressoShotPageInput(
@@ -36,11 +37,13 @@ export function espressoShotPageInput(
     cursor?: EspressoShotCursor
     coffeeId?: string
     q?: string
+    dialedIn?: boolean
   } = { limit: ESPRESSO_SHOT_PAGE_SIZE }
   if (cursor) input.cursor = cursor
   if (filters.coffeeId) input.coffeeId = filters.coffeeId
   const q = filters.q?.trim()
   if (q) input.q = q.slice(0, ESPRESSO_SHOT_Q_MAX)
+  if (filters.dialedIn) input.dialedIn = true
   return input
 }
 
@@ -64,7 +67,7 @@ export function useEspressoShotPages(
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const loadMoreSeq = useRef(0)
   const generation = first.dataUpdatedAt
-  const filterKey = `${filters.coffeeId ?? ''}\0${filters.q?.trim() ?? ''}`
+  const filterKey = `${filters.coffeeId ?? ''}\0${filters.q?.trim() ?? ''}\0${filters.dialedIn ? '1' : ''}`
 
   useEffect(() => {
     loadMoreSeq.current += 1

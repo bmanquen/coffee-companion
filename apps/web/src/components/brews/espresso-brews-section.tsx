@@ -220,6 +220,20 @@ export function EspressoBrewsSection() {
           </Button>
         </Link>
       </div>
+      <div className="flex w-full flex-col gap-2 sm:flex-row">
+        <CoffeeFilter
+          options={coffeeOptions}
+          value={coffeeId}
+          onChange={setCoffeeId}
+        />
+        <Input
+          placeholder="Filter shots..."
+          value={q}
+          maxLength={ESPRESSO_SHOT_Q_MAX}
+          onChange={(e) => setQ(e.target.value)}
+          className="flex-1"
+        />
+      </div>
       {loading ? (
         <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
       ) : loadError ? (
@@ -237,20 +251,6 @@ export function EspressoBrewsSection() {
         />
       ) : (
         <>
-          <div className="flex w-full flex-col gap-2 sm:flex-row">
-            <CoffeeFilter
-              options={coffeeOptions}
-              value={coffeeId}
-              onChange={setCoffeeId}
-            />
-            <Input
-              placeholder="Filter shots..."
-              value={q}
-              maxLength={ESPRESSO_SHOT_Q_MAX}
-              onChange={(e) => setQ(e.target.value)}
-              className="flex-1"
-            />
-          </div>
           <DataTable
             table={table}
             renderSubComponent={(row) => renderBrewDetails(row.original)}

@@ -156,6 +156,8 @@ describe('EspressoBrewsSection', () => {
 
     expect(screen.getByRole('status')).toBeTruthy()
     expect(screen.getByText(ESPRESSO_LOADING_SHOTS)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
+    expect(screen.getByPlaceholderText('Filter shots...')).toBeTruthy()
     expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
   })
 
@@ -173,6 +175,8 @@ describe('EspressoBrewsSection', () => {
       render(<EspressoBrewsSection />, { wrapper: Wrapper })
 
       expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
+      expect(screen.getByPlaceholderText('Filter shots...')).toBeTruthy()
       expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
 
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
@@ -844,9 +848,21 @@ describe('EspressoBrewsSection', () => {
   })
 
   it('retries a failed load-more from the error', async () => {
+    const extra = makeRecentShot({
+      id: 's-next',
+      coffeeId: 'c-next',
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValueOnce(
+        trpcSuccess({
+          items: [extra],
+          total: ESPRESSO_SHOT_PAGE_SIZE + 1,
+          nextCursor: null,
+        }),
+      )
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
@@ -863,24 +879,13 @@ describe('EspressoBrewsSection', () => {
       expect(
         await screen.findByText("We couldn't load more shots. Try again."),
       ).toBeTruthy()
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
 
-      seedEspressoShotPage(
-        queryClient,
-        trpc,
-        [
-          makeRecentShot({
-            id: 's-next',
-            coffeeId: 'c-next',
-            coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
-          }),
-        ],
-        first.length + 1,
-        espressoShotCursor(first[first.length - 1]),
-      )
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
       expect(
         await within(screen.getByRole('table')).findByText('Coffee extra'),
       ).toBeTruthy()
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
     } finally {
       fetchSpy.mockRestore()
     }

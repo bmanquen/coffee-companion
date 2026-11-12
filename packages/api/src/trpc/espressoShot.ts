@@ -59,6 +59,7 @@ const getRecentInput = z.object({
   cursor: z.string().min(1).max(256).optional(),
   coffeeId: z.uuid().optional(),
   q: z.string().trim().max(ESPRESSO_SHOT_Q_MAX).optional(),
+  dialedIn: z.boolean().optional(),
 })
 
 function likeContains(value: string) {
@@ -124,11 +125,19 @@ function afterCursor(cursor: EspressoShotCursorKey) {
 
 function recentWhere(
   userId: string,
-  input: { coffeeId?: string; q?: string; cursor?: EspressoShotCursorKey },
+  input: {
+    coffeeId?: string
+    q?: string
+    cursor?: EspressoShotCursorKey
+    dialedInIds?: Array<string>
+  },
   shelf: Shelf,
 ) {
   const parts = [eq(espressoShots.userId, userId)]
   if (input.coffeeId) parts.push(eq(espressoShots.coffeeId, input.coffeeId))
+  if (input.dialedInIds) {
+    parts.push(inArray(espressoShots.id, input.dialedInIds))
+  }
   if (input.cursor) {
     const cursorWhere = afterCursor(input.cursor)
     if (cursorWhere) parts.push(cursorWhere)
@@ -176,13 +185,18 @@ async function loadRecentPage(
     coffeeId?: string
     q?: string
     cursor?: EspressoShotCursorKey
+    dialedInIds?: Array<string>
   },
   shelf: Shelf,
 ): Promise<RecentPage> {
   const where = recentWhere(userId, input, shelf)
   const countWhere = recentWhere(
     userId,
-    { coffeeId: input.coffeeId, q: input.q },
+    {
+      coffeeId: input.coffeeId,
+      q: input.q,
+      dialedInIds: input.dialedInIds,
+    },
     shelf,
   )
   const [idRows, [{ total }]] = await Promise.all([
@@ -247,10 +261,16 @@ async function assertEspressoDevice(brewingDeviceId: string, userId: string) {
 export const espressoShotRouter = createTRPCRouter({
   getRecent: authedProcedure
     .input(getRecentInput)
-    .query(({ ctx, input }) => {
+    .query(async ({ ctx, input }) => {
       const cursor = input.cursor
         ? decodeCursorOrThrow(input.cursor)
         : undefined
+      const dialedInIds = input.dialedIn
+        ? await brewIdsForMethod(ctx.session.user.id, 'espresso')
+        : undefined
+      if (dialedInIds && dialedInIds.length === 0) {
+        return { items: [], total: 0, nextCursor: null }
+      }
       return sealBrewPageWithDialedIn(
         ctx.session.user.id,
         ctx.shelf,
@@ -262,6 +282,7 @@ export const espressoShotRouter = createTRPCRouter({
               coffeeId: input.coffeeId,
               q: input.q,
               cursor,
+              dialedInIds,
             },
             await ctx.shelf(),
           ),
@@ -271,21 +292,23 @@ export const espressoShotRouter = createTRPCRouter({
   getLatestUnsealed: authedProcedure
     .input(z.object({ coffeeId: z.uuid() }))
     .query(async ({ ctx, input }) => {
-      const shots = await sealBrewsWithDialedIn(
+      const shelf = await ctx.shelf()
+      if (shelf !== null && !shelf.has(input.coffeeId)) return null
+      const shot = await db.query.espressoShots.findFirst({
+        where: {
+          userId: ctx.session.user.id,
+          coffeeId: input.coffeeId,
+          ...(shelf !== null ? { sealedAt: { isNull: true } } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        with: withRelations,
+      })
+      if (!shot) return null
+      return sealBrewWithDialedIn(
         ctx.session.user.id,
         ctx.shelf,
-        () =>
-          db.query.espressoShots.findMany({
-            where: {
-              userId: ctx.session.user.id,
-              coffeeId: input.coffeeId,
-            },
-            orderBy: { createdAt: 'desc' },
-            with: withRelations,
-            limit: 20,
-          }),
+        () => Promise.resolve(shot),
       )
-      return shots.find((shot) => !shot.sealed) ?? null
     }),
 
   // Dialed-in shots, most recent first. An optional limit caps the result;

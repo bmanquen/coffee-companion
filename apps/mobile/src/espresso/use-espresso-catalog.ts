@@ -128,6 +128,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const activeUser = useRef(userId)
   const refreshSeq = useRef(0)
   const pageSeq = useRef(0)
+  const refreshPending = useRef(false)
 
   const runLoad = useCallback(() => {
     const seq = ++loadSeq.current
@@ -172,12 +173,14 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     (forUser: string) => {
       const seq = ++refreshSeq.current
       pageSeq.current += 1
+      refreshPending.current = true
       dispatch({ type: 'pageInvalidated' })
       void api.listShots().then(
         (page) => {
           if (forUser !== activeUser.current || seq !== refreshSeq.current) {
             return
           }
+          refreshPending.current = false
           dispatch({
             type: 'shotsRefreshed',
             shots: page.items,
@@ -189,6 +192,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
           if (forUser !== activeUser.current || seq !== refreshSeq.current) {
             return
           }
+          refreshPending.current = false
           runLoad()
         },
       )
@@ -206,6 +210,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
         () => {
           saveInFlight.current = false
           if (forUser !== activeUser.current) return
+          refreshPending.current = true
           dispatch({ type: 'saveSucceeded' })
           onSuccess?.()
           refreshFirstPage(forUser)
@@ -225,7 +230,12 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
 
   const loadMore = useCallback(() => {
     const catalog = state.catalog
-    if (state.loadingMore || !catalog || !catalog.nextCursor) {
+    if (
+      refreshPending.current ||
+      state.loadingMore ||
+      !catalog ||
+      !catalog.nextCursor
+    ) {
       return
     }
     const forUser = userId

@@ -26,4 +26,11 @@ describe('espressoShotPageInput', () => {
       cursor: 'next-page-token',
     })
   })
+
+  it('passes dialedIn when the filter is on', () => {
+    expect(espressoShotPageInput(undefined, { dialedIn: true })).toEqual({
+      limit: ESPRESSO_SHOT_PAGE_SIZE,
+      dialedIn: true,
+    })
+  })
 })

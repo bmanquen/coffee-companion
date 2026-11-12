@@ -36,6 +36,9 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData(
+        context.trpc.coffee.getAll.queryOptions(),
+      ),
+      context.queryClient.ensureQueryData(
         context.trpc.espressoShot.getRecent.queryOptions(
           espressoShotPageInput(),
         ),
