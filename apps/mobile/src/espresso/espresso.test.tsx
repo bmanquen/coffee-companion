@@ -21,6 +21,7 @@ import {
   BACK,
   EMPTY_SHOTS,
   ERROR_LOAD_FAILED,
+  ERROR_LOAD_MORE_FAILED,
   ERROR_PREFILL_FAILED,
   ERROR_SAVE_FAILED,
   LABEL_COFFEE,
@@ -106,14 +107,37 @@ function seedShot(overrides: Partial<ShotRow> = {}): ShotRow {
   }
 }
 
+const PAGE_CURSOR_PREFIX = 'after:'
+
+function pageCursor(shotId: string): ShotCursor {
+  return `${PAGE_CURSOR_PREFIX}${shotId}`
+}
+
 function pageFrom(all: Array<ShotRow>, cursor?: ShotCursor | null) {
-  const start = cursor ? all.findIndex((shot) => shot.id === cursor) + 1 : 0
-  const items = all.slice(Math.max(start, 0), Math.max(start, 0) + 20)
-  const nextCursor =
-    items.length > 0 && start + items.length < all.length
-      ? items[items.length - 1].id
-      : null
-  return { items, total: all.length, nextCursor }
+  if (!cursor) {
+    const items = all.slice(0, 20)
+    return {
+      items,
+      total: all.length,
+      nextCursor:
+        items.length > 0 && items.length < all.length
+          ? pageCursor(items[items.length - 1].id)
+          : null,
+    }
+  }
+  const index = all.findIndex((shot) => pageCursor(shot.id) === cursor)
+  if (index < 0) {
+    return { items: [], total: all.length, nextCursor: null }
+  }
+  const items = all.slice(index + 1, index + 1 + 20)
+  return {
+    items,
+    total: all.length,
+    nextCursor:
+      items.length > 0 && index + 1 + items.length < all.length
+        ? pageCursor(items[items.length - 1].id)
+        : null,
+  }
 }
 
 function catalog(overrides: Partial<EspressoCatalog> = {}): EspressoCatalog {
@@ -125,7 +149,7 @@ function catalog(overrides: Partial<EspressoCatalog> = {}): EspressoCatalog {
     devices: [{ id: ESP_DEVICE, name: 'Linea Mini' }],
     nextCursor:
       shots.length > 0 && shots.length < total
-        ? shots[shots.length - 1].id
+        ? pageCursor(shots[shots.length - 1].id)
         : null,
     ...overrides,
     shots,
@@ -817,6 +841,76 @@ describe('log espresso shot', () => {
     expect(screen.queryByText('Ada House')).toBeNull()
   })
 
+  it('loads more after the signed-in user changes during a pending refresh', async () => {
+    const adaAll = Array.from({ length: 25 }, (_, index) =>
+      seedShot({
+        id: `ada-${index}`,
+        coffeeName: `Ada ${index}`,
+      }),
+    )
+    const alanAll = Array.from({ length: 25 }, (_, index) =>
+      seedShot({
+        id: `alan-${index}`,
+        coffeeName: `Alan ${index}`,
+      }),
+    )
+    let owner = ADA_ID
+    const cursors: Array<ShotCursor | null | undefined> = []
+    const api: EspressoApi = {
+      load: () =>
+        Promise.resolve(
+          catalog({
+            shots: (owner === ADA_ID ? adaAll : alanAll).slice(0, 20),
+            total: 25,
+          }),
+        ),
+      listShots: (cursor) => {
+        cursors.push(cursor)
+        if (owner === ADA_ID && !cursor) {
+          return new Promise(() => {})
+        }
+        return Promise.resolve(
+          pageFrom(owner === ADA_ID ? adaAll : alanAll, cursor),
+        )
+      },
+      loadPrefill: () => Promise.resolve(seedShot()),
+      create: async () => {},
+    }
+    const view = await render(
+      <SignedInHome
+        userId={ADA_ID}
+        name="Ada Lovelace"
+        espresso={api}
+        onSignOut={() => {}}
+      />,
+    )
+    expect(screen.getByText('Ada 0')).toBeTruthy()
+
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+    expect(cursors).toEqual([undefined])
+
+    owner = ALAN_ID
+    await view.rerender(
+      <SignedInHome
+        userId={ALAN_ID}
+        name="Ada Lovelace"
+        espresso={api}
+        onSignOut={() => {}}
+      />,
+    )
+    expect(await screen.findByText('Alan 0')).toBeTruthy()
+    expect(screen.queryByText('Ada 0')).toBeNull()
+
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    await waitFor(() =>
+      expect(cursors).toContain(pageCursor('alan-19')),
+    )
+  })
+
   it('does not apply a previous user save after the signed-in user changes', async () => {
     let resolveCreate: () => void = () => {}
     const pending = new Promise<void>((resolve) => {
@@ -1018,8 +1112,8 @@ describe('log espresso shot', () => {
     expect(screen.queryByText('Coffee 20')).toBeNull()
 
     await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
-    await waitFor(() => expect(cursors).toContain('shot-19'))
-    expect(await screen.findByText('Coffee 20')).toBeTruthy()
+    await waitFor(() => expect(cursors).toContain(pageCursor('shot-19')))
+    expect(cursors).not.toContain('shot-19')
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
   })
 
@@ -1404,13 +1498,13 @@ describe('log espresso shot', () => {
       resolveRefresh?.({
         items: all.slice(0, 20),
         total: all.length,
-        nextCursor: all[19].id,
+        nextCursor: pageCursor(all[19].id),
       })
       await Promise.resolve()
     })
     await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
-    await waitFor(() => expect(cursors).toContain('shot-19'))
-    expect(await screen.findByText('Coffee 20')).toBeTruthy()
+    await waitFor(() => expect(cursors).toContain(pageCursor('shot-19')))
+    expect(cursors).not.toContain('shot-19')
   })
 
   it('drops an in-flight next page after a refresh', async () => {
@@ -1436,7 +1530,10 @@ describe('log espresso shot', () => {
           return Promise.resolve({
             items: shots,
             total,
-            nextCursor: shots.length < total ? shots[shots.length - 1].id : null,
+            nextCursor:
+              shots.length < total
+                ? pageCursor(shots[shots.length - 1].id)
+                : null,
           })
         }
         return new Promise((resolve) => {
@@ -1521,6 +1618,53 @@ describe('log espresso shot', () => {
     await enterRecipe()
     await press(LOG)
     expect(await screen.findByText('Logged new')).toBeTruthy()
+    expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
+  })
+
+  it('retries the next page from the list footer when loading more fails', async () => {
+    const all = Array.from({ length: 25 }, (_, index) =>
+      seedShot({
+        id: `shot-${index}`,
+        coffeeName: `Coffee ${index}`,
+      }),
+    )
+    const cursors: Array<ShotCursor | null | undefined> = []
+    let attempts = 0
+    const api: EspressoApi = {
+      ...pagingFor(() => all),
+      load: () =>
+        Promise.resolve(
+          catalog({ shots: all.slice(0, 20), total: all.length }),
+        ),
+      listShots: (cursor) => {
+        cursors.push(cursor)
+        attempts += 1
+        if (attempts === 1) {
+          return Promise.reject(new Error('Network request failed'))
+        }
+        return Promise.resolve(pageFrom(all, cursor))
+      },
+      create: async () => {},
+    }
+    const view = await render(<App auth={signedIn} espresso={api} />)
+    expect(screen.getByText('Coffee 0')).toBeTruthy()
+    expect(screen.queryByText('Coffee 20')).toBeNull()
+
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    expect(await screen.findByText(ERROR_LOAD_MORE_FAILED)).toBeTruthy()
+    const loadMoreDest = process.env.VERIFY_MOBILE_LOAD_MORE_ARTIFACTS
+    if (loadMoreDest) writeHostTreeArtifacts(view, loadMoreDest)
+    expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
+    expect(screen.queryByText('Coffee 20')).toBeNull()
+
+    await press(TRY_AGAIN)
+    await waitFor(() =>
+      expect(cursors).toEqual([
+        pageCursor('shot-19'),
+        pageCursor('shot-19'),
+      ]),
+    )
+    expect(screen.queryByText(ERROR_LOAD_MORE_FAILED)).toBeNull()
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
   })
 

@@ -1,5 +1,5 @@
 import { coffeeOptionLabel } from '@coffee-companion/brew-display'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
 import { useMemo, useState } from 'react'
 import type { EspressoShotWithRelations } from '@/types'
@@ -61,7 +61,10 @@ const columns = [
 // feed. Hands loaded pages to BrewFeed and offers Load more for the rest.
 export function EspressoBrewFeed() {
   const trpc = useTRPC()
-  const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
+  const { data: coffees = [] } = useQuery({
+    ...trpc.coffee.getAll.queryOptions(),
+    staleTime: Infinity,
+  })
   const [coffeeId, setCoffeeId] = useState('')
   const [dialedInOnly, setDialedInOnly] = useState(false)
   const coffeeOptions = useMemo(
@@ -82,6 +85,7 @@ export function EspressoBrewFeed() {
     loadMoreError,
     loading,
     loadError,
+    stale,
     retry,
   } = useEspressoShotPages({
     coffeeId: coffeeId || undefined,
@@ -104,10 +108,21 @@ export function EspressoBrewFeed() {
         onCoffeeIdChange={setCoffeeId}
         dialedInOnly={dialedInOnly}
         onDialedInOnlyChange={setDialedInOnly}
+        banner={
+          loadError && items.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <p role="alert">{loadError}</p>
+              <Button type="button" variant="outline" onClick={retry}>
+                Try again
+              </Button>
+            </div>
+          ) : undefined
+        }
+        stale={stale}
         status={
           loading ? (
             <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
-          ) : loadError ? (
+          ) : loadError && items.length === 0 ? (
             <div className="flex flex-col gap-2">
               <p role="alert">{loadError}</p>
               <Button type="button" variant="outline" onClick={retry}>
@@ -117,7 +132,7 @@ export function EspressoBrewFeed() {
           ) : undefined
         }
       />
-      {loading || loadError ? null : (
+      {loading || (loadError && items.length === 0) ? null : (
         <EspressoShotPager
           hasMore={hasMore}
           loadingMore={loadingMore}

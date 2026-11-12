@@ -463,6 +463,72 @@ describe('Dashboard', () => {
     expect(within(screen.getByRole('table')).queryByText('Coffee 6')).toBeNull()
   })
 
+  it('clamps the table page when loaded shots shrink', async () => {
+    const shots = Array.from({ length: 6 }, (_, i) =>
+      makeRecentShot({
+        id: `s${i}`,
+        coffeeId: `c${i}`,
+        coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
+      }),
+    )
+    const extra = Array.from({ length: 5 }, (_, i) =>
+      makeRecentShot({
+        id: `n${i}`,
+        coffeeId: `n${i}`,
+        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
+      }),
+    )
+    const { queryClient, trpc } = renderDashboard(
+      'espresso',
+      shots,
+      {},
+      (providers) => {
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          shots,
+          shots.length + extra.length,
+          undefined,
+          {},
+          espressoShotCursor(shots[shots.length - 1]),
+        )
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          extra,
+          shots.length + extra.length,
+          espressoShotCursor(shots[shots.length - 1]),
+        )
+        seedCoffees(
+          providers.queryClient,
+          providers.trpc,
+          coffeesFrom([...shots, ...extra]),
+        )
+      },
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Next page'))
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    expect(await screen.findByText('Page 2 of 3')).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Next page'))
+    })
+    expect(screen.getByText('Page 3 of 3')).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('Extra 5')).toBeTruthy()
+
+    await act(async () => {
+      queryClient.setQueryData(
+        trpc.espressoShot.getRecent.queryKey(espressoShotPageInput()),
+        { items: shots, total: shots.length, nextCursor: null },
+      )
+    })
+    expect(await screen.findByText('Page 2 of 2')).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('Coffee 6')).toBeTruthy()
+    expect(screen.queryByText(/No results/i)).toBeNull()
+  })
+
   it('pages through the feed client-side', async () => {
     const shots = Array.from({ length: 6 }, (_, i) =>
       makeRecentShot({
@@ -738,13 +804,10 @@ describe('Dashboard', () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1)
 
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-      await waitFor(() => {
-        expect(
-          screen.queryByText("We couldn't load more shots. Try again."),
-        ).toBeNull()
-      })
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull(),
+      )
       expect(fetchSpy).toHaveBeenCalledTimes(2)
-      expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull()
       for (let step = 0; step < 4; step += 1) {
         fireEvent.click(screen.getByLabelText('Next page'))
       }

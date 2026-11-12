@@ -22,6 +22,12 @@ export const ESPRESSO_LOAD_FAILED =
 
 export const ESPRESSO_LOADING_SHOTS = 'Loading shots'
 
+// First-page refetch drops appended pages (generation follows dataUpdatedAt).
+// 30s is long enough that paging through Load more is not wiped by a quick
+// tab switch, and short enough that a Shot saved on mobile shows up after
+// remount or focus.
+export const ESPRESSO_SHOT_STALE_TIME_MS = 30_000
+
 export type EspressoShotPageFilters = {
   coffeeId?: string
   q?: string
@@ -57,12 +63,12 @@ export function useEspressoShotPages(
       espressoShotPageInput(undefined, filters),
     ),
     placeholderData: keepPreviousData,
-    staleTime: Infinity,
+    staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
   })
   const [extra, setExtra] = useState<Array<EspressoShotWithRelations>>([])
-  const [extraCursor, setExtraCursor] = useState<EspressoShotCursor | null>(
-    null,
-  )
+  const [extraCursor, setExtraCursor] = useState<
+    EspressoShotCursor | null | undefined
+  >(undefined)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const loadMoreSeq = useRef(0)
@@ -72,28 +78,28 @@ export function useEspressoShotPages(
   useEffect(() => {
     loadMoreSeq.current += 1
     setExtra([])
-    setExtraCursor(null)
+    setExtraCursor(undefined)
     setLoadMoreError(null)
     setLoadingMore(false)
   }, [generation, filterKey])
 
   const pageItems = first.data?.items ?? []
+  const filterPending = first.isPlaceholderData && first.isFetching
   const items = useMemo(() => {
-    if (first.isPlaceholderData) return pageItems
+    if (first.isPlaceholderData) return []
     return [...pageItems, ...extra]
   }, [extra, first.isPlaceholderData, pageItems])
   const nextCursor = first.isPlaceholderData
     ? null
-    : extra.length > 0
+    : extraCursor !== undefined
       ? extraCursor
       : (first.data?.nextCursor ?? null)
   const hasMore = nextCursor != null
   const loading =
-    first.isPending && pageItems.length === 0 && extra.length === 0
-  const loadError =
-    first.isError && pageItems.length === 0 && extra.length === 0
-      ? ESPRESSO_LOAD_FAILED
-      : null
+    (first.isPending && pageItems.length === 0 && extra.length === 0) ||
+    filterPending
+  const loadError = first.isError ? ESPRESSO_LOAD_FAILED : null
+  const stale = Boolean(first.isError && items.length > 0)
 
   const loadMore = useCallback(async () => {
     if (nextCursor == null || loadingMore) return
@@ -116,7 +122,7 @@ export function useEspressoShotPages(
     } finally {
       if (seq === loadMoreSeq.current) setLoadingMore(false)
     }
-  }, [filters, hasMore, loadingMore, nextCursor, queryClient, trpc])
+  }, [filters, loadingMore, nextCursor, queryClient, trpc])
 
   const retry = useCallback(() => {
     void first.refetch()
@@ -130,6 +136,7 @@ export function useEspressoShotPages(
     loadMoreError,
     loading,
     loadError,
+    stale,
     retry,
   }
 }

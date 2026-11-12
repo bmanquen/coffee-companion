@@ -42,6 +42,7 @@ export function SignedInHome({
     save,
     clearSaveError,
     loadingMore,
+    loadMoreError,
   } = useEspressoCatalog(espresso, userId)
 
   useEffect(() => {
@@ -103,6 +104,7 @@ export function SignedInHome({
           shots={catalog?.shots ?? null}
           loading={loading}
           loadingMore={loadingMore}
+          loadMoreError={loadMoreError}
           failed={loadError != null}
           onEndReached={loadMore}
           onLogShot={() => {
