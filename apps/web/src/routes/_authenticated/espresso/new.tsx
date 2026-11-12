@@ -155,7 +155,7 @@ export function NewEspressoShot() {
   }
 
   const requestPrefill = (coffeeId: string) => {
-    if (saveAttempted.current) return
+    if (createShot.isPending || saveAttempted.current) return
     const seq = ++prefillSeq.current
     const startedSaveGen = saveGen.current
     prefillCoffeeId.current = coffeeId
@@ -228,6 +228,8 @@ export function NewEspressoShot() {
                 form.setFieldValue('brewingDeviceId', '')
               }
               applyingPrefill.current = false
+              // A failed save must not lock out a later coffee choice.
+              saveAttempted.current = false
               requestPrefill(value)
             },
           }}
@@ -309,6 +311,8 @@ export function NewEspressoShot() {
               type="button"
               variant="outline"
               onClick={() => {
+                // Retry is a new lookup, not a completion of the pre-save one.
+                saveAttempted.current = false
                 if (prefillCoffeeId.current) {
                   requestPrefill(prefillCoffeeId.current)
                 }

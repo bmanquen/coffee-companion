@@ -158,6 +158,10 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const runLoad = useCallback(() => {
     const seq = ++catalogSeq.current
     invalidatePagedLoads()
+    // A full load is a new catalog. Drop an in-flight first-page refresh so it
+    // cannot overwrite this result or hold loadMore.
+    refreshSeq.current += 1
+    refreshPending.current = false
     const forUser = userId
     dispatch({ type: 'loadStarted' })
     void api.load().then(

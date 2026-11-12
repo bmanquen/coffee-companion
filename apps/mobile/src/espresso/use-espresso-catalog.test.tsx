@@ -1,6 +1,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native'
 import { useEspressoCatalog } from './use-espresso-catalog'
-import type { EspressoApi, EspressoCatalog, ShotCreate, ShotRow } from './types'
+import type {
+  EspressoApi,
+  EspressoCatalog,
+  ShotCreate,
+  ShotCursor,
+  ShotRow,
+} from './types'
 
 const USER = 'user-ada'
 const COFFEE = '00000000-0000-4000-8000-000000000001'
@@ -185,6 +191,100 @@ describe('useEspressoCatalog', () => {
     })
     expect(result.current.catalog?.shots[0]?.coffeeName).toBe('Refreshed')
     expect(result.current.loadError).toBeNull()
+    expect(result.current.loading).toBe(false)
+  })
+
+  it('discards a late first-page refresh after a newer full load', async () => {
+    const NEXT_CURSOR: ShotCursor = 'after:shot-1'
+    let resolveRefresh:
+      | ((page: {
+          items: Array<ShotRow>
+          total: number
+          nextCursor: ShotCursor | null
+        }) => void)
+      | null = null
+    let loads = 0
+    const listCursors: Array<ShotCursor | undefined> = []
+    const api: EspressoApi = {
+      load: () => {
+        loads += 1
+        if (loads === 1) {
+          return Promise.resolve(
+            catalog({
+              shots: [shot({ coffeeName: 'Initial' })],
+              total: 2,
+              nextCursor: NEXT_CURSOR,
+            }),
+          )
+        }
+        return Promise.resolve(
+          catalog({
+            shots: [shot({ id: 'shot-reload', coffeeName: 'Reloaded' })],
+            total: 2,
+            nextCursor: NEXT_CURSOR,
+          }),
+        )
+      },
+      listShots: (cursor) => {
+        listCursors.push(cursor)
+        if (!cursor) {
+          return new Promise((resolve) => {
+            resolveRefresh = resolve
+          })
+        }
+        return Promise.resolve({
+          items: [shot({ id: 'shot-more', coffeeName: 'Page two' })],
+          total: 2,
+          nextCursor: null,
+        })
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {},
+    }
+    const { result } = await renderHook(() => useEspressoCatalog(api, USER))
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+      expect(result.current.catalog?.shots[0]?.coffeeName).toBe('Initial')
+    })
+
+    await act(async () => {
+      result.current.save(shotInput)
+      await Promise.resolve()
+    })
+    expect(listCursors).toEqual([undefined])
+
+    await act(async () => {
+      result.current.reload()
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots[0]?.coffeeName).toBe('Reloaded'),
+    )
+    expect(result.current.loading).toBe(false)
+
+    await act(async () => {
+      result.current.loadMore()
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(
+        result.current.catalog?.shots.some((row) => row.coffeeName === 'Page two'),
+      ).toBe(true),
+    )
+    expect(listCursors).toEqual([undefined, NEXT_CURSOR])
+
+    await act(async () => {
+      resolveRefresh?.({
+        items: [shot({ id: 'shot-stale', coffeeName: 'Stale refresh' })],
+        total: 1,
+        nextCursor: null,
+      })
+      await Promise.resolve()
+    })
+    expect(result.current.catalog?.shots.map((row) => row.coffeeName)).toEqual([
+      'Reloaded',
+      'Page two',
+    ])
     expect(result.current.loading).toBe(false)
   })
 })

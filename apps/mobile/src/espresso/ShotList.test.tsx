@@ -35,7 +35,7 @@ describe('ShotList', () => {
     const view = await render(<ShotList {...props} />)
     const pendingRows = view.getByTestId(SHOT_LIST_TEST_ID).props.data
     expect(pendingRows).toEqual([])
-    view.rerender(<ShotList {...props} />)
+    await view.rerender(<ShotList {...props} />)
     expect(view.getByTestId(SHOT_LIST_TEST_ID).props.data).toBe(pendingRows)
   })
 
@@ -49,7 +49,7 @@ describe('ShotList', () => {
       />,
     )
     const pendingRows = view.getByTestId(SHOT_LIST_TEST_ID).props.data
-    view.rerender(
+    await view.rerender(
       <ShotList
         {...emptyProps}
         shots={[shot]}
