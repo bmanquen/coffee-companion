@@ -33,6 +33,10 @@ type Trpc = {
 
 export { ESPRESSO_SHOT_PAGE_SIZE }
 
+export function espressoShotFixtureId(index: number): string {
+  return `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`
+}
+
 const ISO_MILLISECOND_PATTERN =
   /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})\.(\d{3})Z$/
 

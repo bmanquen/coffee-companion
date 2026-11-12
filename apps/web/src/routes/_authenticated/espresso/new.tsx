@@ -63,6 +63,7 @@ export function NewEspressoShot() {
   const keepPrefill = useRef<PrefillKeep>({})
   const applyingPrefill = useRef(false)
   const saveGen = useRef(0)
+  const saveAttempted = useRef(false)
   const [prefillError, setPrefillError] = useState(false)
 
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
@@ -116,6 +117,7 @@ export function NewEspressoShot() {
         idempotencyKey.current = createIdempotencyKey()
       }
       lastSubmitted.current = fingerprint
+      saveAttempted.current = true
       saveGen.current += 1
       await submitFormMutation(form, createShot.mutateAsync, {
         ...value,
@@ -137,9 +139,7 @@ export function NewEspressoShot() {
     if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
       return
     }
-    // Drop prefill that arrives after a save has started so a retry keeps the
-    // same payload and idempotency key.
-    if (startedSaveGen !== saveGen.current) return
+    if (saveAttempted.current || startedSaveGen !== saveGen.current) return
     const keep = keepPrefill.current
     applyingPrefill.current = true
     if (latest?.grinderId && !keep.grinderId) {
@@ -155,6 +155,7 @@ export function NewEspressoShot() {
   }
 
   const requestPrefill = (coffeeId: string) => {
+    if (saveAttempted.current) return
     const seq = ++prefillSeq.current
     const startedSaveGen = saveGen.current
     prefillCoffeeId.current = coffeeId

@@ -29,6 +29,20 @@ export function encodeEspressoShotCursor(key: EspressoShotCursorKey): string {
   )
 }
 
+function isEspressoCursorTimestamp(value: string): boolean {
+  if (!ESPRESSO_CURSOR_TIMESTAMP_PATTERN.test(value)) return false
+  const year = Number(value.slice(0, 4))
+  const month = Number(value.slice(5, 7))
+  const day = Number(value.slice(8, 10))
+  const hour = Number(value.slice(11, 13))
+  const minute = Number(value.slice(14, 16))
+  const second = Number(value.slice(17, 19))
+  if (month < 1 || month > 12) return false
+  if (hour > 23 || minute > 59 || second > 59) return false
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  return day >= 1 && day <= daysInMonth
+}
+
 export function decodeEspressoShotCursor(
   cursor: string,
 ): EspressoShotCursorKey | null {
@@ -42,10 +56,7 @@ export function decodeEspressoShotCursor(
   if (sep <= 0) return null
   const createdAt = payload.slice(0, sep)
   const id = payload.slice(sep + 1)
-  if (
-    !ESPRESSO_CURSOR_TIMESTAMP_PATTERN.test(createdAt) ||
-    !UUID_PATTERN.test(id)
-  ) {
+  if (!isEspressoCursorTimestamp(createdAt) || !UUID_PATTERN.test(id)) {
     return null
   }
   return { createdAt, id }

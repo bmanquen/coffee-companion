@@ -617,6 +617,124 @@ describe('NewEspressoShot form', () => {
     }
   })
 
+  it('does not prefill from Try again after a save has started', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    queryClient.removeQueries({
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+    })
+    let lookups = 0
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) {
+        lookups += 1
+        throw new Error('Network request failed')
+      }
+      if (isCreateCall(call)) throw new Error('Network request failed')
+      return trpcSuccess()
+    })
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(
+        await screen.findByRole('button', { name: 'Try again' }),
+      ).toBeTruthy()
+      expect(prefillCalls(fetchSpy)).toHaveLength(1)
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
+        target: { value: ESP_DEVICE },
+      })
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(prefillCalls(fetchSpy)).toHaveLength(1)
+      expect(lookups).toBe(1)
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('does not prefill from Try again while a create is pending', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    queryClient.removeQueries({
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+    })
+    let resolveCreate: (value: Response) => void = () => {}
+    const pendingCreate = new Promise<Response>((resolve) => {
+      resolveCreate = resolve
+    })
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) throw new Error('Network request failed')
+      if (isCreateCall(call)) return pendingCreate
+      return trpcSuccess()
+    })
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(
+        await screen.findByRole('button', { name: 'Try again' }),
+      ).toBeTruthy()
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
+        target: { value: ESP_DEVICE },
+      })
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      expect(prefillCalls(fetchSpy)).toHaveLength(1)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(prefillCalls(fetchSpy)).toHaveLength(1)
+    } finally {
+      resolveCreate(trpcSuccess())
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('shows a retry when the last shot cannot be loaded and still lets you enter one', async () => {
     const providers = seeded()
     const { queryClient, trpc, Wrapper, fetchSpy } = providers

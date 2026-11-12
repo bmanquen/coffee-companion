@@ -78,6 +78,9 @@ export function ShotForm({
   const prefillCoffeeId = useRef('')
   const keepPrefill = useRef<PrefillKeep>({})
   const saveGen = useRef(0)
+  const saveAttempted = useRef(false)
+  const draftRef = useRef(draft)
+  draftRef.current = draft
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () =>
@@ -109,27 +112,36 @@ export function ShotForm({
     if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
       return
     }
-    // Drop prefill that arrives after a save has started so a retry keeps the
-    // same payload and idempotency key.
-    if (startedSaveGen !== saveGen.current) return
-    setDraft((current) => {
-      const next = applyCoffeePrefill(
-        current,
-        coffeeId,
-        latest,
-        keepPrefill.current,
-      )
-      if (
-        keepPrefill.current.brewingDeviceId ||
-        catalog.devices.some((device) => device.id === next.brewingDeviceId)
-      ) {
-        return next
+    if (saveAttempted.current || startedSaveGen !== saveGen.current) return
+    const next = applyCoffeePrefill(
+      draftRef.current,
+      coffeeId,
+      latest,
+      keepPrefill.current,
+    )
+    const filled =
+      keepPrefill.current.brewingDeviceId ||
+      catalog.devices.some((device) => device.id === next.brewingDeviceId)
+        ? next
+        : { ...next, brewingDeviceId: '' }
+    setDraft(filled)
+    setFieldErrors((current) => {
+      const updated = { ...current }
+      let changed = false
+      if (filled.grinderId && updated.grinderId) {
+        delete updated.grinderId
+        changed = true
       }
-      return { ...next, brewingDeviceId: '' }
+      if (filled.brewingDeviceId && updated.brewingDeviceId) {
+        delete updated.brewingDeviceId
+        changed = true
+      }
+      return changed ? updated : current
     })
   }
 
   const requestPrefill = (coffeeId: string) => {
+    if (saveAttempted.current) return
     const seq = ++prefillSeq.current
     const startedSaveGen = saveGen.current
     prefillCoffeeId.current = coffeeId
@@ -176,7 +188,12 @@ export function ShotForm({
         disabled={busy}
         onChange={(coffeeId) => {
           onClearError()
-          setFieldErrors({})
+          setFieldErrors((current) => {
+            if (!current.coffeeId) return current
+            const next = { ...current }
+            delete next.coffeeId
+            return next
+          })
           const keep = keepPrefill.current
           keepPrefill.current = {
             grinderId: keep.grinderId,
@@ -296,6 +313,7 @@ export function ShotForm({
             idempotencyKey.current = newIdempotencyKey()
           }
           lastSubmitted.current = fingerprint
+          saveAttempted.current = true
           saveGen.current += 1
           onSubmit({ ...parsed.value, idempotencyKey: idempotencyKey.current })
         }}

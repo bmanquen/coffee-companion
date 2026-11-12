@@ -19,6 +19,7 @@ import {
 } from '@/hooks/use-espresso-shot-pages'
 import {
   espressoShotCursor,
+  espressoShotFixtureId,
   seedCoffees,
   seedEspressoShotPage,
 } from '@/test/espresso-shots'
@@ -109,6 +110,15 @@ function seedLog(
   if (!extra.cursor && !extra.filters) {
     seedCoffees(queryClient, trpc, extra.coffees ?? coffeesFrom(shots))
   }
+}
+
+function trpcCallText(input: unknown, init?: unknown) {
+  const body = String((init as RequestInit | undefined)?.body ?? '')
+  return `${String(input)}\n${body}`
+}
+
+function isEspressoCursorRequest(input: unknown, init?: unknown) {
+  return /"cursor"\s*:/.test(decodeURIComponent(trpcCallText(input, init)))
 }
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
@@ -709,7 +719,7 @@ describe('EspressoBrewsSection', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
       makeRecentShot({
-        id: `s${index}`,
+        id: espressoShotFixtureId(index),
         coffeeId: `c${index}`,
         coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
       }),
@@ -839,14 +849,22 @@ describe('EspressoBrewsSection', () => {
   })
 
   it('re-enables Load more when the filter changes during a load-more', async () => {
+    let settleLoadMore = () => {}
+    const pendingLoadMore = new Promise<Response>((resolve) => {
+      settleLoadMore = () =>
+        resolve(trpcSuccess({ items: [], total: 0, nextCursor: null }))
+    })
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockImplementation(() => new Promise(() => {}))
+      .mockImplementation((input, init) => {
+        if (isEspressoCursorRequest(input, init)) return pendingLoadMore
+        return Promise.resolve(trpcSuccess())
+      })
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
         makeRecentShot({
-          id: `s${index}`,
+          id: espressoShotFixtureId(index),
           coffeeId: `c${index}`,
           coffee: makeRecentCoffee({
             id: `c${index}`,
@@ -858,7 +876,7 @@ describe('EspressoBrewsSection', () => {
         { length: ESPRESSO_SHOT_PAGE_SIZE },
         (_, index) =>
           makeRecentShot({
-            id: `h${index}`,
+            id: espressoShotFixtureId(100 + index),
             coffeeId: 'c-huila',
             coffee: makeRecentCoffee({
               id: 'c-huila',
@@ -910,18 +928,19 @@ describe('EspressoBrewsSection', () => {
         { timeout: FILTER_SETTLE_TIMEOUT_MS },
       )
     } finally {
+      settleLoadMore()
       fetchSpy.mockRestore()
     }
   }, LOAD_MORE_DURING_FILTER_TIMEOUT_MS)
 
   it('retries a failed load-more from the error', async () => {
     const extra = makeRecentShot({
-      id: 's-next',
+      id: espressoShotFixtureId(20),
       coffeeId: 'c-next',
       coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
     })
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
+    const fetchMock = vi
+      .fn<typeof fetch>()
       .mockRejectedValueOnce(new Error('Network request failed'))
       .mockResolvedValueOnce(
         trpcSuccess({
@@ -930,35 +949,33 @@ describe('EspressoBrewsSection', () => {
           nextCursor: null,
         }),
       )
-    try {
-      const { queryClient, trpc, Wrapper } = createTestProviders()
-      const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
-        makeRecentShot({
-          id: `s${index}`,
-          coffeeId: `c${index}`,
-          coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
-        }),
-      )
-      seedLog(queryClient, trpc, first, first.length + 1)
-      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+    const { queryClient, trpc, Wrapper } = createTestProviders({
+      fetch: fetchMock,
+    })
+    const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(index),
+        coffeeId: `c${index}`,
+        coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
+      }),
+    )
+    seedLog(queryClient, trpc, first, first.length + 1)
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
 
-      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
-      expect(
-        await screen.findByText("We couldn't load more shots. Try again."),
-      ).toBeTruthy()
-      await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    expect(
+      await screen.findByText("We couldn't load more shots. Try again."),
+    ).toBeTruthy()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
 
-      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-      expect(
-        await within(screen.getByRole('table')).findByText('Coffee extra'),
-      ).toBeTruthy()
-      expect(fetchSpy).toHaveBeenCalledTimes(2)
-    } finally {
-      fetchSpy.mockRestore()
-    }
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(
+      await within(screen.getByRole('table')).findByText('Coffee extra'),
+    ).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps cached shots visible and retryable when a refetch after delete fails', async () => {
+  it('keeps remaining shots visible when a refetch after delete fails', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       if (String(input).includes('espressoShot.delete')) {
         return Promise.resolve(trpcSuccess())
@@ -967,15 +984,30 @@ describe('EspressoBrewsSection', () => {
     })
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
-      const shot = makeRecentShot({ id: 's1' })
-      seedLog(queryClient, trpc, [shot])
+      const first = makeRecentShot({
+        id: espressoShotFixtureId(1),
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      })
+      const second = makeRecentShot({
+        id: espressoShotFixtureId(2),
+        coffeeId: 'c2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Kenya AA' }),
+      })
+      seedLog(queryClient, trpc, [first, second])
       queryClient.setQueryData(trpc.dialedInBrew.list.queryKey(), [])
 
       render(<EspressoBrewsSection />, { wrapper: Wrapper })
       const table = within(screen.getByRole('table'))
       expect(table.getByText('Ethiopia Guji')).toBeTruthy()
+      expect(table.getByText('Kenya AA')).toBeTruthy()
 
-      fireEvent.click(table.getByRole('button', { name: 'Delete shot' }))
+      const ethiopiaRow = table.getByText('Ethiopia Guji').closest('tr')
+      expect(ethiopiaRow).toBeTruthy()
+      fireEvent.click(
+        within(ethiopiaRow as HTMLElement).getByRole('button', {
+          name: 'Delete shot',
+        }),
+      )
       fireEvent.click(
         within(screen.getByRole('dialog')).getByRole('button', {
           name: 'Delete',
@@ -984,9 +1016,70 @@ describe('EspressoBrewsSection', () => {
 
       expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
-      expect(table.getByText('Ethiopia Guji')).toBeTruthy()
+      expect(table.queryByText('Ethiopia Guji')).toBeNull()
+      expect(table.getByText('Kenya AA')).toBeTruthy()
       expect(table.getByRole('button', { name: 'Edit shot' })).toBeTruthy()
-      expect(screen.getByRole('table').closest('[aria-busy="true"]')).toBeTruthy()
+      expect(table.getByRole('button', { name: 'Delete shot' })).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('deletes the original shot when a refetch inserts a row ahead of an open dialog', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      const first = makeRecentShot({
+        id: espressoShotFixtureId(1),
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      })
+      const second = makeRecentShot({
+        id: espressoShotFixtureId(2),
+        coffeeId: 'c2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Kenya AA' }),
+      })
+      seedLog(queryClient, trpc, [first, second])
+      queryClient.setQueryData(trpc.dialedInBrew.list.queryKey(), [])
+
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+      const table = within(screen.getByRole('table'))
+      const kenyaRow = table.getByText('Kenya AA').closest('tr')
+      expect(kenyaRow).toBeTruthy()
+      fireEvent.click(
+        within(kenyaRow as HTMLElement).getByRole('button', {
+          name: 'Delete shot',
+        }),
+      )
+      expect(screen.getByRole('dialog')).toBeTruthy()
+
+      const inserted = makeRecentShot({
+        id: espressoShotFixtureId(0),
+        coffeeId: 'c0',
+        coffee: makeRecentCoffee({ id: 'c0', name: 'Costa Rica' }),
+      })
+      seedEspressoShotPage(queryClient, trpc, [inserted, first, second])
+
+      expect(await table.findByText('Costa Rica')).toBeTruthy()
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: 'Delete',
+        }),
+      )
+
+      await waitFor(() => {
+        const deleteCall = fetchSpy.mock.calls.find((call) =>
+          trpcCallText(call[0], call[1]).includes('espressoShot.delete'),
+        )
+        expect(deleteCall).toBeTruthy()
+        expect(trpcCallText(deleteCall![0], deleteCall![1])).toContain(
+          second.id,
+        )
+        expect(trpcCallText(deleteCall![0], deleteCall![1])).not.toContain(
+          inserted.id,
+        )
+      })
     } finally {
       fetchSpy.mockRestore()
     }
@@ -1030,7 +1123,7 @@ describe('EspressoBrewsSection', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
       makeRecentShot({
-        id: `s${index}`,
+        id: espressoShotFixtureId(index),
         coffeeId: `c${index}`,
         coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
       }),

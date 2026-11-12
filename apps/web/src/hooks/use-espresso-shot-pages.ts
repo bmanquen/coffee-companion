@@ -30,6 +30,8 @@ export const ESPRESSO_COFFEES_LOAD_FAILED =
 // expires a cached cursor page without an observer refetching it on its own.
 export const ESPRESSO_SHOT_STALE_TIME_MS = 30_000
 
+export const ESPRESSO_COFFEES_STALE_TIME_MS = ESPRESSO_SHOT_STALE_TIME_MS
+
 export const ESPRESSO_SHOT_FILTER_DEBOUNCE_MS = 300
 
 const NO_SHOTS: Array<EspressoShotWithRelations> = []

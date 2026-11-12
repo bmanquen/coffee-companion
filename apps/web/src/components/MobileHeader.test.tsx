@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import MobileHeader from './MobileHeader'
 import type { ReactNode } from 'react'
+import { SIGN_OUT_FAILED } from '@/hooks/use-sign-out'
 
 function renderHeader(ui: ReactNode) {
   const queryClient = new QueryClient({
@@ -20,7 +21,7 @@ const authState = vi.hoisted(() => ({
 }))
 const mocks = vi.hoisted(() => ({
   signInSocial: vi.fn(),
-  signOut: vi.fn(),
+  signOut: vi.fn(async () => ({})),
   navigate: vi.fn(),
   resetAnalytics: vi.fn(),
   setSentryUser: vi.fn(),
@@ -99,6 +100,22 @@ describe('MobileHeader', () => {
       mocks.signOut.mock.invocationCallOrder[0],
     )
     expect(mocks.navigate).toHaveBeenCalledWith({ to: '/' })
+  })
+
+  it('shows an error when sign-out fails', async () => {
+    authState.session = {
+      user: { name: 'Test User', email: 'test@example.com', image: null },
+    }
+    mocks.navigate.mockClear()
+    mocks.signOut.mockResolvedValueOnce({ error: { message: 'nope' } })
+    renderHeader(<MobileHeader />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }))
+    })
+
+    expect(screen.getByRole('alert').textContent).toBe(SIGN_OUT_FAILED)
+    expect(mocks.navigate).not.toHaveBeenCalled()
   })
 
   it('shows a sign-in button and no account details when signed out', async () => {

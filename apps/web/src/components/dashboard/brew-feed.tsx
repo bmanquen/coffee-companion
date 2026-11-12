@@ -173,11 +173,14 @@ export function BrewFeed<T extends BrewRow>({
         </Link>
       </div>
       {showEmpty ? (
-        <BrewsEmptyState
-          message={emptyMessage}
-          to={newTo}
-          linkLabel={emptyLinkLabel}
-        />
+        <>
+          {banner}
+          <BrewsEmptyState
+            message={emptyMessage}
+            to={newTo}
+            linkLabel={emptyLinkLabel}
+          />
+        </>
       ) : (
         <>
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">

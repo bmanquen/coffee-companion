@@ -6,7 +6,7 @@ import { useSignOut } from './use-sign-out'
 import type { ReactNode } from 'react'
 
 const mocks = vi.hoisted(() => ({
-  signOut: vi.fn(),
+  signOut: vi.fn(async () => ({})),
   navigate: vi.fn(),
   resetAnalytics: vi.fn(),
   setSentryUser: vi.fn(),
@@ -88,5 +88,21 @@ describe('useSignOut', () => {
 
     expect(mocks.signOut).toHaveBeenCalledOnce()
     expect(mocks.navigate).toHaveBeenCalledWith({ to: '/' })
+  })
+
+  it('throws before clearing queries when sign-out returns an error', async () => {
+    mocks.signOut.mockResolvedValueOnce({ error: { message: 'nope' } })
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(['coffee.getAll'], [{ id: 'c1', name: 'Kept' }])
+    const clear = vi.spyOn(queryClient, 'clear')
+    const { result } = renderSignOut(queryClient)
+
+    await expect(result.current()).rejects.toEqual({ message: 'nope' })
+
+    expect(clear).not.toHaveBeenCalled()
+    expect(mocks.navigate).not.toHaveBeenCalled()
+    expect(queryClient.getQueryData(['coffee.getAll'])).toEqual([
+      { id: 'c1', name: 'Kept' },
+    ])
   })
 })

@@ -116,6 +116,17 @@ describe('BrewFeed', () => {
     expect(table.getByText('Kenya AA')).toBeTruthy()
   })
 
+  it('still shows the coffee-load banner in the empty state', () => {
+    renderFeed({
+      brews: [],
+      banner: <p role="alert">We couldn&apos;t load your coffees. Try again.</p>,
+    })
+    expect(screen.getByText(/No espresso shots yet/i)).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toBe(
+      "We couldn't load your coffees. Try again.",
+    )
+  })
+
   it('resets to page 1 when a filter still spans multiple pages', () => {
     const ethiopia = Array.from({ length: SHOTS_PER_COFFEE }, (_, index) =>
       makeRecentShot({

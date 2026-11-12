@@ -59,4 +59,14 @@ describe('espresso shot cursor', () => {
       ),
     ).toBeNull()
   })
+
+  it('rejects an out-of-range calendar date or time', () => {
+    const encode = (createdAt: string) =>
+      Buffer.from(`${createdAt}\0${key.id}`, 'utf8').toString('base64url')
+    expect(decodeEspressoShotCursor(encode('2026-99-99 12:00:00.123456'))).toBeNull()
+    expect(decodeEspressoShotCursor(encode('2026-02-31 12:00:00.123456'))).toBeNull()
+    expect(decodeEspressoShotCursor(encode('2026-05-01 24:00:00.123456'))).toBeNull()
+    expect(decodeEspressoShotCursor(encode('2026-05-01 12:60:00.123456'))).toBeNull()
+    expect(decodeEspressoShotCursor(encode('2026-05-01 12:00:60.123456'))).toBeNull()
+  })
 })
