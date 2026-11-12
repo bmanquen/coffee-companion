@@ -221,7 +221,7 @@ describe('account.export', () => {
   })
 
   it('includes a Free user’s Sealed Brews in full, for every method', async () => {
-    const espressoFeed = (await asUser.espressoShot.getRecent({ limit: 50, offset: 0 })).items
+    const espressoFeed = (await asUser.espressoShot.getRecent({ limit: 50 })).items
     const sealedOnFeed = espressoFeed.find(
       (shot) => shot.id === sealedId('espressoShot'),
     )

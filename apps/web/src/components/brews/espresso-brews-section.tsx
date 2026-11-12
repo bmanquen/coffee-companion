@@ -32,7 +32,11 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
-import { useEspressoShotPages } from '@/hooks/use-espresso-shot-pages'
+import {
+  ESPRESSO_LOADING_SHOTS,
+  ESPRESSO_SHOT_Q_MAX,
+  useEspressoShotPages,
+} from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 
 type Shot = {
@@ -163,8 +167,16 @@ export function EspressoBrewsSection() {
   const [coffeeId, setCoffeeId] = useState('')
   const expansion = useAccordionExpansion()
   const filtering = Boolean(coffeeId || q.trim())
-  const { items: shots, hasMore, loadingMore, loadMore, loadMoreError } =
-    useEspressoShotPages({
+  const {
+    items: shots,
+    hasMore,
+    loadingMore,
+    loadMore,
+    loadMoreError,
+    loading,
+    loadError,
+    retry,
+  } = useEspressoShotPages({
       coffeeId: coffeeId || undefined,
       q: q.trim() || undefined,
     })
@@ -208,7 +220,16 @@ export function EspressoBrewsSection() {
           </Button>
         </Link>
       </div>
-      {shots.length === 0 && !filtering ? (
+      {loading ? (
+        <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
+      ) : loadError ? (
+        <div className="flex flex-col gap-2">
+          <p role="alert">{loadError}</p>
+          <Button type="button" variant="outline" onClick={retry}>
+            Try again
+          </Button>
+        </div>
+      ) : shots.length === 0 && !filtering ? (
         <BrewsEmptyState
           message="No espresso shots yet."
           to="/espresso/new"
@@ -225,6 +246,7 @@ export function EspressoBrewsSection() {
             <Input
               placeholder="Filter shots..."
               value={q}
+              maxLength={ESPRESSO_SHOT_Q_MAX}
               onChange={(e) => setQ(e.target.value)}
               className="flex-1"
             />

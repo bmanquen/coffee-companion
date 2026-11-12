@@ -92,7 +92,7 @@ beforeAll(async () => {
 })
 
 const shotById = async (id: string) => {
-  const all = (await asUser.espressoShot.getRecent({ limit: 50, offset: 0 })).items
+  const all = (await asUser.espressoShot.getRecent({ limit: 50 })).items
   const found = all.find((shot) => shot.id === id)
   if (!found) throw new Error(`Shot ${id} missing from the feed entirely`)
   return found
@@ -160,7 +160,7 @@ describe('Sealing and the Plan', () => {
 
     await grantPlan(USER, 'pro')
 
-    const all = (await asUser.espressoShot.getRecent({ limit: 50, offset: 0 })).items
+    const all = (await asUser.espressoShot.getRecent({ limit: 50 })).items
     expect(all.every((shot) => shot.sealed === false)).toBe(true)
     expect(all.every((shot) => shot.dose === '18')).toBe(true)
 
@@ -189,8 +189,8 @@ describe('Sealing and the Plan', () => {
       )[0].sealedAt
 
     const first = await stampOf(coffees[1].shotId)
-    await asUser.espressoShot.getRecent({ limit: 50, offset: 0 })
-    await asUser.espressoShot.getRecent({ limit: 50, offset: 0 })
+    await asUser.espressoShot.getRecent({ limit: 50 })
+    await asUser.espressoShot.getRecent({ limit: 50 })
 
     expect(await stampOf(coffees[1].shotId)).toEqual(first)
   })
@@ -279,9 +279,9 @@ describe('reading needs no prior write', () => {
     const execute = vi.spyOn(db, 'execute')
     try {
       await Promise.all([
-        inOneRequest.espressoShot.getRecent({ limit: 50, offset: 0 }),
+        inOneRequest.espressoShot.getRecent({ limit: 50 }),
         inOneRequest.espressoShot.getDialedIn(),
-        inOneRequest.espressoShot.getRecent({ limit: 10, offset: 0 }),
+        inOneRequest.espressoShot.getRecent({ limit: 10 }),
         inOneRequest.coffee.getAll(),
       ])
       expect(execute).toHaveBeenCalledTimes(1)
@@ -345,7 +345,7 @@ describe('a Coffee promoted back onto the Shelf', () => {
     ).id
 
   const promotedShotById = async (id: string) => {
-    const all = (await asPromoted.espressoShot.getRecent({ limit: 50, offset: 0 })).items
+    const all = (await asPromoted.espressoShot.getRecent({ limit: 50 })).items
     const found = all.find((shot) => shot.id === id)
     if (!found) throw new Error(`Shot ${id} missing from the feed entirely`)
     return found

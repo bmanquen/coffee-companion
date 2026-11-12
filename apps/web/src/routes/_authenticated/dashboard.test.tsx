@@ -13,9 +13,16 @@ import type { ReactNode } from 'react'
 import type { DashboardMethod } from '@/components/dashboard/methods'
 import { dashboardMethods } from '@/components/dashboard/methods'
 import {
+  ESPRESSO_LOADING_SHOTS,
+  ESPRESSO_LOAD_FAILED,
   ESPRESSO_SHOT_PAGE_SIZE,
+  espressoShotPageInput,
+} from '@/hooks/use-espresso-shot-pages'
+import {
+  espressoShotCursor,
   seedEspressoShotPage,
 } from '@/test/espresso-shots'
+import { trpcSuccess } from '@/test/trpc-response'
 import {
   makeAeropressBrew,
   makeColdBrewBrew,
@@ -213,6 +220,76 @@ describe('Dashboard', () => {
     expect(
       screen.getByRole('link', { name: /Log your first shot/i }),
     ).toBeTruthy()
+  })
+
+  it('shows loading instead of the empty state while the first page is pending', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+    void queryClient.prefetchQuery({
+      ...trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
+      queryFn: () => new Promise<never>(() => {}),
+    })
+    render(
+      <Dashboard
+        selectedMethod="espresso"
+        onSelectMethod={vi.fn()}
+        feeds={[
+          { method: 'espresso', brews: [] },
+          { method: 'pourover', brews: [] },
+          { method: 'frenchpress', brews: [] },
+          { method: 'aeropress', brews: [] },
+          { method: 'coldbrew', brews: [] },
+        ]}
+        now={NOW}
+      />,
+      { wrapper: Wrapper },
+    )
+    expect(screen.getByRole('status')).toBeTruthy()
+    expect(screen.getByText(ESPRESSO_LOADING_SHOTS)).toBeTruthy()
+    expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
+  })
+
+  it('shows a retry instead of the empty state when the first page fails', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValue(
+        trpcSuccess({ items: [], total: 0, nextCursor: null }),
+      )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      render(
+        <Dashboard
+          selectedMethod="espresso"
+          onSelectMethod={vi.fn()}
+          feeds={[
+            { method: 'espresso', brews: [] },
+            { method: 'pourover', brews: [] },
+            { method: 'frenchpress', brews: [] },
+            { method: 'aeropress', brews: [] },
+            { method: 'coldbrew', brews: [] },
+          ]}
+          now={NOW}
+        />,
+        { wrapper: Wrapper },
+      )
+      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(
+        await screen.findByText(/No espresso shots yet/i),
+      ).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 
   it('narrows the feed to dialed-in shots when the toggle is on', async () => {
@@ -507,13 +584,7 @@ describe('Dashboard', () => {
         }),
       )
       const { queryClient, trpc, Wrapper } = seed(shots)
-      queryClient.setQueryData(
-        trpc.espressoShot.getRecent.queryKey({
-          limit: ESPRESSO_SHOT_PAGE_SIZE,
-          offset: 0,
-        }),
-        { items: shots, total: shots.length + 1 },
-      )
+      seedEspressoShotPage(queryClient, trpc, shots, shots.length + 1)
       render(
         <Dashboard
           selectedMethod="espresso"
@@ -546,7 +617,7 @@ describe('Dashboard', () => {
           }),
         ],
         shots.length + 1,
-        ESPRESSO_SHOT_PAGE_SIZE,
+        espressoShotCursor(shots[shots.length - 1]),
       )
       fetchSpy.mockRestore()
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))

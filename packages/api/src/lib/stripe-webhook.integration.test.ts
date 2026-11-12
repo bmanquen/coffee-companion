@@ -161,7 +161,7 @@ const subscriptionRowCount = async () =>
       .where(eq(subscription.referenceId, BUYER))
   ).length
 const sealedShotIds = async () =>
-  (await asBuyer.espressoShot.getRecent({ limit: 50, offset: 0 })).items
+  (await asBuyer.espressoShot.getRecent({ limit: 50 })).items
     .filter((shot) => shot.sealed)
     .map((shot) => shot.id)
 
@@ -205,7 +205,7 @@ describe('the Stripe webhook', () => {
   })
 
   it('reopens everything Sealed while the buyer was on Free', async () => {
-    const all = (await asBuyer.espressoShot.getRecent({ limit: 50, offset: 0 })).items
+    const all = (await asBuyer.espressoShot.getRecent({ limit: 50 })).items
 
     expect(all.every((shot) => shot.sealed === false)).toBe(true)
     expect(all.every((shot) => shot.dose === '18')).toBe(true)

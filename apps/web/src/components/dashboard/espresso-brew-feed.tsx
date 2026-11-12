@@ -1,4 +1,6 @@
+import { Link } from '@tanstack/react-router'
 import { createColumnHelper } from '@tanstack/react-table'
+import { Plus } from 'lucide-react'
 import type { EspressoShotWithRelations } from '@/types'
 import {
   dialedInCoffeeColumn,
@@ -8,7 +10,12 @@ import { ratioColumn } from '@/components/brews/brew-ratio'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { expanderColumn } from '@/components/data-table'
 import { EspressoShotPager } from '@/components/brews/espresso-shot-pager'
-import { useEspressoShotPages } from '@/hooks/use-espresso-shot-pages'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import {
+  ESPRESSO_LOADING_SHOTS,
+  useEspressoShotPages,
+} from '@/hooks/use-espresso-shot-pages'
 
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 
@@ -52,8 +59,42 @@ const columns = [
 // The Espresso tab of the dashboard: paged Shot history as a reference-only
 // feed. Hands loaded pages to BrewFeed and offers Load more for the rest.
 export function EspressoBrewFeed() {
-  const { items, hasMore, loadingMore, loadMore, loadMoreError } =
-    useEspressoShotPages()
+  const {
+    items,
+    hasMore,
+    loadingMore,
+    loadMore,
+    loadMoreError,
+    loading,
+    loadError,
+    retry,
+  } = useEspressoShotPages()
+
+  if (loading || loadError) {
+    return (
+      <Card className="flex flex-col gap-4 w-full bg-white p-6">
+        <div className="flex justify-between items-center w-full">
+          <h2 className="text-lg font-semibold">Espresso</h2>
+          <Link to="/espresso/new">
+            <Button>
+              <Plus />
+              Log Shot
+            </Button>
+          </Link>
+        </div>
+        {loading ? (
+          <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <p role="alert">{loadError}</p>
+            <Button type="button" variant="outline" onClick={retry}>
+              Try again
+            </Button>
+          </div>
+        )}
+      </Card>
+    )
+  }
 
   return (
     <>

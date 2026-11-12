@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
@@ -10,11 +10,25 @@ import {
   sealBrewWithDialedIn,
   sealBrewsWithDialedIn,
 } from '../lib/dialed-in-brew'
-import { ESPRESSO_DEVICE_TYPE, isEspressoDevice } from '../lib/espresso'
+import {
+  ESPRESSO_DEVICE_TYPE,
+  ESPRESSO_SHOT_Q_MAX,
+  decodeEspressoShotCursor,
+  encodeEspressoShotCursor,
+  isEspressoDevice,
+  normalizeDecimal,
+} from '../lib/espresso'
 import { isSealed, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
+import type { EspressoShotCursor } from '../lib/espresso'
+import type { Shelf } from '../lib/shelf'
 
-const TRPC_CONFLICT = 'CONFLICT' as const
+type EspressoShotCursorKey = NonNullable<
+  ReturnType<typeof decodeEspressoShotCursor>
+>
+
+export const TRPC_BAD_REQUEST = 'BAD_REQUEST' as const
+export const TRPC_CONFLICT = 'CONFLICT' as const
 
 const SHOT_REPLAY_CONFLICT =
   'This shot was already saved with different settings.'
@@ -25,11 +39,26 @@ const withRelations = {
   brewingDevice: { with: { type: true } },
 } as const
 
+function loadShotsByIds(userId: string, ids: Array<string>) {
+  return db.query.espressoShots.findMany({
+    where: { userId, id: { in: ids } },
+    with: withRelations,
+  })
+}
+
+type LoadedShot = Awaited<ReturnType<typeof loadShotsByIds>>[number]
+
+type RecentPage = {
+  items: Array<LoadedShot>
+  total: number
+  nextCursor: EspressoShotCursor | null
+}
+
 const getRecentInput = z.object({
   limit: z.number().min(1).max(50),
-  offset: z.number().min(0),
+  cursor: z.string().min(1).max(256).optional(),
   coffeeId: z.uuid().optional(),
-  q: z.string().trim().max(100).optional(),
+  q: z.string().trim().max(ESPRESSO_SHOT_Q_MAX).optional(),
 })
 
 function likeContains(value: string) {
@@ -65,66 +94,124 @@ function shotMatchesReplay(
     stored.grinderId === input.grinderId &&
     stored.brewingDeviceId === input.brewingDeviceId &&
     (stored.roastDate ?? null) === (input.roastDate ?? null) &&
-    Number(stored.dose) === Number(input.dose) &&
-    Number(stored.yield) === Number(input.yield) &&
+    normalizeDecimal(stored.dose) === normalizeDecimal(input.dose) &&
+    normalizeDecimal(stored.yield) === normalizeDecimal(input.yield) &&
     stored.time === input.time &&
     (stored.grindSetting ?? null) === input.grindSetting &&
     (stored.notes ?? null) === (input.notes ?? null)
   )
 }
 
+function settingsReadable(shelf: Shelf) {
+  if (shelf === null) return undefined
+  const onShelf = [...shelf]
+  if (onShelf.length === 0) return sql`false`
+  return and(
+    isNull(espressoShots.sealedAt),
+    inArray(espressoShots.coffeeId, onShelf),
+  )
+}
+
+function afterCursor(cursor: EspressoShotCursorKey) {
+  return or(
+    lt(espressoShots.createdAt, cursor.createdAt),
+    and(
+      eq(espressoShots.createdAt, cursor.createdAt),
+      lt(espressoShots.id, cursor.id),
+    ),
+  )
+}
+
 function recentWhere(
   userId: string,
-  input: { coffeeId?: string; q?: string },
+  input: { coffeeId?: string; q?: string; cursor?: EspressoShotCursorKey },
+  shelf: Shelf,
 ) {
   const parts = [eq(espressoShots.userId, userId)]
   if (input.coffeeId) parts.push(eq(espressoShots.coffeeId, input.coffeeId))
+  if (input.cursor) {
+    const cursorWhere = afterCursor(input.cursor)
+    if (cursorWhere) parts.push(cursorWhere)
+  }
   const q = input.q?.trim()
   if (q) {
     const pattern = likeContains(q)
+    const settingsMatch = or(
+      ilike(espressoShots.grindSetting, pattern),
+      ilike(espressoShots.notes, pattern),
+      sql`CAST(${espressoShots.dose} AS TEXT) ILIKE ${pattern}`,
+      sql`CAST(${espressoShots.yield} AS TEXT) ILIKE ${pattern}`,
+      sql`CAST(${espressoShots.time} AS TEXT) ILIKE ${pattern}`,
+    )
+    const identityMatch = or(
+      ilike(coffees.name, pattern),
+      ilike(roasters.name, pattern),
+    )
+    const readable = settingsReadable(shelf)
     parts.push(
       or(
-        ilike(espressoShots.grindSetting, pattern),
-        ilike(espressoShots.notes, pattern),
-        sql`CAST(${espressoShots.dose} AS TEXT) ILIKE ${pattern}`,
-        sql`CAST(${espressoShots.yield} AS TEXT) ILIKE ${pattern}`,
-        sql`CAST(${espressoShots.time} AS TEXT) ILIKE ${pattern}`,
-        ilike(coffees.name, pattern),
-        ilike(roasters.name, pattern),
+        readable ? and(readable, settingsMatch) : settingsMatch,
+        identityMatch,
       )!,
     )
   }
   return and(...parts)
 }
 
+function decodeCursorOrThrow(cursor: string): EspressoShotCursorKey {
+  const decoded = decodeEspressoShotCursor(cursor)
+  if (!decoded) {
+    throw new TRPCError({
+      code: TRPC_BAD_REQUEST,
+      message: 'Invalid cursor',
+    })
+  }
+  return decoded
+}
+
 async function loadRecentPage(
   userId: string,
-  input: z.infer<typeof getRecentInput>,
-) {
-  const where = recentWhere(userId, input)
+  input: {
+    limit: number
+    coffeeId?: string
+    q?: string
+    cursor?: EspressoShotCursorKey
+  },
+  shelf: Shelf,
+): Promise<RecentPage> {
+  const where = recentWhere(userId, input, shelf)
+  const countWhere = recentWhere(
+    userId,
+    { coffeeId: input.coffeeId, q: input.q },
+    shelf,
+  )
   const [idRows, [{ total }]] = await Promise.all([
     db
-      .select({ id: espressoShots.id })
+      .select({ id: espressoShots.id, createdAt: espressoShots.createdAt })
       .from(espressoShots)
       .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
       .leftJoin(roasters, eq(roasters.id, coffees.roasterId))
       .where(where)
-      .orderBy(desc(espressoShots.createdAt))
-      .limit(input.limit)
-      .offset(input.offset),
+      .orderBy(desc(espressoShots.createdAt), desc(espressoShots.id))
+      .limit(input.limit + 1),
     db
       .select({ total: count() })
       .from(espressoShots)
       .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
       .leftJoin(roasters, eq(roasters.id, coffees.roasterId))
-      .where(where),
+      .where(countWhere),
   ])
-  const ids = idRows.map((row) => row.id)
-  if (ids.length === 0) return { items: [], total }
-  const items = await db.query.espressoShots.findMany({
-    where: { userId, id: { in: ids } },
-    with: withRelations,
-  })
+  const hasMore = idRows.length > input.limit
+  const pageRows = hasMore ? idRows.slice(0, input.limit) : idRows
+  const ids = pageRows.map((row) => row.id)
+  if (pageRows.length === 0) {
+    return { items: [], total, nextCursor: null }
+  }
+  const last = pageRows[pageRows.length - 1]
+  const nextCursor: EspressoShotCursor | null = hasMore
+    ? encodeEspressoShotCursor({ createdAt: last.createdAt, id: last.id })
+    : null
+  const items = await loadShotsByIds(userId, ids)
   const byId = new Map(items.map((item) => [item.id, item]))
   return {
     items: ids.flatMap((id) => {
@@ -132,6 +219,7 @@ async function loadRecentPage(
       return item ? [item] : []
     }),
     total,
+    nextCursor,
   }
 }
 
@@ -150,7 +238,7 @@ async function assertEspressoDevice(brewingDeviceId: string, userId: string) {
   }
   if (!isEspressoDevice(device)) {
     throw new TRPCError({
-      code: 'BAD_REQUEST',
+      code: TRPC_BAD_REQUEST,
       message: `Espresso shots require an ${ESPRESSO_DEVICE_TYPE} brewing device`,
     })
   }
@@ -159,11 +247,26 @@ async function assertEspressoDevice(brewingDeviceId: string, userId: string) {
 export const espressoShotRouter = createTRPCRouter({
   getRecent: authedProcedure
     .input(getRecentInput)
-    .query(({ ctx, input }) =>
-      sealBrewPageWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
-        loadRecentPage(ctx.session.user.id, input),
-      ),
-    ),
+    .query(({ ctx, input }) => {
+      const cursor = input.cursor
+        ? decodeCursorOrThrow(input.cursor)
+        : undefined
+      return sealBrewPageWithDialedIn(
+        ctx.session.user.id,
+        ctx.shelf,
+        async () =>
+          loadRecentPage(
+            ctx.session.user.id,
+            {
+              limit: input.limit,
+              coffeeId: input.coffeeId,
+              q: input.q,
+              cursor,
+            },
+            await ctx.shelf(),
+          ),
+      )
+    }),
 
   getLatestUnsealed: authedProcedure
     .input(z.object({ coffeeId: z.uuid() }))

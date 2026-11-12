@@ -130,21 +130,16 @@ export function applyCoffeePrefill(
   latest: ShotRow | null,
   keep: PrefillKeep = {},
 ): ShotDraft {
-  if (!latest?.grinderId || !latest.brewingDeviceId) {
-    return {
-      ...draft,
-      coffeeId,
-      roastDate: keep.roastDate ? draft.roastDate : '',
-    }
-  }
   return {
     ...draft,
     coffeeId,
-    grinderId: keep.grinderId ? draft.grinderId : latest.grinderId,
+    grinderId: keep.grinderId
+      ? draft.grinderId
+      : (latest?.grinderId ?? draft.grinderId),
     brewingDeviceId: keep.brewingDeviceId
       ? draft.brewingDeviceId
-      : latest.brewingDeviceId,
-    roastDate: keep.roastDate ? draft.roastDate : (latest.roastDate ?? ''),
+      : (latest?.brewingDeviceId ?? draft.brewingDeviceId),
+    roastDate: keep.roastDate ? draft.roastDate : (latest?.roastDate ?? ''),
   }
 }
 

@@ -1,4 +1,8 @@
-import { ESPRESSO_SHOT_PAGE_SIZE } from '@coffee-companion/api/lib/espresso'
+import {
+  ESPRESSO_SHOT_PAGE_SIZE,
+  encodeEspressoShotCursor,
+} from '@coffee-companion/api/lib/espresso'
+import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
 import type { QueryClient } from '@tanstack/react-query'
 import type { EspressoShotWithRelations } from '@/types'
 import type { EspressoShotPageFilters } from '@/hooks/use-espresso-shot-pages'
@@ -10,7 +14,7 @@ type Trpc = {
     getRecent: {
       queryKey: (input: {
         limit: number
-        offset: number
+        cursor?: EspressoShotCursor
         coffeeId?: string
         q?: string
       }) => ReadonlyArray<unknown>
@@ -28,19 +32,30 @@ type Trpc = {
 
 export { ESPRESSO_SHOT_PAGE_SIZE }
 
+export function espressoShotCursor(shot: {
+  createdAt: Date
+  id: string
+}): EspressoShotCursor {
+  return encodeEspressoShotCursor(shot)
+}
+
 export function seedEspressoShotPage(
   queryClient: QueryClient,
   trpc: Trpc,
   items: Array<Shot>,
   total = items.length,
-  offset = 0,
+  cursor?: EspressoShotCursor | null,
   filters: EspressoShotPageFilters = {},
 ) {
+  const nextCursor =
+    items.length === ESPRESSO_SHOT_PAGE_SIZE && items.length < total
+      ? espressoShotCursor(items[items.length - 1])
+      : null
   queryClient.setQueryData(
     trpc.espressoShot.getRecent.queryKey(
-      espressoShotPageInput(offset, filters),
+      espressoShotPageInput(cursor, filters),
     ),
-    { items, total },
+    { items, total, nextCursor },
   )
 }
 

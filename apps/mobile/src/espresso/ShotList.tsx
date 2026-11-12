@@ -63,7 +63,7 @@ export function ShotList({
         </View>
       }
       ListEmptyComponent={
-        loading && shots == null ? (
+        loading ? (
           <View accessibilityLabel={LOADING_SHOTS}>
             <ActivityIndicator />
           </View>

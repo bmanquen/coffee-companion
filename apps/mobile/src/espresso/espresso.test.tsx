@@ -36,6 +36,7 @@ import {
   LOG,
   LOG_ESPRESSO_HEADING,
   LOG_SHOT,
+  LOG_SHOT_TEST_ID,
   LOG_TEST_ID,
   SEALED_SHOT,
   SELECT_COFFEE_ERROR,
@@ -46,7 +47,13 @@ import {
   TRY_AGAIN,
   USE_CALENDAR_DATE,
 } from './copy'
-import type { EspressoApi, EspressoCatalog, ShotCreate, ShotRow } from './types'
+import type {
+  EspressoApi,
+  EspressoCatalog,
+  ShotCreate,
+  ShotCursor,
+  ShotRow,
+} from './types'
 import type { Auth } from '../auth/use-auth'
 
 const COFFEE = '00000000-0000-4000-8000-000000000001'
@@ -98,15 +105,30 @@ function seedShot(overrides: Partial<ShotRow> = {}): ShotRow {
   }
 }
 
+function pageFrom(all: Array<ShotRow>, cursor?: ShotCursor | null) {
+  const start = cursor ? all.findIndex((shot) => shot.id === cursor) + 1 : 0
+  const items = all.slice(Math.max(start, 0), Math.max(start, 0) + 20)
+  const nextCursor =
+    items.length > 0 && start + items.length < all.length
+      ? items[items.length - 1].id
+      : null
+  return { items, total: all.length, nextCursor }
+}
+
 function catalog(overrides: Partial<EspressoCatalog> = {}): EspressoCatalog {
   const shots = overrides.shots ?? [seedShot()]
+  const total = overrides.total ?? shots.length
   return {
     coffees: [{ id: COFFEE, name: 'Ethiopia Guji' }],
     grinders: [{ id: GRINDER, name: 'Niche Zero' }],
     devices: [{ id: ESP_DEVICE, name: 'Linea Mini' }],
+    nextCursor:
+      shots.length > 0 && shots.length < total
+        ? shots[shots.length - 1].id
+        : null,
     ...overrides,
     shots,
-    total: overrides.total ?? shots.length,
+    total,
   }
 }
 
@@ -114,13 +136,7 @@ function pagingFor(
   getShots: () => Array<ShotRow>,
 ): Pick<EspressoApi, 'listShots' | 'loadPrefill'> {
   return {
-    listShots: (offset) => {
-      const shots = getShots()
-      return Promise.resolve({
-        items: shots.slice(offset, offset + 20),
-        total: shots.length,
-      })
-    },
+    listShots: (cursor) => Promise.resolve(pageFrom(getShots(), cursor)),
     loadPrefill: (coffeeId) => {
       const shots = getShots()
       return Promise.resolve(
@@ -139,16 +155,19 @@ function fakeApi(
 ): { api: EspressoApi; created: Array<ShotCreate> } {
   const created: Array<ShotCreate> = []
   let shots = [...initial.shots]
-  function pageFrom(all: Array<ShotRow>, offset = 0) {
-    return { items: all.slice(offset, offset + 20), total: all.length }
-  }
   const api: EspressoApi = {
     load: () =>
       Promise.resolve().then(() => {
-        const next = { ...initial, shots: [...shots], total: shots.length }
+        const page = pageFrom(shots)
+        const next = {
+          ...initial,
+          shots: [...shots],
+          total: page.total,
+          nextCursor: page.nextCursor,
+        }
         return hooks.load ? hooks.load(next) : next
       }),
-    listShots: (offset) => Promise.resolve(pageFrom(shots, offset)),
+    listShots: (cursor) => Promise.resolve(pageFrom(shots, cursor)),
     loadPrefill: (coffeeId) =>
       Promise.resolve(
         shots.find((shot) => shot.coffeeId === coffeeId && !shot.sealed) ?? null,
@@ -924,6 +943,8 @@ describe('log espresso shot', () => {
     await render(<App auth={signedIn} espresso={api} />)
     expect(screen.getByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
     expect(screen.getByLabelText(LOADING_SHOTS)).toBeTruthy()
+    expect(screen.queryByText(EMPTY_SHOTS)).toBeNull()
+    expect(screen.getByTestId(LOG_SHOT_TEST_ID)).toBeDisabled()
   })
 
   it('retries a lost create with the same key and does not duplicate the shot', async () => {
@@ -978,19 +999,16 @@ describe('log espresso shot', () => {
         coffeeName: `Coffee ${index}`,
       }),
     )
-    const offsets: Array<number> = []
+    const cursors: Array<ShotCursor | null | undefined> = []
     const api: EspressoApi = {
       ...pagingFor(() => all),
       load: () =>
         Promise.resolve(
           catalog({ shots: all.slice(0, 20), total: all.length }),
         ),
-      listShots: (offset) => {
-        offsets.push(offset)
-        return Promise.resolve({
-          items: all.slice(offset, offset + 20),
-          total: all.length,
-        })
+      listShots: (cursor) => {
+        cursors.push(cursor)
+        return Promise.resolve(pageFrom(all, cursor))
       },
       create: async () => {},
     }
@@ -999,7 +1017,7 @@ describe('log espresso shot', () => {
     expect(screen.queryByText('Coffee 20')).toBeNull()
 
     await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
-    await waitFor(() => expect(offsets).toContain(20))
+    await waitFor(() => expect(cursors).toContain('shot-19'))
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
   })
 
@@ -1103,6 +1121,84 @@ describe('log espresso shot', () => {
     expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
   })
 
+  it('keeps a chosen grinder and still prefills roast date and device', async () => {
+    let resolvePrefill: (shot: ShotRow | null) => void = () => {}
+    const pending = new Promise<ShotRow | null>((resolve) => {
+      resolvePrefill = resolve
+    })
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () =>
+        Promise.resolve(
+          catalog({
+            grinders: [
+              { id: GRINDER, name: 'Niche Zero' },
+              { id: GRINDER_B, name: 'P64' },
+            ],
+          }),
+        ),
+      loadPrefill: () => pending,
+      create: async () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER_B)
+    expect(screen.getByLabelText('Grinder, P64')).toBeTruthy()
+
+    await act(async () => {
+      resolvePrefill(seedShot())
+      await pending
+    })
+    expect(await screen.findByDisplayValue('2026-05-01')).toBeTruthy()
+    expect(screen.getByLabelText('Grinder, P64')).toBeTruthy()
+    expect(screen.queryByText('Niche Zero')).toBeNull()
+    expect(screen.getByLabelText('Brewing Device, Linea Mini')).toBeTruthy()
+  })
+
+  it('does not apply prefill after a save has started', async () => {
+    let resolvePrefill: (shot: ShotRow | null) => void = () => {}
+    const pendingPrefill = new Promise<ShotRow | null>((resolve) => {
+      resolvePrefill = resolve
+    })
+    const created: Array<ShotCreate> = []
+    const keys: Array<string> = []
+    let creates = 0
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      loadPrefill: () => pendingPrefill,
+      create: (input) =>
+        Promise.resolve().then(() => {
+          created.push(input)
+          keys.push(input.idempotencyKey)
+          creates += 1
+          if (creates === 1) throw new Error('Network request failed')
+        }),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    await press(LOG)
+    expect(created).toHaveLength(1)
+    expect(created[0].roastDate).toBeNull()
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
+
+    await act(async () => {
+      resolvePrefill(seedShot())
+      await pendingPrefill
+    })
+    expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
+
+    await press(LOG)
+    expect(created).toHaveLength(2)
+    expect(keys[0]).toBe(keys[1])
+    expect(created[1].roastDate).toBeNull()
+  })
+
   it('shows a retry when the last shot cannot be loaded and still lets you log one', async () => {
     const { api, created } = fakeApi(catalog(), {})
     const espresso: EspressoApi = {
@@ -1180,8 +1276,9 @@ describe('log espresso shot', () => {
   })
 
   it('keeps a newer first page when an older refresh arrives late', async () => {
-    const pages: Array<(page: { items: Array<ShotRow>; total: number }) => void> =
-      []
+    const pages: Array<
+      (page: { items: Array<ShotRow>; total: number; nextCursor: ShotCursor | null }) => void
+    > = []
     let shots = [seedShot({ id: 'shot-old', coffeeName: 'Old Guji' })]
     const initial = catalog({ shots })
     const api: EspressoApi = {
@@ -1228,6 +1325,7 @@ describe('log espresso shot', () => {
           seedShot({ id: 'shot-first-save', coffeeName: 'Logged first-save' }),
         ],
         total: 2,
+        nextCursor: null,
       })
       await Promise.resolve()
     })
@@ -1239,6 +1337,7 @@ describe('log espresso shot', () => {
           seedShot({ id: 'shot-first-save', coffeeName: 'Logged first-save' }),
         ],
         total: 1,
+        nextCursor: null,
       })
       await Promise.resolve()
     })
@@ -1254,13 +1353,22 @@ describe('log espresso shot', () => {
     )
     let shots = all.slice(0, 20)
     let total = 25
-    let resolveMore: ((page: { items: Array<ShotRow>; total: number }) => void) | null =
-      null
+    let resolveMore:
+      | ((page: {
+          items: Array<ShotRow>
+          total: number
+          nextCursor: ShotCursor | null
+        }) => void)
+      | null = null
     const api: EspressoApi = {
       load: () => Promise.resolve(catalog({ shots, total })),
-      listShots: (offset) => {
-        if (offset === 0) {
-          return Promise.resolve({ items: shots, total })
+      listShots: (cursor) => {
+        if (!cursor) {
+          return Promise.resolve({
+            items: shots,
+            total,
+            nextCursor: shots.length < total ? shots[shots.length - 1].id : null,
+          })
         }
         return new Promise((resolve) => {
           resolveMore = resolve
@@ -1291,11 +1399,60 @@ describe('log espresso shot', () => {
       resolveMore?.({
         items: [seedShot({ id: 'shot-20', coffeeName: 'Coffee 20' })],
         total: 25,
+        nextCursor: null,
       })
       await Promise.resolve()
     })
     expect(screen.queryByText('Coffee 20')).toBeNull()
     expect(screen.getByText('Logged new')).toBeTruthy()
+  })
+
+  it('clears the load-more spinner when a refresh fails', async () => {
+    const all = Array.from({ length: 25 }, (_, index) =>
+      seedShot({
+        id: `shot-${index}`,
+        coffeeName: `Coffee ${index}`,
+      }),
+    )
+    let shots = all.slice(0, 20)
+    let total = 25
+    let resolveMore:
+      | ((page: {
+          items: Array<ShotRow>
+          total: number
+          nextCursor: ShotCursor | null
+        }) => void)
+      | null = null
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog({ shots, total })),
+      listShots: (cursor) => {
+        if (!cursor) return Promise.reject(new Error('Network request failed'))
+        return new Promise((resolve) => {
+          resolveMore = resolve
+        })
+      },
+      loadPrefill: () => Promise.resolve(seedShot()),
+      create: () =>
+        Promise.resolve().then(() => {
+          shots = [
+            seedShot({ id: 'shot-new', coffeeName: 'Logged new' }),
+            ...all.slice(0, 19),
+          ]
+          total = 26
+        }),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    expect(screen.getByText('Coffee 0')).toBeTruthy()
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    expect(resolveMore).toBeTruthy()
+    expect(screen.getByLabelText(LOADING_MORE_SHOTS)).toBeTruthy()
+
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(await screen.findByText('Logged new')).toBeTruthy()
+    expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
   })
 
   it('names same-name coffees with their roaster in the list', async () => {

@@ -10,8 +10,7 @@ import {
   seedUsers,
   uniqFor,
 } from '../../test/trpc'
-
-const TRPC_CONFLICT = 'CONFLICT'
+import { TRPC_BAD_REQUEST, TRPC_CONFLICT } from './espressoShot'
 
 const USER_A = 'espresso-user-a'
 const USER_B = 'espresso-user-b'
@@ -389,7 +388,7 @@ describe('espressoShot.create idempotency', () => {
     const second = await asA.espressoShot.create(input)
     expect(second.id).toBe(first.id)
     expect(second.dose).toBe('18')
-    const page = await asA.espressoShot.getRecent({ limit: 50, offset: 0 })
+    const page = await asA.espressoShot.getRecent({ limit: 50 })
     expect(page.items.filter((shot) => shot.id === first.id)).toHaveLength(1)
   })
 
@@ -481,7 +480,7 @@ describe('espressoShot.create idempotency', () => {
 
 describe('espressoShot.getRecent', () => {
   it('returns the user shots with relations', async () => {
-    const shots = (await asA.espressoShot.getRecent({ limit: 50, offset: 0 })).items
+    const shots = (await asA.espressoShot.getRecent({ limit: 50 })).items
     expect(shots.length).toBeGreaterThanOrEqual(1)
     expect(shots.every((s) => s.userId === USER_A)).toBe(true)
     expect(shots[0].coffee).toBeTruthy()
@@ -512,7 +511,6 @@ describe('espressoShot.getRecent', () => {
     })
     const byCoffee = await asA.espressoShot.getRecent({
       limit: 50,
-      offset: 0,
       coffeeId: other.id,
     })
     expect(byCoffee.items.every((shot) => shot.coffeeId === other.id)).toBe(
@@ -521,7 +519,6 @@ describe('espressoShot.getRecent', () => {
     expect(byCoffee.items.length).toBeGreaterThanOrEqual(1)
     const byText = await asA.espressoShot.getRecent({
       limit: 50,
-      offset: 0,
       q: 'huila-grind',
     })
     expect(byText.items.map((shot) => shot.grindSetting)).toContain(
@@ -533,17 +530,19 @@ describe('espressoShot.getRecent', () => {
   })
 
   it('includes the roaster on getRecent coffee relations', async () => {
-    const shots = (await asA.espressoShot.getRecent({ limit: 50, offset: 0 }))
+    const shots = (await asA.espressoShot.getRecent({ limit: 50 }))
       .items
     expect(shots[0]?.coffee.roaster).toEqual(
       expect.objectContaining({ name: expect.any(String) }),
     )
   })
 
-  it('paginates with getRecent', async () => {
-    for (let i = 0; i < 3; i++) {
-      await asA.espressoShot.create({
-        coffeeId: coffeeAId,
+  it('paginates with a cursor and stays stable when a shot is inserted', async () => {
+    const coffee = await createCoffee(uniq('Cursor Coffee'))
+    const created: Array<string> = []
+    for (let i = 0; i < 5; i++) {
+      const shot = await asA.espressoShot.create({
+        coffeeId: coffee.id,
         grinderId,
         brewingDeviceId: espressoDeviceId,
         dose: '18',
@@ -552,13 +551,146 @@ describe('espressoShot.getRecent', () => {
         grindSetting: '1.5',
         idempotencyKey: crypto.randomUUID(),
       })
+      created.push(shot.id)
     }
-    const page1 = await asA.espressoShot.getRecent({ limit: 2, offset: 0 })
-    expect(page1.items.length).toBe(2)
-    expect(page1.total).toBeGreaterThanOrEqual(3)
+    const page1 = await asA.espressoShot.getRecent({
+      limit: 2,
+      coffeeId: coffee.id,
+    })
+    expect(page1.items).toHaveLength(2)
+    expect(typeof page1.nextCursor).toBe('string')
+    expect(page1.nextCursor).toBeTruthy()
 
-    const page2 = await asA.espressoShot.getRecent({ limit: 2, offset: 2 })
-    expect(page2.items.length).toBeGreaterThanOrEqual(1)
+    const inserted = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+
+    const collected = [...page1.items]
+    let cursor = page1.nextCursor
+    while (cursor) {
+      const page = await asA.espressoShot.getRecent({
+        limit: 2,
+        coffeeId: coffee.id,
+        cursor,
+      })
+      collected.push(...page.items)
+      cursor = page.nextCursor
+    }
+    const collectedIds = collected.map((shot) => shot.id)
+    expect(new Set(collectedIds).size).toBe(collectedIds.length)
+    expect(collectedIds).toEqual(expect.arrayContaining(created))
+    expect(collectedIds).not.toContain(inserted.id)
+    expect(collectedIds).toHaveLength(created.length)
+
+    const refreshed: Array<string> = []
+    let next = undefined as typeof page1.nextCursor | undefined
+    for (;;) {
+      const page = await asA.espressoShot.getRecent({
+        limit: 2,
+        coffeeId: coffee.id,
+        cursor: next ?? undefined,
+      })
+      refreshed.push(...page.items.map((shot) => shot.id))
+      if (!page.nextCursor) break
+      next = page.nextCursor
+    }
+    expect(refreshed).toHaveLength(page1.total + 1)
+    expect(new Set(refreshed).size).toBe(refreshed.length)
+    expect(refreshed[0]).toBe(inserted.id)
+    expect(refreshed).toEqual(expect.arrayContaining([...created, inserted.id]))
+  })
+
+  it('rejects a malformed cursor', async () => {
+    await expect(
+      asA.espressoShot.getRecent({ limit: 2, cursor: 'not-a-cursor' }),
+    ).rejects.toMatchObject({ code: TRPC_BAD_REQUEST })
+  })
+
+  it('does not match Sealed settings in search', async () => {
+    const coffee = await createCoffee(uniq('Sealed Search Coffee'))
+    const grindSetting = uniq('sealed-grind')
+    const shot = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting,
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const before = await asA.espressoShot.getRecent({
+      limit: 50,
+      q: grindSetting,
+    })
+    expect(before.items.map((item) => item.id)).toContain(shot.id)
+
+    await db
+      .update(espressoShots)
+      .set({ sealedAt: new Date() })
+      .where(eq(espressoShots.id, shot.id))
+
+    const after = await asA.espressoShot.getRecent({
+      limit: 50,
+      q: grindSetting,
+    })
+    expect(after.items.map((item) => item.id)).not.toContain(shot.id)
+    expect(after.total).toBe(before.total - 1)
+
+    const byCoffee = await asA.espressoShot.getRecent({
+      limit: 50,
+      q: coffee.name,
+    })
+    const sealed = byCoffee.items.find((item) => item.id === shot.id)
+    expect(sealed?.sealed).toBe(true)
+    expect(sealed?.grindSetting).toBeNull()
+  })
+
+  it('treats 16 and 16.0 as the same dose on replay', async () => {
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '16.0',
+      yield: '32.00',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    const first = await asA.espressoShot.create(input)
+    const replayed = await asA.espressoShot.create({
+      ...input,
+      dose: '16',
+      yield: '32',
+    })
+    expect(replayed.id).toBe(first.id)
+
+    await expect(
+      asA.espressoShot.create({
+        ...input,
+        dose: '16.1',
+      }),
+    ).rejects.toMatchObject({ code: TRPC_CONFLICT })
+
+    await db
+      .update(espressoShots)
+      .set({ dose: null })
+      .where(eq(espressoShots.id, first.id))
+    await expect(
+      asA.espressoShot.create({
+        ...input,
+        dose: '16',
+        yield: '32',
+      }),
+    ).rejects.toMatchObject({ code: TRPC_CONFLICT })
   })
 })
 

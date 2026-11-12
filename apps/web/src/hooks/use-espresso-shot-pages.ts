@@ -4,14 +4,23 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ESPRESSO_SHOT_PAGE_SIZE } from '@coffee-companion/api/lib/espresso'
+import {
+  ESPRESSO_SHOT_PAGE_SIZE,
+  ESPRESSO_SHOT_Q_MAX,
+} from '@coffee-companion/api/lib/espresso'
+import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
 import type { EspressoShotWithRelations } from '@/types'
 import { useTRPC } from '@/integrations/trpc/react'
 
-export { ESPRESSO_SHOT_PAGE_SIZE }
+export { ESPRESSO_SHOT_PAGE_SIZE, ESPRESSO_SHOT_Q_MAX }
 
 export const ESPRESSO_LOAD_MORE_FAILED =
   "We couldn't load more shots. Try again."
+
+export const ESPRESSO_LOAD_FAILED =
+  "We couldn't load your shots. Try again."
+
+export const ESPRESSO_LOADING_SHOTS = 'Loading shots'
 
 export type EspressoShotPageFilters = {
   coffeeId?: string
@@ -19,18 +28,19 @@ export type EspressoShotPageFilters = {
 }
 
 export function espressoShotPageInput(
-  offset = 0,
+  cursor?: EspressoShotCursor | null,
   filters: EspressoShotPageFilters = {},
 ) {
   const input: {
     limit: number
-    offset: number
+    cursor?: EspressoShotCursor
     coffeeId?: string
     q?: string
-  } = { limit: ESPRESSO_SHOT_PAGE_SIZE, offset }
+  } = { limit: ESPRESSO_SHOT_PAGE_SIZE }
+  if (cursor) input.cursor = cursor
   if (filters.coffeeId) input.coffeeId = filters.coffeeId
   const q = filters.q?.trim()
-  if (q) input.q = q
+  if (q) input.q = q.slice(0, ESPRESSO_SHOT_Q_MAX)
   return input
 }
 
@@ -41,54 +51,82 @@ export function useEspressoShotPages(
   const queryClient = useQueryClient()
   const first = useQuery({
     ...trpc.espressoShot.getRecent.queryOptions(
-      espressoShotPageInput(0, filters),
+      espressoShotPageInput(undefined, filters),
     ),
     placeholderData: keepPreviousData,
     staleTime: Infinity,
   })
   const [extra, setExtra] = useState<Array<EspressoShotWithRelations>>([])
+  const [extraCursor, setExtraCursor] = useState<EspressoShotCursor | null>(
+    null,
+  )
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
+  const loadMoreSeq = useRef(0)
   const generation = first.dataUpdatedAt
-  const generationRef = useRef(generation)
-  generationRef.current = generation
   const filterKey = `${filters.coffeeId ?? ''}\0${filters.q?.trim() ?? ''}`
 
   useEffect(() => {
+    loadMoreSeq.current += 1
     setExtra([])
+    setExtraCursor(null)
     setLoadMoreError(null)
+    setLoadingMore(false)
   }, [generation, filterKey])
 
   const pageItems = first.data?.items ?? []
-  const total = first.data?.total ?? 0
   const items = useMemo(() => {
     if (first.isPlaceholderData) return pageItems
     return [...pageItems, ...extra]
   }, [extra, first.isPlaceholderData, pageItems])
-  const hasMore = !first.isPlaceholderData && items.length < total
+  const nextCursor = first.isPlaceholderData
+    ? null
+    : extra.length > 0
+      ? extraCursor
+      : (first.data?.nextCursor ?? null)
+  const hasMore = nextCursor != null
+  const loading =
+    first.isPending && pageItems.length === 0 && extra.length === 0
+  const loadError =
+    first.isError && pageItems.length === 0 && extra.length === 0
+      ? ESPRESSO_LOAD_FAILED
+      : null
 
   const loadMore = useCallback(async () => {
-    if (!hasMore || loadingMore) return
-    const offset = items.length
-    const startedAt = generationRef.current
+    if (nextCursor == null || loadingMore) return
+    const seq = ++loadMoreSeq.current
     setLoadingMore(true)
     setLoadMoreError(null)
     try {
       const page = await queryClient.fetchQuery({
         ...trpc.espressoShot.getRecent.queryOptions(
-          espressoShotPageInput(offset, filters),
+          espressoShotPageInput(nextCursor, filters),
         ),
         staleTime: Infinity,
       })
-      if (startedAt !== generationRef.current) return
+      if (seq !== loadMoreSeq.current) return
       setExtra((current) => [...current, ...page.items])
+      setExtraCursor(page.nextCursor)
     } catch {
-      if (startedAt !== generationRef.current) return
+      if (seq !== loadMoreSeq.current) return
       setLoadMoreError(ESPRESSO_LOAD_MORE_FAILED)
     } finally {
-      if (startedAt === generationRef.current) setLoadingMore(false)
+      if (seq === loadMoreSeq.current) setLoadingMore(false)
     }
-  }, [filters, hasMore, items.length, loadingMore, queryClient, trpc])
+  }, [filters, hasMore, loadingMore, nextCursor, queryClient, trpc])
 
-  return { items, hasMore, loadingMore, loadMore, loadMoreError }
+  const retry = useCallback(() => {
+    void first.refetch()
+  }, [first])
+
+  return {
+    items,
+    hasMore,
+    loadingMore,
+    loadMore,
+    loadMoreError,
+    loading,
+    loadError,
+    retry,
+  }
 }

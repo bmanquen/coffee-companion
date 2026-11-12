@@ -1,3 +1,5 @@
+import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
+
 export type NamedOption = {
   id: string
   name: string
@@ -31,9 +33,12 @@ export type ShotCreate = {
   idempotencyKey: string
 }
 
+export type ShotCursor = EspressoShotCursor
+
 export type ShotPage = {
   items: Array<ShotRow>
   total: number
+  nextCursor: ShotCursor | null
 }
 
 export type EspressoCatalog = {
@@ -42,11 +47,12 @@ export type EspressoCatalog = {
   devices: Array<NamedOption>
   shots: Array<ShotRow>
   total: number
+  nextCursor: ShotCursor | null
 }
 
 export type EspressoApi = {
   load: () => Promise<EspressoCatalog>
-  listShots: (offset: number) => Promise<ShotPage>
+  listShots: (cursor?: ShotCursor | null) => Promise<ShotPage>
   loadPrefill: (coffeeId: string) => Promise<ShotRow | null>
   create: (input: ShotCreate) => Promise<void>
 }
@@ -59,11 +65,12 @@ const emptyCatalog: EspressoCatalog = {
   devices: [],
   shots: [],
   total: 0,
+  nextCursor: null,
 }
 
 export const idleEspressoApi: EspressoApi = {
   load: () => Promise.resolve(emptyCatalog),
-  listShots: () => Promise.resolve({ items: [], total: 0 }),
+  listShots: () => Promise.resolve({ items: [], total: 0, nextCursor: null }),
   loadPrefill: () => Promise.resolve(null),
   create: () => Promise.reject(new Error('Espresso API is not configured')),
 }

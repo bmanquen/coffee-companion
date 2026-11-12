@@ -209,14 +209,20 @@ export async function sealBrews<T extends SealableBrew>(
   return brews.map((brew) => withSealing(brew, resolved))
 }
 
-export async function sealBrewPage<T extends SealableBrew>(
+export async function sealBrewPage<
+  TPage extends { items: Array<SealableBrew>; total: number },
+>(
   shelf: () => Promise<Shelf>,
-  load: () => Promise<{ items: Array<T>; total: number }>,
-): Promise<{ items: Array<Sealable<T>>; total: number }> {
+  load: () => Promise<TPage>,
+): Promise<
+  Omit<TPage, 'items'> & { items: Array<Sealable<TPage['items'][number]>> }
+> {
   const [page, resolved] = await Promise.all([load(), shelf()])
   return {
-    items: page.items.map((brew) => withSealing(brew, resolved)),
-    total: page.total,
+    ...page,
+    items: page.items.map((brew) =>
+      withSealing(brew, resolved),
+    ) as Array<Sealable<TPage['items'][number]>>,
   }
 }
 
