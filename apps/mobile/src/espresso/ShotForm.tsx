@@ -78,7 +78,7 @@ export function ShotForm({
   const prefillCoffeeId = useRef('')
   const keepPrefill = useRef<PrefillKeep>({})
   const saveGen = useRef(0)
-  const saveAttempted = useRef(false)
+  const saveInFlight = useRef(false)
   const draftRef = useRef(draft)
   draftRef.current = draft
 
@@ -88,6 +88,10 @@ export function ShotForm({
     )
     return () => sub.remove()
   }, [busy, onBack])
+
+  useEffect(() => {
+    if (error) saveInFlight.current = false
+  }, [error])
 
   const setField = (key: keyof ShotDraft, value: string) => {
     onClearError()
@@ -112,7 +116,7 @@ export function ShotForm({
     if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
       return
     }
-    if (saveAttempted.current || startedSaveGen !== saveGen.current) return
+    if (startedSaveGen !== saveGen.current) return
     const next = applyCoffeePrefill(
       draftRef.current,
       coffeeId,
@@ -141,7 +145,7 @@ export function ShotForm({
   }
 
   const requestPrefill = (coffeeId: string) => {
-    if (busy || saveAttempted.current) return
+    if (saveInFlight.current || busy) return
     const seq = ++prefillSeq.current
     const startedSaveGen = saveGen.current
     prefillCoffeeId.current = coffeeId
@@ -208,8 +212,6 @@ export function ShotForm({
               ? current.brewingDeviceId
               : '',
           }))
-          // A failed save must not lock out a later coffee choice.
-          saveAttempted.current = false
           requestPrefill(coffeeId)
         }}
       />
@@ -286,8 +288,6 @@ export function ShotForm({
             accessibilityRole="button"
             disabled={busy}
             onPress={() => {
-              // Retry is a new lookup, not a completion of the pre-save one.
-              saveAttempted.current = false
               if (prefillCoffeeId.current) requestPrefill(prefillCoffeeId.current)
             }}
           >
@@ -317,7 +317,7 @@ export function ShotForm({
             idempotencyKey.current = newIdempotencyKey()
           }
           lastSubmitted.current = fingerprint
-          saveAttempted.current = true
+          saveInFlight.current = true
           saveGen.current += 1
           onSubmit({ ...parsed.value, idempotencyKey: idempotencyKey.current })
         }}
