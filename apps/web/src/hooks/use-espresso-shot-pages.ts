@@ -32,6 +32,8 @@ export const ESPRESSO_SHOT_STALE_TIME_MS = 30_000
 
 export const ESPRESSO_SHOT_FILTER_DEBOUNCE_MS = 300
 
+const NO_SHOTS: Array<EspressoShotWithRelations> = []
+
 export type EspressoShotPageFilters = {
   coffeeId?: string
   q?: string
@@ -87,10 +89,10 @@ export function useEspressoShotPages(
     setLoadingMore(false)
   }, [generation, filterKey])
 
-  const pageItems = first.data?.items ?? []
+  const pageItems = first.data?.items ?? NO_SHOTS
   const filterPending = first.isPlaceholderData && first.isFetching
   const items = useMemo(() => {
-    if (first.isPlaceholderData) return []
+    if (first.isPlaceholderData) return NO_SHOTS
     return [...pageItems, ...extra]
   }, [extra, first.isPlaceholderData, pageItems])
   const nextCursor = first.isPlaceholderData

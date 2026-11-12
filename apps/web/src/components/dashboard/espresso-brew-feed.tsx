@@ -108,8 +108,7 @@ export function EspressoBrewFeed() {
         coffeeOptions={
           coffeesQuery.isError && coffees.length === 0 ? [] : coffeeOptions
         }
-        coffeeId={coffeeId}
-        onCoffeeIdChange={setCoffeeId}
+        coffeeFilter={{ value: coffeeId, onChange: setCoffeeId }}
         banner={
           loadError && items.length > 0 ? (
             <div className="flex flex-col gap-2">
@@ -133,8 +132,7 @@ export function EspressoBrewFeed() {
             </div>
           ) : undefined
         }
-        dialedInOnly={dialedInOnly}
-        onDialedInOnlyChange={setDialedInOnly}
+        dialedInFilter={{ value: dialedInOnly, onChange: setDialedInOnly }}
         stale={stale}
         status={
           loading ? (

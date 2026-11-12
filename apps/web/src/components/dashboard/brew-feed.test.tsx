@@ -46,6 +46,9 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   }
 })
 
+const BREW_FEED_PAGE_SIZE = 5
+const SHOTS_PER_COFFEE = 6
+
 const columns: Array<ColumnDef<ReturnType<typeof makeRecentShot>, unknown>> = [
   {
     accessorFn: (row) => row.coffee.name,
@@ -87,8 +90,7 @@ function renderFeed(
 describe('BrewFeed', () => {
   it('still filters Dialed-in only when only the coffee filter is controlled', () => {
     renderFeed({
-      coffeeId: '',
-      onCoffeeIdChange: vi.fn(),
+      coffeeFilter: { value: '', onChange: vi.fn() },
     })
 
     const table = within(screen.getByRole('table'))
@@ -103,8 +105,7 @@ describe('BrewFeed', () => {
 
   it('still filters by coffee when only Dialed-in only is controlled', () => {
     renderFeed({
-      dialedInOnly: false,
-      onDialedInOnlyChange: vi.fn(),
+      dialedInFilter: { value: false, onChange: vi.fn() },
     })
 
     fireEvent.click(screen.getByText('All coffees'))
@@ -113,5 +114,35 @@ describe('BrewFeed', () => {
     const table = within(screen.getByRole('table'))
     expect(table.queryByText('Ethiopia Guji')).toBeNull()
     expect(table.getByText('Kenya AA')).toBeTruthy()
+  })
+
+  it('resets to page 1 when a filter still spans multiple pages', () => {
+    const ethiopia = Array.from({ length: SHOTS_PER_COFFEE }, (_, index) =>
+      makeRecentShot({
+        id: `e${index}`,
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      }),
+    )
+    const kenya = Array.from({ length: SHOTS_PER_COFFEE }, (_, index) =>
+      makeRecentShot({
+        id: `k${index}`,
+        coffeeId: 'c2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Kenya AA' }),
+      }),
+    )
+    renderFeed({
+      brews: [...ethiopia, ...kenya],
+      pageSize: BREW_FEED_PAGE_SIZE,
+    })
+
+    expect(screen.getByText('Page 1 of 3')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Next page'))
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('All coffees'))
+    fireEvent.click(screen.getByRole('option', { name: 'Ethiopia Guji' }))
+
+    expect(screen.getByText('Page 1 of 2')).toBeTruthy()
   })
 })

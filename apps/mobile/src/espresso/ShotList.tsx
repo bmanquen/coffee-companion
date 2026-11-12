@@ -22,6 +22,8 @@ import { shotSummary } from './draft'
 import { SHOT_PAGE_SIZE } from './types'
 import type { ShotRow } from './types'
 
+const NO_SHOT_ROWS: Array<ShotRow> = []
+
 export function ShotList({
   shots,
   loading,
@@ -40,7 +42,7 @@ export function ShotList({
   onEndReached: () => void
 }) {
   const canLog = !loading && !failed && shots != null
-  const rows = failed ? [] : (shots ?? [])
+  const rows = failed || shots == null ? NO_SHOT_ROWS : shots
   // A failed next page stays failed until Retry; scroll must not retry it.
   const handleEndReached = () => {
     if (loadMoreError) return

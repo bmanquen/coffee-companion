@@ -131,6 +131,7 @@ describe('Brews loader', () => {
           context: { queryClient, trpc },
         } as never),
       ).toBeUndefined()
+      await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalled())
       await new Promise((resolve) => setTimeout(resolve, 0))
       expect(rejections).toEqual([])
     } finally {

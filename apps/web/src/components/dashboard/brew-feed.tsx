@@ -29,6 +29,12 @@ type BrewRow = {
   sealed: boolean
 }
 
+// Value + handler travel together so a parent cannot own one without the other.
+export type BrewFeedFilter<T> = {
+  value: T
+  onChange: (value: T) => void
+}
+
 // The dashboard's reference-only per-method Brew feed. Given the rows already
 // loaded for that method, it renders a glanceable, paginated feed of
 // cards with the dialed-in Brew highlighted, a "dialed-in only" toggle and a
@@ -48,10 +54,8 @@ export function BrewFeed<T extends BrewRow>({
   emptyLinkLabel,
   pageSize = 5,
   coffeeOptions: coffeeOptionsProp,
-  coffeeId: coffeeIdProp,
-  onCoffeeIdChange,
-  dialedInOnly: dialedInOnlyProp,
-  onDialedInOnlyChange,
+  coffeeFilter,
+  dialedInFilter,
   banner,
   stale,
   status,
@@ -67,10 +71,8 @@ export function BrewFeed<T extends BrewRow>({
   emptyLinkLabel: string
   pageSize?: number
   coffeeOptions?: Array<CoffeeFilterOption>
-  coffeeId?: string
-  onCoffeeIdChange?: (id: string) => void
-  dialedInOnly?: boolean
-  onDialedInOnlyChange?: (value: boolean) => void
+  coffeeFilter?: BrewFeedFilter<string>
+  dialedInFilter?: BrewFeedFilter<boolean>
   banner?: ReactNode
   stale?: boolean
   status?: ReactNode
@@ -80,10 +82,10 @@ export function BrewFeed<T extends BrewRow>({
   'use no memo'
   const [internalCoffeeId, setInternalCoffeeId] = useState('')
   const [internalDialedInOnly, setInternalDialedInOnly] = useState(false)
-  const coffeeId = coffeeIdProp ?? internalCoffeeId
-  const setCoffeeId = onCoffeeIdChange ?? setInternalCoffeeId
-  const dialedInOnly = dialedInOnlyProp ?? internalDialedInOnly
-  const setDialedInOnly = onDialedInOnlyChange ?? setInternalDialedInOnly
+  const coffeeId = coffeeFilter?.value ?? internalCoffeeId
+  const setCoffeeId = coffeeFilter?.onChange ?? setInternalCoffeeId
+  const dialedInOnly = dialedInFilter?.value ?? internalDialedInOnly
+  const setDialedInOnly = dialedInFilter?.onChange ?? setInternalDialedInOnly
   const expansion = useAccordionExpansion()
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -101,8 +103,8 @@ export function BrewFeed<T extends BrewRow>({
     [brews],
   )
   const coffeeOptions = coffeeOptionsProp ?? derivedCoffeeOptions
-  const filterCoffeeOnClient = onCoffeeIdChange == null
-  const filterDialedInOnClient = onDialedInOnlyChange == null
+  const filterCoffeeOnClient = coffeeFilter == null
+  const filterDialedInOnClient = dialedInFilter == null
   const filtering = Boolean(coffeeId || dialedInOnly)
   const showEmpty = status == null && brews.length === 0 && !filtering
 
