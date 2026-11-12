@@ -838,6 +838,16 @@ describe('Dashboard', () => {
           context: { queryClient, trpc },
         } as never),
       ).resolves.toBeUndefined()
+      await waitFor(() => {
+        expect(queryClient.getQueryState(trpc.coffee.getAll.queryKey())?.status).toBe(
+          'error',
+        )
+        expect(
+          queryClient.getQueryState(
+            trpc.espressoShot.getRecent.queryKey(espressoShotPageInput()),
+          )?.status,
+        ).toBe('error')
+      })
     } finally {
       fetchSpy.mockRestore()
     }

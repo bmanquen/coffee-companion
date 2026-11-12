@@ -927,6 +927,11 @@ describe('EspressoBrewsSection', () => {
         },
         { timeout: FILTER_SETTLE_TIMEOUT_MS },
       )
+      settleLoadMore()
+      expect(
+        within(screen.getByRole('table')).getByText('Colombia Huila'),
+      ).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Load more' })).toBeTruthy()
     } finally {
       settleLoadMore()
       fetchSpy.mockRestore()

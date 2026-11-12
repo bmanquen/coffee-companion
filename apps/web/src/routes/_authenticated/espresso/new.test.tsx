@@ -26,6 +26,8 @@ const GRINDER_B = '00000000-0000-4000-8000-000000000006'
 const ESP_DEVICE = '00000000-0000-4000-8000-000000000005'
 const AERO_DEVICE = '00000000-0000-4000-8000-000000000004'
 const ts = new Date('2026-06-01T08:00:00.000Z')
+const IDEMPOTENCY_KEY_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const mocks = vi.hoisted(() => ({ navigate: vi.fn(), track: vi.fn() }))
 
@@ -433,6 +435,8 @@ describe('NewEspressoShot form', () => {
       const keys = bodies.map(
         (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
       )
+      expect(keys[0]).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      expect(keys[1]).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[0]).not.toBe(keys[1])
       expect(bodies[1]).toContain('22')
       expect(bodies[1]).not.toMatch(/"dose"\s*:\s*"18"/)
@@ -617,7 +621,7 @@ describe('NewEspressoShot form', () => {
     }
   })
 
-  it('does not prefill from Try again after a save has started', async () => {
+  it('prefills from Try again after a failed save', async () => {
     const providers = seeded()
     const { queryClient, trpc, Wrapper, fetchSpy } = providers
     queryClient.removeQueries({
@@ -629,7 +633,16 @@ describe('NewEspressoShot form', () => {
     fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
       if (isPrefillCall(call)) {
         lookups += 1
-        throw new Error('Network request failed')
+        if (lookups === 1) throw new Error('Network request failed')
+        return trpcSuccess(
+          makeRecentShot({
+            id: 'shot-1',
+            coffeeId: COFFEE,
+            grinderId: GRINDER,
+            brewingDeviceId: ESP_DEVICE,
+            roastDate: '2026-05-01',
+          }),
+        )
       }
       if (isCreateCall(call)) throw new Error('Network request failed')
       return trpcSuccess()
@@ -672,9 +685,58 @@ describe('NewEspressoShot form', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-      expect(prefillCalls(fetchSpy)).toHaveLength(1)
-      expect(lookups).toBe(1)
-      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      await waitFor(() => expect(lookups).toBe(2))
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('prefills a newly chosen coffee after a failed save', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        throw new Error('Network request failed')
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
+        target: { value: ESP_DEVICE },
+      })
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE_B },
+      })
+      expect(await screen.findByText('April 1st, 2026')).toBeTruthy()
     } finally {
       fetchSpy.mockRestore()
     }

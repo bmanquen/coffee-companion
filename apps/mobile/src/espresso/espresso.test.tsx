@@ -73,6 +73,8 @@ const GRIND_MARKER = 'verify-grind-7'
 const LOGGED_RECIPE = `Grind ${GRIND_MARKER} · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s`
 const TRPC_FORBIDDEN = 'FORBIDDEN'
 const TRPC_INTERNAL = 'INTERNAL_SERVER_ERROR'
+const IDEMPOTENCY_KEY_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const signedIn: Auth = {
   session: {
@@ -292,9 +294,7 @@ describe('log espresso shot', () => {
       time: 30,
       grindSetting: GRIND_MARKER,
       notes: null,
-      idempotencyKey: expect.stringMatching(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-      ),
+      idempotencyKey: expect.stringMatching(IDEMPOTENCY_KEY_PATTERN),
     })
 
     expect(screen.getByText(LOGGED_RECIPE)).toBeTruthy()
@@ -1407,7 +1407,7 @@ describe('log espresso shot', () => {
     expect(screen.getByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
   })
 
-  it('does not prefill from Try again after a save has started', async () => {
+  it('prefills from Try again after a failed save', async () => {
     let prefillCalls = 0
     const created: Array<ShotCreate> = []
     const api: EspressoApi = {
@@ -1415,7 +1415,10 @@ describe('log espresso shot', () => {
       load: () => Promise.resolve(catalog({ shots: [] })),
       loadPrefill: () => {
         prefillCalls += 1
-        return Promise.reject(new Error('Network request failed'))
+        if (prefillCalls === 1) {
+          return Promise.reject(new Error('Network request failed'))
+        }
+        return Promise.resolve(seedShot())
       },
       create: (input) =>
         Promise.resolve().then(() => {
@@ -1436,8 +1439,56 @@ describe('log espresso shot', () => {
     expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
 
     await press(TRY_AGAIN)
-    expect(prefillCalls).toBe(1)
-    expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
+    expect(prefillCalls).toBe(2)
+    expect(await screen.findByDisplayValue('2026-05-01')).toBeTruthy()
+  })
+
+  it('prefills a newly chosen coffee after a failed save', async () => {
+    const created: Array<ShotCreate> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () =>
+        Promise.resolve(
+          catalog({
+            coffees: [
+              { id: COFFEE, name: 'Ethiopia Guji' },
+              { id: COFFEE_B, name: 'Colombia Huila' },
+            ],
+            grinders: [
+              { id: GRINDER, name: 'Niche Zero' },
+              { id: GRINDER_B, name: 'P64' },
+            ],
+          }),
+        ),
+      loadPrefill: (coffeeId) => {
+        if (coffeeId === COFFEE_B) {
+          return Promise.resolve(
+            seedShot({
+              coffeeId: COFFEE_B,
+              coffeeName: 'Colombia Huila',
+              roastDate: '2026-04-01',
+              grinderId: GRINDER_B,
+            }),
+          )
+        }
+        return Promise.resolve(seedShot())
+      },
+      create: (input) =>
+        Promise.resolve().then(() => {
+          created.push(input)
+          throw new Error('Network request failed')
+        }),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(created).toHaveLength(1)
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
+
+    await pickSelect(LABEL_COFFEE, COFFEE_B)
+    expect(await screen.findByDisplayValue('2026-04-01')).toBeTruthy()
   })
 
   it('does not report the stored shot after a failed save is edited and retried', async () => {
@@ -1488,6 +1539,8 @@ describe('log espresso shot', () => {
     await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '22')
     await press(LOG)
 
+    expect(keys[0]).toMatch(IDEMPOTENCY_KEY_PATTERN)
+    expect(keys[1]).toMatch(IDEMPOTENCY_KEY_PATTERN)
     expect(keys[0]).not.toBe(keys[1])
     expect(
       await screen.findByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-new`),

@@ -141,7 +141,7 @@ export function ShotForm({
   }
 
   const requestPrefill = (coffeeId: string) => {
-    if (saveAttempted.current) return
+    if (busy || saveAttempted.current) return
     const seq = ++prefillSeq.current
     const startedSaveGen = saveGen.current
     prefillCoffeeId.current = coffeeId
@@ -208,6 +208,8 @@ export function ShotForm({
               ? current.brewingDeviceId
               : '',
           }))
+          // A failed save must not lock out a later coffee choice.
+          saveAttempted.current = false
           requestPrefill(coffeeId)
         }}
       />
@@ -284,6 +286,8 @@ export function ShotForm({
             accessibilityRole="button"
             disabled={busy}
             onPress={() => {
+              // Retry is a new lookup, not a completion of the pre-save one.
+              saveAttempted.current = false
               if (prefillCoffeeId.current) requestPrefill(prefillCoffeeId.current)
             }}
           >
