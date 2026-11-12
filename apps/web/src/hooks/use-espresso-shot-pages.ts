@@ -142,6 +142,9 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const loadMore = useCallback(async () => {
     if (nextCursor == null || loadingMore) return
     const requested = nextCursor
+    // Bind before the fetch so a same-cursor first-page refetch that
+    // finishes first cannot treat this load as unbound and cancel it.
+    if (extraBoundTo.current === undefined) extraBoundTo.current = requested
     const seq = ++loadMoreSeq.current
     setLoadingMore(true)
     setLoadMoreError(null)
@@ -153,7 +156,6 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
         staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
       })
       if (seq !== loadMoreSeq.current) return
-      if (extraBoundTo.current === undefined) extraBoundTo.current = requested
       setExtra((current) => [...current, ...page.items])
       setExtraCursor(page.nextCursor)
     } catch {

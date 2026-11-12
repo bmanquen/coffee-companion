@@ -293,6 +293,80 @@ describe('useEspressoShotPages', () => {
     }
   })
 
+  it('applies a load-more that finishes after a same-cursor first-page refetch', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extraShot = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const refreshed = makeRecentShot({
+      id: REFRESHED_FIRST_ID,
+      coffee: makeRecentCoffee({ name: 'Coffee refreshed' }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    const pending: Array<(value: Response) => void> = []
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            pending.push(resolve)
+          }),
+      )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      let loadMoreDone: Promise<void> = Promise.resolve()
+      await act(async () => {
+        loadMoreDone = result.current.loadMore()
+      })
+      await waitFor(() => expect(pending).toHaveLength(1))
+
+      await act(async () => {
+        void result.current.retry()
+      })
+      await waitFor(() => expect(pending).toHaveLength(2))
+
+      await act(async () => {
+        pending[1](
+          trpcSuccess({
+            items: [refreshed, ...first.slice(1)],
+            total: first.length + 1,
+            nextCursor: boundary,
+          }),
+        )
+      })
+      await waitFor(() =>
+        expect(
+          result.current.items.some((shot) => shot.id === REFRESHED_FIRST_ID),
+        ).toBe(true),
+      )
+
+      await act(async () => {
+        pending[0](
+          trpcSuccess({
+            items: [extraShot],
+            total: first.length + 1,
+            nextCursor: null,
+          }),
+        )
+        await loadMoreDone
+      })
+
+      expect(
+        result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+      ).toBe(true)
+      expect(result.current.hasMore).toBe(false)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('drops extra shots after a successful first-page refetch', async () => {
     const refreshed = makeRecentShot({
       id: REFRESHED_FIRST_ID,
