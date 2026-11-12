@@ -61,6 +61,7 @@ export function NewEspressoShot() {
   const prefillCoffeeId = useRef('')
   const keepPrefill = useRef<PrefillKeep>({})
   const applyingPrefill = useRef(false)
+  const saveGen = useRef(0)
   const [prefillError, setPrefillError] = useState(false)
 
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
@@ -114,6 +115,7 @@ export function NewEspressoShot() {
         idempotencyKey.current = crypto.randomUUID()
       }
       lastSubmitted.current = fingerprint
+      saveGen.current += 1
       await submitFormMutation(form, createShot.mutateAsync, {
         ...value,
         idempotencyKey: idempotencyKey.current,
@@ -129,24 +131,31 @@ export function NewEspressoShot() {
       brewingDeviceId: string | null
       roastDate: string | null
     } | null,
+    startedSaveGen: number,
   ) => {
     if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
       return
     }
+    // Drop prefill that arrives after a save has started so a retry keeps the
+    // same payload and idempotency key.
+    if (startedSaveGen !== saveGen.current) return
     const keep = keepPrefill.current
     applyingPrefill.current = true
-    if (latest?.grinderId && latest.brewingDeviceId) {
-      if (!keep.grinderId) form.setFieldValue('grinderId', latest.grinderId)
-      if (!keep.brewingDeviceId) {
-        form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
-      }
-      if (!keep.roastDate) form.setFieldValue('roastDate', latest.roastDate)
+    if (latest?.grinderId && !keep.grinderId) {
+      form.setFieldValue('grinderId', latest.grinderId)
+    }
+    if (latest?.brewingDeviceId && !keep.brewingDeviceId) {
+      form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
+    }
+    if (!keep.roastDate) {
+      form.setFieldValue('roastDate', latest?.roastDate ?? null)
     }
     applyingPrefill.current = false
   }
 
   const requestPrefill = (coffeeId: string) => {
     const seq = ++prefillSeq.current
+    const startedSaveGen = saveGen.current
     prefillCoffeeId.current = coffeeId
     setPrefillError(false)
     void queryClient
@@ -155,7 +164,7 @@ export function NewEspressoShot() {
         staleTime: Infinity,
       })
       .then(
-        (latest) => applyPrefill(coffeeId, seq, latest),
+        (latest) => applyPrefill(coffeeId, seq, latest, startedSaveGen),
         () => {
           if (
             seq !== prefillSeq.current ||
@@ -164,7 +173,7 @@ export function NewEspressoShot() {
             return
           }
           setPrefillError(true)
-          applyPrefill(coffeeId, seq, null)
+          applyPrefill(coffeeId, seq, null, startedSaveGen)
         },
       )
   }

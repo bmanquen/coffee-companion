@@ -9,7 +9,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EspressoBrewsSection } from './espresso-brews-section'
 import type * as ReactRouter from '@tanstack/react-router'
 import {
+  ESPRESSO_LOADING_SHOTS,
+  ESPRESSO_LOAD_FAILED,
   ESPRESSO_SHOT_PAGE_SIZE,
+  ESPRESSO_SHOT_Q_MAX,
+  espressoShotPageInput,
+} from '@/hooks/use-espresso-shot-pages'
+import {
+  espressoShotCursor,
   seedCoffees,
   seedEspressoShotPage,
 } from '@/test/espresso-shots'
@@ -76,8 +83,8 @@ function seedLog(
   trpc: ReturnType<typeof createTestProviders>['trpc'],
   shots: Array<ReturnType<typeof makeRecentShot>>,
   total = shots.length,
-  offset = 0,
   extra: {
+    cursor?: ReturnType<typeof espressoShotCursor>
     coffees?: Array<ReturnType<typeof makeCoffee>>
     filters?: { coffeeId?: string; q?: string }
   } = {},
@@ -87,10 +94,10 @@ function seedLog(
     trpc,
     shots,
     total,
-    offset,
+    extra.cursor,
     extra.filters,
   )
-  if (offset === 0 && !extra.filters) {
+  if (!extra.cursor && !extra.filters) {
     seedCoffees(queryClient, trpc, extra.coffees ?? coffeesFrom(shots))
   }
 }
@@ -137,6 +144,46 @@ describe('EspressoBrewsSection', () => {
     expect(screen.getByText(/No espresso shots yet/i)).toBeTruthy()
   })
 
+  it('shows loading instead of the empty state while the first page is pending', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    seedCoffees(queryClient, trpc, [])
+    void queryClient.prefetchQuery({
+      ...trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
+      queryFn: () => new Promise<never>(() => {}),
+    })
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+    expect(screen.getByRole('status')).toBeTruthy()
+    expect(screen.getByText(ESPRESSO_LOADING_SHOTS)).toBeTruthy()
+    expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
+  })
+
+  it('shows a retry instead of the empty state when the first page fails', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValue(
+        trpcSuccess({ items: [], total: 0, nextCursor: null }),
+      )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedCoffees(queryClient, trpc, [])
+
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(
+        await screen.findByText(/No espresso shots yet/i),
+      ).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('renders shots with dose and yield', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     seedLog(queryClient, trpc, [
@@ -167,7 +214,7 @@ describe('EspressoBrewsSection', () => {
       coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
     })
     seedLog(queryClient, trpc, [guji, huila])
-    seedEspressoShotPage(queryClient, trpc, [huila], 1, 0, { q: 'Huila' })
+    seedEspressoShotPage(queryClient, trpc, [huila], 1, undefined, { q: 'Huila' })
 
     render(<EspressoBrewsSection />, { wrapper: Wrapper })
 
@@ -175,7 +222,9 @@ describe('EspressoBrewsSection', () => {
     expect(table.getByText('Ethiopia Guji')).toBeTruthy()
     expect(table.getByText('Colombia Huila')).toBeTruthy()
 
-    fireEvent.change(screen.getByPlaceholderText('Filter shots...'), {
+    const filter = screen.getByPlaceholderText('Filter shots...')
+    expect(filter.getAttribute('maxLength')).toBe(String(ESPRESSO_SHOT_Q_MAX))
+    fireEvent.change(filter, {
       target: { value: 'Huila' },
     })
 
@@ -616,7 +665,7 @@ describe('EspressoBrewsSection', () => {
         }),
       ],
       first.length + 1,
-      ESPRESSO_SHOT_PAGE_SIZE,
+      { cursor: espressoShotCursor(first[first.length - 1]) },
     )
 
     render(<EspressoBrewsSection />, { wrapper: Wrapper })
@@ -636,13 +685,13 @@ describe('EspressoBrewsSection', () => {
       coffeeId: 'c1',
       coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
     })
-    seedLog(queryClient, trpc, [loaded], 1, 0, {
+    seedLog(queryClient, trpc, [loaded], 1, {
       coffees: [
         makeCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
         makeCoffee({ id: 'c-unloaded', name: 'Kenya Nyeri' }),
       ],
     })
-    seedEspressoShotPage(queryClient, trpc, [], 0, 0, {
+    seedEspressoShotPage(queryClient, trpc, [], 0, undefined, {
       coffeeId: 'c-unloaded',
     })
 
@@ -669,7 +718,7 @@ describe('EspressoBrewsSection', () => {
       coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
     })
     seedLog(queryClient, trpc, [guji, huila])
-    seedEspressoShotPage(queryClient, trpc, [huila], 1, 0, {
+    seedEspressoShotPage(queryClient, trpc, [huila], 1, undefined, {
       coffeeId: 'c2',
     })
 
@@ -728,6 +777,72 @@ describe('EspressoBrewsSection', () => {
     expect(table.getByText('Ethiopia Guji · Onyx')).toBeTruthy()
   })
 
+  it('re-enables Load more when the filter changes during a load-more', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => new Promise(() => {}))
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+        makeRecentShot({
+          id: `s${index}`,
+          coffeeId: `c${index}`,
+          coffee: makeRecentCoffee({
+            id: `c${index}`,
+            name: `Coffee ${index}`,
+          }),
+        }),
+      )
+      const huilaPage = Array.from(
+        { length: ESPRESSO_SHOT_PAGE_SIZE },
+        (_, index) =>
+          makeRecentShot({
+            id: `h${index}`,
+            coffeeId: 'c-huila',
+            coffee: makeRecentCoffee({
+              id: 'c-huila',
+              name: index === 0 ? 'Colombia Huila' : `Huila ${index}`,
+            }),
+          }),
+      )
+      seedLog(queryClient, trpc, first, first.length + 1, {
+        coffees: [
+          ...coffeesFrom(first),
+          makeCoffee({ id: 'c-huila', name: 'Colombia Huila' }),
+        ],
+      })
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        huilaPage,
+        huilaPage.length + 1,
+        undefined,
+        { q: 'Huila' },
+      )
+
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+      expect(
+        screen.getByRole('button', { name: 'Load more' }),
+      ).toHaveProperty('disabled', true)
+
+      fireEvent.change(screen.getByPlaceholderText('Filter shots...'), {
+        target: { value: 'Huila' },
+      })
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Load more' }),
+        ).toHaveProperty('disabled', false),
+      )
+      expect(
+        within(screen.getByRole('table')).getByText('Colombia Huila'),
+      ).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('retries a failed load-more from the error', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
@@ -760,7 +875,7 @@ describe('EspressoBrewsSection', () => {
           }),
         ],
         first.length + 1,
-        ESPRESSO_SHOT_PAGE_SIZE,
+        espressoShotCursor(first[first.length - 1]),
       )
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
       expect(

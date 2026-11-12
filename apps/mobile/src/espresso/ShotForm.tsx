@@ -76,6 +76,7 @@ export function ShotForm({
   const prefillSeq = useRef(0)
   const prefillCoffeeId = useRef('')
   const keepPrefill = useRef<PrefillKeep>({})
+  const saveGen = useRef(0)
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () =>
@@ -98,10 +99,18 @@ export function ShotForm({
     })
   }
 
-  const applyPrefill = (coffeeId: string, seq: number, latest: ShotRow | null) => {
+  const applyPrefill = (
+    coffeeId: string,
+    seq: number,
+    latest: ShotRow | null,
+    startedSaveGen: number,
+  ) => {
     if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
       return
     }
+    // Drop prefill that arrives after a save has started so a retry keeps the
+    // same payload and idempotency key.
+    if (startedSaveGen !== saveGen.current) return
     setDraft((current) =>
       applyCoffeePrefill(current, coffeeId, latest, keepPrefill.current),
     )
@@ -109,16 +118,17 @@ export function ShotForm({
 
   const requestPrefill = (coffeeId: string) => {
     const seq = ++prefillSeq.current
+    const startedSaveGen = saveGen.current
     prefillCoffeeId.current = coffeeId
     setPrefillError(false)
     void loadPrefill(coffeeId).then(
-      (latest) => applyPrefill(coffeeId, seq, latest),
+      (latest) => applyPrefill(coffeeId, seq, latest, startedSaveGen),
       () => {
         if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
           return
         }
         setPrefillError(true)
-        applyPrefill(coffeeId, seq, null)
+        applyPrefill(coffeeId, seq, null, startedSaveGen)
       },
     )
   }
@@ -260,6 +270,7 @@ export function ShotForm({
             idempotencyKey.current = newIdempotencyKey()
           }
           lastSubmitted.current = fingerprint
+          saveGen.current += 1
           onSubmit({ ...parsed.value, idempotencyKey: idempotencyKey.current })
         }}
       >

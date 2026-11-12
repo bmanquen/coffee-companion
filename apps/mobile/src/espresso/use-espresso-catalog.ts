@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { apiErrorMessage } from '../api-error'
 import { ERROR_LOAD_FAILED, ERROR_SAVE_FAILED } from './copy'
-import type { EspressoApi, EspressoCatalog, ShotCreate, ShotRow } from './types'
+import type {
+  EspressoApi,
+  EspressoCatalog,
+  ShotCreate,
+  ShotCursor,
+  ShotRow,
+} from './types'
 
 type LoadStatus = 'loading' | 'loaded' | 'failed'
 
@@ -24,8 +30,19 @@ type Action =
   | { type: 'saveErrorCleared' }
   | { type: 'reset' }
   | { type: 'loadMoreStarted' }
-  | { type: 'shotsRefreshed'; shots: Array<ShotRow>; total: number }
-  | { type: 'shotsAppended'; shots: Array<ShotRow>; total: number }
+  | { type: 'pageInvalidated' }
+  | {
+      type: 'shotsRefreshed'
+      shots: Array<ShotRow>
+      total: number
+      nextCursor: ShotCursor | null
+    }
+  | {
+      type: 'shotsAppended'
+      shots: Array<ShotRow>
+      total: number
+      nextCursor: ShotCursor | null
+    }
   | { type: 'loadMoreFailed' }
 
 const initial: State = {
@@ -40,16 +57,22 @@ const initial: State = {
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'loadStarted':
-      return { ...state, status: 'loading', loadError: null }
+      return { ...state, status: 'loading', loadError: null, loadingMore: false }
     case 'loadSucceeded':
       return {
         ...state,
         status: 'loaded',
         catalog: action.catalog,
         loadError: null,
+        loadingMore: false,
       }
     case 'loadFailed':
-      return { ...state, status: 'failed', loadError: action.error }
+      return {
+        ...state,
+        status: 'failed',
+        loadError: action.error,
+        loadingMore: false,
+      }
     case 'saveStarted':
       return { ...state, busy: true, saveError: null }
     case 'saveSucceeded':
@@ -62,8 +85,10 @@ function reducer(state: State, action: Action): State {
       return initial
     case 'loadMoreStarted':
       return { ...state, loadingMore: true }
+    case 'pageInvalidated':
+      return { ...state, loadingMore: false }
     case 'shotsRefreshed':
-      if (!state.catalog) return state
+      if (!state.catalog) return { ...state, loadingMore: false }
       return {
         ...state,
         loadingMore: false,
@@ -71,6 +96,7 @@ function reducer(state: State, action: Action): State {
           ...state.catalog,
           shots: action.shots,
           total: action.total,
+          nextCursor: action.nextCursor,
         },
       }
     case 'shotsAppended': {
@@ -86,6 +112,7 @@ function reducer(state: State, action: Action): State {
             ...action.shots.filter((shot) => !seen.has(shot.id)),
           ],
           total: action.total,
+          nextCursor: action.nextCursor,
         },
       }
     }
@@ -145,7 +172,8 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     (forUser: string) => {
       const seq = ++refreshSeq.current
       pageSeq.current += 1
-      void api.listShots(0).then(
+      dispatch({ type: 'pageInvalidated' })
+      void api.listShots().then(
         (page) => {
           if (forUser !== activeUser.current || seq !== refreshSeq.current) {
             return
@@ -154,6 +182,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
             type: 'shotsRefreshed',
             shots: page.items,
             total: page.total,
+            nextCursor: page.nextCursor,
           })
         },
         () => {
@@ -196,24 +225,21 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
 
   const loadMore = useCallback(() => {
     const catalog = state.catalog
-    if (
-      state.loadingMore ||
-      !catalog ||
-      catalog.shots.length >= catalog.total
-    ) {
+    if (state.loadingMore || !catalog || !catalog.nextCursor) {
       return
     }
     const forUser = userId
     const seq = pageSeq.current
-    const offset = catalog.shots.length
+    const cursor = catalog.nextCursor
     dispatch({ type: 'loadMoreStarted' })
-    void api.listShots(offset).then(
+    void api.listShots(cursor).then(
       (page) => {
         if (forUser !== activeUser.current || seq !== pageSeq.current) return
         dispatch({
           type: 'shotsAppended',
           shots: page.items,
           total: page.total,
+          nextCursor: page.nextCursor,
         })
       },
       () => {

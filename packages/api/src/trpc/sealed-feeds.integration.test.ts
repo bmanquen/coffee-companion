@@ -305,7 +305,7 @@ const readableId = (method: MethodKey) => {
 async function historyItems(method: MethodKey) {
   switch (method) {
     case 'espressoShot':
-      return (await asUser.espressoShot.getRecent({ limit: 50, offset: 0 }))
+      return (await asUser.espressoShot.getRecent({ limit: 50 }))
         .items
     case 'aeropressBrew':
       return asUser.aeropressBrew.getAll()
@@ -330,7 +330,10 @@ describe.each(methods)('%s feeds', (method) => {
   })
 
   it('withholds a Sealed brew from getRecent', async () => {
-    const { items } = await feedFor().getRecent({ limit: 50, offset: 0 })
+    const { items } =
+      method === 'espressoShot'
+        ? await asUser.espressoShot.getRecent({ limit: 50 })
+        : await feedFor().getRecent({ limit: 50, offset: 0 })
     const brew = items.find((row) => row.id === sealedId(method))
 
     expect(brew?.sealed).toBe(true)

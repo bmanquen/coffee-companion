@@ -428,8 +428,121 @@ describe('NewEspressoShot form', () => {
         roastDate: '2026-05-01',
       }),
     )
-    await waitFor(() => expect(screen.getByDisplayValue('P64')).toBeTruthy())
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+    expect(screen.getByDisplayValue('P64')).toBeTruthy()
     expect(screen.queryByDisplayValue('Niche Zero')).toBeNull()
+  })
+
+  it('prefills roast date and device when the latest shot has no grinder', async () => {
+    const { queryClient, trpc, Wrapper } = seeded()
+    seedLatestUnsealed(
+      queryClient,
+      trpc,
+      COFFEE,
+      makeRecentShot({
+        id: 'shot-1',
+        coffeeId: COFFEE,
+        grinderId: null,
+        grinder: null,
+        brewingDeviceId: ESP_DEVICE,
+        roastDate: '2026-05-01',
+      }),
+    )
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+    expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
+    expect(screen.queryByDisplayValue('Niche Zero')).toBeNull()
+  })
+
+  it('does not apply prefill after a save has started', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValue(trpcSuccess())
+    try {
+      const providers = seeded()
+      const { queryClient, trpc, Wrapper } = providers
+      queryClient.removeQueries({
+        queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+          coffeeId: COFFEE,
+        }),
+      })
+      let resolvePrefill: (shot: ReturnType<typeof makeRecentShot>) => void =
+        () => {}
+      const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+        (resolve) => {
+          resolvePrefill = resolve
+        },
+      )
+      void queryClient.prefetchQuery({
+        ...trpc.espressoShot.getLatestUnsealed.queryOptions({
+          coffeeId: COFFEE,
+        }),
+        queryFn: () => pending,
+      })
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
+        target: { value: ESP_DEVICE },
+      })
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      resolvePrefill(
+        makeRecentShot({
+          id: 'shot-1',
+          coffeeId: COFFEE,
+          grinderId: GRINDER,
+          brewingDeviceId: ESP_DEVICE,
+          roastDate: '2026-05-01',
+        }),
+      )
+      await pending
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
+      const bodies = createCalls(fetchSpy).map((call) =>
+        String((call[1] as RequestInit | undefined)?.body ?? ''),
+      )
+      const keys = bodies.map(
+        (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
+      )
+      expect(keys[0]).toBe(keys[1])
+      expect(bodies[1]).not.toContain('2026-05-01')
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 
   it('shows a retry when the last shot cannot be loaded and still lets you enter one', async () => {

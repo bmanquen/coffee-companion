@@ -11,7 +11,7 @@ import {
 } from '../db/schema'
 import { isPgUniqueViolation } from './pg-error'
 import { isSealed, sealBrew, sealBrewPage, sealBrews } from './shelf'
-import type { SealableBrew, Shelf } from './shelf'
+import type { Sealable, SealableBrew, Shelf } from './shelf'
 
 type BrewTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -521,12 +521,16 @@ export async function sealBrewsWithDialedIn<
 }
 
 export async function sealBrewPageWithDialedIn<
-  T extends SealableBrew & { id: string },
+  TPage extends { items: Array<SealableBrew & { id: string }>; total: number },
 >(
   userId: string,
   shelf: () => Promise<Shelf>,
-  load: () => Promise<{ items: Array<T>; total: number }>,
-) {
+  load: () => Promise<TPage>,
+): Promise<
+  Omit<TPage, 'items'> & {
+    items: Array<Sealable<TPage['items'][number]> & { isDialedIn: boolean }>
+  }
+> {
   const page = await sealBrewPage(shelf, load)
   return { ...page, items: await stampDialedIn(userId, page.items) }
 }

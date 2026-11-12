@@ -59,7 +59,6 @@ export function createLiveEspressoApi(): EspressoApi {
         client.brewingDevice.list.query(),
         client.espressoShot.getRecent.query({
           limit: ESPRESSO_SHOT_PAGE_SIZE,
-          offset: 0,
         }),
       ])
       return {
@@ -72,14 +71,19 @@ export function createLiveEspressoApi(): EspressoApi {
         devices: espressoDevicesFrom(devices),
         shots: page.items.map(toShotRow),
         total: page.total,
+        nextCursor: page.nextCursor,
       }
     },
-    async listShots(offset: number): Promise<ShotPage> {
+    async listShots(cursor?: ShotPage['nextCursor']): Promise<ShotPage> {
       const page = await client.espressoShot.getRecent.query({
         limit: ESPRESSO_SHOT_PAGE_SIZE,
-        offset,
+        ...(cursor ? { cursor } : {}),
       })
-      return { items: page.items.map(toShotRow), total: page.total }
+      return {
+        items: page.items.map(toShotRow),
+        total: page.total,
+        nextCursor: page.nextCursor,
+      }
     },
     async loadPrefill(coffeeId: string): Promise<ShotRow | null> {
       const shot = await client.espressoShot.getLatestUnsealed.query({
