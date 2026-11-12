@@ -19,7 +19,9 @@ import { createTestProviders } from '@/test/providers'
 import { trpcSuccess } from '@/test/trpc-response'
 
 const COFFEE = '00000000-0000-4000-8000-000000000001'
+const COFFEE_B = '00000000-0000-4000-8000-000000000002'
 const GRINDER = '00000000-0000-4000-8000-000000000003'
+const GRINDER_B = '00000000-0000-4000-8000-000000000006'
 const ESP_DEVICE = '00000000-0000-4000-8000-000000000005'
 const AERO_DEVICE = '00000000-0000-4000-8000-000000000004'
 const ts = new Date('2026-06-01T08:00:00.000Z')
@@ -67,9 +69,11 @@ function seeded() {
   const { queryClient: qc, trpc } = providers
   qc.setQueryData(trpc.coffee.getAll.queryKey(), [
     makeCoffee({ id: COFFEE, name: 'Ethiopia Guji' }),
+    makeCoffee({ id: COFFEE_B, name: 'Colombia Huila' }),
   ])
   qc.setQueryData(trpc.grinder.list.queryKey(), [
     makeGrinder({ id: GRINDER, name: 'Niche Zero' }),
+    makeGrinder({ id: GRINDER_B, name: 'P64' }),
   ])
   qc.setQueryData(trpc.brewingDevice.list.queryKey(), [
     makeBrewingDevice({
@@ -96,6 +100,18 @@ function seeded() {
       grinderId: GRINDER,
       brewingDeviceId: ESP_DEVICE,
       roastDate: '2026-05-01',
+    }),
+  )
+  seedLatestUnsealed(
+    qc,
+    trpc,
+    COFFEE_B,
+    makeRecentShot({
+      id: 'shot-b',
+      coffeeId: COFFEE_B,
+      grinderId: GRINDER_B,
+      brewingDeviceId: ESP_DEVICE,
+      roastDate: '2026-04-01',
     }),
   )
   qc.setQueryData(
@@ -302,6 +318,166 @@ describe('NewEspressoShot form', () => {
       expect(keys[0]).toBe(keys[1])
     } finally {
       fetchSpy.mockRestore()
+    }
+  })
+
+  it('mints a new key when the draft changes after a failed save', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValue(trpcSuccess({ id: 'shot-new', dose: '22' }))
+    try {
+      const { Wrapper } = seeded()
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '22' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
+
+      const bodies = createCalls(fetchSpy).map((call) =>
+        String((call[1] as RequestInit | undefined)?.body ?? ''),
+      )
+      const keys = bodies.map(
+        (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
+      )
+      expect(keys[0]).not.toBe(keys[1])
+      expect(bodies[1]).toContain('22')
+      expect(bodies[1]).not.toMatch(/"dose"\s*:\s*"18"/)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('clears the previous coffee’s roast date as soon as another coffee is chosen', async () => {
+    const { Wrapper } = seeded()
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE_B },
+    })
+    expect(screen.queryByText('May 1st, 2026')).toBeNull()
+    expect(await screen.findByText('April 1st, 2026')).toBeTruthy()
+  })
+
+  it('keeps a grinder chosen while prefill is still loading', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper } = providers
+    queryClient.removeQueries({
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+    })
+    let resolvePrefill: (shot: ReturnType<typeof makeRecentShot>) => void =
+      () => {}
+    const pending = new Promise<ReturnType<typeof makeRecentShot>>((resolve) => {
+      resolvePrefill = resolve
+    })
+    void queryClient.prefetchQuery({
+      ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId: COFFEE }),
+      queryFn: () => pending,
+    })
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+      target: { value: GRINDER_B },
+    })
+    expect(screen.getByDisplayValue('P64')).toBeTruthy()
+
+    resolvePrefill(
+      makeRecentShot({
+        id: 'shot-1',
+        coffeeId: COFFEE,
+        grinderId: GRINDER,
+        brewingDeviceId: ESP_DEVICE,
+        roastDate: '2026-05-01',
+      }),
+    )
+    await waitFor(() => expect(screen.getByDisplayValue('P64')).toBeTruthy())
+    expect(screen.queryByDisplayValue('Niche Zero')).toBeNull()
+  })
+
+  it('shows a retry when the last shot cannot be loaded and still lets you enter one', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    try {
+      const { queryClient, trpc, Wrapper } = seeded()
+      queryClient.removeQueries({
+        queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+          coffeeId: COFFEE,
+        }),
+      })
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+
+      expect(
+        await screen.findByText(
+          "We couldn't load this coffee's last shot. Enter it yourself, or try again.",
+        ),
+      ).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      expect(screen.getByDisplayValue('18')).toBeTruthy()
+
+      fetchSpy.mockRestore()
+      seedLatestUnsealed(
+        queryClient,
+        trpc,
+        COFFEE,
+        makeRecentShot({
+          id: 'shot-1',
+          coffeeId: COFFEE,
+          grinderId: GRINDER,
+          brewingDeviceId: ESP_DEVICE,
+          roastDate: '2026-05-01',
+        }),
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+    } catch (error) {
+      fetchSpy.mockRestore()
+      throw error
     }
   })
 })

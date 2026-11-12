@@ -10,9 +10,14 @@ import { EspressoBrewsSection } from './espresso-brews-section'
 import type * as ReactRouter from '@tanstack/react-router'
 import {
   ESPRESSO_SHOT_PAGE_SIZE,
+  seedCoffees,
   seedEspressoShotPage,
 } from '@/test/espresso-shots'
-import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
+import {
+  makeCoffee,
+  makeRecentCoffee,
+  makeRecentShot,
+} from '@/test/factories'
 import { createTestProviders } from '@/test/providers'
 import { trpcSuccess } from '@/test/trpc-response'
 
@@ -20,7 +25,75 @@ const mocks = vi.hoisted(() => ({ track: vi.fn() }))
 
 vi.mock('@/lib/analytics', () => ({ track: mocks.track }))
 
+vi.mock('@/components/ui/command', () => ({
+  Command: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CommandList: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CommandGroup: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CommandEmpty: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CommandInput: ({ placeholder }: { placeholder?: string }) => (
+    <input placeholder={placeholder} />
+  ),
+  CommandItem: ({
+    children,
+    onSelect,
+  }: {
+    children: React.ReactNode
+    onSelect?: () => void
+  }) => (
+    <div role="option" onClick={() => onSelect?.()}>
+      {children}
+    </div>
+  ),
+}))
+
 beforeEach(() => mocks.track.mockClear())
+
+function coffeesFrom(shots: Array<ReturnType<typeof makeRecentShot>>) {
+  const byId = new Map<string, ReturnType<typeof makeCoffee>>()
+  for (const shot of shots) {
+    if (!byId.has(shot.coffeeId)) {
+      byId.set(
+        shot.coffeeId,
+        makeCoffee({
+          id: shot.coffeeId,
+          name: shot.coffee.name,
+          roaster: shot.coffee.roaster ?? null,
+        }),
+      )
+    }
+  }
+  return [...byId.values()]
+}
+
+function seedLog(
+  queryClient: ReturnType<typeof createTestProviders>['queryClient'],
+  trpc: ReturnType<typeof createTestProviders>['trpc'],
+  shots: Array<ReturnType<typeof makeRecentShot>>,
+  total = shots.length,
+  offset = 0,
+  extra: {
+    coffees?: Array<ReturnType<typeof makeCoffee>>
+    filters?: { coffeeId?: string; q?: string }
+  } = {},
+) {
+  seedEspressoShotPage(
+    queryClient,
+    trpc,
+    shots,
+    total,
+    offset,
+    extra.filters,
+  )
+  if (offset === 0 && !extra.filters) {
+    seedCoffees(queryClient, trpc, extra.coffees ?? coffeesFrom(shots))
+  }
+}
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 // Resolve `params` into `to` (e.g. /espresso/$shotId/edit -> /espresso/s1/edit)
@@ -57,7 +130,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 describe('EspressoBrewsSection', () => {
   it('shows the empty state when there are no shots', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [])
+    seedLog(queryClient, trpc, [])
 
     render(<EspressoBrewsSection />, { wrapper: Wrapper })
 
@@ -66,7 +139,7 @@ describe('EspressoBrewsSection', () => {
 
   it('renders shots with dose and yield', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({ id: 's1', dose: '18', yield: '36' }),
     ])
 
@@ -81,20 +154,20 @@ describe('EspressoBrewsSection', () => {
     expect(within(table.getByText('36g').closest('td')!).queryByText('1:2')).toBeNull()
   })
 
-  it('filters shots by the free-text filter', () => {
+  it('filters shots by the free-text filter', async () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
-      makeRecentShot({
-        id: 's1',
-        coffeeId: 'c1',
-        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
-      }),
-      makeRecentShot({
-        id: 's2',
-        coffeeId: 'c2',
-        coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
-      }),
-    ])
+    const guji = makeRecentShot({
+      id: 's1',
+      coffeeId: 'c1',
+      coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    })
+    const huila = makeRecentShot({
+      id: 's2',
+      coffeeId: 'c2',
+      coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+    })
+    seedLog(queryClient, trpc, [guji, huila])
+    seedEspressoShotPage(queryClient, trpc, [huila], 1, 0, { q: 'Huila' })
 
     render(<EspressoBrewsSection />, { wrapper: Wrapper })
 
@@ -106,13 +179,13 @@ describe('EspressoBrewsSection', () => {
       target: { value: 'Huila' },
     })
 
-    expect(table.queryByText('Ethiopia Guji')).toBeNull()
+    await waitFor(() => expect(table.queryByText('Ethiopia Guji')).toBeNull())
     expect(table.getByText('Colombia Huila')).toBeTruthy()
   })
 
   it('renders the recipe columns', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         dose: '18',
@@ -135,7 +208,7 @@ describe('EspressoBrewsSection', () => {
 
   it('shows the computed ratio as its own card-summary field', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({ id: 's1', dose: '18', yield: '36' }),
     ])
 
@@ -151,7 +224,7 @@ describe('EspressoBrewsSection', () => {
 
   it('shows no ratio when dose is missing', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({ id: 's1', dose: null, yield: '36' }),
     ])
 
@@ -164,7 +237,7 @@ describe('EspressoBrewsSection', () => {
 
   it('does not leave an empty ratio slot on the card when there is no ratio', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({ id: 's1', dose: null, yield: '36' }),
     ])
 
@@ -178,7 +251,7 @@ describe('EspressoBrewsSection', () => {
 
   it('shows no ratio when yield is missing', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({ id: 's1', dose: '18', yield: null }),
     ])
 
@@ -191,7 +264,7 @@ describe('EspressoBrewsSection', () => {
 
   it('falls back to a dash for missing recipe values', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         dose: null,
@@ -213,7 +286,7 @@ describe('EspressoBrewsSection', () => {
 
   it('highlights the dialed-in row and not the others', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         isDialedIn: true,
@@ -239,7 +312,7 @@ describe('EspressoBrewsSection', () => {
 
   it('links each row to its edit page and the header to the new-shot form', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({ id: 's1' }),
     ])
 
@@ -260,7 +333,7 @@ describe('EspressoBrewsSection', () => {
 
   it('reflects each shot’s dialed-in state on the crosshair toggle', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         isDialedIn: true,
@@ -290,7 +363,7 @@ describe('EspressoBrewsSection', () => {
 
   it('opens a delete confirmation dialog naming the coffee', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
@@ -316,7 +389,7 @@ describe('EspressoBrewsSection', () => {
       .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
-      seedEspressoShotPage(queryClient, trpc, [
+      seedLog(queryClient, trpc, [
         makeRecentShot({
           id: 's1',
           isDialedIn: false,
@@ -352,7 +425,7 @@ describe('EspressoBrewsSection', () => {
       .mockResolvedValue(trpcSuccess())
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
-      seedEspressoShotPage(queryClient, trpc, [
+      seedLog(queryClient, trpc, [
         makeRecentShot({
           id: 's1',
           isDialedIn: true,
@@ -384,7 +457,7 @@ describe('EspressoBrewsSection', () => {
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
       const shot = makeRecentShot({ id: 's1' })
-      seedEspressoShotPage(queryClient, trpc, [shot])
+      seedLog(queryClient, trpc, [shot])
       queryClient.setQueryData(trpc.dialedInBrew.list.queryKey(), [])
 
       render(<EspressoBrewsSection />, { wrapper: Wrapper })
@@ -421,7 +494,7 @@ describe('EspressoBrewsSection', () => {
 
   it('expands a desktop row on click to reveal the brew detail', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         coffeeId: 'c1',
@@ -453,7 +526,7 @@ describe('EspressoBrewsSection', () => {
 
   it('keeps only one desktop row expanded at a time (accordion)', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    seedEspressoShotPage(queryClient, trpc, [
+    seedLog(queryClient, trpc, [
       makeRecentShot({
         id: 's1',
         coffeeId: 'c1',
@@ -491,7 +564,7 @@ describe('EspressoBrewsSection', () => {
     )
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
-      seedEspressoShotPage(queryClient, trpc, [
+      seedLog(queryClient, trpc, [
         makeRecentShot({
           id: 's1',
           isDialedIn: false,
@@ -531,8 +604,8 @@ describe('EspressoBrewsSection', () => {
         coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
       }),
     )
-    seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
-    seedEspressoShotPage(
+    seedLog(queryClient, trpc, first, first.length + 1)
+    seedLog(
       queryClient,
       trpc,
       [
@@ -554,5 +627,147 @@ describe('EspressoBrewsSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
     expect(await table.findByText('Coffee extra')).toBeTruthy()
+  })
+
+  it('lists coffees from the library, not only loaded shots', async () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    const loaded = makeRecentShot({
+      id: 's1',
+      coffeeId: 'c1',
+      coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    })
+    seedLog(queryClient, trpc, [loaded], 1, 0, {
+      coffees: [
+        makeCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        makeCoffee({ id: 'c-unloaded', name: 'Kenya Nyeri' }),
+      ],
+    })
+    seedEspressoShotPage(queryClient, trpc, [], 0, 0, {
+      coffeeId: 'c-unloaded',
+    })
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+    fireEvent.click(screen.getByRole('button', { name: 'All coffees' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Kenya Nyeri' }))
+
+    await waitFor(() =>
+      expect(screen.queryByText('Ethiopia Guji')).toBeNull(),
+    )
+    expect(screen.getByPlaceholderText('Filter shots...')).toBeTruthy()
+  })
+
+  it('filters shots by coffee on the server', async () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    const guji = makeRecentShot({
+      id: 's1',
+      coffeeId: 'c1',
+      coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    })
+    const huila = makeRecentShot({
+      id: 's2',
+      coffeeId: 'c2',
+      coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+    })
+    seedLog(queryClient, trpc, [guji, huila])
+    seedEspressoShotPage(queryClient, trpc, [huila], 1, 0, {
+      coffeeId: 'c2',
+    })
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+    fireEvent.click(screen.getByRole('button', { name: 'All coffees' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Colombia Huila' }))
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('table')).queryByText('Ethiopia Guji'),
+      ).toBeNull(),
+    )
+    expect(
+      within(screen.getByRole('table')).getByText('Colombia Huila'),
+    ).toBeTruthy()
+  })
+
+  it('names same-name coffees with their roaster', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    seedLog(queryClient, trpc, [
+      makeRecentShot({
+        id: 's1',
+        coffeeId: 'c1',
+        coffee: {
+          ...makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+          roaster: {
+            id: 'r1',
+            userId: 'u1',
+            name: 'Sey',
+            nameKey: 'sey',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        },
+      }),
+      makeRecentShot({
+        id: 's2',
+        coffeeId: 'c2',
+        coffee: {
+          ...makeRecentCoffee({ id: 'c2', name: 'Ethiopia Guji' }),
+          roaster: {
+            id: 'r2',
+            userId: 'u1',
+            name: 'Onyx',
+            nameKey: 'onyx',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        },
+      }),
+    ])
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('Ethiopia Guji · Sey')).toBeTruthy()
+    expect(table.getByText('Ethiopia Guji · Onyx')).toBeTruthy()
+  })
+
+  it('retries a failed load-more from the error', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+        makeRecentShot({
+          id: `s${index}`,
+          coffeeId: `c${index}`,
+          coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
+        }),
+      )
+      seedLog(queryClient, trpc, first, first.length + 1)
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+      expect(
+        await screen.findByText("We couldn't load more shots. Try again."),
+      ).toBeTruthy()
+
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [
+          makeRecentShot({
+            id: 's-next',
+            coffeeId: 'c-next',
+            coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+          }),
+        ],
+        first.length + 1,
+        ESPRESSO_SHOT_PAGE_SIZE,
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(
+        await within(screen.getByRole('table')).findByText('Coffee extra'),
+      ).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })

@@ -25,6 +25,9 @@ export const Route = createFileRoute('/_authenticated/brews/')({
       context.trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
     )
     context.queryClient.ensureQueryData(
+      context.trpc.coffee.getAll.queryOptions(),
+    )
+    context.queryClient.ensureQueryData(
       context.trpc.aeropressBrew.getAll.queryOptions(),
     )
     context.queryClient.ensureQueryData(

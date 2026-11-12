@@ -28,7 +28,7 @@ function toShotRow(shot: ShotRecord): ShotRow {
   return {
     id: shot.id,
     coffeeId: shot.coffeeId,
-    coffeeName: shot.coffee.name,
+    coffeeName: coffeeOptionLabel(shot.coffee),
     grinderId: shot.grinderId,
     brewingDeviceId: shot.brewingDeviceId,
     roastDate: shot.roastDate,

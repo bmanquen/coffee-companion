@@ -1,11 +1,21 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Dashboard } from './dashboard'
 import type * as ReactRouter from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import type { DashboardMethod } from '@/components/dashboard/methods'
 import { dashboardMethods } from '@/components/dashboard/methods'
-import { seedEspressoShotPage } from '@/test/espresso-shots'
+import {
+  ESPRESSO_SHOT_PAGE_SIZE,
+  seedEspressoShotPage,
+} from '@/test/espresso-shots'
 import {
   makeAeropressBrew,
   makeColdBrewBrew,
@@ -482,6 +492,73 @@ describe('Dashboard', () => {
     expect(
       screen.getByRole('link', { name: /Log your first cold brew/i }),
     ).toBeTruthy()
+  })
+
+  it('retries a failed espresso load-more from the error', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+    try {
+      const shots = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+        makeRecentShot({
+          id: `s${index}`,
+          coffeeId: `c${index}`,
+          coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
+        }),
+      )
+      const { queryClient, trpc, Wrapper } = seed(shots)
+      queryClient.setQueryData(
+        trpc.espressoShot.getRecent.queryKey({
+          limit: ESPRESSO_SHOT_PAGE_SIZE,
+          offset: 0,
+        }),
+        { items: shots, total: shots.length + 1 },
+      )
+      render(
+        <Dashboard
+          selectedMethod="espresso"
+          onSelectMethod={vi.fn()}
+          feeds={[
+            { method: 'espresso', brews: shots },
+            { method: 'pourover', brews: [] },
+            { method: 'frenchpress', brews: [] },
+            { method: 'aeropress', brews: [] },
+            { method: 'coldbrew', brews: [] },
+          ]}
+          now={NOW}
+        />,
+        { wrapper: Wrapper },
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+      expect(
+        await screen.findByText("We couldn't load more shots. Try again."),
+      ).toBeTruthy()
+
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [
+          makeRecentShot({
+            id: 's-next',
+            coffeeId: 'c-next',
+            coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+          }),
+        ],
+        shots.length + 1,
+        ESPRESSO_SHOT_PAGE_SIZE,
+      )
+      fetchSpy.mockRestore()
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      await waitFor(() => {
+        expect(
+          screen.queryByText("We couldn't load more shots. Try again."),
+        ).toBeNull()
+      })
+      expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })
 

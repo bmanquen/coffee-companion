@@ -3,8 +3,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { Brews } from './index'
 import type * as ReactRouter from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { seedEspressoShotPage } from '@/test/espresso-shots'
-import { makeAeropressBrew, makeRecentShot } from '@/test/factories'
+import { seedCoffees, seedEspressoShotPage } from '@/test/espresso-shots'
+import {
+  makeAeropressBrew,
+  makeCoffee,
+  makeRecentShot,
+} from '@/test/factories'
 import { createTestProviders } from '@/test/providers'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
@@ -57,6 +61,9 @@ vi.mock('@/components/ui/command', () => ({
 function seeded() {
   const providers = createTestProviders()
   seedEspressoShotPage(providers.queryClient, providers.trpc, [makeRecentShot()])
+  seedCoffees(providers.queryClient, providers.trpc, [
+    makeCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+  ])
   providers.queryClient.setQueryData(
     providers.trpc.aeropressBrew.getAll.queryKey(),
     [makeAeropressBrew()],

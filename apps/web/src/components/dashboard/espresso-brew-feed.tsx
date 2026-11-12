@@ -7,7 +7,7 @@ import {
 import { ratioColumn } from '@/components/brews/brew-ratio'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { expanderColumn } from '@/components/data-table'
-import { Button } from '@/components/ui/button'
+import { EspressoShotPager } from '@/components/brews/espresso-shot-pager'
 import { useEspressoShotPages } from '@/hooks/use-espresso-shot-pages'
 
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
@@ -52,7 +52,8 @@ const columns = [
 // The Espresso tab of the dashboard: paged Shot history as a reference-only
 // feed. Hands loaded pages to BrewFeed and offers Load more for the rest.
 export function EspressoBrewFeed() {
-  const { items, hasMore, loadingMore, loadMore } = useEspressoShotPages()
+  const { items, hasMore, loadingMore, loadMore, loadMoreError } =
+    useEspressoShotPages()
 
   return (
     <>
@@ -66,18 +67,12 @@ export function EspressoBrewFeed() {
         emptyMessage="No espresso shots yet."
         emptyLinkLabel="Log your first shot"
       />
-      {hasMore ? (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={loadingMore}
-          onClick={() => {
-            void loadMore()
-          }}
-        >
-          Load more
-        </Button>
-      ) : null}
+      <EspressoShotPager
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        loadMoreError={loadMoreError}
+        loadMore={loadMore}
+      />
     </>
   )
 }

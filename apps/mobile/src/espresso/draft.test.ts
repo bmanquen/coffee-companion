@@ -141,6 +141,24 @@ describe('applyCoffeePrefill', () => {
     expect(next.coffeeId).toBe(other)
     expect(next.roastDate).toBe('')
   })
+
+  it('keeps grinder, device, and roast date the user already chose', () => {
+    const draft = {
+      ...emptyShotDraft(),
+      coffeeId: COFFEE,
+      grinderId: 'keep-grinder',
+      brewingDeviceId: 'keep-device',
+      roastDate: '2026-06-15',
+    }
+    const next = applyCoffeePrefill(draft, COFFEE, shot(), {
+      grinderId: true,
+      brewingDeviceId: true,
+      roastDate: true,
+    })
+    expect(next.grinderId).toBe('keep-grinder')
+    expect(next.brewingDeviceId).toBe('keep-device')
+    expect(next.roastDate).toBe('2026-06-15')
+  })
 })
 
 describe('shotSummary', () => {

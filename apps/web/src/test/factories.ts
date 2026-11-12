@@ -32,8 +32,11 @@ function namedLookup(id: string, name: string) {
 }
 
 export function makeRecentShot(
-  overrides: Partial<RecentShot> = {},
+  overrides: Omit<Partial<RecentShot>, 'coffee'> & {
+    coffee?: Partial<RecentShot['coffee']>
+  } = {},
 ): RecentShot {
+  const { coffee, ...rest } = overrides
   return {
     id: 's1',
     sealed: false,
@@ -52,7 +55,11 @@ export function makeRecentShot(
     idempotencyKey: null,
     createdAt,
     updatedAt,
-    coffee: makeRecentCoffee({ id: 'c1' }),
+    coffee: {
+      ...makeRecentCoffee({ id: 'c1' }),
+      ...coffee,
+      roaster: coffee?.roaster ?? null,
+    },
     grinder: {
       id: 'g1',
       userId: 'u1',
@@ -71,7 +78,7 @@ export function makeRecentShot(
       updatedAt,
       type: namedLookup('t1', 'Espresso'),
     },
-    ...overrides,
+    ...rest,
   }
 }
 

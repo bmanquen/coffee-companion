@@ -1,10 +1,14 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { coffeeOptionLabel } from '@coffee-companion/brew-display'
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
   getCoreRowModel,
   getExpandedRowModel,
-  getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
@@ -19,6 +23,7 @@ import { ratioColumn } from '@/components/brews/brew-ratio'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { BrewDialedInCell } from '@/components/brews/dialed-in-toggle-cell'
+import { EspressoShotPager } from '@/components/brews/espresso-shot-pager'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { SealedRowNotice } from '@/components/brews/sealed-row'
 import { DataTable, expanderColumn } from '@/components/data-table'
@@ -42,7 +47,7 @@ type Shot = {
   time: number | null
   grindSetting: string | null
   notes: string | null
-  coffee: { name: string }
+  coffee: { name: string; roaster?: { name: string | null } | null }
   grinder: { name: string; brand: string } | null
   brewingDevice: { name: string; brand: string; type: { name: string } } | null
   sealed: boolean
@@ -86,7 +91,7 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
       </Link>
       <DeleteBrewDialog
         noun="shot"
-        coffeeName={shot.coffee.name}
+        coffeeName={coffeeOptionLabel(shot.coffee)}
         isPending={deleteShot.isPending}
         onDelete={() => deleteShot.mutate(shot.id)}
       />
@@ -107,7 +112,8 @@ const columns = [
     enableSorting: false,
     meta: { cardHideLabel: true },
   }),
-  columnHelper.accessor('coffee.name', {
+  columnHelper.accessor((row) => coffeeOptionLabel(row.coffee), {
+    id: 'coffee',
     header: 'Coffee',
     meta: { cardTitle: true },
   }),
@@ -150,46 +156,42 @@ const columns = [
 // page's section components (heading + add button + filters + table).
 export function EspressoBrewsSection() {
   'use no memo'
-  const { items: shots, hasMore, loadingMore, loadMore } = useEspressoShotPages()
-
+  const trpc = useTRPC()
+  const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
   const [sorting, setSorting] = useState<SortingState>([])
-  const [globalFilter, setGlobalFilter] = useState('')
+  const [q, setQ] = useState('')
   const [coffeeId, setCoffeeId] = useState('')
   const expansion = useAccordionExpansion()
+  const filtering = Boolean(coffeeId || q.trim())
+  const { items: shots, hasMore, loadingMore, loadMore, loadMoreError } =
+    useEspressoShotPages({
+      coffeeId: coffeeId || undefined,
+      q: q.trim() || undefined,
+    })
 
-  // Unique coffees that actually appear in the log, sorted by name.
   const coffeeOptions = useMemo(
     () =>
-      Array.from(
-        new Map(shots.map((s) => [s.coffeeId, s.coffee.name])).entries(),
-      )
-        .map(([value, label]) => ({ value, label }))
+      coffees
+        .map((coffee) => ({
+          value: coffee.id,
+          label: coffeeOptionLabel(coffee),
+        }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [shots],
-  )
-
-  // Memoized so the filtered array keeps a stable reference between renders.
-  // Passing a fresh array to the table on every render trips its default
-  // autoReset* state updates and spins into an infinite render loop.
-  const visibleShots = useMemo(
-    () => (coffeeId ? shots.filter((s) => s.coffeeId === coffeeId) : shots),
-    [shots, coffeeId],
+    [coffees],
   )
 
   const table = useReactTable({
-    data: visibleShots,
+    data: shots,
     columns,
     // Both layouts collapse to the dial-in summary; expansion (accordion)
     // reveals grinder, device, days off roast and notes via BrewDetails — a
     // card detail region on mobile, a desktop sub-row (see ADR-0003).
-    state: { sorting, globalFilter, expanded: expansion.expanded },
+    state: { sorting, expanded: expansion.expanded },
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
     onExpandedChange: expansion.onExpandedChange,
     enableSorting: false,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     // A Sealed Brew has no settings to reveal.
     getRowCanExpand: (row) => !row.original.sealed,
@@ -206,7 +208,7 @@ export function EspressoBrewsSection() {
           </Button>
         </Link>
       </div>
-      {shots.length === 0 ? (
+      {shots.length === 0 && !filtering ? (
         <BrewsEmptyState
           message="No espresso shots yet."
           to="/espresso/new"
@@ -222,8 +224,8 @@ export function EspressoBrewsSection() {
             />
             <Input
               placeholder="Filter shots..."
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
               className="flex-1"
             />
           </div>
@@ -237,18 +239,12 @@ export function EspressoBrewsSection() {
               brewLogRowClass(row.original.sealed, row.original.isDialedIn)
             }
           />
-          {hasMore ? (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={loadingMore}
-              onClick={() => {
-                void loadMore()
-              }}
-            >
-              Load more
-            </Button>
-          ) : null}
+          <EspressoShotPager
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            loadMoreError={loadMoreError}
+            loadMore={loadMore}
+          />
         </>
       )}
     </Card>

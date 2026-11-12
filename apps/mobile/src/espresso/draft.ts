@@ -118,22 +118,33 @@ export function parseShotDraft(draft: ShotDraft): ParseResult {
   }
 }
 
+export type PrefillKeep = {
+  grinderId?: boolean
+  brewingDeviceId?: boolean
+  roastDate?: boolean
+}
+
 export function applyCoffeePrefill(
   draft: ShotDraft,
   coffeeId: string,
   latest: ShotRow | null,
+  keep: PrefillKeep = {},
 ): ShotDraft {
   if (!latest?.grinderId || !latest.brewingDeviceId) {
-    return coffeeId === draft.coffeeId
-      ? draft
-      : { ...draft, coffeeId, roastDate: '' }
+    return {
+      ...draft,
+      coffeeId,
+      roastDate: keep.roastDate ? draft.roastDate : '',
+    }
   }
   return {
     ...draft,
     coffeeId,
-    grinderId: latest.grinderId,
-    brewingDeviceId: latest.brewingDeviceId,
-    roastDate: latest.roastDate ?? '',
+    grinderId: keep.grinderId ? draft.grinderId : latest.grinderId,
+    brewingDeviceId: keep.brewingDeviceId
+      ? draft.brewingDeviceId
+      : latest.brewingDeviceId,
+    roastDate: keep.roastDate ? draft.roastDate : (latest.roastDate ?? ''),
   }
 }
 

@@ -1,3 +1,7 @@
+jest.mock('expo-crypto', () => ({
+  randomUUID: () => globalThis.crypto.randomUUID(),
+}))
+
 jest.mock('expo-secure-store', () => ({
   getItem: jest.fn(() => null),
   setItem: jest.fn(),
