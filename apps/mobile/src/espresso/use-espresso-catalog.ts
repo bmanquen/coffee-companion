@@ -66,6 +66,7 @@ function reducer(state: State, action: Action): State {
       if (!state.catalog) return state
       return {
         ...state,
+        loadingMore: false,
         catalog: {
           ...state.catalog,
           shots: action.shots,
@@ -98,6 +99,8 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const loadSeq = useRef(0)
   const saveInFlight = useRef(false)
   const activeUser = useRef(userId)
+  const refreshSeq = useRef(0)
+  const pageSeq = useRef(0)
 
   const runLoad = useCallback(() => {
     const seq = ++loadSeq.current
@@ -140,9 +143,13 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
 
   const refreshFirstPage = useCallback(
     (forUser: string) => {
+      const seq = ++refreshSeq.current
+      pageSeq.current += 1
       void api.listShots(0).then(
         (page) => {
-          if (forUser !== activeUser.current) return
+          if (forUser !== activeUser.current || seq !== refreshSeq.current) {
+            return
+          }
           dispatch({
             type: 'shotsRefreshed',
             shots: page.items,
@@ -150,7 +157,9 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
           })
         },
         () => {
-          if (forUser !== activeUser.current) return
+          if (forUser !== activeUser.current || seq !== refreshSeq.current) {
+            return
+          }
           runLoad()
         },
       )
@@ -195,11 +204,12 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
       return
     }
     const forUser = userId
+    const seq = pageSeq.current
     const offset = catalog.shots.length
     dispatch({ type: 'loadMoreStarted' })
     void api.listShots(offset).then(
       (page) => {
-        if (forUser !== activeUser.current) return
+        if (forUser !== activeUser.current || seq !== pageSeq.current) return
         dispatch({
           type: 'shotsAppended',
           shots: page.items,
@@ -207,7 +217,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
         })
       },
       () => {
-        if (forUser !== activeUser.current) return
+        if (forUser !== activeUser.current || seq !== pageSeq.current) return
         dispatch({ type: 'loadMoreFailed' })
       },
     )

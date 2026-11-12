@@ -9,6 +9,7 @@ import {
 import { ErrorBanner, Field, SelectField } from '../ui/fields'
 import {
   BACK,
+  ERROR_PREFILL_FAILED,
   LABEL_COFFEE,
   LABEL_DEVICE,
   LABEL_DOSE,
@@ -27,7 +28,9 @@ import {
   SHOT_FORM_A11Y_LABEL,
   SHOT_FORM_ERROR_TEST_ID,
   SHOT_FORM_HEADING_TEST_ID,
+  SHOT_FORM_PREFILL_ERROR_TEST_ID,
   SHOT_FORM_TEST_ID,
+  TRY_AGAIN,
 } from './copy'
 import {
   applyCoffeePrefill,
@@ -35,13 +38,17 @@ import {
   parseShotDraft,
 } from './draft'
 import { newIdempotencyKey } from './idempotency'
-import type { FieldErrors, ShotDraft } from './draft'
+import type { FieldErrors, PrefillKeep, ShotDraft } from './draft'
 import type { EspressoCatalog, ShotCreate, ShotRow } from './types'
 
 export function consumeHardwareBack(busy: boolean, onBack: () => void) {
   if (busy) return true
   onBack()
   return true
+}
+
+function draftFingerprint(input: Omit<ShotCreate, 'idempotencyKey'>) {
+  return JSON.stringify(input)
 }
 
 export function ShotForm({
@@ -63,8 +70,12 @@ export function ShotForm({
 }) {
   const [draft, setDraft] = useState<ShotDraft>(emptyShotDraft)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
-  const [idempotencyKey] = useState(newIdempotencyKey)
+  const [prefillError, setPrefillError] = useState(false)
+  const idempotencyKey = useRef(newIdempotencyKey())
+  const lastSubmitted = useRef<string | null>(null)
   const prefillSeq = useRef(0)
+  const prefillCoffeeId = useRef('')
+  const keepPrefill = useRef<PrefillKeep>({})
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () =>
@@ -75,6 +86,9 @@ export function ShotForm({
 
   const setField = (key: keyof ShotDraft, value: string) => {
     onClearError()
+    if (key === 'grinderId' || key === 'brewingDeviceId' || key === 'roastDate') {
+      keepPrefill.current = { ...keepPrefill.current, [key]: true }
+    }
     setDraft((current) => ({ ...current, [key]: value }))
     setFieldErrors((current) => {
       if (!current[key]) return current
@@ -82,6 +96,31 @@ export function ShotForm({
       delete next[key]
       return next
     })
+  }
+
+  const applyPrefill = (coffeeId: string, seq: number, latest: ShotRow | null) => {
+    if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
+      return
+    }
+    setDraft((current) =>
+      applyCoffeePrefill(current, coffeeId, latest, keepPrefill.current),
+    )
+  }
+
+  const requestPrefill = (coffeeId: string) => {
+    const seq = ++prefillSeq.current
+    prefillCoffeeId.current = coffeeId
+    setPrefillError(false)
+    void loadPrefill(coffeeId).then(
+      (latest) => applyPrefill(coffeeId, seq, latest),
+      () => {
+        if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
+          return
+        }
+        setPrefillError(true)
+        applyPrefill(coffeeId, seq, null)
+      },
+    )
   }
 
   return (
@@ -115,20 +154,9 @@ export function ShotForm({
         onChange={(coffeeId) => {
           onClearError()
           setFieldErrors({})
-          const seq = ++prefillSeq.current
-          setDraft((current) => ({ ...current, coffeeId }))
-          void loadPrefill(coffeeId).then(
-            (latest) => {
-              if (seq !== prefillSeq.current) return
-              setDraft((current) =>
-                applyCoffeePrefill(current, coffeeId, latest),
-              )
-            },
-            () => {
-              if (seq !== prefillSeq.current) return
-              setDraft((current) => applyCoffeePrefill(current, coffeeId, null))
-            },
-          )
+          keepPrefill.current = {}
+          setDraft((current) => ({ ...current, coffeeId, roastDate: '' }))
+          requestPrefill(coffeeId)
         }}
       />
       <SelectField
@@ -194,6 +222,23 @@ export function ShotForm({
         disabled={busy}
         onChange={(value) => setField('notes', value)}
       />
+      {prefillError ? (
+        <>
+          <ErrorBanner
+            message={ERROR_PREFILL_FAILED}
+            testID={SHOT_FORM_PREFILL_ERROR_TEST_ID}
+          />
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => {
+              if (prefillCoffeeId.current) requestPrefill(prefillCoffeeId.current)
+            }}
+          >
+            <Text>{TRY_AGAIN}</Text>
+          </Pressable>
+        </>
+      ) : null}
       {error ? (
         <ErrorBanner message={error} testID={SHOT_FORM_ERROR_TEST_ID} />
       ) : null}
@@ -207,7 +252,15 @@ export function ShotForm({
             setFieldErrors(parsed.errors)
             return
           }
-          onSubmit({ ...parsed.value, idempotencyKey })
+          const fingerprint = draftFingerprint(parsed.value)
+          if (
+            lastSubmitted.current != null &&
+            lastSubmitted.current !== fingerprint
+          ) {
+            idempotencyKey.current = newIdempotencyKey()
+          }
+          lastSubmitted.current = fingerprint
+          onSubmit({ ...parsed.value, idempotencyKey: idempotencyKey.current })
         }}
       >
         <Text>{LOG}</Text>

@@ -41,6 +41,9 @@ importers:
       expo-constants:
         specifier: ~57.0.24
         version: 57.0.24(expo@57.0.33)(react-native@0.86.3(@babel/core@7.29.13)(@react-native/jest-preset@0.86.3(@babel/core@7.29.13)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))
+      expo-crypto:
+        specifier: ~57.0.4
+        version: 57.0.4(expo@57.0.33)
       expo-dev-client:
         specifier: ~57.0.21
         version: 57.0.21(expo@57.0.33)(react-native@0.86.3(@babel/core@7.29.13)(@react-native/jest-preset@0.86.3(@babel/core@7.29.13)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))
@@ -5321,6 +5324,11 @@ packages:
     peerDependencies:
       expo: '*'
       react-native: '*'
+
+  expo-crypto@57.0.4:
+    resolution: {integrity: sha512-LqMMs/N6wvwZyw4deVmcl3AgXgqMwCVQ9WyWf2eaWyrk99TXSKk5da3QspiLOOjnn5Qv9f8C50cDNuoyLThpdw==}
+    peerDependencies:
+      expo: '*'
 
   expo-dev-client@57.0.21:
     resolution: {integrity: sha512-IWsfmUX71DuHJSpKpr7njBPuqNSSlvxTpTlrTVw7DVvIrZTckimI3hZvwGry24d3YTMGedLn+mUQ7nguJqcYkA==}
@@ -13747,6 +13755,10 @@ snapshots:
       react-native: 0.86.3(@babel/core@7.29.13)(@react-native/jest-preset@0.86.3(@babel/core@7.29.13)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
     transitivePeerDependencies:
       - supports-color
+
+  expo-crypto@57.0.4(expo@57.0.33):
+    dependencies:
+      expo: 57.0.33(@babel/core@7.29.13)(@expo/dom-webview@57.0.1)(react-dom@19.3.1(react@19.3.1))(react-native@0.86.3(@babel/core@7.29.13)(@react-native/jest-preset@0.86.3(@babel/core@7.29.13)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)(typescript@5.9.3)
 
   expo-dev-client@57.0.21(expo@57.0.33)(react-native@0.86.3(@babel/core@7.29.13)(@react-native/jest-preset@0.86.3(@babel/core@7.29.13)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)):
     dependencies:

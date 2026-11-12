@@ -27,6 +27,8 @@ export const LABEL_NOTES = 'Notes'
 
 export const ERROR_LOAD_FAILED = "We couldn't load your shots. Try again."
 export const ERROR_SAVE_FAILED = 'Something went wrong. Try again.'
+export const ERROR_PREFILL_FAILED =
+  "We couldn't load this coffee's last shot. Enter it yourself, or try again."
 export const TRY_AGAIN = 'Try again'
 
 export const SELECT_COFFEE_ERROR = 'Select a coffee'
@@ -44,4 +46,5 @@ export const SHOT_FORM_TEST_ID = 'shot-form'
 export const SHOT_FORM_A11Y_LABEL = 'Log espresso shot'
 export const SHOT_FORM_HEADING_TEST_ID = 'shot-form-heading'
 export const SHOT_FORM_ERROR_TEST_ID = 'shot-form-error'
+export const SHOT_FORM_PREFILL_ERROR_TEST_ID = 'shot-form-prefill-error'
 export const SHOT_ROW_TEST_ID_PREFIX = 'shot-row-'

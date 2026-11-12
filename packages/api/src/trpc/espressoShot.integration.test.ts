@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
-import { brewingDeviceTypes } from '../db/schema'
+import { brewingDeviceTypes, espressoShots } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import {
   UNKNOWN_UUID,
@@ -10,6 +10,8 @@ import {
   seedUsers,
   uniqFor,
 } from '../../test/trpc'
+
+const TRPC_CONFLICT = 'CONFLICT'
 
 const USER_A = 'espresso-user-a'
 const USER_B = 'espresso-user-b'
@@ -371,7 +373,7 @@ describe('espressoShot.delete', () => {
 })
 
 describe('espressoShot.create idempotency', () => {
-  it('returns the existing row when the same key is reused', async () => {
+  it('returns the existing row when the same key and fields are reused', async () => {
     const idempotencyKey = crypto.randomUUID()
     const input = {
       coffeeId: coffeeAId,
@@ -384,14 +386,59 @@ describe('espressoShot.create idempotency', () => {
       idempotencyKey,
     }
     const first = await asA.espressoShot.create(input)
-    const second = await asA.espressoShot.create({
-      ...input,
-      dose: '22',
-    })
+    const second = await asA.espressoShot.create(input)
     expect(second.id).toBe(first.id)
     expect(second.dose).toBe('18')
     const page = await asA.espressoShot.getRecent({ limit: 50, offset: 0 })
     expect(page.items.filter((shot) => shot.id === first.id)).toHaveLength(1)
+  })
+
+  it('rejects a reused key when the shot fields differ', async () => {
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    await asA.espressoShot.create(input)
+    await expect(
+      asA.espressoShot.create({
+        ...input,
+        dose: '22',
+      }),
+    ).rejects.toMatchObject({
+      code: TRPC_CONFLICT,
+      message: 'This shot was already saved with different settings.',
+    })
+  })
+
+  it('withholds settings when a sealed shot is replayed', async () => {
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    const first = await asA.espressoShot.create(input)
+    await db
+      .update(espressoShots)
+      .set({ sealedAt: new Date() })
+      .where(eq(espressoShots.id, first.id))
+    const replayed = await asA.espressoShot.create(input)
+    expect(replayed.id).toBe(first.id)
+    expect(replayed.sealed).toBe(true)
+    expect(replayed.dose).toBeNull()
+    expect(replayed.grindSetting).toBeNull()
   })
 
   it('does not return another user’s row for the same key', async () => {
@@ -439,6 +486,58 @@ describe('espressoShot.getRecent', () => {
     expect(shots.every((s) => s.userId === USER_A)).toBe(true)
     expect(shots[0].coffee).toBeTruthy()
     expect(shots[0].brewingDevice?.type).toBeTruthy()
+  })
+
+  it('filters getRecent by coffee and text without loading every page', async () => {
+    const other = await createCoffee(uniq('Colombia Huila'))
+    await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: 'guji-grind',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    await asA.espressoShot.create({
+      coffeeId: other.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '19',
+      yield: '38',
+      time: 32,
+      grindSetting: 'huila-grind',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const byCoffee = await asA.espressoShot.getRecent({
+      limit: 50,
+      offset: 0,
+      coffeeId: other.id,
+    })
+    expect(byCoffee.items.every((shot) => shot.coffeeId === other.id)).toBe(
+      true,
+    )
+    expect(byCoffee.items.length).toBeGreaterThanOrEqual(1)
+    const byText = await asA.espressoShot.getRecent({
+      limit: 50,
+      offset: 0,
+      q: 'huila-grind',
+    })
+    expect(byText.items.map((shot) => shot.grindSetting)).toContain(
+      'huila-grind',
+    )
+    expect(byText.items.every((shot) => shot.grindSetting !== 'guji-grind')).toBe(
+      true,
+    )
+  })
+
+  it('includes the roaster on getRecent coffee relations', async () => {
+    const shots = (await asA.espressoShot.getRecent({ limit: 50, offset: 0 }))
+      .items
+    expect(shots[0]?.coffee.roaster).toEqual(
+      expect.objectContaining({ name: expect.any(String) }),
+    )
   })
 
   it('paginates with getRecent', async () => {
