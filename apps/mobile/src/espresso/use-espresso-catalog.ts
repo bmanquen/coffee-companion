@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { apiErrorMessage } from '../api-error'
-import { ERROR_LOAD_FAILED, ERROR_SAVE_FAILED } from './copy'
+import {
+  ERROR_LOAD_FAILED,
+  ERROR_LOAD_MORE_FAILED,
+  ERROR_SAVE_FAILED,
+} from './copy'
 import type {
   EspressoApi,
   EspressoCatalog,
@@ -18,6 +22,7 @@ type State = {
   busy: boolean
   saveError: string | null
   loadingMore: boolean
+  loadMoreError: string | null
 }
 
 type Action =
@@ -43,7 +48,7 @@ type Action =
       total: number
       nextCursor: ShotCursor | null
     }
-  | { type: 'loadMoreFailed' }
+  | { type: 'loadMoreFailed'; error: string }
 
 const initial: State = {
   status: 'loading',
@@ -52,12 +57,19 @@ const initial: State = {
   busy: false,
   saveError: null,
   loadingMore: false,
+  loadMoreError: null,
 }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'loadStarted':
-      return { ...state, status: 'loading', loadError: null, loadingMore: false }
+      return {
+        ...state,
+        status: 'loading',
+        loadError: null,
+        loadingMore: false,
+        loadMoreError: null,
+      }
     case 'loadSucceeded':
       return {
         ...state,
@@ -65,6 +77,7 @@ function reducer(state: State, action: Action): State {
         catalog: action.catalog,
         loadError: null,
         loadingMore: false,
+        loadMoreError: null,
       }
     case 'loadFailed':
       return {
@@ -84,14 +97,15 @@ function reducer(state: State, action: Action): State {
     case 'reset':
       return initial
     case 'loadMoreStarted':
-      return { ...state, loadingMore: true }
+      return { ...state, loadingMore: true, loadMoreError: null }
     case 'pageInvalidated':
-      return { ...state, loadingMore: false }
+      return { ...state, loadingMore: false, loadMoreError: null }
     case 'shotsRefreshed':
       if (!state.catalog) return { ...state, loadingMore: false }
       return {
         ...state,
         loadingMore: false,
+        loadMoreError: null,
         catalog: {
           ...state.catalog,
           shots: action.shots,
@@ -105,6 +119,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         loadingMore: false,
+        loadMoreError: null,
         catalog: {
           ...state.catalog,
           shots: [
@@ -117,7 +132,7 @@ function reducer(state: State, action: Action): State {
       }
     }
     case 'loadMoreFailed':
-      return { ...state, loadingMore: false }
+      return { ...state, loadingMore: false, loadMoreError: action.error }
   }
 }
 
@@ -156,6 +171,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     if (previousUser !== userId) {
       saveInFlight.current = false
       loadSeq.current += 1
+      refreshPending.current = false
       dispatch({ type: 'reset' })
     }
     runLoad()
@@ -252,9 +268,12 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
           nextCursor: page.nextCursor,
         })
       },
-      () => {
+      (error) => {
         if (forUser !== activeUser.current || seq !== pageSeq.current) return
-        dispatch({ type: 'loadMoreFailed' })
+        dispatch({
+          type: 'loadMoreFailed',
+          error: apiErrorMessage(error, ERROR_LOAD_MORE_FAILED),
+        })
       },
     )
   }, [api, state.catalog, state.loadingMore, userId])
@@ -272,6 +291,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     catalog: state.catalog,
     loading,
     loadingMore: state.loadingMore,
+    loadMoreError: state.loadMoreError,
     loadError: state.status === 'failed' ? state.loadError : null,
     busy: state.busy,
     saveError: state.saveError,

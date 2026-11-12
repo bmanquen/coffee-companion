@@ -710,6 +710,29 @@ describe('NewEspressoShot form', () => {
     expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
   })
 
+  it('clears prefill when Coffee is emptied', async () => {
+    const { Wrapper } = seeded()
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+    expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+    expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: '' },
+    })
+    expect(screen.getByRole('combobox', { name: 'Grinder' })).toHaveProperty(
+      'value',
+      '',
+    )
+    expect(
+      screen.getByRole('combobox', { name: 'Brewing Device' }),
+    ).toHaveProperty('value', '')
+    expect(screen.queryByText('May 1st, 2026')).toBeNull()
+  })
+
   it('shows Logging… on the Log button while a save is in flight', async () => {
     const providers = seeded()
     const { Wrapper, fetchSpy } = providers

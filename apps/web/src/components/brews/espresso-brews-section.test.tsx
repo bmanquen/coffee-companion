@@ -457,9 +457,17 @@ describe('EspressoBrewsSection', () => {
         table.getByRole('button', { name: 'Mark Ethiopia Guji as dialed in' }),
       )
 
-      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
-      const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('dialedInBrew.set')
+      await waitFor(() =>
+        expect(
+          fetchSpy.mock.calls.some((call) =>
+            String(call[0]).includes('dialedInBrew.set'),
+          ),
+        ).toBe(true),
+      )
+      const setCall = fetchSpy.mock.calls.find((call) =>
+        String(call[0]).includes('dialedInBrew.set'),
+      )!
+      const [, init] = setCall
       const body = String(init?.body ?? '')
       expect(body).toContain('s1')
       expect(body).toContain('espresso')
@@ -493,9 +501,17 @@ describe('EspressoBrewsSection', () => {
         table.getByRole('button', { name: 'Dialed in Ethiopia Guji — clear' }),
       )
 
-      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
-      const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('dialedInBrew.unset')
+      await waitFor(() =>
+        expect(
+          fetchSpy.mock.calls.some((call) =>
+            String(call[0]).includes('dialedInBrew.unset'),
+          ),
+        ).toBe(true),
+      )
+      const unsetCall = fetchSpy.mock.calls.find((call) =>
+        String(call[0]).includes('dialedInBrew.unset'),
+      )!
+      const [, init] = unsetCall
       const body = String(init?.body ?? '')
       expect(body).toContain('s1')
       await waitFor(() => expect(queryClient.isMutating()).toBe(0))
@@ -520,8 +536,11 @@ describe('EspressoBrewsSection', () => {
       fireEvent.click(dialog.getByRole('button', { name: 'Delete' }))
 
       await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
-      const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('espressoShot.delete')
+      const deleteCall = fetchSpy.mock.calls.find((call) =>
+        String(call[0]).includes('espressoShot.delete'),
+      )
+      expect(deleteCall).toBeTruthy()
+      const [, init] = deleteCall!
       expect(String(init?.body ?? '')).toContain('s1')
       await waitFor(() => {
         expect(
@@ -889,5 +908,100 @@ describe('EspressoBrewsSection', () => {
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+
+  it('keeps cached shots visible and retryable when a refetch after delete fails', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      if (String(input).includes('espressoShot.delete')) {
+        return Promise.resolve(trpcSuccess())
+      }
+      return Promise.reject(new Error('Network request failed'))
+    })
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      const shot = makeRecentShot({ id: 's1' })
+      seedLog(queryClient, trpc, [shot])
+      queryClient.setQueryData(trpc.dialedInBrew.list.queryKey(), [])
+
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+      const table = within(screen.getByRole('table'))
+      expect(table.getByText('Ethiopia Guji')).toBeTruthy()
+
+      fireEvent.click(table.getByRole('button', { name: 'Delete shot' }))
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: 'Delete',
+        }),
+      )
+
+      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+      expect(table.getByText('Ethiopia Guji')).toBeTruthy()
+      expect(table.getByRole('button', { name: 'Edit shot' })).toBeTruthy()
+      expect(screen.getByRole('table').closest('[aria-busy="true"]')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('hides the previous filter’s shots while the next page is pending', async () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    const guji = makeRecentShot({
+      id: 's1',
+      coffeeId: 'c1',
+      coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    })
+    seedLog(queryClient, trpc, [guji])
+    void queryClient.prefetchQuery({
+      ...trpc.espressoShot.getRecent.queryOptions(
+        espressoShotPageInput(undefined, { q: 'zzz' }),
+      ),
+      queryFn: () => new Promise<never>(() => {}),
+    })
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+    expect(screen.getAllByText('Ethiopia Guji').length).toBeGreaterThan(0)
+
+    fireEvent.change(screen.getByPlaceholderText('Filter shots...'), {
+      target: { value: 'zzz' },
+    })
+
+    expect(await screen.findByRole('status')).toBeTruthy()
+    expect(screen.getByText(ESPRESSO_LOADING_SHOTS)).toBeTruthy()
+    expect(screen.queryByRole('table')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Edit shot' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Delete shot' })).toBeNull()
+  })
+
+  it('hides Load more after an empty last page', async () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+      makeRecentShot({
+        id: `s${index}`,
+        coffeeId: `c${index}`,
+        coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
+      }),
+    )
+    const cursor = espressoShotCursor(first[first.length - 1])
+    seedEspressoShotPage(
+      queryClient,
+      trpc,
+      first,
+      first.length,
+      undefined,
+      {},
+      cursor,
+    )
+    seedCoffees(queryClient, trpc, coffeesFrom(first))
+    seedEspressoShotPage(queryClient, trpc, [], first.length, cursor, {}, null)
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+    expect(screen.getByRole('button', { name: 'Load more' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull(),
+    )
+    expect(within(screen.getByRole('table')).getByText('Coffee 0')).toBeTruthy()
   })
 })

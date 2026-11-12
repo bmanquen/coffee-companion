@@ -16,6 +16,7 @@ import {
   SHOT_LIST_A11Y_LABEL,
   SHOT_LIST_TEST_ID,
   SHOT_ROW_TEST_ID_PREFIX,
+  TRY_AGAIN,
 } from './copy'
 import { shotSummary } from './draft'
 import { SHOT_PAGE_SIZE } from './types'
@@ -25,6 +26,7 @@ export function ShotList({
   shots,
   loading,
   loadingMore,
+  loadMoreError,
   failed,
   onLogShot,
   onEndReached,
@@ -32,6 +34,7 @@ export function ShotList({
   shots: Array<ShotRow> | null
   loading: boolean
   loadingMore: boolean
+  loadMoreError: string | null
   failed: boolean
   onLogShot: () => void
   onEndReached: () => void
@@ -46,8 +49,8 @@ export function ShotList({
       style={styles.list}
       contentContainerStyle={styles.content}
       data={rows}
-      extraData={`${loading}:${failed}:${loadingMore}:${rows.length}`}
-      initialNumToRender={Math.max(SHOT_PAGE_SIZE, rows.length)}
+      extraData={`${loading}:${failed}:${loadingMore}:${loadMoreError ?? ''}:${rows.length}`}
+      initialNumToRender={SHOT_PAGE_SIZE}
       keyExtractor={(shot) => shot.id}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.4}
@@ -77,6 +80,13 @@ export function ShotList({
         loadingMore ? (
           <View accessibilityLabel={LOADING_MORE_SHOTS}>
             <ActivityIndicator />
+          </View>
+        ) : loadMoreError ? (
+          <View style={styles.footerError}>
+            <Text accessibilityRole="alert">{loadMoreError}</Text>
+            <Pressable accessibilityRole="button" onPress={onEndReached}>
+              <Text>{TRY_AGAIN}</Text>
+            </Pressable>
           </View>
         ) : null
       }
@@ -113,5 +123,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  footerError: {
+    gap: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
   },
 })

@@ -11,6 +11,7 @@ export const BACK = 'Back'
 export const EMPTY_SHOTS = 'No espresso shots yet.'
 export const LOADING_SHOTS = 'Loading shots'
 export const LOADING_MORE_SHOTS = 'Loading more shots'
+export const ERROR_LOAD_MORE_FAILED = "We couldn't load more shots. Try again."
 
 export const SELECT_COFFEE = 'Select Coffee'
 export const SELECT_GRINDER = 'Select Grinder'

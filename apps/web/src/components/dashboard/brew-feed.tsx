@@ -52,6 +52,8 @@ export function BrewFeed<T extends BrewRow>({
   onCoffeeIdChange,
   dialedInOnly: dialedInOnlyProp,
   onDialedInOnlyChange,
+  banner,
+  stale,
   status,
 }: {
   title: string
@@ -69,6 +71,8 @@ export function BrewFeed<T extends BrewRow>({
   onCoffeeIdChange?: (id: string) => void
   dialedInOnly?: boolean
   onDialedInOnlyChange?: (value: boolean) => void
+  banner?: ReactNode
+  stale?: boolean
   status?: ReactNode
 }) {
   // TanStack Table's instance is a stable, mutable object the React Compiler
@@ -122,6 +126,19 @@ export function BrewFeed<T extends BrewRow>({
     )
   }, [coffeeId, dialedInOnly])
 
+  useEffect(() => {
+    setPagination((current) => {
+      const pageCount = Math.max(
+        1,
+        Math.ceil(visibleBrews.length / current.pageSize),
+      )
+      const pageIndex = Math.min(current.pageIndex, pageCount - 1)
+      return pageIndex === current.pageIndex
+        ? current
+        : { ...current, pageIndex }
+    })
+  }, [visibleBrews.length])
+
   const table = useReactTable({
     data: visibleBrews,
     columns,
@@ -172,22 +189,28 @@ export function BrewFeed<T extends BrewRow>({
               Dialed-in only
             </Button>
           </div>
+          {banner}
           {status ?? (
-            <DataTable
-              table={table}
-              renderSubComponent={renderDetails}
-              replaceRow={(row) =>
-                row.original.sealed ? <SealedRowNotice /> : null
-              }
-              paginated
-              rowClassName={(row) =>
-                row.original.sealed
-                  ? sealedRowClass
-                  : row.original.isDialedIn
-                    ? 'bg-primary/10 hover:bg-primary/15'
-                    : undefined
-              }
-            />
+            <div
+              aria-busy={stale || undefined}
+              className={stale ? 'opacity-60' : undefined}
+            >
+              <DataTable
+                table={table}
+                renderSubComponent={renderDetails}
+                replaceRow={(row) =>
+                  row.original.sealed ? <SealedRowNotice /> : null
+                }
+                paginated
+                rowClassName={(row) =>
+                  row.original.sealed
+                    ? sealedRowClass
+                    : row.original.isDialedIn
+                      ? 'bg-primary/10 hover:bg-primary/15'
+                      : undefined
+                }
+              />
+            </div>
           )}
         </>
       )}

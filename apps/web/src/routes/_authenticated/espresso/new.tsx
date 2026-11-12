@@ -200,7 +200,20 @@ export function NewEspressoShot() {
             // recent shot. The recipe (dose/yield/time/grind) is left blank so
             // it's entered fresh each shot.
             onChange: ({ value }) => {
-              if (!value) return
+              if (!value) {
+                prefillSeq.current += 1
+                prefillCoffeeId.current = ''
+                setPrefillError(false)
+                const keep = keepPrefill.current
+                applyingPrefill.current = true
+                if (!keep.roastDate) form.setFieldValue('roastDate', null)
+                if (!keep.grinderId) form.setFieldValue('grinderId', '')
+                if (!keep.brewingDeviceId) {
+                  form.setFieldValue('brewingDeviceId', '')
+                }
+                applyingPrefill.current = false
+                return
+              }
               const keep = keepPrefill.current
               keepPrefill.current = {
                 grinderId: keep.grinderId,

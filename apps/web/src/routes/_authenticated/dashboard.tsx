@@ -11,7 +11,10 @@ import {
   isDashboardMethod,
   resolveSelectedMethod,
 } from '@/components/dashboard/methods'
-import { espressoShotPageInput } from '@/hooks/use-espresso-shot-pages'
+import {
+  ESPRESSO_SHOT_STALE_TIME_MS,
+  espressoShotPageInput,
+} from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 import type {
   DashboardMethod,
@@ -67,9 +70,10 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
 // supply the recency fallback when no method is in the URL.
 function DashboardContainer() {
   const trpc = useTRPC()
-  const { data: espressoPage } = useSuspenseQuery(
-    trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
-  )
+  const { data: espressoPage } = useSuspenseQuery({
+    ...trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
+    staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
+  })
   const espresso = espressoPage.items
   const { data: pourover } = useSuspenseQuery(
     trpc.pouroverBrew.getAll.queryOptions(),

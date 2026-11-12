@@ -32,8 +32,10 @@ export function jsonSafe(value: unknown) {
   )
 }
 
-export function writeHostTreeArtifacts(view: { toJSON: () => unknown }) {
-  const dest = process.env.VERIFY_MOBILE_ARTIFACTS
+export function writeHostTreeArtifacts(
+  view: { toJSON: () => unknown },
+  dest = process.env.VERIFY_MOBILE_ARTIFACTS,
+) {
   if (!dest) return
   const tree = view.toJSON()
   mkdirSync(dest, { recursive: true })

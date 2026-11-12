@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ESPRESSO_SHOT_PAGE_SIZE,
   ESPRESSO_SHOT_Q_MAX,
+  ESPRESSO_SHOT_STALE_TIME_MS,
   espressoShotPageInput,
 } from './use-espresso-shot-pages'
 
@@ -32,5 +33,9 @@ describe('espressoShotPageInput', () => {
       limit: ESPRESSO_SHOT_PAGE_SIZE,
       dialedIn: true,
     })
+  })
+
+  it('uses a bounded stale window for the first page', () => {
+    expect(ESPRESSO_SHOT_STALE_TIME_MS).toBe(30_000)
   })
 })

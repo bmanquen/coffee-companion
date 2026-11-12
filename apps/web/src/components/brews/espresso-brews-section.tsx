@@ -1,8 +1,8 @@
 import { coffeeOptionLabel } from '@coffee-companion/brew-display'
 import {
   useMutation,
+  useQuery,
   useQueryClient,
-  useSuspenseQuery,
 } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
@@ -161,7 +161,10 @@ const columns = [
 export function EspressoBrewsSection() {
   'use no memo'
   const trpc = useTRPC()
-  const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
+  const { data: coffees = [] } = useQuery({
+    ...trpc.coffee.getAll.queryOptions(),
+    staleTime: Infinity,
+  })
   const [sorting, setSorting] = useState<SortingState>([])
   const [q, setQ] = useState('')
   const [coffeeId, setCoffeeId] = useState('')
@@ -175,6 +178,7 @@ export function EspressoBrewsSection() {
     loadMoreError,
     loading,
     loadError,
+    stale,
     retry,
   } = useEspressoShotPages({
       coffeeId: coffeeId || undefined,
@@ -236,37 +240,50 @@ export function EspressoBrewsSection() {
       </div>
       {loading ? (
         <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
-      ) : loadError ? (
-        <div className="flex flex-col gap-2">
-          <p role="alert">{loadError}</p>
-          <Button type="button" variant="outline" onClick={retry}>
-            Try again
-          </Button>
-        </div>
-      ) : shots.length === 0 && !filtering ? (
-        <BrewsEmptyState
-          message="No espresso shots yet."
-          to="/espresso/new"
-          linkLabel="Log your first shot"
-        />
       ) : (
         <>
-          <DataTable
-            table={table}
-            renderSubComponent={(row) => renderBrewDetails(row.original)}
-            replaceRow={(row) =>
-              row.original.sealed ? <SealedRowNotice /> : null
-            }
-            rowClassName={(row) =>
-              brewLogRowClass(row.original.sealed, row.original.isDialedIn)
-            }
-          />
-          <EspressoShotPager
-            hasMore={hasMore}
-            loadingMore={loadingMore}
-            loadMoreError={loadMoreError}
-            loadMore={loadMore}
-          />
+          {loadError ? (
+            <div className="flex flex-col gap-2">
+              <p role="alert">{loadError}</p>
+              <Button type="button" variant="outline" onClick={retry}>
+                Try again
+              </Button>
+            </div>
+          ) : null}
+          {shots.length === 0 && !filtering && !loadError ? (
+            <BrewsEmptyState
+              message="No espresso shots yet."
+              to="/espresso/new"
+              linkLabel="Log your first shot"
+            />
+          ) : shots.length === 0 && loadError ? null : (
+            <>
+              <div
+                aria-busy={stale || undefined}
+                className={stale ? 'opacity-60' : undefined}
+              >
+                <DataTable
+                  table={table}
+                  renderSubComponent={(row) => renderBrewDetails(row.original)}
+                  replaceRow={(row) =>
+                    row.original.sealed ? <SealedRowNotice /> : null
+                  }
+                  rowClassName={(row) =>
+                    brewLogRowClass(
+                      row.original.sealed,
+                      row.original.isDialedIn,
+                    )
+                  }
+                />
+              </div>
+              <EspressoShotPager
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                loadMoreError={loadMoreError}
+                loadMore={loadMore}
+              />
+            </>
+          )}
         </>
       )}
     </Card>
