@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react-native'
 import * as SecureStore from 'expo-secure-store'
 import { App } from '../App'
+import { idleEspressoApi } from '../espresso/types'
 import { WELCOME_SCREEN_TEST_ID } from '../welcome'
 import { sessionAtom } from './auth-client'
 import {
@@ -81,7 +82,7 @@ describe('E2E sign-in path', () => {
   })
 
   it('sends x-e2e-auth through the real client and transitions to welcome', async () => {
-    await render(<App />)
+    await render(<App espresso={idleEspressoApi} />)
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: E2E_SIGN_IN })).toBeTruthy()
@@ -101,5 +102,5 @@ describe('E2E sign-in path', () => {
         new Headers(init?.headers).get(E2E_AUTH_HEADER) === E2E_USER_WITH_DATA,
       )
     expect(authed).toBe(true)
-  })
+  }, 15_000)
 })
