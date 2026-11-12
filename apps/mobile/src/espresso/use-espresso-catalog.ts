@@ -141,6 +141,7 @@ function reducer(state: State, action: Action): State {
 export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const [state, dispatch] = useReducer(reducer, initial)
   const catalogSeq = useRef(0)
+  const accountGen = useRef(0)
   const saveInFlight = useRef(false)
   const activeUser = useRef(userId)
   const refreshSeq = useRef(0)
@@ -185,6 +186,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     const previousUser = activeUser.current
     activeUser.current = userId
     if (previousUser !== userId) {
+      accountGen.current += 1
       saveInFlight.current = false
       catalogSeq.current += 1
       invalidatePagedLoads()
@@ -241,19 +243,20 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
       if (saveInFlight.current) return
       saveInFlight.current = true
       const forUser = userId
+      const startedAccountGen = accountGen.current
       dispatch({ type: 'saveStarted' })
       void api.create(input).then(
         () => {
+          if (startedAccountGen !== accountGen.current) return
           saveInFlight.current = false
-          if (forUser !== activeUser.current) return
           refreshPending.current = true
           dispatch({ type: 'saveSucceeded' })
           onSuccess?.()
           refreshFirstPage(forUser)
         },
         (error) => {
+          if (startedAccountGen !== accountGen.current) return
           saveInFlight.current = false
-          if (forUser !== activeUser.current) return
           dispatch({
             type: 'saveFailed',
             error: apiErrorMessage(error, ERROR_SAVE_FAILED),

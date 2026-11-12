@@ -1,5 +1,8 @@
 import { insertEspressoShotSchema } from '@coffee-companion/api/db/zod'
-import { ESPRESSO_DEVICE_TYPE } from '@coffee-companion/api/lib/espresso'
+import {
+  ESPRESSO_DEVICE_TYPE,
+  isEspressoDevice,
+} from '@coffee-companion/api/lib/espresso'
 import {
   useMutation,
   useQueryClient,
@@ -64,6 +67,8 @@ export function NewEspressoShot() {
   const applyingPrefill = useRef(false)
   const saveGen = useRef(0)
   const saveInFlight = useRef(false)
+  const saveSucceeded = useRef(false)
+  const prefillQueued = useRef(false)
   const [prefillError, setPrefillError] = useState(false)
 
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
@@ -72,6 +77,10 @@ export function NewEspressoShot() {
   const { data: grinders } = useSuspenseQuery(trpc.grinder.list.queryOptions())
   const grinder = useSearchSelectResource(grinders)
 
+  const { data: brewingDevices } = useSuspenseQuery(
+    trpc.brewingDevice.list.queryOptions(),
+  )
+
   // Espresso shots must be brewed on an Espresso-type device (enforced again
   // server-side in espressoShot.create).
   const brewingDevice = useBrewingDeviceSelect(ESPRESSO_DEVICE_TYPE)
@@ -79,6 +88,7 @@ export function NewEspressoShot() {
   const createShot = useMutation(
     trpc.espressoShot.create.mutationOptions({
       onSuccess: () => {
+        saveSucceeded.current = true
         queryClient.invalidateQueries(trpc.espressoShot.getRecent.queryFilter())
         queryClient.invalidateQueries(
           trpc.espressoShot.getLatestUnsealed.queryFilter(),
@@ -144,8 +154,14 @@ export function NewEspressoShot() {
     if (latest?.grinderId && !keep.grinderId) {
       form.setFieldValue('grinderId', latest.grinderId)
     }
-    if (latest?.brewingDeviceId && !keep.brewingDeviceId) {
-      form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
+    if (!keep.brewingDeviceId) {
+      const device = brewingDevices.find(
+        (item) => item.id === latest?.brewingDeviceId,
+      )
+      form.setFieldValue(
+        'brewingDeviceId',
+        device && isEspressoDevice(device) ? device.id : '',
+      )
     }
     if (!keep.roastDate) {
       form.setFieldValue('roastDate', latest?.roastDate ?? null)
@@ -153,12 +169,15 @@ export function NewEspressoShot() {
     applyingPrefill.current = false
   }
 
-  const requestPrefill = (coffeeId: string) => {
-    if (saveInFlight.current) return
-    const seq = ++prefillSeq.current
+  const loadPrefillFor = (coffeeId: string) => {
+    if (!coffeeId) return
+    if (saveInFlight.current) {
+      prefillQueued.current = true
+      return
+    }
+    prefillQueued.current = false
+    const seq = prefillSeq.current
     const startedSaveGen = saveGen.current
-    prefillCoffeeId.current = coffeeId
-    setPrefillError(false)
     void queryClient
       .fetchQuery({
         ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId }),
@@ -179,6 +198,24 @@ export function NewEspressoShot() {
       )
   }
 
+  const requestPrefill = (coffeeId: string) => {
+    prefillSeq.current += 1
+    prefillCoffeeId.current = coffeeId
+    setPrefillError(false)
+    loadPrefillFor(coffeeId)
+  }
+
+  const flushQueuedPrefill = () => {
+    saveInFlight.current = false
+    if (
+      !saveSucceeded.current &&
+      prefillQueued.current &&
+      prefillCoffeeId.current
+    ) {
+      loadPrefillFor(prefillCoffeeId.current)
+    }
+  }
+
   const markTouched = (key: keyof PrefillKeep) => {
     if (applyingPrefill.current) return
     keepPrefill.current = { ...keepPrefill.current, [key]: true }
@@ -191,9 +228,10 @@ export function NewEspressoShot() {
         className="w-full max-w-md flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault()
+          saveSucceeded.current = false
           saveInFlight.current = true
           void form.handleSubmit().finally(() => {
-            saveInFlight.current = false
+            flushQueuedPrefill()
           })
         }}
       >

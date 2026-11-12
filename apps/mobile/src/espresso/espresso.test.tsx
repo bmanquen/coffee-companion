@@ -17,7 +17,7 @@ import {
   selectTriggerA11yLabel,
   selectTriggerTestId,
 } from '../ui/fields'
-import { consumeHardwareBack } from './ShotForm'
+import { ShotForm, consumeHardwareBack } from './ShotForm'
 import {
   BACK,
   EMPTY_SHOTS,
@@ -301,6 +301,20 @@ describe('log espresso shot', () => {
 
     writeHostTreeArtifacts(view)
   }, 15_000)
+
+  it('sends a comma decimal dose as dotted text', async () => {
+    const { api, created } = fakeApi(catalog())
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '18,5')
+    await fireEvent.changeText(screen.getByLabelText(LABEL_YIELD), '36')
+    await fireEvent.changeText(screen.getByLabelText(LABEL_TIME), '30')
+    await fireEvent.changeText(screen.getByLabelText(LABEL_GRIND), GRIND_MARKER)
+    await press(LOG)
+    expect(created).toHaveLength(1)
+    expect(created[0].dose).toBe('18.5')
+  })
 
   it('shows the empty list until a shot is logged', async () => {
     const { api } = fakeApi(catalog({ shots: [] }))
@@ -1437,6 +1451,63 @@ describe('log espresso shot', () => {
       settleCreate()
       await pendingCreate
     })
+  })
+
+  it('prefills the coffee chosen during a pending save once the save fails', async () => {
+    const loadIds: Array<string> = []
+    const form = (
+      error: string | null,
+    ) => (
+      <ShotForm
+        catalog={catalog({
+          coffees: [
+            { id: COFFEE, name: 'Ethiopia Guji' },
+            { id: COFFEE_B, name: 'Colombia Huila' },
+          ],
+          grinders: [
+            { id: GRINDER, name: 'Niche Zero' },
+            { id: GRINDER_B, name: 'P64' },
+          ],
+        })}
+        busy={false}
+        error={error}
+        onBack={() => {}}
+        onClearError={() => {}}
+        onSubmit={() => {}}
+        loadPrefill={(coffeeId) => {
+          loadIds.push(coffeeId)
+          if (coffeeId === COFFEE_B) {
+            return Promise.resolve(
+              seedShot({
+                coffeeId: COFFEE_B,
+                coffeeName: 'Colombia Huila',
+                roastDate: '2026-04-01',
+                grinderId: GRINDER_B,
+              }),
+            )
+          }
+          return Promise.resolve(seedShot())
+        }}
+      />
+    )
+    const view = await render(form(null))
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    expect(await screen.findByDisplayValue('2026-05-01')).toBeTruthy()
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    await press(LOG)
+    const loadsDuringSave = loadIds.length
+
+    await pickSelect(LABEL_COFFEE, COFFEE_B)
+    expect(loadIds).toHaveLength(loadsDuringSave)
+    expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
+    expect(screen.queryByDisplayValue('2026-04-01')).toBeNull()
+
+    view.rerender(form(ERROR_SAVE_FAILED))
+    expect(await screen.findByDisplayValue('2026-04-01')).toBeTruthy()
+    expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
+    expect(loadIds.at(-1)).toBe(COFFEE_B)
   })
 
   it('prefills from Try again after a failed save', async () => {

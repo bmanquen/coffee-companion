@@ -77,19 +77,22 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const loadMoreSeq = useRef(0)
   const firstPageFetch = useRef(false)
+  const extraBoundTo = useRef<EspressoShotCursor | undefined>(undefined)
   const filterKey = `${filters.coffeeId ?? ''}\0${filters.q?.trim() ?? ''}\0${filters.dialedIn ? '1' : ''}`
 
   const dropExtraPages = useCallback(() => {
     loadMoreSeq.current += 1
+    extraBoundTo.current = undefined
     setExtra([])
     setExtraCursor(undefined)
     setLoadMoreError(null)
     setLoadingMore(false)
   }, [])
 
-  // Extra pages are a local copy of cursor fetches. A filter change or a
-  // completed first-page fetch is a new listing; a cache patch or a failed
-  // refetch is not.
+  // Extra pages are a local copy of cursor fetches. A filter change, a first
+  // page whose next-page cursor moved, or a first page that now has no next
+  // page is a new listing. A cache patch, a failed refetch, or a refetch that
+  // keeps the same cursor boundary is not.
   useEffect(() => {
     dropExtraPages()
   }, [dropExtraPages, filterKey])
@@ -101,11 +104,17 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
     }
     if (firstPageFetch.current && first.isSuccess) {
       firstPageFetch.current = false
-      dropExtraPages()
+      const boundary = first.data.nextCursor ?? null
+      if (
+        extraBoundTo.current === undefined ||
+        extraBoundTo.current !== boundary
+      ) {
+        dropExtraPages()
+      }
       return
     }
     firstPageFetch.current = false
-  }, [dropExtraPages, first.isFetching, first.isSuccess])
+  }, [dropExtraPages, first.data?.nextCursor, first.isFetching, first.isSuccess])
 
   useEffect(() => {
     if (first.isPlaceholderData) return
@@ -132,17 +141,19 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
 
   const loadMore = useCallback(async () => {
     if (nextCursor == null || loadingMore) return
+    const requested = nextCursor
     const seq = ++loadMoreSeq.current
     setLoadingMore(true)
     setLoadMoreError(null)
     try {
       const page = await queryClient.fetchQuery({
         ...trpc.espressoShot.getRecent.queryOptions(
-          espressoShotPageInput(nextCursor, filters),
+          espressoShotPageInput(requested, filters),
         ),
         staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
       })
       if (seq !== loadMoreSeq.current) return
+      if (extraBoundTo.current === undefined) extraBoundTo.current = requested
       setExtra((current) => [...current, ...page.items])
       setExtraCursor(page.nextCursor)
     } catch {

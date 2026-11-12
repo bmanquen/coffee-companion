@@ -243,6 +243,56 @@ describe('useEspressoShotPages', () => {
     }
   })
 
+  it('keeps extra shots when a first-page refetch keeps the same cursor boundary', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+      const extraShot = makeRecentShot({
+        id: RETRY_EXTRA_ID,
+        coffeeId: 'c-next',
+        coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+      })
+      const boundary = espressoShotCursor(first[first.length - 1])
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 1,
+        boundary,
+      )
+      fetchSpy.mockResolvedValue(
+        trpcSuccess({
+          items: first,
+          total: first.length + 1,
+          nextCursor: boundary,
+        }),
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+      ).toBe(true)
+
+      await act(async () => {
+        await result.current.retry()
+      })
+      await waitFor(() => expect(result.current.loadError).toBeNull())
+      expect(
+        result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+      ).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('drops extra shots after a successful first-page refetch', async () => {
     const refreshed = makeRecentShot({
       id: REFRESHED_FIRST_ID,

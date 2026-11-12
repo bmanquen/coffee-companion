@@ -2,7 +2,13 @@ import { and, count, desc, eq, ilike, inArray, isNull, lt, or, sql } from 'drizz
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
-import { coffees, dialedInBrews, espressoShots, roasters } from '../db/schema'
+import {
+  coffees,
+  dialedInBrews,
+  espressoShotIdempotencyKeys,
+  espressoShots,
+  roasters,
+} from '../db/schema'
 import { insertEspressoShotSchema } from '../db/zod'
 import {
   brewIdsForMethod,
@@ -14,6 +20,8 @@ import {
   ESPRESSO_CURSOR_TIMESTAMP_FORMAT,
   ESPRESSO_DEVICE_TYPE,
   ESPRESSO_SHOT_Q_MAX,
+  SHOT_IDEMPOTENCY_DELETED,
+  SHOT_REPLAY_CONFLICT,
   decodeEspressoShotCursor,
   encodeEspressoShotCursor,
   isEspressoDevice,
@@ -30,9 +38,7 @@ type EspressoShotCursorKey = NonNullable<
 
 export const TRPC_BAD_REQUEST = 'BAD_REQUEST' as const
 export const TRPC_CONFLICT = 'CONFLICT' as const
-
-const SHOT_REPLAY_CONFLICT =
-  'This shot was already saved with different settings.'
+export { SHOT_IDEMPOTENCY_DELETED, SHOT_REPLAY_CONFLICT }
 
 const withRelations = {
   coffee: { with: { roaster: true } },
@@ -273,6 +279,82 @@ async function assertEspressoDevice(brewingDeviceId: string, userId: string) {
   }
 }
 
+async function loadIdempotencyKey(userId: string, idempotencyKey: string) {
+  const rows = await db
+    .select()
+    .from(espressoShotIdempotencyKeys)
+    .where(
+      and(
+        eq(espressoShotIdempotencyKeys.userId, userId),
+        eq(espressoShotIdempotencyKeys.idempotencyKey, idempotencyKey),
+      ),
+    )
+  if (rows.length === 0) return null
+  return rows[0]
+}
+
+function throwIfKeyDeleted(shotId: string | null) {
+  if (shotId != null) return
+  throw new TRPCError({
+    code: TRPC_CONFLICT,
+    message: SHOT_IDEMPOTENCY_DELETED,
+  })
+}
+
+async function insertShotWithKey(
+  userId: string,
+  input: z.infer<typeof insertEspressoShotSchema> & { idempotencyKey: string },
+) {
+  const claimedId = await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(espressoShots)
+      .values({ ...input, userId })
+      .returning({ id: espressoShots.id })
+    if (inserted.length === 0) return null
+    const shotId = inserted[0].id
+    const claimed = await tx
+      .insert(espressoShotIdempotencyKeys)
+      .values({
+        userId,
+        idempotencyKey: input.idempotencyKey,
+        shotId,
+      })
+      .onConflictDoNothing()
+      .returning({
+        shotId: espressoShotIdempotencyKeys.shotId,
+      })
+    if (claimed.length > 0) return shotId
+    await tx.delete(espressoShots).where(eq(espressoShots.id, shotId))
+    return null
+  })
+  if (claimedId) return claimedId
+
+  const raced = await loadIdempotencyKey(userId, input.idempotencyKey)
+  if (!raced) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Could not save this shot',
+    })
+  }
+  throwIfKeyDeleted(raced.shotId)
+  const existing = await db.query.espressoShots.findFirst({
+    where: { id: raced.shotId!, userId },
+  })
+  if (!existing) {
+    throw new TRPCError({
+      code: TRPC_CONFLICT,
+      message: SHOT_IDEMPOTENCY_DELETED,
+    })
+  }
+  if (!shotMatchesReplay(existing, input)) {
+    throw new TRPCError({
+      code: TRPC_CONFLICT,
+      message: SHOT_REPLAY_CONFLICT,
+    })
+  }
+  return existing.id
+}
+
 export const espressoShotRouter = createTRPCRouter({
   getRecent: authedProcedure
     .input(getRecentInput)
@@ -356,58 +438,37 @@ export const espressoShotRouter = createTRPCRouter({
   create: authedProcedure
     .input(insertEspressoShotSchema.extend({ idempotencyKey: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await assertEspressoDevice(input.brewingDeviceId, ctx.session.user.id)
+      const userId = ctx.session.user.id
+      await assertEspressoDevice(input.brewingDeviceId, userId)
 
-      const existing = await db.query.espressoShots.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          idempotencyKey: input.idempotencyKey,
-        },
-      })
-      if (existing) {
+      const keyRow = await loadIdempotencyKey(userId, input.idempotencyKey)
+      let shotId: string
+      if (keyRow) {
+        throwIfKeyDeleted(keyRow.shotId)
+        const existing = await db.query.espressoShots.findFirst({
+          where: { id: keyRow.shotId!, userId },
+        })
+        if (!existing) {
+          throw new TRPCError({
+            code: TRPC_CONFLICT,
+            message: SHOT_IDEMPOTENCY_DELETED,
+          })
+        }
         if (!shotMatchesReplay(existing, input)) {
           throw new TRPCError({
             code: TRPC_CONFLICT,
             message: SHOT_REPLAY_CONFLICT,
           })
         }
+        shotId = existing.id
       } else {
-        await stampFallenBrews(ctx.session.user.id, ctx.plan)
-
-        const inserted = await db
-          .insert(espressoShots)
-          .values({ ...input, userId: ctx.session.user.id })
-          .onConflictDoNothing({
-            target: [espressoShots.userId, espressoShots.idempotencyKey],
-          })
-          .returning()
-        if (!inserted[0]) {
-          const raced = await db.query.espressoShots.findFirst({
-            where: {
-              userId: ctx.session.user.id,
-              idempotencyKey: input.idempotencyKey,
-            },
-          })
-          if (!raced) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Could not save this shot',
-            })
-          }
-          if (!shotMatchesReplay(raced, input)) {
-            throw new TRPCError({
-              code: TRPC_CONFLICT,
-              message: SHOT_REPLAY_CONFLICT,
-            })
-          }
-        }
+        await stampFallenBrews(userId, ctx.plan)
+        shotId = await insertShotWithKey(userId, input)
       }
-      return sealBrewWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {
+
+      return sealBrewWithDialedIn(userId, ctx.shelf, async () => {
         const shot = await db.query.espressoShots.findFirst({
-          where: {
-            userId: ctx.session.user.id,
-            idempotencyKey: input.idempotencyKey,
-          },
+          where: { id: shotId, userId },
         })
         if (!shot) {
           throw new TRPCError({
