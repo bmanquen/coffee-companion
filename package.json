@@ -24,6 +24,6 @@
     "export:app-icon": "pnpm --filter coffee-companion export:app-icon"
   },
   "devDependencies": {
-    "turbo": "^2.8.16"
+    "turbo": "^2.11.10"
   }
 }
