@@ -101,8 +101,8 @@ export function BrewFeed<T extends BrewRow>({
     [brews],
   )
   const coffeeOptions = coffeeOptionsProp ?? derivedCoffeeOptions
-  const filterOnClient =
-    onCoffeeIdChange == null && onDialedInOnlyChange == null
+  const filterCoffeeOnClient = onCoffeeIdChange == null
+  const filterDialedInOnClient = onDialedInOnlyChange == null
   const filtering = Boolean(coffeeId || dialedInOnly)
   const showEmpty = status == null && brews.length === 0 && !filtering
 
@@ -110,14 +110,18 @@ export function BrewFeed<T extends BrewRow>({
   // a fresh array each render trips the table's autoReset* state and loops.
   const visibleBrews = useMemo(
     () =>
-      filterOnClient
-        ? brews.filter(
-            (b) =>
-              (!coffeeId || b.coffeeId === coffeeId) &&
-              (!dialedInOnly || b.isDialedIn),
-          )
-        : brews,
-    [brews, coffeeId, dialedInOnly, filterOnClient],
+      brews.filter(
+        (b) =>
+          (!filterCoffeeOnClient || !coffeeId || b.coffeeId === coffeeId) &&
+          (!filterDialedInOnClient || !dialedInOnly || b.isDialedIn),
+      ),
+    [
+      brews,
+      coffeeId,
+      dialedInOnly,
+      filterCoffeeOnClient,
+      filterDialedInOnClient,
+    ],
   )
 
   useEffect(() => {

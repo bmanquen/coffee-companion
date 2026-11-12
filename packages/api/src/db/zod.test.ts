@@ -35,6 +35,18 @@ describe('insertEspressoShotSchema', () => {
     ).toBe(true)
   })
 
+  it('rejects a negative time and accepts zero', () => {
+    expect(
+      insertEspressoShotSchema.safeParse({ ...valid, time: -10 }).success,
+    ).toBe(false)
+    expect(
+      insertEspressoShotSchema.safeParse({ ...valid, time: '-10' }).success,
+    ).toBe(false)
+    expect(
+      insertEspressoShotSchema.safeParse({ ...valid, time: 0 }).success,
+    ).toBe(true)
+  })
+
   it('keeps roast date as a YYYY-MM-DD string', () => {
     const parsed = insertEspressoShotSchema.parse({
       ...valid,

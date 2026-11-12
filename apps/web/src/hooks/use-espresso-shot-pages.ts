@@ -22,11 +22,15 @@ export const ESPRESSO_LOAD_FAILED =
 
 export const ESPRESSO_LOADING_SHOTS = 'Loading shots'
 
+export const ESPRESSO_COFFEES_LOAD_FAILED =
+  "We couldn't load your coffees. Try again."
+
 // First-page refetch drops appended pages (generation follows dataUpdatedAt).
-// 30s is long enough that paging through Load more is not wiped by a quick
-// tab switch, and short enough that a Shot saved on mobile shows up after
-// remount or focus.
+// Extra pages are only read through loadMore's fetchQuery, so this window
+// expires a cached cursor page without an observer refetching it on its own.
 export const ESPRESSO_SHOT_STALE_TIME_MS = 30_000
+
+export const ESPRESSO_SHOT_FILTER_DEBOUNCE_MS = 300
 
 export type EspressoShotPageFilters = {
   coffeeId?: string
@@ -111,7 +115,7 @@ export function useEspressoShotPages(
         ...trpc.espressoShot.getRecent.queryOptions(
           espressoShotPageInput(nextCursor, filters),
         ),
-        staleTime: Infinity,
+        staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
       })
       if (seq !== loadMoreSeq.current) return
       setExtra((current) => [...current, ...page.items])

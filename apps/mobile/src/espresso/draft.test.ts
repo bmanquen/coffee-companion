@@ -87,6 +87,18 @@ describe('parseShotDraft', () => {
     expect(parsed.errors).toEqual({ dose: 'Must be a number' })
   })
 
+  it('rejects a negative time and accepts zero', () => {
+    const negative = parseShotDraft({ ...valid, time: '-10' })
+    expect(negative.ok).toBe(false)
+    if (negative.ok) return
+    expect(negative.errors).toEqual({ time: 'Must be a whole number' })
+
+    expect(parseShotDraft({ ...valid, time: '0' })).toEqual({
+      ok: true,
+      value: expect.objectContaining({ time: 0 }),
+    })
+  })
+
   it('rejects a timestamp roast date', () => {
     const parsed = parseShotDraft({
       ...valid,

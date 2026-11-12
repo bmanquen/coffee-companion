@@ -7,7 +7,7 @@ import {
   within,
 } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Dashboard } from './dashboard'
+import { Dashboard, DashboardContainer, Route } from './dashboard'
 import type * as ReactRouter from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import type { DashboardMethod } from '@/components/dashboard/methods'
@@ -816,6 +816,57 @@ describe('Dashboard', () => {
       ).toBeTruthy()
     } finally {
       fetchSpy.mockRestore()
+    }
+  })
+
+  it('keeps loading the route when coffee.getAll and getRecent reject', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    try {
+      const { queryClient, trpc } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      const loader = Route.options.loader
+      expect(loader).toBeTypeOf('function')
+      await expect(
+        loader?.({
+          context: { queryClient, trpc },
+        } as never),
+      ).resolves.toBeUndefined()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('shows the espresso feed retry when getRecent fails with no cached page', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [])
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(
+        1,
+      )
+      expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy()
+      expect(screen.queryByText(/Something went wrong/i)).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
     }
   })
 })

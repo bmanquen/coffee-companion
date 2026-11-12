@@ -41,6 +41,7 @@ import {
   LOG_TEST_ID,
   SEALED_SHOT,
   SELECT_COFFEE_ERROR,
+  SELECT_DEVICE,
   SELECT_GRINDER,
   SHOT_FORM_PREFILL_ERROR_TEST_ID,
   SHOT_FORM_TEST_ID,
@@ -186,7 +187,7 @@ function fakeApi(
         const page = pageFrom(shots)
         const next = {
           ...initial,
-          shots: [...shots],
+          shots: page.items,
           total: page.total,
           nextCursor: page.nextCursor,
         }
@@ -1260,6 +1261,33 @@ describe('log espresso shot', () => {
     expect(screen.getByLabelText('Brewing Device, Linea Mini')).toBeTruthy()
   })
 
+  it('clears a prefilled device that is not an espresso option', async () => {
+    const otherDevice = '00000000-0000-4000-8000-000000000099'
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog()),
+      loadPrefill: () =>
+        Promise.resolve(
+          seedShot({
+            brewingDeviceId: otherDevice,
+            roastDate: '2026-05-01',
+          }),
+        ),
+      create: async () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    expect(await screen.findByDisplayValue('2026-05-01')).toBeTruthy()
+    expect(
+      screen.getByLabelText(
+        selectTriggerA11yLabel(LABEL_DEVICE, SELECT_DEVICE),
+      ),
+    ).toBeTruthy()
+    expect(screen.queryByLabelText('Brewing Device, Linea Mini')).toBeNull()
+    expect(screen.getByLabelText('Grinder, Niche Zero')).toBeTruthy()
+  })
+
   it('does not apply prefill after a save has started', async () => {
     let resolvePrefill: (shot: ShotRow | null) => void = () => {}
     const pendingPrefill = new Promise<ShotRow | null>((resolve) => {
@@ -1507,6 +1535,65 @@ describe('log espresso shot', () => {
     expect(cursors).not.toContain('shot-19')
   })
 
+  it('does not append a page started during the refresh-failure fallback load', async () => {
+    const all = Array.from({ length: 25 }, (_, index) =>
+      seedShot({
+        id: `shot-${index}`,
+        coffeeName: `Coffee ${index}`,
+      }),
+    )
+    const cursors: Array<ShotCursor | null | undefined> = []
+    let resolveFallback: ((catalog: EspressoCatalog) => void) | null = null
+    let loads = 0
+    const replacement = catalog({
+      shots: [
+        seedShot({ id: 'shot-new', coffeeName: 'Logged new' }),
+        ...all.slice(0, 19),
+      ],
+      total: 26,
+    })
+    const api: EspressoApi = {
+      load: () => {
+        loads += 1
+        if (loads === 1) {
+          return Promise.resolve(
+            catalog({ shots: all.slice(0, 20), total: all.length }),
+          )
+        }
+        return new Promise((resolve) => {
+          resolveFallback = resolve
+        })
+      },
+      listShots: (cursor) => {
+        cursors.push(cursor)
+        if (!cursor) return Promise.reject(new Error('Network request failed'))
+        return Promise.resolve(pageFrom(all, cursor))
+      },
+      loadPrefill: () => Promise.resolve(seedShot()),
+      create: async () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    expect(screen.getByText('Coffee 0')).toBeTruthy()
+
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+    await waitFor(() => expect(resolveFallback).toBeTruthy())
+    expect(cursors).toEqual([undefined])
+
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    expect(cursors).toEqual([undefined])
+
+    await act(async () => {
+      resolveFallback?.(replacement)
+      await Promise.resolve()
+    })
+    expect(await screen.findByText('Logged new')).toBeTruthy()
+    expect(screen.queryByText('Coffee 20')).toBeNull()
+  })
+
   it('drops an in-flight next page after a refresh', async () => {
     const all = Array.from({ length: 25 }, (_, index) =>
       seedShot({
@@ -1656,6 +1743,10 @@ describe('log espresso shot', () => {
     if (loadMoreDest) writeHostTreeArtifacts(view, loadMoreDest)
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
     expect(screen.queryByText('Coffee 20')).toBeNull()
+
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    expect(cursors).toEqual([pageCursor('shot-19')])
+    expect(screen.getByText(ERROR_LOAD_MORE_FAILED)).toBeTruthy()
 
     await press(TRY_AGAIN)
     await waitFor(() =>

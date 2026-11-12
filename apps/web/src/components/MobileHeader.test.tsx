@@ -1,7 +1,17 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import MobileHeader from './MobileHeader'
 import type { ReactNode } from 'react'
+
+function renderHeader(ui: ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  )
+}
 
 const authState = vi.hoisted(() => ({
   session: null as {
@@ -65,7 +75,7 @@ describe('MobileHeader', () => {
     authState.session = {
       user: { name: 'Test User', email: 'test@example.com', image: null },
     }
-    render(<MobileHeader />)
+    renderHeader(<MobileHeader />)
 
     expect(screen.getByText('Coffee Companion')).toBeTruthy()
     expect(screen.getByText('Test User')).toBeTruthy()
@@ -93,7 +103,7 @@ describe('MobileHeader', () => {
 
   it('shows a sign-in button and no account details when signed out', async () => {
     authState.session = null
-    render(<MobileHeader />)
+    renderHeader(<MobileHeader />)
 
     expect(screen.getByText('Coffee Companion')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Sign Out' })).toBeNull()
@@ -112,7 +122,7 @@ describe('MobileHeader', () => {
         image: 'https://example.com/avatar.png',
       },
     }
-    const { container } = render(<MobileHeader />)
+    const { container } = renderHeader(<MobileHeader />)
 
     // The avatar mock renders a decorative img (empty alt), so it has no
     // accessible role to query by.

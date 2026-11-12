@@ -41,6 +41,11 @@ export function ShotList({
 }) {
   const canLog = !loading && !failed && shots != null
   const rows = failed ? [] : (shots ?? [])
+  // A failed next page stays failed until Retry; scroll must not retry it.
+  const handleEndReached = () => {
+    if (loadMoreError) return
+    onEndReached()
+  }
 
   return (
     <FlatList
@@ -52,7 +57,7 @@ export function ShotList({
       extraData={`${loading}:${failed}:${loadingMore}:${loadMoreError ?? ''}:${rows.length}`}
       initialNumToRender={SHOT_PAGE_SIZE}
       keyExtractor={(shot) => shot.id}
-      onEndReached={onEndReached}
+      onEndReached={handleEndReached}
       onEndReachedThreshold={0.4}
       ListHeaderComponent={
         <View style={styles.header}>
