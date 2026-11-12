@@ -1,13 +1,14 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  ESPRESSO_LOAD_FAILED,
   ESPRESSO_LOAD_MORE_FAILED,
   ESPRESSO_SHOT_PAGE_SIZE,
   ESPRESSO_SHOT_Q_MAX,
   espressoShotPageInput,
   useEspressoShotPages,
 } from './use-espresso-shot-pages'
-import { seedEspressoShotPage } from '@/test/espresso-shots'
+import { espressoShotCursor, seedEspressoShotPage } from '@/test/espresso-shots'
 import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
 import { createTestProviders } from '@/test/providers'
 import { trpcSuccess } from '@/test/trpc-response'
@@ -15,6 +16,9 @@ import { trpcSuccess } from '@/test/trpc-response'
 const FILTERED_COFFEE_ID = 'c-filtered'
 const STALE_EXTRA_ID = 'stale-extra'
 const RETRY_EXTRA_ID = 'retry-extra'
+const KEPT_EXTRA_ID = 'kept-extra'
+const REMOVED_EXTRA_ID = 'removed-extra'
+const REFRESHED_FIRST_ID = 'refreshed-0'
 
 function pageOf(
   count: number,
@@ -26,7 +30,10 @@ function pageOf(
     makeRecentShot({
       id: `${idPrefix}${index}`,
       coffeeId,
-      coffee: makeRecentCoffee({ id: coffeeId, name: `${coffeeName} ${index}` }),
+      coffee: makeRecentCoffee({
+        id: coffeeId,
+        name: `${coffeeName} ${index}`,
+      }),
     }),
   )
 }
@@ -182,11 +189,150 @@ describe('useEspressoShotPages', () => {
         await result.current.loadMore()
       })
       expect(result.current.loadMoreError).toBeNull()
-      expect(result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID)).toBe(
-        true,
-      )
+      expect(
+        result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+      ).toBe(true)
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+
+  it('keeps extra shots when a first-page refetch fails', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+      const extraShot = makeRecentShot({
+        id: RETRY_EXTRA_ID,
+        coffeeId: 'c-next',
+        coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+      })
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 1,
+        espressoShotCursor(first[first.length - 1]),
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+      ).toBe(true)
+
+      await act(async () => {
+        await result.current.retry()
+      })
+      await waitFor(() =>
+        expect(result.current.loadError).toBe(ESPRESSO_LOAD_FAILED),
+      )
+      expect(
+        result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+      ).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('drops extra shots after a successful first-page refetch', async () => {
+    const refreshed = makeRecentShot({
+      id: REFRESHED_FIRST_ID,
+      coffee: makeRecentCoffee({ name: 'Coffee refreshed' }),
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      trpcSuccess({
+        items: [refreshed],
+        total: 1,
+        nextCursor: null,
+      }),
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+      const extraShot = makeRecentShot({
+        id: RETRY_EXTRA_ID,
+        coffeeId: 'c-next',
+        coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+      })
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 1,
+        espressoShotCursor(first[first.length - 1]),
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+      ).toBe(true)
+
+      await act(async () => {
+        await result.current.retry()
+      })
+      await waitFor(() => {
+        expect(result.current.items.map((shot) => shot.id)).toEqual([
+          REFRESHED_FIRST_ID,
+        ])
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('drops a removed extra shot without dropping the rest', async () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const kept = makeRecentShot({
+      id: KEPT_EXTRA_ID,
+      coffeeId: 'c-kept',
+      coffee: makeRecentCoffee({ id: 'c-kept', name: 'Coffee kept' }),
+    })
+    const removed = makeRecentShot({
+      id: REMOVED_EXTRA_ID,
+      coffeeId: 'c-removed',
+      coffee: makeRecentCoffee({ id: 'c-removed', name: 'Coffee removed' }),
+    })
+    seedEspressoShotPage(queryClient, trpc, first, first.length + 2)
+    seedEspressoShotPage(
+      queryClient,
+      trpc,
+      [kept, removed],
+      first.length + 2,
+      espressoShotCursor(first[first.length - 1]),
+    )
+
+    const { result } = renderHook(() => useEspressoShotPages(), {
+      wrapper: Wrapper,
+    })
+
+    await act(async () => {
+      await result.current.loadMore()
+    })
+
+    act(() => {
+      result.current.removeShot(REMOVED_EXTRA_ID)
+    })
+
+    const ids = result.current.items.map((shot) => shot.id)
+    expect(ids).toContain(KEPT_EXTRA_ID)
+    expect(ids).not.toContain(REMOVED_EXTRA_ID)
+    expect(ids).toHaveLength(ESPRESSO_SHOT_PAGE_SIZE + 1)
   })
 })

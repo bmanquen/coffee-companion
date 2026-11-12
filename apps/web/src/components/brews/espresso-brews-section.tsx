@@ -1,9 +1,5 @@
 import { coffeeOptionLabel } from '@coffee-companion/brew-display'
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
@@ -13,7 +9,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { Pencil, Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { createContext, useContext, useMemo, useState } from 'react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import {
   brewLogRowClass,
@@ -63,6 +59,8 @@ type Shot = {
 
 const columnHelper = createColumnHelper<Shot>()
 
+const RemoveShotContext = createContext<(shotId: string) => void>(() => {})
+
 function DialedInCell({ row }: CellContext<Shot, unknown>) {
   return <BrewDialedInCell brewingMethod="espresso" brew={row.original} />
 }
@@ -76,9 +74,11 @@ type ShotPage = {
 function ActionsCell({ row }: CellContext<Shot, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
+  const removeShot = useContext(RemoveShotContext)
   const deleteShot = useMutation(
     trpc.espressoShot.delete.mutationOptions({
       onSuccess: (_deleted, shotId) => {
+        removeShot(shotId)
         queryClient.setQueriesData(
           trpc.espressoShot.getRecent.queryFilter(),
           (page: ShotPage | undefined) => {
@@ -205,10 +205,11 @@ export function EspressoBrewsSection() {
     loadError,
     stale,
     retry,
+    removeShot,
   } = useEspressoShotPages({
-      coffeeId: coffeeId || undefined,
-      q: debouncedQ.trim() || undefined,
-    })
+    coffeeId: coffeeId || undefined,
+    q: debouncedQ.trim() || undefined,
+  })
 
   const coffeeOptions = useMemo(
     () =>
@@ -240,93 +241,97 @@ export function EspressoBrewsSection() {
   })
 
   return (
-    <Card className="flex flex-col gap-4 w-full bg-white p-6">
-      <div className="flex justify-between items-center w-full">
-        <h2 className="text-lg font-semibold">Espresso</h2>
-        <Link to="/espresso/new">
-          <Button>
-            <Plus />
-            Log Shot
-          </Button>
-        </Link>
-      </div>
-      <div className="flex w-full flex-col gap-2 sm:flex-row">
-        {coffeesQuery.isError && coffees.length === 0 ? (
-          <div className="flex flex-col gap-2">
-            <p role="alert">{ESPRESSO_COFFEES_LOAD_FAILED}</p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                void coffeesQuery.refetch()
-              }}
-            >
-              Try again
+    <RemoveShotContext.Provider value={removeShot}>
+      <Card className="flex flex-col gap-4 w-full bg-white p-6">
+        <div className="flex justify-between items-center w-full">
+          <h2 className="text-lg font-semibold">Espresso</h2>
+          <Link to="/espresso/new">
+            <Button>
+              <Plus />
+              Log Shot
             </Button>
-          </div>
-        ) : (
-          <CoffeeFilter
-            options={coffeeOptions}
-            value={coffeeId}
-            onChange={setCoffeeId}
-          />
-        )}
-        <Input
-          placeholder="Filter shots..."
-          value={q}
-          maxLength={ESPRESSO_SHOT_Q_MAX}
-          onChange={(e) => setQ(e.target.value)}
-          className="flex-1"
-        />
-      </div>
-      {loading ? (
-        <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
-      ) : (
-        <>
-          {loadError ? (
+          </Link>
+        </div>
+        <div className="flex w-full flex-col gap-2 sm:flex-row">
+          {coffeesQuery.isError && coffees.length === 0 ? (
             <div className="flex flex-col gap-2">
-              <p role="alert">{loadError}</p>
-              <Button type="button" variant="outline" onClick={retry}>
+              <p role="alert">{ESPRESSO_COFFEES_LOAD_FAILED}</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  void coffeesQuery.refetch()
+                }}
+              >
                 Try again
               </Button>
             </div>
-          ) : null}
-          {shots.length === 0 && !filtering && !loadError ? (
-            <BrewsEmptyState
-              message="No espresso shots yet."
-              to="/espresso/new"
-              linkLabel="Log your first shot"
+          ) : (
+            <CoffeeFilter
+              options={coffeeOptions}
+              value={coffeeId}
+              onChange={setCoffeeId}
             />
-          ) : shots.length === 0 && loadError ? null : (
-            <>
-              <div
-                aria-busy={stale || undefined}
-                className={stale ? 'opacity-60' : undefined}
-              >
-                <DataTable
-                  table={table}
-                  renderSubComponent={(row) => renderBrewDetails(row.original)}
-                  replaceRow={(row) =>
-                    row.original.sealed ? <SealedRowNotice /> : null
-                  }
-                  rowClassName={(row) =>
-                    brewLogRowClass(
-                      row.original.sealed,
-                      row.original.isDialedIn,
-                    )
-                  }
-                />
-              </div>
-              <EspressoShotPager
-                hasMore={hasMore}
-                loadingMore={loadingMore}
-                loadMoreError={loadMoreError}
-                loadMore={loadMore}
-              />
-            </>
           )}
-        </>
-      )}
-    </Card>
+          <Input
+            placeholder="Filter shots..."
+            value={q}
+            maxLength={ESPRESSO_SHOT_Q_MAX}
+            onChange={(e) => setQ(e.target.value)}
+            className="flex-1"
+          />
+        </div>
+        {loading ? (
+          <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
+        ) : (
+          <>
+            {loadError ? (
+              <div className="flex flex-col gap-2">
+                <p role="alert">{loadError}</p>
+                <Button type="button" variant="outline" onClick={retry}>
+                  Try again
+                </Button>
+              </div>
+            ) : null}
+            {shots.length === 0 && !filtering && !loadError ? (
+              <BrewsEmptyState
+                message="No espresso shots yet."
+                to="/espresso/new"
+                linkLabel="Log your first shot"
+              />
+            ) : shots.length === 0 && loadError ? null : (
+              <>
+                <div
+                  aria-busy={stale || undefined}
+                  className={stale ? 'opacity-60' : undefined}
+                >
+                  <DataTable
+                    table={table}
+                    renderSubComponent={(row) =>
+                      renderBrewDetails(row.original)
+                    }
+                    replaceRow={(row) =>
+                      row.original.sealed ? <SealedRowNotice /> : null
+                    }
+                    rowClassName={(row) =>
+                      brewLogRowClass(
+                        row.original.sealed,
+                        row.original.isDialedIn,
+                      )
+                    }
+                  />
+                </div>
+                <EspressoShotPager
+                  hasMore={hasMore}
+                  loadingMore={loadingMore}
+                  loadMoreError={loadMoreError}
+                  loadMore={loadMore}
+                />
+              </>
+            )}
+          </>
+        )}
+      </Card>
+    </RemoveShotContext.Provider>
   )
 }
