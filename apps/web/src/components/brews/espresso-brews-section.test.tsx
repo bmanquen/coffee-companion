@@ -9,8 +9,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EspressoBrewsSection } from './espresso-brews-section'
 import type * as ReactRouter from '@tanstack/react-router'
 import {
+  ESPRESSO_COFFEES_LOAD_FAILED,
   ESPRESSO_LOADING_SHOTS,
   ESPRESSO_LOAD_FAILED,
+  ESPRESSO_SHOT_FILTER_DEBOUNCE_MS,
   ESPRESSO_SHOT_PAGE_SIZE,
   ESPRESSO_SHOT_Q_MAX,
   espressoShotPageInput,
@@ -159,6 +161,35 @@ describe('EspressoBrewsSection', () => {
     expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
     expect(screen.getByPlaceholderText('Filter shots...')).toBeTruthy()
     expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
+  })
+
+  it('retries a failed coffee-library load without hiding shots', async () => {
+    const coffees = [
+      makeCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    ]
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValueOnce(trpcSuccess(coffees))
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, [makeRecentShot({ id: 's1' })])
+
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+      expect(await screen.findByText(ESPRESSO_COFFEES_LOAD_FAILED)).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getByText('Ethiopia Guji'),
+      ).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'All coffees' })).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(
+        await screen.findByRole('button', { name: 'All coffees' }),
+      ).toBeTruthy()
+      expect(screen.queryByText(ESPRESSO_COFFEES_LOAD_FAILED)).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 
   it('shows a retry instead of the empty state when the first page fails', async () => {
@@ -852,15 +883,25 @@ describe('EspressoBrewsSection', () => {
       fireEvent.change(screen.getByPlaceholderText('Filter shots...'), {
         target: { value: 'Huila' },
       })
-
-      await waitFor(() =>
-        expect(
-          screen.getByRole('button', { name: 'Load more' }),
-        ).toHaveProperty('disabled', false),
+      expect(screen.getByPlaceholderText('Filter shots...')).toHaveProperty(
+        'value',
+        'Huila',
       )
       expect(
-        within(screen.getByRole('table')).getByText('Colombia Huila'),
-      ).toBeTruthy()
+        screen.getByRole('button', { name: 'Load more' }),
+      ).toHaveProperty('disabled', true)
+
+      await waitFor(
+        () => {
+          expect(
+            within(screen.getByRole('table')).getByText('Colombia Huila'),
+          ).toBeTruthy()
+          expect(
+            screen.getByRole('button', { name: 'Load more' }),
+          ).toHaveProperty('disabled', false)
+        },
+        { timeout: ESPRESSO_SHOT_FILTER_DEBOUNCE_MS + 2_000 },
+      )
     } finally {
       fetchSpy.mockRestore()
     }
@@ -965,6 +1006,11 @@ describe('EspressoBrewsSection', () => {
     fireEvent.change(screen.getByPlaceholderText('Filter shots...'), {
       target: { value: 'zzz' },
     })
+    expect(screen.getByPlaceholderText('Filter shots...')).toHaveProperty(
+      'value',
+      'zzz',
+    )
+    expect(screen.getByRole('table')).toBeTruthy()
 
     expect(await screen.findByRole('status')).toBeTruthy()
     expect(screen.getByText(ESPRESSO_LOADING_SHOTS)).toBeTruthy()

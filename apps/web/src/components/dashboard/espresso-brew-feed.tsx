@@ -13,6 +13,7 @@ import { expanderColumn } from '@/components/data-table'
 import { EspressoShotPager } from '@/components/brews/espresso-shot-pager'
 import { Button } from '@/components/ui/button'
 import {
+  ESPRESSO_COFFEES_LOAD_FAILED,
   ESPRESSO_LOADING_SHOTS,
   useEspressoShotPages,
 } from '@/hooks/use-espresso-shot-pages'
@@ -61,10 +62,11 @@ const columns = [
 // feed. Hands loaded pages to BrewFeed and offers Load more for the rest.
 export function EspressoBrewFeed() {
   const trpc = useTRPC()
-  const { data: coffees = [] } = useQuery({
+  const coffeesQuery = useQuery({
     ...trpc.coffee.getAll.queryOptions(),
     staleTime: Infinity,
   })
+  const coffees = coffeesQuery.data ?? []
   const [coffeeId, setCoffeeId] = useState('')
   const [dialedInOnly, setDialedInOnly] = useState(false)
   const coffeeOptions = useMemo(
@@ -103,11 +105,11 @@ export function EspressoBrewFeed() {
         logLabel="Log Shot"
         emptyMessage="No espresso shots yet."
         emptyLinkLabel="Log your first shot"
-        coffeeOptions={coffeeOptions}
+        coffeeOptions={
+          coffeesQuery.isError && coffees.length === 0 ? [] : coffeeOptions
+        }
         coffeeId={coffeeId}
         onCoffeeIdChange={setCoffeeId}
-        dialedInOnly={dialedInOnly}
-        onDialedInOnlyChange={setDialedInOnly}
         banner={
           loadError && items.length > 0 ? (
             <div className="flex flex-col gap-2">
@@ -116,8 +118,23 @@ export function EspressoBrewFeed() {
                 Try again
               </Button>
             </div>
+          ) : coffeesQuery.isError && coffees.length === 0 ? (
+            <div className="flex flex-col gap-2">
+              <p role="alert">{ESPRESSO_COFFEES_LOAD_FAILED}</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  void coffeesQuery.refetch()
+                }}
+              >
+                Try again
+              </Button>
+            </div>
           ) : undefined
         }
+        dialedInOnly={dialedInOnly}
+        onDialedInOnlyChange={setDialedInOnly}
         stale={stale}
         status={
           loading ? (

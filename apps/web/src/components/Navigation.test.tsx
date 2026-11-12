@@ -1,7 +1,17 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import Navigation from './Navigation'
 import type { ReactNode } from 'react'
+
+function renderNav(ui: ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  )
+}
 
 const authState = vi.hoisted(() => ({
   session: null as { user: { name: string; image: string | null } } | null,
@@ -84,7 +94,7 @@ vi.mock('@/components/ui/avatar', () => ({
 describe('Navigation', () => {
   it('shows authenticated links and the user, and signs out', async () => {
     authState.session = { user: { name: 'Test User', image: null } }
-    render(<Navigation open setOpen={() => {}} />)
+    renderNav(<Navigation open setOpen={() => {}} />)
 
     expect(screen.getByRole('link', { name: 'Coffee' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Brews' })).toBeTruthy()
@@ -112,7 +122,7 @@ describe('Navigation', () => {
   it('takes the user to their account from their avatar and name', () => {
     authState.session = { user: { name: 'Test User', image: null } }
     const setOpen = vi.fn()
-    render(<Navigation open setOpen={setOpen} />)
+    renderNav(<Navigation open setOpen={setOpen} />)
 
     const link = screen.getByRole('link', { name: /Test User/ })
     expect(link.getAttribute('href')).toBe('/account')
@@ -125,7 +135,7 @@ describe('Navigation', () => {
   it('closes the drawer when any nav link is selected', () => {
     authState.session = { user: { name: 'Test User', image: null } }
     const setOpen = vi.fn()
-    render(<Navigation open setOpen={setOpen} />)
+    renderNav(<Navigation open setOpen={setOpen} />)
 
     for (const name of ['Home', 'Coffee', 'Brews', 'Equipment', 'Account']) {
       fireEvent.click(screen.getByRole('link', { name }))
@@ -136,7 +146,7 @@ describe('Navigation', () => {
 
   it('shows sign-in and no authenticated links when signed out', async () => {
     authState.session = null
-    render(<Navigation open setOpen={() => {}} />)
+    renderNav(<Navigation open setOpen={() => {}} />)
 
     expect(screen.queryByRole('link', { name: 'Coffee' })).toBeNull()
     await act(async () => {
@@ -152,7 +162,7 @@ describe('Navigation', () => {
   it('refuses to close on an interaction outside it', () => {
     authState.session = { user: { name: 'Test User', image: null } }
     interactOutside.prevented = 0
-    render(<Navigation open setOpen={() => {}} />)
+    renderNav(<Navigation open setOpen={() => {}} />)
 
     fireEvent.click(screen.getByTestId('interact-outside'))
 

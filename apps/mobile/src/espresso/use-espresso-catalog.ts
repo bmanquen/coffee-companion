@@ -147,6 +147,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
 
   const runLoad = useCallback(() => {
     const seq = ++loadSeq.current
+    pageSeq.current += 1
     const forUser = userId
     dispatch({ type: 'loadStarted' })
     void api.load().then(
@@ -171,6 +172,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     if (previousUser !== userId) {
       saveInFlight.current = false
       loadSeq.current += 1
+      pageSeq.current += 1
       refreshPending.current = false
       dispatch({ type: 'reset' })
     }
@@ -248,6 +250,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     const catalog = state.catalog
     if (
       refreshPending.current ||
+      state.status === 'loading' ||
       state.loadingMore ||
       !catalog ||
       !catalog.nextCursor
@@ -276,7 +279,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
         })
       },
     )
-  }, [api, state.catalog, state.loadingMore, userId])
+  }, [api, state.catalog, state.loadingMore, state.status, userId])
 
   const loadPrefill = useCallback(
     (coffeeId: string) => api.loadPrefill(coffeeId),

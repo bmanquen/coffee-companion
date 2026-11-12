@@ -2,7 +2,7 @@ import { and, count, desc, eq, ilike, inArray, isNull, lt, or, sql } from 'drizz
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
-import { coffees, espressoShots, roasters } from '../db/schema'
+import { coffees, dialedInBrews, espressoShots, roasters } from '../db/schema'
 import { insertEspressoShotSchema } from '../db/zod'
 import {
   brewIdsForMethod,
@@ -129,15 +129,11 @@ function recentWhere(
     coffeeId?: string
     q?: string
     cursor?: EspressoShotCursorKey
-    dialedInIds?: Array<string>
   },
   shelf: Shelf,
 ) {
   const parts = [eq(espressoShots.userId, userId)]
   if (input.coffeeId) parts.push(eq(espressoShots.coffeeId, input.coffeeId))
-  if (input.dialedInIds) {
-    parts.push(inArray(espressoShots.id, input.dialedInIds))
-  }
   if (input.cursor) {
     const cursorWhere = afterCursor(input.cursor)
     if (cursorWhere) parts.push(cursorWhere)
@@ -185,7 +181,7 @@ async function loadRecentPage(
     coffeeId?: string
     q?: string
     cursor?: EspressoShotCursorKey
-    dialedInIds?: Array<string>
+    dialedIn?: boolean
   },
   shelf: Shelf,
 ): Promise<RecentPage> {
@@ -195,25 +191,33 @@ async function loadRecentPage(
     {
       coffeeId: input.coffeeId,
       q: input.q,
-      dialedInIds: input.dialedInIds,
     },
     shelf,
   )
+  const dialedInOn = and(
+    eq(dialedInBrews.brewId, espressoShots.id),
+    eq(dialedInBrews.userId, userId),
+    eq(dialedInBrews.brewingMethod, 'espresso'),
+  )
+  const pageQuery = db
+    .select({ id: espressoShots.id, createdAt: espressoShots.createdAt })
+    .from(espressoShots)
+    .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
+    .leftJoin(roasters, eq(roasters.id, coffees.roasterId))
+  const countQuery = db
+    .select({ total: count() })
+    .from(espressoShots)
+    .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
+    .leftJoin(roasters, eq(roasters.id, coffees.roasterId))
   const [idRows, [{ total }]] = await Promise.all([
-    db
-      .select({ id: espressoShots.id, createdAt: espressoShots.createdAt })
-      .from(espressoShots)
-      .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
-      .leftJoin(roasters, eq(roasters.id, coffees.roasterId))
+    (input.dialedIn ? pageQuery.innerJoin(dialedInBrews, dialedInOn) : pageQuery)
       .where(where)
       .orderBy(desc(espressoShots.createdAt), desc(espressoShots.id))
       .limit(input.limit + 1),
-    db
-      .select({ total: count() })
-      .from(espressoShots)
-      .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
-      .leftJoin(roasters, eq(roasters.id, coffees.roasterId))
-      .where(countWhere),
+    (input.dialedIn
+      ? countQuery.innerJoin(dialedInBrews, dialedInOn)
+      : countQuery
+    ).where(countWhere),
   ])
   const hasMore = idRows.length > input.limit
   const pageRows = hasMore ? idRows.slice(0, input.limit) : idRows
@@ -265,12 +269,6 @@ export const espressoShotRouter = createTRPCRouter({
       const cursor = input.cursor
         ? decodeCursorOrThrow(input.cursor)
         : undefined
-      const dialedInIds = input.dialedIn
-        ? await brewIdsForMethod(ctx.session.user.id, 'espresso')
-        : undefined
-      if (dialedInIds && dialedInIds.length === 0) {
-        return { items: [], total: 0, nextCursor: null }
-      }
       return sealBrewPageWithDialedIn(
         ctx.session.user.id,
         ctx.shelf,
@@ -282,7 +280,7 @@ export const espressoShotRouter = createTRPCRouter({
               coffeeId: input.coffeeId,
               q: input.q,
               cursor,
-              dialedInIds,
+              dialedIn: input.dialedIn,
             },
             await ctx.shelf(),
           ),

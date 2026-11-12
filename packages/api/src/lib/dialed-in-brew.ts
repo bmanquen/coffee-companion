@@ -510,6 +510,18 @@ export async function stampDialedIn<T extends { id: string }>(
   return withDialedInFlag(brews, ids)
 }
 
+export async function stampDialedInPage<T extends { id: string }>(
+  userId: string,
+  brews: Array<T>,
+): Promise<Array<T & { isDialedIn: boolean }>> {
+  if (brews.length === 0) return []
+  const rows = await db.query.dialedInBrews.findMany({
+    where: { userId, brewId: { in: brews.map((brew) => brew.id) } },
+    columns: { brewId: true },
+  })
+  return withDialedInFlag(brews, new Set(rows.map((row) => row.brewId)))
+}
+
 export async function sealBrewsWithDialedIn<
   T extends SealableBrew & { id: string },
 >(
@@ -532,7 +544,7 @@ export async function sealBrewPageWithDialedIn<
   }
 > {
   const page = await sealBrewPage(shelf, load)
-  return { ...page, items: await stampDialedIn(userId, page.items) }
+  return { ...page, items: await stampDialedInPage(userId, page.items) }
 }
 
 export async function sealBrewWithDialedIn<

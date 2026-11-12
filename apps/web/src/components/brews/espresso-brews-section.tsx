@@ -32,8 +32,11 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
+import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import {
+  ESPRESSO_COFFEES_LOAD_FAILED,
   ESPRESSO_LOADING_SHOTS,
+  ESPRESSO_SHOT_FILTER_DEBOUNCE_MS,
   ESPRESSO_SHOT_Q_MAX,
   useEspressoShotPages,
 } from '@/hooks/use-espresso-shot-pages'
@@ -161,15 +164,17 @@ const columns = [
 export function EspressoBrewsSection() {
   'use no memo'
   const trpc = useTRPC()
-  const { data: coffees = [] } = useQuery({
+  const coffeesQuery = useQuery({
     ...trpc.coffee.getAll.queryOptions(),
     staleTime: Infinity,
   })
+  const coffees = coffeesQuery.data ?? []
   const [sorting, setSorting] = useState<SortingState>([])
   const [q, setQ] = useState('')
   const [coffeeId, setCoffeeId] = useState('')
   const expansion = useAccordionExpansion()
-  const filtering = Boolean(coffeeId || q.trim())
+  const debouncedQ = useDebouncedValue(q, ESPRESSO_SHOT_FILTER_DEBOUNCE_MS)
+  const filtering = Boolean(coffeeId || debouncedQ.trim())
   const {
     items: shots,
     hasMore,
@@ -182,7 +187,7 @@ export function EspressoBrewsSection() {
     retry,
   } = useEspressoShotPages({
       coffeeId: coffeeId || undefined,
-      q: q.trim() || undefined,
+      q: debouncedQ.trim() || undefined,
     })
 
   const coffeeOptions = useMemo(
@@ -225,11 +230,26 @@ export function EspressoBrewsSection() {
         </Link>
       </div>
       <div className="flex w-full flex-col gap-2 sm:flex-row">
-        <CoffeeFilter
-          options={coffeeOptions}
-          value={coffeeId}
-          onChange={setCoffeeId}
-        />
+        {coffeesQuery.isError && coffees.length === 0 ? (
+          <div className="flex flex-col gap-2">
+            <p role="alert">{ESPRESSO_COFFEES_LOAD_FAILED}</p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void coffeesQuery.refetch()
+              }}
+            >
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <CoffeeFilter
+            options={coffeeOptions}
+            value={coffeeId}
+            onChange={setCoffeeId}
+          />
+        )}
         <Input
           placeholder="Filter shots..."
           value={q}

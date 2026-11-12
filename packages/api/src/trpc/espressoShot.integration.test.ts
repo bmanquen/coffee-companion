@@ -565,6 +565,52 @@ describe('espressoShot.getRecent', () => {
     expect(page.total).toBe(1)
   })
 
+  it('pages dialed-in shots beyond the first page', async () => {
+    const token = uniq('dialed-page')
+    const created: Array<string> = []
+    for (let index = 0; index < 3; index++) {
+      const coffee = await createCoffee(uniq(`Dialed Page ${index}`))
+      const shot = await asA.espressoShot.create({
+        coffeeId: coffee.id,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: `${token}-${index}`,
+        idempotencyKey: crypto.randomUUID(),
+      })
+      await asA.dialedInBrew.set({
+        brewingMethod: 'espresso',
+        brewingDeviceId: espressoDeviceId,
+        brewId: shot.id,
+      })
+      created.push(shot.id)
+    }
+    const page1 = await asA.espressoShot.getRecent({
+      limit: 2,
+      q: token,
+      dialedIn: true,
+    })
+    expect(page1.items.map((shot) => shot.id)).toEqual([
+      created[2],
+      created[1],
+    ])
+    expect(page1.items.every((shot) => shot.isDialedIn)).toBe(true)
+    expect(page1.total).toBe(3)
+    expect(page1.nextCursor).toBeTruthy()
+
+    const page2 = await asA.espressoShot.getRecent({
+      limit: 2,
+      q: token,
+      dialedIn: true,
+      cursor: page1.nextCursor!,
+    })
+    expect(page2.items.map((shot) => shot.id)).toEqual([created[0]])
+    expect(page2.items[0]?.isDialedIn).toBe(true)
+    expect(page2.nextCursor).toBeNull()
+  })
+
   it('includes the roaster on getRecent coffee relations', async () => {
     const shots = (await asA.espressoShot.getRecent({ limit: 50 }))
       .items

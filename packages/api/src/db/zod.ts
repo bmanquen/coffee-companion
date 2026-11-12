@@ -162,11 +162,11 @@ const requiredInt = () =>
         ctx.addIssue({ code: 'custom', message: 'Enter a number' })
         return
       }
-      if (typeof value === 'number' && !Number.isInteger(value)) {
+      if (typeof value === 'number' && (!Number.isInteger(value) || value < 0)) {
         ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
         return
       }
-      if (typeof value === 'string' && !/^-?\d+$/.test(value)) {
+      if (typeof value === 'string' && !/^\d+$/.test(value)) {
         ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
       }
     })

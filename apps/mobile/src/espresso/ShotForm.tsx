@@ -112,9 +112,21 @@ export function ShotForm({
     // Drop prefill that arrives after a save has started so a retry keeps the
     // same payload and idempotency key.
     if (startedSaveGen !== saveGen.current) return
-    setDraft((current) =>
-      applyCoffeePrefill(current, coffeeId, latest, keepPrefill.current),
-    )
+    setDraft((current) => {
+      const next = applyCoffeePrefill(
+        current,
+        coffeeId,
+        latest,
+        keepPrefill.current,
+      )
+      if (
+        keepPrefill.current.brewingDeviceId ||
+        catalog.devices.some((device) => device.id === next.brewingDeviceId)
+      ) {
+        return next
+      }
+      return { ...next, brewingDeviceId: '' }
+    })
   }
 
   const requestPrefill = (coffeeId: string) => {
