@@ -20,6 +20,7 @@ import {
   LABEL_TIME,
   LABEL_YIELD,
   LOG,
+  LOGGING,
   LOG_ESPRESSO_HEADING,
   LOG_TEST_ID,
   SELECT_COFFEE,
@@ -164,8 +165,20 @@ export function ShotForm({
         onChange={(coffeeId) => {
           onClearError()
           setFieldErrors({})
-          keepPrefill.current = {}
-          setDraft((current) => ({ ...current, coffeeId, roastDate: '' }))
+          const keep = keepPrefill.current
+          keepPrefill.current = {
+            grinderId: keep.grinderId,
+            brewingDeviceId: keep.brewingDeviceId,
+          }
+          setDraft((current) => ({
+            ...current,
+            coffeeId,
+            roastDate: '',
+            grinderId: keep.grinderId ? current.grinderId : '',
+            brewingDeviceId: keep.brewingDeviceId
+              ? current.brewingDeviceId
+              : '',
+          }))
           requestPrefill(coffeeId)
         }}
       />
@@ -254,6 +267,7 @@ export function ShotForm({
       ) : null}
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ disabled: busy, busy }}
         testID={LOG_TEST_ID}
         disabled={busy}
         onPress={() => {
@@ -274,7 +288,7 @@ export function ShotForm({
           onSubmit({ ...parsed.value, idempotencyKey: idempotencyKey.current })
         }}
       >
-        <Text>{LOG}</Text>
+        <Text>{busy ? LOGGING : LOG}</Text>
       </Pressable>
     </ScrollView>
   )

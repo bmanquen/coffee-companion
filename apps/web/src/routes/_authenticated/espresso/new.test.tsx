@@ -5,7 +5,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route } from './new'
 import { useFieldContext } from '@/hooks/form-context'
 import { seedLatestUnsealed } from '@/test/espresso-shots'
@@ -122,18 +122,75 @@ function seeded() {
     }),
     [],
   )
-  return providers
+  const fetchSpy = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(serveFromCache(providers))
+  return { ...providers, fetchSpy }
 }
 
 const NewEspressoShot = Route.options.component!
 
-function createCalls(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
-  return fetchSpy.mock.calls.filter((call) =>
-    String(call[0]).includes('espressoShot.create'),
+function callText(call: Array<unknown>) {
+  const url = String(call[0])
+  const body = String((call[1] as RequestInit | undefined)?.body ?? '')
+  return `${url}\n${body}`
+}
+
+function isCreateCall(call: Array<unknown>) {
+  return callText(call).includes('espressoShot.create')
+}
+
+function isPrefillCall(call: Array<unknown>) {
+  return callText(call).includes('getLatestUnsealed')
+}
+
+function coffeeIdFromCall(call: Array<unknown>) {
+  return decodeURIComponent(callText(call)).match(
+    /"coffeeId"\s*:\s*"([^"]+)"/,
+  )?.[1]
+}
+
+function prefillResponse(
+  queryClient: ReturnType<typeof createTestProviders>['queryClient'],
+  trpc: ReturnType<typeof createTestProviders>['trpc'],
+  call: Array<unknown>,
+) {
+  const coffeeId = coffeeIdFromCall(call)
+  if (!coffeeId) return trpcSuccess(null)
+  return trpcSuccess(
+    queryClient.getQueryData(
+      trpc.espressoShot.getLatestUnsealed.queryKey({ coffeeId }),
+    ) ?? null,
   )
 }
 
+function serveFromCache(
+  providers: ReturnType<typeof createTestProviders>,
+  create?: (call: Array<unknown>) => Promise<Response> | Response,
+) {
+  return async (...call: Array<unknown>) => {
+    if (isCreateCall(call) && create) return create(call)
+    if (isPrefillCall(call)) {
+      return prefillResponse(providers.queryClient, providers.trpc, call)
+    }
+    if (isCreateCall(call)) return trpcSuccess()
+    return trpcSuccess()
+  }
+}
+
+function createCalls(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
+  return fetchSpy.mock.calls.filter((call) => isCreateCall(call))
+}
+
+function prefillCalls(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
+  return fetchSpy.mock.calls.filter((call) => isPrefillCall(call))
+}
+
 describe('NewEspressoShot form', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('offers only Espresso-type brewing devices', () => {
     const { Wrapper } = seeded()
     render(<NewEspressoShot />, { wrapper: Wrapper })
@@ -216,11 +273,8 @@ describe('NewEspressoShot form', () => {
   })
 
   it('submits a create with the entered dose and yield', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(trpcSuccess())
+    const { Wrapper, fetchSpy } = seeded()
     try {
-      const { Wrapper } = seeded()
       render(<NewEspressoShot />, { wrapper: Wrapper })
 
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
@@ -269,12 +323,17 @@ describe('NewEspressoShot form', () => {
   })
 
   it('retries a lost create with the same idempotency key', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockRejectedValueOnce(new Error('Network request failed'))
-      .mockResolvedValue(trpcSuccess())
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates === 1) throw new Error('Network request failed')
+        return trpcSuccess()
+      }),
+    )
     try {
-      const { Wrapper } = seeded()
       render(<NewEspressoShot />, { wrapper: Wrapper })
 
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
@@ -322,12 +381,17 @@ describe('NewEspressoShot form', () => {
   })
 
   it('mints a new key when the draft changes after a failed save', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockRejectedValueOnce(new Error('Network request failed'))
-      .mockResolvedValue(trpcSuccess({ id: 'shot-new', dose: '22' }))
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates === 1) throw new Error('Network request failed')
+        return trpcSuccess({ id: 'shot-new', dose: '22' })
+      }),
+    )
     try {
-      const { Wrapper } = seeded()
       render(<NewEspressoShot />, { wrapper: Wrapper })
 
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
@@ -460,13 +524,17 @@ describe('NewEspressoShot form', () => {
   })
 
   it('does not apply prefill after a save has started', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockRejectedValueOnce(new Error('Network request failed'))
-      .mockResolvedValue(trpcSuccess())
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates === 1) throw new Error('Network request failed')
+        return trpcSuccess()
+      }),
+    )
     try {
-      const providers = seeded()
-      const { queryClient, trpc, Wrapper } = providers
       queryClient.removeQueries({
         queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
           coffeeId: COFFEE,
@@ -546,11 +614,25 @@ describe('NewEspressoShot form', () => {
   })
 
   it('shows a retry when the last shot cannot be loaded and still lets you enter one', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockRejectedValue(new Error('Network request failed'))
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    const shot = makeRecentShot({
+      id: 'shot-1',
+      coffeeId: COFFEE,
+      grinderId: GRINDER,
+      brewingDeviceId: ESP_DEVICE,
+      roastDate: '2026-05-01',
+    })
+    let lookups = 0
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) {
+        lookups += 1
+        if (lookups === 1) throw new Error('Network request failed')
+        return trpcSuccess(shot)
+      }
+      return trpcSuccess()
+    })
     try {
-      const { queryClient, trpc, Wrapper } = seeded()
       queryClient.removeQueries({
         queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
           coffeeId: COFFEE,
@@ -568,29 +650,103 @@ describe('NewEspressoShot form', () => {
         ),
       ).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+      expect(prefillCalls(fetchSpy)).toHaveLength(1)
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '18' },
       })
       expect(screen.getByDisplayValue('18')).toBeTruthy()
 
-      fetchSpy.mockRestore()
-      seedLatestUnsealed(
-        queryClient,
-        trpc,
-        COFFEE,
-        makeRecentShot({
-          id: 'shot-1',
-          coffeeId: COFFEE,
-          grinderId: GRINDER,
-          brewingDeviceId: ESP_DEVICE,
-          roastDate: '2026-05-01',
-        }),
-      )
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
       expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
-    } catch (error) {
+      expect(prefillCalls(fetchSpy)).toHaveLength(2)
+    } finally {
       fetchSpy.mockRestore()
-      throw error
     }
+  })
+
+  it('clears the previous coffee’s grinder and device before the next lookup', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let resolveB: (shot: ReturnType<typeof makeRecentShot>) => void = () => {}
+    const pendingB = new Promise<ReturnType<typeof makeRecentShot>>((resolve) => {
+      resolveB = resolve
+    })
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call) && coffeeIdFromCall(call) === COFFEE_B) {
+        return trpcSuccess(await pendingB)
+      }
+      return serveFromCache(providers)(...call)
+    })
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+    expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+    expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE_B },
+    })
+    expect(screen.queryByDisplayValue('Niche Zero')).toBeNull()
+    expect(screen.getByRole('combobox', { name: 'Grinder' })).toHaveProperty(
+      'value',
+      '',
+    )
+    expect(
+      screen.getByRole('combobox', { name: 'Brewing Device' }),
+    ).toHaveProperty('value', '')
+
+    resolveB(
+      makeRecentShot({
+        id: 'shot-b',
+        coffeeId: COFFEE_B,
+        grinderId: GRINDER_B,
+        brewingDeviceId: ESP_DEVICE,
+        roastDate: '2026-04-01',
+      }),
+    )
+    expect(await screen.findByDisplayValue('P64')).toBeTruthy()
+    expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
+  })
+
+  it('shows Logging… on the Log button while a save is in flight', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let finishCreate: (() => void) | undefined
+    fetchSpy.mockImplementation(
+      serveFromCache(
+        providers,
+        () =>
+          new Promise((resolve) => {
+            finishCreate = () => resolve(trpcSuccess())
+          }),
+      ),
+    )
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+    expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(/^Dose/), {
+      target: { value: '18' },
+    })
+    fireEvent.change(screen.getByLabelText(/^Yield/), {
+      target: { value: '36' },
+    })
+    fireEvent.change(screen.getByLabelText(/^Time/), {
+      target: { value: '30' },
+    })
+    fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+      target: { value: '1.5' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+    const log = await screen.findByRole('button', { name: 'Logging…' })
+    expect(log).toHaveProperty('disabled', true)
+    expect(log.getAttribute('aria-busy')).toBe('true')
+    finishCreate?.()
+    expect(await screen.findByRole('button', { name: 'Log' })).toBeTruthy()
   })
 })

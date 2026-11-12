@@ -17,6 +17,7 @@ type Trpc = {
         cursor?: EspressoShotCursor
         coffeeId?: string
         q?: string
+        dialedIn?: boolean
       }) => ReadonlyArray<unknown>
     }
     getLatestUnsealed: {
@@ -46,16 +47,21 @@ export function seedEspressoShotPage(
   total = items.length,
   cursor?: EspressoShotCursor | null,
   filters: EspressoShotPageFilters = {},
+  nextCursor?: EspressoShotCursor | null,
 ) {
-  const nextCursor =
-    items.length === ESPRESSO_SHOT_PAGE_SIZE && items.length < total
-      ? espressoShotCursor(items[items.length - 1])
-      : null
+  const resolvedNextCursor =
+    nextCursor !== undefined
+      ? nextCursor
+      : !cursor &&
+          items.length === ESPRESSO_SHOT_PAGE_SIZE &&
+          items.length < total
+        ? espressoShotCursor(items[items.length - 1])
+        : null
   queryClient.setQueryData(
     trpc.espressoShot.getRecent.queryKey(
       espressoShotPageInput(cursor, filters),
     ),
-    { items, total, nextCursor },
+    { items, total, nextCursor: resolvedNextCursor },
   )
 }
 

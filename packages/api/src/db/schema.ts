@@ -289,6 +289,17 @@ export const espressoShots = pgTable(
   (table) => [
     index('espresso_shots_user_idx').on(table.userId),
     index('espresso_shots_user_coffee_idx').on(table.userId, table.coffeeId),
+    index('espresso_shots_user_created_id_idx').on(
+      table.userId,
+      table.createdAt,
+      table.id,
+    ),
+    index('espresso_shots_user_coffee_created_id_idx').on(
+      table.userId,
+      table.coffeeId,
+      table.createdAt,
+      table.id,
+    ),
     uniqueIndex('espresso_shots_user_idempotency_idx').on(
       table.userId,
       table.idempotencyKey,

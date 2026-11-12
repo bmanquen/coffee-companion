@@ -4,7 +4,7 @@ The dashboard is the signed-in home: one method picker and that method's brew fe
 
 ## Sub-features
 
-- `dashboard-open` renders at `/dashboard` and is where `/` sends a signed-in visitor. The espresso feed shows a Ratio column. More than 20 loaded espresso Shots shows a `Load more` button under the feed.
+- `dashboard-open` renders at `/dashboard` and is where `/` sends a signed-in visitor. The espresso feed shows a Ratio column. `Load more` appears under the feed when more espresso Shots are available.
 - `dashboard-chrome` shows the signed-in shell (Open menu, Account menu) and not `Sign in with Google`.
 - `dashboard-picker` lists every method alphabetically and switches the feed.
 - `dashboard-deeplink` honours `?method=` on load and keeps it across reload and back.

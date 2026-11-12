@@ -529,6 +529,42 @@ describe('espressoShot.getRecent', () => {
     )
   })
 
+  it('filters getRecent to dialed-in shots', async () => {
+    const coffee = await createCoffee(uniq('Dialed Recent'))
+    const dialed = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: 'dialed-recent',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '19',
+      yield: '38',
+      time: 32,
+      grindSetting: 'not-dialed',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceId,
+      brewId: dialed.id,
+    })
+    const page = await asA.espressoShot.getRecent({
+      limit: 50,
+      coffeeId: coffee.id,
+      dialedIn: true,
+    })
+    expect(page.items.map((shot) => shot.id)).toEqual([dialed.id])
+    expect(page.total).toBe(1)
+  })
+
   it('includes the roaster on getRecent coffee relations', async () => {
     const shots = (await asA.espressoShot.getRecent({ limit: 50 }))
       .items
@@ -737,6 +773,89 @@ describe('espressoShot.getLatestUnsealed', () => {
       coffeeId: coffeeAId,
     })
     expect(found).toBeNull()
+  })
+
+  it('returns the latest readable shot even behind newer sealed shots', async () => {
+    const coffee = await createCoffee(uniq('Sealed Prefill Coffee'))
+    const readable = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '16',
+      yield: '32',
+      time: 28,
+      grindSetting: 'readable',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const sealedIds: Array<string> = []
+    for (let i = 0; i < 25; i++) {
+      const shot = await asA.espressoShot.create({
+        coffeeId: coffee.id,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: `sealed-${i}`,
+        idempotencyKey: crypto.randomUUID(),
+      })
+      sealedIds.push(shot.id)
+    }
+    await db
+      .update(espressoShots)
+      .set({ sealedAt: new Date() })
+      .where(inArray(espressoShots.id, sealedIds))
+
+    const found = await asA.espressoShot.getLatestUnsealed({
+      coffeeId: coffee.id,
+    })
+    expect(found?.id).toBe(readable.id)
+    expect(found?.grindSetting).toBe('readable')
+  })
+
+  it('follows a shot reassigned to another coffee without a sealed stamp', async () => {
+    const source = await createCoffee(uniq('Reassign Source'))
+    const destination = await createCoffee(uniq('Reassign Dest'))
+    const older = await asA.espressoShot.create({
+      coffeeId: destination.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '16',
+      yield: '32',
+      time: 28,
+      grindSetting: 'older',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const moved = await asA.espressoShot.create({
+      coffeeId: source.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: 'moved',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    await asA.espressoShot.update({
+      id: moved.id,
+      coffeeId: destination.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: 'moved',
+    })
+
+    const found = await asA.espressoShot.getLatestUnsealed({
+      coffeeId: destination.id,
+    })
+    expect(found?.id).toBe(moved.id)
+    expect(found?.id).not.toBe(older.id)
+    const fromSource = await asA.espressoShot.getLatestUnsealed({
+      coffeeId: source.id,
+    })
+    expect(fromSource).toBeNull()
   })
 })
 

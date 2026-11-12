@@ -1,6 +1,7 @@
-import { Link } from '@tanstack/react-router'
+import { coffeeOptionLabel } from '@coffee-companion/brew-display'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import type { EspressoShotWithRelations } from '@/types'
 import {
   dialedInCoffeeColumn,
@@ -11,11 +12,11 @@ import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { expanderColumn } from '@/components/data-table'
 import { EspressoShotPager } from '@/components/brews/espresso-shot-pager'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import {
   ESPRESSO_LOADING_SHOTS,
   useEspressoShotPages,
 } from '@/hooks/use-espresso-shot-pages'
+import { useTRPC } from '@/integrations/trpc/react'
 
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 
@@ -59,6 +60,20 @@ const columns = [
 // The Espresso tab of the dashboard: paged Shot history as a reference-only
 // feed. Hands loaded pages to BrewFeed and offers Load more for the rest.
 export function EspressoBrewFeed() {
+  const trpc = useTRPC()
+  const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
+  const [coffeeId, setCoffeeId] = useState('')
+  const [dialedInOnly, setDialedInOnly] = useState(false)
+  const coffeeOptions = useMemo(
+    () =>
+      coffees
+        .map((coffee) => ({
+          value: coffee.id,
+          label: coffeeOptionLabel(coffee),
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [coffees],
+  )
   const {
     items,
     hasMore,
@@ -68,33 +83,10 @@ export function EspressoBrewFeed() {
     loading,
     loadError,
     retry,
-  } = useEspressoShotPages()
-
-  if (loading || loadError) {
-    return (
-      <Card className="flex flex-col gap-4 w-full bg-white p-6">
-        <div className="flex justify-between items-center w-full">
-          <h2 className="text-lg font-semibold">Espresso</h2>
-          <Link to="/espresso/new">
-            <Button>
-              <Plus />
-              Log Shot
-            </Button>
-          </Link>
-        </div>
-        {loading ? (
-          <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <p role="alert">{loadError}</p>
-            <Button type="button" variant="outline" onClick={retry}>
-              Try again
-            </Button>
-          </div>
-        )}
-      </Card>
-    )
-  }
+  } = useEspressoShotPages({
+    coffeeId: coffeeId || undefined,
+    dialedIn: dialedInOnly || undefined,
+  })
 
   return (
     <>
@@ -107,13 +99,32 @@ export function EspressoBrewFeed() {
         logLabel="Log Shot"
         emptyMessage="No espresso shots yet."
         emptyLinkLabel="Log your first shot"
+        coffeeOptions={coffeeOptions}
+        coffeeId={coffeeId}
+        onCoffeeIdChange={setCoffeeId}
+        dialedInOnly={dialedInOnly}
+        onDialedInOnlyChange={setDialedInOnly}
+        status={
+          loading ? (
+            <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
+          ) : loadError ? (
+            <div className="flex flex-col gap-2">
+              <p role="alert">{loadError}</p>
+              <Button type="button" variant="outline" onClick={retry}>
+                Try again
+              </Button>
+            </div>
+          ) : undefined
+        }
       />
-      <EspressoShotPager
-        hasMore={hasMore}
-        loadingMore={loadingMore}
-        loadMoreError={loadMoreError}
-        loadMore={loadMore}
-      />
+      {loading || loadError ? null : (
+        <EspressoShotPager
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          loadMoreError={loadMoreError}
+          loadMore={loadMore}
+        />
+      )}
     </>
   )
 }

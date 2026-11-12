@@ -161,7 +161,7 @@ export function NewEspressoShot() {
     void queryClient
       .fetchQuery({
         ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId }),
-        staleTime: Infinity,
+        staleTime: 0,
       })
       .then(
         (latest) => applyPrefill(coffeeId, seq, latest, startedSaveGen),
@@ -201,9 +201,17 @@ export function NewEspressoShot() {
             // it's entered fresh each shot.
             onChange: ({ value }) => {
               if (!value) return
-              keepPrefill.current = {}
+              const keep = keepPrefill.current
+              keepPrefill.current = {
+                grinderId: keep.grinderId,
+                brewingDeviceId: keep.brewingDeviceId,
+              }
               applyingPrefill.current = true
               form.setFieldValue('roastDate', null)
+              if (!keep.grinderId) form.setFieldValue('grinderId', '')
+              if (!keep.brewingDeviceId) {
+                form.setFieldValue('brewingDeviceId', '')
+              }
               applyingPrefill.current = false
               requestPrefill(value)
             },
@@ -300,8 +308,12 @@ export function NewEspressoShot() {
           reset={createShot.reset}
           form={form}
         />
-        <Button type="submit" disabled={createShot.isPending}>
-          Log
+        <Button
+          type="submit"
+          disabled={createShot.isPending}
+          aria-busy={createShot.isPending}
+        >
+          {createShot.isPending ? 'Logging…' : 'Log'}
           <Plus />
         </Button>
       </form>

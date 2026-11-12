@@ -18,6 +18,7 @@ import {
   SHOT_ROW_TEST_ID_PREFIX,
 } from './copy'
 import { shotSummary } from './draft'
+import { SHOT_PAGE_SIZE } from './types'
 import type { ShotRow } from './types'
 
 export function ShotList({
@@ -45,7 +46,8 @@ export function ShotList({
       style={styles.list}
       contentContainerStyle={styles.content}
       data={rows}
-      extraData={`${loading}:${failed}:${loadingMore}`}
+      extraData={`${loading}:${failed}:${loadingMore}:${rows.length}`}
+      initialNumToRender={Math.max(SHOT_PAGE_SIZE, rows.length)}
       keyExtractor={(shot) => shot.id}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.4}

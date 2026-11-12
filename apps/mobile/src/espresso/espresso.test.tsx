@@ -40,6 +40,7 @@ import {
   LOG_TEST_ID,
   SEALED_SHOT,
   SELECT_COFFEE_ERROR,
+  SELECT_GRINDER,
   SHOT_FORM_PREFILL_ERROR_TEST_ID,
   SHOT_FORM_TEST_ID,
   SHOT_LIST_TEST_ID,
@@ -1018,6 +1019,7 @@ describe('log espresso shot', () => {
 
     await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
     await waitFor(() => expect(cursors).toContain('shot-19'))
+    expect(await screen.findByText('Coffee 20')).toBeTruthy()
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
   })
 
@@ -1078,6 +1080,14 @@ describe('log espresso shot', () => {
     await pickSelect(LABEL_COFFEE, COFFEE_B)
     expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
     expect(screen.getByLabelText(LABEL_ROAST_DATE).props.value).toBe('')
+    expect(
+      screen.queryByLabelText(
+        selectTriggerA11yLabel(LABEL_GRINDER, 'Niche Zero'),
+      ),
+    ).toBeNull()
+    expect(
+      screen.getByLabelText(selectTriggerA11yLabel(LABEL_GRINDER, SELECT_GRINDER)),
+    ).toBeTruthy()
 
     await act(async () => {
       resolveB(
@@ -1249,11 +1259,13 @@ describe('log espresso shot', () => {
               { data: { code: TRPC_CONFLICT } },
             )
           }
-          stored[0] = seedShot({
-            id: 'shot-new',
-            dose: input.dose,
-            grindSetting: GRIND_MARKER,
-          })
+          stored.push(
+            seedShot({
+              id: 'shot-new',
+              dose: input.dose,
+              grindSetting: GRIND_MARKER,
+            }),
+          )
         }),
     }
     await render(<App auth={signedIn} espresso={api} />)
@@ -1271,7 +1283,7 @@ describe('log espresso shot', () => {
       await screen.findByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-new`),
     ).toBeTruthy()
     expect(screen.getByText(/Dose 22g/)).toBeTruthy()
-    expect(screen.queryByText(/Dose 18g/)).toBeNull()
+    expect(screen.getByText(/Dose 18g/)).toBeTruthy()
     expect(screen.queryByText('This shot was already saved with different settings.')).toBeNull()
   })
 
@@ -1342,6 +1354,63 @@ describe('log espresso shot', () => {
       await Promise.resolve()
     })
     expect(screen.getByText('Logged second-save')).toBeTruthy()
+  })
+
+  it('does not load the next page while a refresh is in flight', async () => {
+    const all = Array.from({ length: 25 }, (_, index) =>
+      seedShot({
+        id: `shot-${index}`,
+        coffeeName: `Coffee ${index}`,
+      }),
+    )
+    const cursors: Array<ShotCursor | null | undefined> = []
+    let resolveRefresh:
+      | ((page: {
+          items: Array<ShotRow>
+          total: number
+          nextCursor: ShotCursor | null
+        }) => void)
+      | null = null
+    const api: EspressoApi = {
+      load: () =>
+        Promise.resolve(catalog({ shots: all.slice(0, 20), total: all.length })),
+      listShots: (cursor) => {
+        cursors.push(cursor)
+        if (!cursor) {
+          return new Promise((resolve) => {
+            resolveRefresh = resolve
+          })
+        }
+        return Promise.resolve(pageFrom(all, cursor))
+      },
+      loadPrefill: () => Promise.resolve(seedShot()),
+      create: async () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    expect(screen.getByText('Coffee 0')).toBeTruthy()
+
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+    expect(cursors).toEqual([undefined])
+
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    expect(cursors).toEqual([undefined])
+    expect(screen.queryByText('Coffee 20')).toBeNull()
+
+    await act(async () => {
+      resolveRefresh?.({
+        items: all.slice(0, 20),
+        total: all.length,
+        nextCursor: all[19].id,
+      })
+      await Promise.resolve()
+    })
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    await waitFor(() => expect(cursors).toContain('shot-19'))
+    expect(await screen.findByText('Coffee 20')).toBeTruthy()
   })
 
   it('drops an in-flight next page after a refresh', async () => {
