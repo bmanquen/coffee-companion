@@ -29,6 +29,7 @@ type State = {
   saveError: string | null
   loadingMore: boolean
   loadMoreError: string | null
+  refreshing: boolean
 }
 
 type Action =
@@ -64,6 +65,7 @@ const initial: State = {
   saveError: null,
   loadingMore: false,
   loadMoreError: null,
+  refreshing: false,
 }
 
 function reducer(state: State, action: Action): State {
@@ -75,6 +77,7 @@ function reducer(state: State, action: Action): State {
         loadError: null,
         loadingMore: false,
         loadMoreError: null,
+        refreshing: false,
       }
     case 'loadSucceeded':
       return {
@@ -84,6 +87,7 @@ function reducer(state: State, action: Action): State {
         loadError: null,
         loadingMore: false,
         loadMoreError: null,
+        refreshing: false,
       }
     case 'loadFailed':
       return {
@@ -91,11 +95,12 @@ function reducer(state: State, action: Action): State {
         status: 'failed',
         loadError: action.error,
         loadingMore: false,
+        refreshing: false,
       }
     case 'saveStarted':
       return { ...state, busy: true, saveError: null }
     case 'saveSucceeded':
-      return { ...state, busy: false, saveError: null }
+      return { ...state, busy: false, saveError: null, refreshing: true }
     case 'saveFailed':
       return { ...state, busy: false, saveError: action.error }
     case 'saveErrorCleared':
@@ -105,15 +110,23 @@ function reducer(state: State, action: Action): State {
     case 'loadMoreStarted':
       return { ...state, loadingMore: true, loadMoreError: null }
     case 'pageInvalidated':
-      return { ...state, loadingMore: false, loadMoreError: null }
+      return {
+        ...state,
+        loadingMore: false,
+        loadMoreError: null,
+        refreshing: true,
+      }
     case 'shotsRefreshed':
-      if (!state.catalog) return { ...state, loadingMore: false }
+      if (!state.catalog) {
+        return { ...state, loadingMore: false, refreshing: false }
+      }
       return {
         ...state,
         status: 'loaded',
         loadError: null,
         loadingMore: false,
         loadMoreError: null,
+        refreshing: false,
         catalog: {
           ...state.catalog,
           shots: action.shots,
@@ -218,7 +231,9 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     }
   }, [invalidatePagedLoads, runLoad, userId])
 
-  const loading = state.status === 'loading'
+  const loading =
+    state.status === 'loading' ||
+    (state.refreshing && (state.catalog?.shots.length ?? 0) === 0)
   const reload = useCallback(() => {
     if (!loading) runLoad()
   }, [loading, runLoad])

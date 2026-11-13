@@ -140,7 +140,15 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
       }
       extraReloadQueued.current = false
       const held = extraRef.current
-      if (held.length === 0) return
+      if (held.length === 0) {
+        queryClient.removeQueries({
+          queryKey: trpc.espressoShot.getRecent.queryKey(
+            espressoShotPageInput(boundary, filtersRef.current),
+          ),
+        })
+        setExtraCursor(undefined)
+        return
+      }
       const seq = loadMoreSeq.current
       const replay = ++extraReplaySeq.current
       const requeueIfStillBound = () => {
