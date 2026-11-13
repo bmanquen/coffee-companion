@@ -253,5 +253,16 @@ describe('authClient sign-out', () => {
     await refreshDone.catch(() => undefined)
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(auth.sessionAtom().get().data?.user?.id).toBe(SESSION_USER_ID)
+
+    const laterRefresh = auth.sessionAtom().get().refetch()
+    await waitUntil(
+      () => getSessionWaiters.length > 0,
+      'post-restore get-session',
+    )
+    expect(getSessionCookies.at(-1) ?? '').toContain(SESSION_TOKEN)
+    getSessionWaiters.shift()?.(jsonResponse(null))
+    await laterRefresh.catch(() => undefined)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(auth.sessionAtom().get().data?.user?.id).toBeUndefined()
   })
 })

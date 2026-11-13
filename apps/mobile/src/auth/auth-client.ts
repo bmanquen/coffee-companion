@@ -1,6 +1,7 @@
 import { createAuthClient } from 'better-auth/react'
 import { expoClient } from '@better-auth/expo/client'
 import {
+  adoptCurrentAuthFetchEpoch,
   applySessionAtomSet,
   invalidatePendingAuthFetches,
   loggedAuthFetch,
@@ -48,6 +49,10 @@ function restoreSignOutSnapshot() {
   const held = signOutSnapshot
   signOutSnapshot = null
   if (!held) return
+  // Cookie-less get-session calls started while expo had cleared storage
+  // must not commit after this restore.
+  invalidatePendingAuthFetches()
+  adoptCurrentAuthFetchEpoch()
   const cookie = held.cookie
   if (cookie != null) {
     withExplicitSessionWrite(() => {
@@ -143,6 +148,7 @@ export function clearClientSession() {
   // Drop in-flight get-session bodies so a late 200 cannot refill the atom
   // or the Expo session cache after sign-out.
   invalidatePendingAuthFetches()
+  adoptCurrentAuthFetchEpoch()
   const session = sessionAtom()
   const current = session.get()
   session.set({
