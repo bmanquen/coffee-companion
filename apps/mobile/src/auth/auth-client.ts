@@ -9,6 +9,7 @@ import {
 import { APP_SCHEME, apiBaseUrl } from './config'
 import {
   SESSION_COOKIE_KEY,
+  SESSION_DATA_KEY,
   SESSION_STORAGE_PREFIX,
   sessionStore,
   withExplicitSessionWrite,
@@ -42,6 +43,7 @@ function isSignOutRequest(url: string) {
 
 let signOutSnapshot: {
   cookie: string | null
+  sessionData: string | null
   atom: ReturnType<SessionAtom['get']>
 } | null = null
 
@@ -53,12 +55,14 @@ function restoreSignOutSnapshot() {
   // must not commit after this restore.
   invalidatePendingAuthFetches()
   adoptCurrentAuthFetchEpoch()
-  const cookie = held.cookie
-  if (cookie != null) {
-    withExplicitSessionWrite(() => {
-      sessionStore.setItem(SESSION_COOKIE_KEY, cookie)
-    })
-  }
+  withExplicitSessionWrite(() => {
+    if (held.cookie != null) {
+      sessionStore.setItem(SESSION_COOKIE_KEY, held.cookie)
+    }
+    if (held.sessionData != null) {
+      sessionStore.setItem(SESSION_DATA_KEY, held.sessionData)
+    }
+  })
   sessionAtom().set(held.atom)
 }
 
@@ -66,10 +70,11 @@ const preserveSessionOnFailedSignOut = {
   id: 'preserve-session-on-failed-sign-out',
   name: 'Preserve session on failed sign-out',
   init(url: string, options?: object) {
-    // expoClient clears the cookie in /sign-out init, before the request.
+    // expoClient clears the cookie and session cache in /sign-out init.
     if (isSignOutRequest(url)) {
       signOutSnapshot = {
         cookie: sessionStore.getItem(SESSION_COOKIE_KEY),
+        sessionData: sessionStore.getItem(SESSION_DATA_KEY),
         atom: sessionAtom().get(),
       }
     }
