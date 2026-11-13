@@ -19,6 +19,7 @@ const RETRY_EXTRA_ID = 'retry-extra'
 const KEPT_EXTRA_ID = 'kept-extra'
 const REMOVED_EXTRA_ID = 'removed-extra'
 const REFRESHED_FIRST_ID = 'refreshed-0'
+const PAGE_THREE_ID = 'page-three'
 
 async function requestText(
   input: RequestInfo | URL,
@@ -392,12 +393,14 @@ describe('useEspressoShotPages', () => {
       id: REFRESHED_FIRST_ID,
       coffee: makeRecentCoffee({ name: 'Coffee refreshed' }),
     })
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      trpcSuccess({
-        items: [refreshed],
-        total: 1,
-        nextCursor: null,
-      }),
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        trpcSuccess({
+          items: [refreshed],
+          total: 1,
+          nextCursor: null,
+        }),
+      ),
     )
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
@@ -543,6 +546,236 @@ describe('useEspressoShotPages', () => {
       expect(
         result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
       ).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('refreshes extra-row dialed-in after load more that overlapped a same-boundary refetch', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extraShot = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const pageThree = makeRecentShot({
+      id: PAGE_THREE_ID,
+      coffeeId: 'c-three',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-three', name: 'Coffee three' }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    const extraBoundary = espressoShotCursor(extraShot)
+    let extraPageReleased = false
+    let resolvePageThree: (value: Response) => void = () => {}
+    const pageThreePending = new Promise<Response>((resolve) => {
+      resolvePageThree = resolve
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(extraBoundary)) {
+          if (!extraPageReleased) return pageThreePending
+          return trpcSuccess({
+            items: [{ ...pageThree, isDialedIn: false }],
+            total: first.length + 2,
+            nextCursor: null,
+          })
+        }
+        if (body.includes(boundary)) {
+          return trpcSuccess({
+            items: [{ ...extraShot, isDialedIn: false }],
+            total: first.length + 2,
+            nextCursor: extraBoundary,
+          })
+        }
+        return trpcSuccess({
+          items: first,
+          total: first.length + 2,
+          nextCursor: boundary,
+        })
+      },
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 2)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 2,
+        boundary,
+        {},
+        extraBoundary,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+          ?.isDialedIn,
+      ).toBe(true)
+      expect(result.current.hasMore).toBe(true)
+
+      let loadMoreDone: Promise<void> = Promise.resolve()
+      await act(async () => {
+        loadMoreDone = result.current.loadMore()
+      })
+      expect(result.current.loadingMore).toBe(true)
+
+      const callsBeforeInvalidate = fetchSpy.mock.calls.length
+      await act(async () => {
+        void queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.queryFilter(),
+        )
+      })
+      await waitFor(() =>
+        expect(fetchSpy.mock.calls.length).toBeGreaterThan(
+          callsBeforeInvalidate,
+        ),
+      )
+      expect(result.current.loadingMore).toBe(true)
+
+      await act(async () => {
+        resolvePageThree(
+          trpcSuccess({
+            items: [pageThree],
+            total: first.length + 2,
+            nextCursor: null,
+          }),
+        )
+        extraPageReleased = true
+        await loadMoreDone
+      })
+
+      await waitFor(() => {
+        expect(
+          result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+            ?.isDialedIn,
+        ).toBe(false)
+        expect(
+          result.current.items.find((shot) => shot.id === PAGE_THREE_ID)
+            ?.isDialedIn,
+        ).toBe(false)
+      })
+      const ids = result.current.items.map((shot) => shot.id)
+      expect(ids).toEqual([
+        ...first.map((shot) => shot.id),
+        RETRY_EXTRA_ID,
+        PAGE_THREE_ID,
+      ])
+      expect(new Set(ids).size).toBe(ids.length)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('refreshes extra-row dialed-in after a failed load more that overlapped a same-boundary refetch', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extraShot = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    const extraBoundary = espressoShotCursor(extraShot)
+    let extraPageReleased = false
+    let rejectPageThree: (reason: Error) => void = () => {}
+    const pageThreePending = new Promise<Response>((_resolve, reject) => {
+      rejectPageThree = reject
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(extraBoundary)) {
+          if (!extraPageReleased) return pageThreePending
+          return trpcSuccess({
+            items: [{ ...extraShot, isDialedIn: false }],
+            total: first.length + 1,
+            nextCursor: extraBoundary,
+          })
+        }
+        if (body.includes(boundary)) {
+          return trpcSuccess({
+            items: [{ ...extraShot, isDialedIn: false }],
+            total: first.length + 1,
+            nextCursor: extraBoundary,
+          })
+        }
+        return trpcSuccess({
+          items: first,
+          total: first.length + 1,
+          nextCursor: boundary,
+        })
+      },
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 1,
+        boundary,
+        {},
+        extraBoundary,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+          ?.isDialedIn,
+      ).toBe(true)
+
+      let loadMoreDone: Promise<void> = Promise.resolve()
+      await act(async () => {
+        loadMoreDone = result.current.loadMore()
+      })
+      expect(result.current.loadingMore).toBe(true)
+
+      const callsBeforeInvalidate = fetchSpy.mock.calls.length
+      await act(async () => {
+        void queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.queryFilter(),
+        )
+      })
+      await waitFor(() =>
+        expect(fetchSpy.mock.calls.length).toBeGreaterThan(
+          callsBeforeInvalidate,
+        ),
+      )
+      expect(result.current.loadingMore).toBe(true)
+
+      await act(async () => {
+        extraPageReleased = true
+        rejectPageThree(new Error('network'))
+        await loadMoreDone
+      })
+
+      await waitFor(() => {
+        expect(
+          result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+            ?.isDialedIn,
+        ).toBe(false)
+      })
+      expect(result.current.loadMoreError).toBe(ESPRESSO_LOAD_MORE_FAILED)
+      const ids = result.current.items.map((shot) => shot.id)
+      expect(ids).toEqual([...first.map((shot) => shot.id), RETRY_EXTRA_ID])
+      expect(ids).not.toContain(PAGE_THREE_ID)
     } finally {
       fetchSpy.mockRestore()
     }
