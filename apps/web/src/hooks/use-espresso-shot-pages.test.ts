@@ -1190,4 +1190,181 @@ describe('useEspressoShotPages', () => {
       fetchSpy.mockRestore()
     }
   })
+
+  it('keeps newer extra rows when an older extra refresh with a different page-3 cursor finishes last', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extraShot = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const extraShotForNewerCursor = makeRecentShot({
+      id: 'extra-newer-cursor',
+      coffeeId: 'c-next-newer',
+      isDialedIn: false,
+      coffee: makeRecentCoffee({
+        id: 'c-next-newer',
+        name: 'Coffee extra newer',
+      }),
+    })
+    const pageThreeOlder = makeRecentShot({
+      id: PAGE_THREE_ID,
+      coffeeId: 'c-three',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-three', name: 'Coffee three' }),
+    })
+    const pageThreeNewer = makeRecentShot({
+      id: 'page-three-newer',
+      coffeeId: 'c-three-newer',
+      isDialedIn: false,
+      coffee: makeRecentCoffee({
+        id: 'c-three-newer',
+        name: 'Coffee three newer',
+      }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    const olderPage3Cursor = espressoShotCursor(extraShot)
+    const newerPage3Cursor = espressoShotCursor(extraShotForNewerCursor)
+    let replayStarted = false
+    let extraReplayPage2Calls = 0
+    let newerPage3Calls = 0
+    let resolveOlderPage3: (value: Response) => void = () => {}
+    const olderPage3Pending = new Promise<Response>((resolve) => {
+      resolveOlderPage3 = resolve
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(olderPage3Cursor)) {
+          if (!replayStarted) {
+            return trpcSuccess({
+              items: [pageThreeOlder],
+              total: first.length + 2,
+              nextCursor: null,
+            })
+          }
+          return olderPage3Pending
+        }
+        if (body.includes(newerPage3Cursor)) {
+          newerPage3Calls += 1
+          return trpcSuccess({
+            items: [pageThreeNewer],
+            total: first.length + 2,
+            nextCursor: null,
+          })
+        }
+        if (body.includes(boundary)) {
+          extraReplayPage2Calls += replayStarted ? 1 : 0
+          if (!replayStarted || extraReplayPage2Calls === 1) {
+            return trpcSuccess({
+              items: [{ ...extraShot, isDialedIn: true }],
+              total: first.length + 2,
+              nextCursor: olderPage3Cursor,
+            })
+          }
+          return trpcSuccess({
+            items: [{ ...extraShot, isDialedIn: false }],
+            total: first.length + 2,
+            nextCursor: newerPage3Cursor,
+          })
+        }
+        return trpcSuccess({
+          items: first,
+          total: first.length + 2,
+          nextCursor: boundary,
+        })
+      },
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 2)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 2,
+        boundary,
+        {},
+        olderPage3Cursor,
+      )
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [pageThreeOlder],
+        first.length + 2,
+        olderPage3Cursor,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+          ?.isDialedIn,
+      ).toBe(true)
+      expect(
+        result.current.items.find((shot) => shot.id === PAGE_THREE_ID),
+      ).toBeTruthy()
+
+      replayStarted = true
+      extraReplayPage2Calls = 0
+      await act(async () => {
+        void queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.queryFilter(),
+        )
+      })
+      await waitFor(() => expect(extraReplayPage2Calls).toBe(1))
+
+      await act(async () => {
+        void queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.queryFilter(),
+        )
+      })
+      await waitFor(() => {
+        expect(extraReplayPage2Calls).toBeGreaterThan(1)
+        expect(newerPage3Calls).toBeGreaterThan(0)
+        expect(
+          result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+            ?.isDialedIn,
+        ).toBe(false)
+        expect(
+          result.current.items.find((shot) => shot.id === 'page-three-newer'),
+        ).toBeTruthy()
+      })
+
+      await act(async () => {
+        resolveOlderPage3(
+          trpcSuccess({
+            items: [{ ...pageThreeOlder, isDialedIn: true }],
+            total: first.length + 2,
+            nextCursor: olderPage3Cursor,
+          }),
+        )
+      })
+
+      await waitFor(() => {
+        expect(
+          result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+            ?.isDialedIn,
+        ).toBe(false)
+        expect(
+          result.current.items.find((shot) => shot.id === 'page-three-newer'),
+        ).toBeTruthy()
+        expect(
+          result.current.items.find((shot) => shot.id === PAGE_THREE_ID),
+        ).toBeUndefined()
+        expect(result.current.hasMore).toBe(false)
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })
