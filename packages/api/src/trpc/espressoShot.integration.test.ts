@@ -951,6 +951,29 @@ describe('espressoShot.getRecent', () => {
       }),
     ).rejects.toMatchObject({ code: TRPC_CONFLICT })
   })
+
+  it('returns the same row when a retry uppercases the relation ids', async () => {
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    const first = await asA.espressoShot.create(input)
+    const replayed = await asA.espressoShot.create({
+      ...input,
+      coffeeId: coffeeAId.toUpperCase(),
+      grinderId: grinderId.toUpperCase(),
+      brewingDeviceId: espressoDeviceId.toUpperCase(),
+      idempotencyKey: idempotencyKey.toUpperCase(),
+    })
+    expect(replayed.id).toBe(first.id)
+  })
 })
 
 describe('espressoShot.getLatestUnsealed', () => {
@@ -1122,6 +1145,25 @@ describe('espressoShot.getLatestUnsealed', () => {
     expect(found?.id).toBe(page.items[0]?.id)
     expect(found?.id).toBe(first.id > second.id ? first.id : second.id)
   })
+
+  it('finds the latest unsealed shot when coffeeId is uppercase', async () => {
+    const coffee = await createCoffee(uniq('Uppercase Prefill Coffee'))
+    const latest = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: 'upper',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const found = await asA.espressoShot.getLatestUnsealed({
+      coffeeId: coffee.id.toUpperCase(),
+    })
+    expect(found?.id).toBe(latest.id)
+    expect(found?.grindSetting).toBe('upper')
+  })
 })
 
 describe('espressoShot.getDialedIn', () => {
@@ -1202,5 +1244,32 @@ describe('espressoShot.getDialedIn', () => {
   it('does not return another user’s dialed-in shots', async () => {
     const dialedIn = await asB.espressoShot.getDialedIn()
     expect(dialedIn.every((s) => s.userId === USER_B)).toBe(true)
+  })
+})
+
+describe('espresso_shot_idempotency_keys shot_id lookup', () => {
+  it('uses an index for ON DELETE SET NULL and losing-request cleanup', async () => {
+    const shot = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+
+    const lookupPlan = await db.transaction(async (tx) => {
+      await tx.execute(sql`SET LOCAL enable_seqscan = off`)
+      return tx.execute<{ 'QUERY PLAN': string }>(sql`
+        EXPLAIN SELECT 1
+        FROM espresso_shot_idempotency_keys
+        WHERE shot_id = ${shot.id}
+      `)
+    })
+    const lookupText = lookupPlan.rows.map((row) => row['QUERY PLAN']).join('\n')
+    expect(lookupText).toMatch(/Index Scan|Index Only Scan|Bitmap Index Scan/)
+    expect(lookupText).toMatch(/shot_id/)
   })
 })

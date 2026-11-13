@@ -20,6 +20,14 @@ const KEPT_EXTRA_ID = 'kept-extra'
 const REMOVED_EXTRA_ID = 'removed-extra'
 const REFRESHED_FIRST_ID = 'refreshed-0'
 
+async function requestText(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<string> {
+  if (input instanceof Request) return input.clone().text()
+  return String(init?.body ?? input)
+}
+
 function pageOf(
   count: number,
   idPrefix: string,
@@ -262,13 +270,21 @@ describe('useEspressoShotPages', () => {
         first.length + 1,
         boundary,
       )
-      fetchSpy.mockResolvedValue(
-        trpcSuccess({
+      fetchSpy.mockImplementation(async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(boundary)) {
+          return trpcSuccess({
+            items: [extraShot],
+            total: first.length + 1,
+            nextCursor: null,
+          })
+        }
+        return trpcSuccess({
           items: first,
           total: first.length + 1,
           nextCursor: boundary,
-        }),
-      )
+        })
+      })
 
       const { result } = renderHook(() => useEspressoShotPages(), {
         wrapper: Wrapper,
@@ -320,6 +336,10 @@ describe('useEspressoShotPages', () => {
       const { result } = renderHook(() => useEspressoShotPages(), {
         wrapper: Wrapper,
       })
+      await waitFor(() =>
+        expect(result.current.items).toHaveLength(ESPRESSO_SHOT_PAGE_SIZE),
+      )
+      pending.length = 0
 
       let loadMoreDone: Promise<void> = Promise.resolve()
       await act(async () => {
@@ -458,5 +478,73 @@ describe('useEspressoShotPages', () => {
     expect(ids).toContain(KEPT_EXTRA_ID)
     expect(ids).not.toContain(REMOVED_EXTRA_ID)
     expect(ids).toHaveLength(ESPRESSO_SHOT_PAGE_SIZE + 1)
+  })
+
+  it('refreshes extra-row dialed-in after a same-boundary first-page refetch', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extraShot = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(boundary)) {
+          return trpcSuccess({
+            items: [{ ...extraShot, isDialedIn: false }],
+            total: first.length + 1,
+            nextCursor: null,
+          })
+        }
+        return trpcSuccess({
+          items: first,
+          total: first.length + 1,
+          nextCursor: boundary,
+        })
+      },
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 1,
+        boundary,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+          ?.isDialedIn,
+      ).toBe(true)
+
+      await act(async () => {
+        await queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.queryFilter(),
+        )
+      })
+      await waitFor(() =>
+        expect(
+          result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+            ?.isDialedIn,
+        ).toBe(false),
+      )
+      expect(
+        result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+      ).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })

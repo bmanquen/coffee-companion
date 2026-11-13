@@ -469,4 +469,245 @@ describe('useEspressoCatalog', () => {
       afterSave.slice(0, PAGE * 2).map((row) => row.id),
     )
   })
+
+  it('does not page from an older refresh when a second save starts before that refresh commits', async () => {
+    const PAGE = SHOT_PAGE_SIZE
+    const listing = Array.from({ length: PAGE * 2 }, (_, index) =>
+      shot({
+        id: `shot-${index + 1}`,
+        coffeeName: `Shot ${index + 1}`,
+      }),
+    )
+    const savedFirst = shot({ id: 'shot-saved-1', coffeeName: 'Saved first' })
+    const savedSecond = shot({
+      id: 'shot-saved-2',
+      coffeeName: 'Saved second',
+    })
+    const afterFirstSave = [savedFirst, ...listing]
+    const afterSecondSave = [savedSecond, savedFirst, ...listing]
+    const page1 = listing.slice(0, PAGE)
+    const cursorAfter = (rows: Array<ShotRow>): ShotCursor =>
+      `after:${rows[rows.length - 1].id}`
+    const cursorPage1 = cursorAfter(page1)
+    const refreshedFirst = afterFirstSave.slice(0, PAGE)
+    const cursorRefreshedFirst = cursorAfter(refreshedFirst)
+    const pageAfterFirst = afterFirstSave.slice(PAGE, PAGE * 2)
+    const refreshedSecond = afterSecondSave.slice(0, PAGE)
+    const cursorRefreshedSecond = cursorAfter(refreshedSecond)
+    const pageAfterSecond = afterSecondSave.slice(PAGE, PAGE * 2)
+    const listCursors: Array<ShotCursor | null> = []
+    let firstPageCalls = 0
+    let resolveFirstRefresh: (page: ShotPage) => void = () => {}
+    let resolveSecondRefresh: (page: ShotPage) => void = () => {}
+    const api: EspressoApi = {
+      load: () =>
+        Promise.resolve(
+          catalog({
+            shots: page1,
+            total: listing.length,
+            nextCursor: cursorPage1,
+          }),
+        ),
+      listShots: (cursor) => {
+        listCursors.push(cursor ?? null)
+        if (cursor == null) {
+          firstPageCalls += 1
+          if (firstPageCalls === 1) {
+            return new Promise((resolve) => {
+              resolveFirstRefresh = resolve
+            })
+          }
+          return new Promise((resolve) => {
+            resolveSecondRefresh = resolve
+          })
+        }
+        if (cursor === cursorRefreshedFirst) {
+          return Promise.resolve({
+            items: pageAfterFirst,
+            total: afterFirstSave.length,
+            nextCursor: null,
+          })
+        }
+        if (cursor === cursorRefreshedSecond) {
+          return Promise.resolve({
+            items: pageAfterSecond,
+            total: afterSecondSave.length,
+            nextCursor: null,
+          })
+        }
+        return Promise.reject(new Error(`unexpected cursor ${cursor}`))
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {},
+    }
+    const { result } = await renderHook(() => useEspressoCatalog(api, USER))
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+      expect(result.current.catalog?.shots).toHaveLength(PAGE)
+    })
+
+    await act(async () => {
+      result.current.save(shotInput)
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      resolveFirstRefresh({
+        items: refreshedFirst,
+        total: afterFirstSave.length,
+        nextCursor: cursorRefreshedFirst,
+      })
+      await Promise.resolve()
+      result.current.save(shotInput)
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      result.current.loadMore()
+      await Promise.resolve()
+    })
+    expect(listCursors).not.toContain(cursorRefreshedFirst)
+
+    await act(async () => {
+      resolveSecondRefresh({
+        items: refreshedSecond,
+        total: afterSecondSave.length,
+        nextCursor: cursorRefreshedSecond,
+      })
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots[0]?.id).toBe(savedSecond.id),
+    )
+
+    await act(async () => {
+      result.current.loadMore()
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE * 2),
+    )
+    expect(result.current.catalog?.shots.map((row) => row.id)).toEqual(
+      afterSecondSave.slice(0, PAGE * 2).map((row) => row.id),
+    )
+  })
+
+  it('does not apply an older refresh that settles after a newer save has started', async () => {
+    const PAGE = SHOT_PAGE_SIZE
+    const listing = Array.from({ length: PAGE * 2 }, (_, index) =>
+      shot({
+        id: `shot-${index + 1}`,
+        coffeeName: `Shot ${index + 1}`,
+      }),
+    )
+    const savedFirst = shot({ id: 'shot-saved-1', coffeeName: 'Saved first' })
+    const savedSecond = shot({
+      id: 'shot-saved-2',
+      coffeeName: 'Saved second',
+    })
+    const afterFirstSave = [savedFirst, ...listing]
+    const afterSecondSave = [savedSecond, savedFirst, ...listing]
+    const page1 = listing.slice(0, PAGE)
+    const cursorAfter = (rows: Array<ShotRow>): ShotCursor =>
+      `after:${rows[rows.length - 1].id}`
+    const cursorPage1 = cursorAfter(page1)
+    const refreshedFirst = afterFirstSave.slice(0, PAGE)
+    const cursorRefreshedFirst = cursorAfter(refreshedFirst)
+    const refreshedSecond = afterSecondSave.slice(0, PAGE)
+    const cursorRefreshedSecond = cursorAfter(refreshedSecond)
+    const pageAfterSecond = afterSecondSave.slice(PAGE, PAGE * 2)
+    const listCursors: Array<ShotCursor | null> = []
+    let firstPageCalls = 0
+    let resolveFirstRefresh: (page: ShotPage) => void = () => {}
+    let resolveSecondRefresh: (page: ShotPage) => void = () => {}
+    const api: EspressoApi = {
+      load: () =>
+        Promise.resolve(
+          catalog({
+            shots: page1,
+            total: listing.length,
+            nextCursor: cursorPage1,
+          }),
+        ),
+      listShots: (cursor) => {
+        listCursors.push(cursor ?? null)
+        if (cursor == null) {
+          firstPageCalls += 1
+          if (firstPageCalls === 1) {
+            return new Promise((resolve) => {
+              resolveFirstRefresh = resolve
+            })
+          }
+          return new Promise((resolve) => {
+            resolveSecondRefresh = resolve
+          })
+        }
+        if (cursor === cursorRefreshedSecond) {
+          return Promise.resolve({
+            items: pageAfterSecond,
+            total: afterSecondSave.length,
+            nextCursor: null,
+          })
+        }
+        return Promise.reject(new Error(`unexpected cursor ${cursor}`))
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {},
+    }
+    const { result } = await renderHook(() => useEspressoCatalog(api, USER))
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+      expect(result.current.catalog?.shots).toHaveLength(PAGE)
+    })
+
+    await act(async () => {
+      result.current.save(shotInput)
+      await Promise.resolve()
+    })
+    await act(async () => {
+      result.current.save(shotInput)
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      resolveFirstRefresh({
+        items: refreshedFirst,
+        total: afterFirstSave.length,
+        nextCursor: cursorRefreshedFirst,
+      })
+      await Promise.resolve()
+    })
+    expect(result.current.catalog?.shots.map((row) => row.id)).toEqual(
+      page1.map((row) => row.id),
+    )
+
+    await act(async () => {
+      result.current.loadMore()
+      await Promise.resolve()
+    })
+    expect(listCursors).toEqual([null, null])
+
+    await act(async () => {
+      resolveSecondRefresh({
+        items: refreshedSecond,
+        total: afterSecondSave.length,
+        nextCursor: cursorRefreshedSecond,
+      })
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots[0]?.id).toBe(savedSecond.id),
+    )
+
+    await act(async () => {
+      result.current.loadMore()
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE * 2),
+    )
+    expect(result.current.catalog?.shots.map((row) => row.id)).toEqual(
+      afterSecondSave.slice(0, PAGE * 2).map((row) => row.id),
+    )
+  })
 })

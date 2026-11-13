@@ -148,6 +148,19 @@ describe('insertEspressoShotSchema', () => {
         .success,
     ).toBe(false)
   })
+
+  it('lowercases relation ids', () => {
+    const mixed = 'ABCDEFAB-CDEF-4000-8000-0000000000AA'
+    const parsed = insertEspressoShotSchema.parse({
+      ...valid,
+      coffeeId: mixed,
+      grinderId: mixed,
+      brewingDeviceId: mixed,
+    })
+    expect(parsed.coffeeId).toBe(mixed.toLowerCase())
+    expect(parsed.grinderId).toBe(mixed.toLowerCase())
+    expect(parsed.brewingDeviceId).toBe(mixed.toLowerCase())
+  })
 })
 
 describe('insertCoffeeSchema', () => {
