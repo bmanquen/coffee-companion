@@ -1,5 +1,4 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import type { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ESPRESSO_LOAD_FAILED,
@@ -31,7 +30,7 @@ async function requestText(
 }
 
 function bumpFirstPage(
-  queryClient: QueryClient,
+  queryClient: Parameters<typeof seedEspressoShotPage>[0],
   trpc: Parameters<typeof seedEspressoShotPage>[1],
 ) {
   queryClient.setQueryData(
