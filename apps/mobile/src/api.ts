@@ -67,8 +67,6 @@ export function createLiveEspressoApi(): EspressoApi {
         grinders: grinders.map(({ id, name }) => ({ id, name })),
         devices: espressoDevicesFrom(devices),
         shots: [],
-        total: 0,
-        nextCursor: null,
       }
     },
     async listShots(cursor?: ShotPage['nextCursor']): Promise<ShotPage> {

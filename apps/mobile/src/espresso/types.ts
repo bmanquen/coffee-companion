@@ -33,12 +33,10 @@ export type ShotCreate = {
   idempotencyKey: string
 }
 
-export type ShotCursor = EspressoShotCursor
-
 export type ShotPage = {
   items: Array<ShotRow>
   total: number
-  nextCursor: ShotCursor | null
+  nextCursor: EspressoShotCursor | null
 }
 
 export type EspressoCatalog = {
@@ -46,26 +44,20 @@ export type EspressoCatalog = {
   grinders: Array<NamedOption>
   devices: Array<NamedOption>
   shots: Array<ShotRow>
-  total: number
-  nextCursor: ShotCursor | null
 }
 
 export type EspressoApi = {
   load: () => Promise<EspressoCatalog>
-  listShots: (cursor?: ShotCursor | null) => Promise<ShotPage>
+  listShots: (cursor?: EspressoShotCursor | null) => Promise<ShotPage>
   loadPrefill: (coffeeId: string) => Promise<ShotRow | null>
   create: (input: ShotCreate) => Promise<void>
 }
-
-export { ESPRESSO_SHOT_PAGE_SIZE as SHOT_PAGE_SIZE } from '@coffee-companion/api/lib/espresso'
 
 const emptyCatalog: EspressoCatalog = {
   coffees: [],
   grinders: [],
   devices: [],
   shots: [],
-  total: 0,
-  nextCursor: null,
 }
 
 export const idleEspressoApi: EspressoApi = {

@@ -32,11 +32,7 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
       typeof search.method === 'string' ? search.method : undefined
     return isDashboardMethod(method) ? { method } : {}
   },
-  // Warm the first espresso page and the other methods' full histories so any
-  // tab renders server-side instead of flashing a spinner when selected. Other
-  // methods read with useSuspenseQuery; espresso uses useInfiniteQuery so a
-  // failed first page stays in the feed with its own retry. The session is
-  // guaranteed by the _authenticated layout.
+  // Warm every tab so selecting one renders server-side instead of flashing a spinner.
   loader: async ({ context }) => {
     void context.queryClient
       .prefetchQuery({

@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native'
+import { ESPRESSO_SHOT_PAGE_SIZE } from '@coffee-companion/api/lib/espresso'
 import {
   EMPTY_SHOTS,
   ESPRESSO_HEADING,
@@ -19,7 +20,6 @@ import {
   TRY_AGAIN,
 } from './copy'
 import { shotSummary } from './draft'
-import { SHOT_PAGE_SIZE } from './types'
 import type { ShotRow } from './types'
 
 const NO_SHOT_ROWS: Array<ShotRow> = []
@@ -57,7 +57,7 @@ export function ShotList({
       contentContainerStyle={styles.content}
       data={rows}
       extraData={`${loading}:${failed}:${loadingMore}:${loadMoreError ?? ''}:${rows.length}`}
-      initialNumToRender={rows.length > 0 ? rows.length : SHOT_PAGE_SIZE}
+      initialNumToRender={rows.length > 0 ? rows.length : ESPRESSO_SHOT_PAGE_SIZE}
       keyExtractor={(shot) => shot.id}
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.4}

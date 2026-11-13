@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { ShotForm } from '../espresso/ShotForm'
 import { ShotList } from '../espresso/ShotList'
@@ -68,10 +68,6 @@ function Home({
     loadingMore,
     loadMoreError,
   } = useEspressoCatalog(espresso, userId)
-
-  useEffect(() => {
-    setScreen('list')
-  }, [userId])
 
   return (
     <View

@@ -2,12 +2,8 @@ import {
   ESPRESSO_SHOT_PAGE_SIZE,
   ESPRESSO_SHOT_Q_MAX,
 } from '@coffee-companion/api/lib/espresso'
-import {
-  keepPreviousData,
-  useInfiniteQuery,
-  useQueryClient,
-} from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo } from 'react'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useMemo } from 'react'
 import type { InfiniteData } from '@tanstack/react-query'
 import type { EspressoShotWithRelations } from '@/types'
 import { useTRPC } from '@/integrations/trpc/react'
@@ -38,8 +34,6 @@ export type EspressoShotPageFilters = {
   dialedIn?: boolean
 }
 
-type CursorPage = { nextCursor: string | null }
-
 export function espressoShotPageInput(
   filters: EspressoShotPageFilters = {},
 ) {
@@ -64,24 +58,9 @@ export function espressoShotInfiniteOptions(
     espressoShotPageInput(filters),
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-      placeholderData: keepPreviousData,
       staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
     },
   )
-}
-
-function linkedShotPages<TPage extends CursorPage>(
-  data: { pages: Array<TPage>; pageParams: Array<unknown> } | undefined,
-): Array<TPage> {
-  if (!data?.pages.length) return []
-  const linked = [data.pages[0]]
-  for (let i = 1; i < data.pages.length; i++) {
-    const previous = linked[linked.length - 1]
-    if (previous.nextCursor == null) break
-    if (data.pageParams[i] !== previous.nextCursor) break
-    linked.push(data.pages[i])
-  }
-  return linked
 }
 
 export function withoutShotFromInfinitePages<
@@ -113,37 +92,14 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const queryClient = useQueryClient()
   const options = espressoShotInfiniteOptions(trpc, filters)
   const query = useInfiniteQuery(options)
-  const hidingPrevious = query.isPlaceholderData && query.isFetching
 
-  useEffect(() => {
-    // Infinite refetch keeps stored pageParams. Extra pages that no longer
-    // follow the first page's nextCursor belong to a different chain.
-    if (query.isFetching) return
-    const data = query.data
-    if (!data || data.pages.length < 2) return
-    const linked = linkedShotPages(data)
-    if (linked.length === data.pages.length) return
-    queryClient.setQueryData(options.queryKey, (current) => {
-      if (!current || current.pages.length < 2) return current
-      const nextLinked = linkedShotPages(current)
-      if (nextLinked.length === current.pages.length) return current
-      return {
-        pages: nextLinked,
-        pageParams: current.pageParams.slice(0, nextLinked.length),
-      }
-    })
-  }, [options.queryKey, query.data, query.isFetching, queryClient])
+  const items = useMemo(
+    () => query.data?.pages.flatMap((page) => page.items) ?? NO_SHOTS,
+    [query.data],
+  )
 
-  const linked = useMemo(() => linkedShotPages(query.data), [query.data])
-  const items = useMemo(() => {
-    if (hidingPrevious) return NO_SHOTS
-    if (linked.length === 0) return NO_SHOTS
-    return linked.flatMap((page) => page.items)
-  }, [hidingPrevious, linked])
-
-  const hasMore =
-    !hidingPrevious && linked[linked.length - 1]?.nextCursor != null
-  const loading = query.isPending || hidingPrevious
+  const hasMore = query.hasNextPage
+  const loading = query.isPending
   const loadingMore = query.isFetchingNextPage
   const loadMoreError = query.isFetchNextPageError
     ? ESPRESSO_LOAD_MORE_FAILED
@@ -153,23 +109,16 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const stale = loadError != null && items.length > 0
 
   const loadMore = useCallback(() => {
-    if (hidingPrevious || query.isFetchingNextPage || query.isRefetching) {
+    if (!query.hasNextPage || query.isFetchingNextPage || query.isRefetching) {
       return Promise.resolve()
     }
-    const pages = linkedShotPages(query.data)
-    if (pages.length === 0) return Promise.resolve()
-    const last = pages[pages.length - 1]
-    if (last.nextCursor == null) return Promise.resolve()
-    if (query.data && pages.length < query.data.pages.length) {
-      queryClient.setQueryData(options.queryKey, {
-        pages,
-        pageParams: query.data.pageParams.slice(0, pages.length),
-      })
-    }
     return query.fetchNextPage().then(() => undefined)
-  }, [hidingPrevious, options.queryKey, query, queryClient])
+  }, [query])
 
-  const retry = useCallback(() => query.refetch().then(() => undefined), [query])
+  const retry = useCallback(
+    () => query.refetch().then(() => undefined),
+    [query],
+  )
 
   const removeShot = useCallback(
     (shotId: string) => {

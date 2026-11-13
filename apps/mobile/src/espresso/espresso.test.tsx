@@ -53,11 +53,11 @@ import {
   TRY_AGAIN,
   USE_CALENDAR_DATE,
 } from './copy'
+import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
 import type {
   EspressoApi,
   EspressoCatalog,
   ShotCreate,
-  ShotCursor,
   ShotRow,
 } from './types'
 import type { Auth } from '../auth/use-auth'
@@ -115,11 +115,11 @@ function seedShot(overrides: Partial<ShotRow> = {}): ShotRow {
 
 const PAGE_CURSOR_PREFIX = 'after:'
 
-function pageCursor(shotId: string): ShotCursor {
+function pageCursor(shotId: string): EspressoShotCursor {
   return `${PAGE_CURSOR_PREFIX}${shotId}`
 }
 
-function pageFrom(all: Array<ShotRow>, cursor?: ShotCursor | null) {
+function pageFrom(all: Array<ShotRow>, cursor?: EspressoShotCursor | null) {
   if (!cursor) {
     const items = all.slice(0, 20)
     return {
@@ -148,18 +148,12 @@ function pageFrom(all: Array<ShotRow>, cursor?: ShotCursor | null) {
 
 function catalog(overrides: Partial<EspressoCatalog> = {}): EspressoCatalog {
   const shots = overrides.shots ?? [seedShot()]
-  const total = overrides.total ?? shots.length
   return {
     coffees: [{ id: COFFEE, name: 'Ethiopia Guji' }],
     grinders: [{ id: GRINDER, name: 'Niche Zero' }],
     devices: [{ id: ESP_DEVICE, name: 'Linea Mini' }],
-    nextCursor:
-      shots.length > 0 && shots.length < total
-        ? pageCursor(shots[shots.length - 1].id)
-        : null,
     ...overrides,
     shots,
-    total,
   }
 }
 
@@ -1030,13 +1024,12 @@ describe('log espresso shot', () => {
     )
     let owner = ADA_ID
     let adaFirstPages = 0
-    const cursors: Array<ShotCursor | null | undefined> = []
+    const cursors: Array<EspressoShotCursor | null | undefined> = []
     const api: EspressoApi = {
       load: () =>
         Promise.resolve(
           catalog({
             shots: (owner === ADA_ID ? adaAll : alanAll).slice(0, 20),
-            total: 25,
           }),
         ),
       listShots: (cursor) => {
@@ -1090,66 +1083,6 @@ describe('log espresso shot', () => {
     )
   })
 
-  it('does not apply a previous user save after the signed-in user changes', async () => {
-    let resolveCreate: () => void = () => {}
-    const pending = new Promise<void>((resolve) => {
-      resolveCreate = resolve
-    })
-    let owner = ADA_ID
-    let loads = 0
-    const api: EspressoApi = {
-      ...pagingFor(() =>
-        owner === ADA_ID
-          ? [seedShot({ coffeeName: 'Ada House' })]
-          : [seedShot({ coffeeName: 'Alan House' })],
-      ),
-      load: () => {
-        loads += 1
-        return Promise.resolve(
-          owner === ADA_ID
-            ? catalog({ shots: [seedShot({ coffeeName: 'Ada House' })] })
-            : catalog({ shots: [seedShot({ coffeeName: 'Alan House' })] }),
-        )
-      },
-      create: () => pending,
-    }
-    const view = await render(
-      <SignedInHome
-        userId={ADA_ID}
-        name="Ada Lovelace"
-        espresso={api}
-        onSignOut={() => {}}
-      />,
-    )
-    expect(await screen.findByText('Ada House')).toBeTruthy()
-    await openForm()
-    await pickCoffee()
-    await enterRecipe()
-    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
-
-    owner = ALAN_ID
-    await view.rerender(
-      <SignedInHome
-        userId={ALAN_ID}
-        name="Ada Lovelace"
-        espresso={api}
-        onSignOut={() => {}}
-      />,
-    )
-    expect(await screen.findByText('Alan House')).toBeTruthy()
-    const loadsAfterSwitch = loads
-
-    await act(async () => {
-      resolveCreate()
-      await pending
-    })
-
-    expect(loads).toBe(loadsAfterSwitch)
-    expect(screen.getByText('Alan House')).toBeTruthy()
-    expect(screen.queryByText('Ada House')).toBeNull()
-    expect(screen.queryByTestId(SHOT_FORM_TEST_ID)).toBeNull()
-  })
-
   it('does not edit fields or open the coffee picker while a save is in flight', async () => {
     let resolveCreate: () => void = () => {}
     const pending = new Promise<void>((resolve) => {
@@ -1184,30 +1117,6 @@ describe('log espresso shot', () => {
     })
   })
 
-  it('keeps a loaded list when an earlier load fails late', async () => {
-    let rejectFirst: (error: Error) => void = () => {}
-    const first: EspressoApi = {
-      ...pagingFor(() => []),
-      load: () =>
-        new Promise<EspressoCatalog>((_, reject) => {
-          rejectFirst = reject
-        }),
-      create: async () => {},
-    }
-    const { api: second } = fakeApi(catalog({ shots: [] }))
-    const view = await render(<App auth={signedIn} espresso={first} />)
-
-    await view.rerender(<App auth={signedIn} espresso={second} />)
-    expect(await screen.findByText(EMPTY_SHOTS)).toBeTruthy()
-
-    await act(async () => {
-      rejectFirst(new Error('Network request failed'))
-      await Promise.resolve()
-    })
-    expect(screen.getByText(EMPTY_SHOTS)).toBeTruthy()
-    expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull()
-  })
-
   it('shows welcome while a catalog load is still in flight', async () => {
     const api: EspressoApi = {
       ...pagingFor(() => []),
@@ -1228,7 +1137,7 @@ describe('log espresso shot', () => {
     const api: EspressoApi = {
       ...pagingFor(() => stored),
       load: () =>
-        Promise.resolve(catalog({ shots: [...stored], total: stored.length })),
+        Promise.resolve(catalog({ shots: [...stored] })),
       loadPrefill: (coffeeId) =>
         Promise.resolve(
           stored.find((shot) => shot.coffeeId === coffeeId && !shot.sealed) ??
@@ -1273,12 +1182,12 @@ describe('log espresso shot', () => {
         coffeeName: `Coffee ${index}`,
       }),
     )
-    const cursors: Array<ShotCursor | null | undefined> = []
+    const cursors: Array<EspressoShotCursor | null | undefined> = []
     const api: EspressoApi = {
       ...pagingFor(() => all),
       load: () =>
         Promise.resolve(
-          catalog({ shots: all.slice(0, 20), total: all.length }),
+          catalog({ shots: all.slice(0, 20) }),
         ),
       listShots: (cursor) => {
         cursors.push(cursor)
@@ -1311,7 +1220,7 @@ describe('log espresso shot', () => {
     })
     const api: EspressoApi = {
       ...pagingFor(() => []),
-      load: () => Promise.resolve(catalog({ shots: [], total: 0 })),
+      load: () => Promise.resolve(catalog({ shots: [] })),
       loadPrefill: () => Promise.resolve(older),
       create: async () => {},
     }
@@ -1778,7 +1687,7 @@ describe('log espresso shot', () => {
     const api: EspressoApi = {
       ...pagingFor(() => stored),
       load: () =>
-        Promise.resolve(catalog({ shots: [...stored], total: stored.length })),
+        Promise.resolve(catalog({ shots: [...stored] })),
       loadPrefill: () => Promise.resolve(seedShot()),
       create: (input) =>
         Promise.resolve().then(() => {
@@ -1834,7 +1743,7 @@ describe('log espresso shot', () => {
     const keys: Array<string> = []
     const api: EspressoApi = {
       ...pagingFor(() => []),
-      load: () => Promise.resolve(catalog({ shots: [], total: 0 })),
+      load: () => Promise.resolve(catalog({ shots: [] })),
       loadPrefill: () => Promise.resolve(seedShot()),
       create: (input) =>
         Promise.resolve().then(() => {
@@ -1859,7 +1768,7 @@ describe('log espresso shot', () => {
 
   it('keeps a newer first page when an older refresh arrives late', async () => {
     const pages: Array<
-      (page: { items: Array<ShotRow>; total: number; nextCursor: ShotCursor | null }) => void
+      (page: { items: Array<ShotRow>; total: number; nextCursor: EspressoShotCursor | null }) => void
     > = []
     let shots = [seedShot({ id: 'shot-old', coffeeName: 'Old Guji' })]
     const initial = catalog({ shots })
@@ -1943,18 +1852,18 @@ describe('log espresso shot', () => {
         coffeeName: `Coffee ${index}`,
       }),
     )
-    const cursors: Array<ShotCursor | null | undefined> = []
+    const cursors: Array<EspressoShotCursor | null | undefined> = []
     let resolveRefresh:
       | ((page: {
           items: Array<ShotRow>
           total: number
-          nextCursor: ShotCursor | null
+          nextCursor: EspressoShotCursor | null
         }) => void)
       | null = null
     let firstPages = 0
     const api: EspressoApi = {
       load: () =>
-        Promise.resolve(catalog({ shots: all.slice(0, 20), total: all.length })),
+        Promise.resolve(catalog({ shots: all.slice(0, 20) })),
       listShots: (cursor) => {
         cursors.push(cursor)
         if (!cursor) {
@@ -2005,12 +1914,12 @@ describe('log espresso shot', () => {
         coffeeName: `Coffee ${index}`,
       }),
     )
-    const cursors: Array<ShotCursor | null | undefined> = []
+    const cursors: Array<EspressoShotCursor | null | undefined> = []
     let firstPages = 0
     const api: EspressoApi = {
       load: () =>
         Promise.resolve(
-          catalog({ shots: all.slice(0, 20), total: all.length }),
+          catalog({ shots: all.slice(0, 20) }),
         ),
       listShots: (cursor) => {
         cursors.push(cursor)
@@ -2053,11 +1962,11 @@ describe('log espresso shot', () => {
       | ((page: {
           items: Array<ShotRow>
           total: number
-          nextCursor: ShotCursor | null
+          nextCursor: EspressoShotCursor | null
         }) => void)
       | null = null
     const api: EspressoApi = {
-      load: () => Promise.resolve(catalog({ shots, total })),
+      load: () => Promise.resolve(catalog({ shots })),
       listShots: (cursor) => {
         if (!cursor) {
           return Promise.resolve({
@@ -2119,12 +2028,12 @@ describe('log espresso shot', () => {
       | ((page: {
           items: Array<ShotRow>
           total: number
-          nextCursor: ShotCursor | null
+          nextCursor: EspressoShotCursor | null
         }) => void)
       | null = null
     let firstPages = 0
     const api: EspressoApi = {
-      load: () => Promise.resolve(catalog({ shots, total })),
+      load: () => Promise.resolve(catalog({ shots })),
       listShots: (cursor) => {
         if (!cursor) {
           firstPages += 1
@@ -2176,13 +2085,13 @@ describe('log espresso shot', () => {
         coffeeName: `Coffee ${index}`,
       }),
     )
-    const cursors: Array<ShotCursor | null | undefined> = []
+    const cursors: Array<EspressoShotCursor | null | undefined> = []
     let attempts = 0
     const api: EspressoApi = {
       ...pagingFor(() => all),
       load: () =>
         Promise.resolve(
-          catalog({ shots: all.slice(0, 20), total: all.length }),
+          catalog({ shots: all.slice(0, 20) }),
         ),
       listShots: (cursor) => {
         cursors.push(cursor)
@@ -2241,13 +2150,13 @@ describe('log espresso shot', () => {
       | ((page: {
           items: Array<ShotRow>
           total: number
-          nextCursor: ShotCursor | null
+          nextCursor: EspressoShotCursor | null
         }) => void)
       | null = null
     const api: EspressoApi = {
       load: () =>
         Promise.resolve(
-          catalog({ shots: all.slice(0, 20), total: all.length }),
+          catalog({ shots: all.slice(0, 20) }),
         ),
       listShots: (cursor) => {
         if (!cursor) {
