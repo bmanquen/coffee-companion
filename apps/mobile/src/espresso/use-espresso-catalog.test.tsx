@@ -1,10 +1,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native'
 import { useEspressoCatalog } from './use-espresso-catalog'
+import { SHOT_PAGE_SIZE } from './types'
 import type {
   EspressoApi,
   EspressoCatalog,
   ShotCreate,
   ShotCursor,
+  ShotPage,
   ShotRow,
 } from './types'
 
@@ -347,5 +349,124 @@ describe('useEspressoCatalog', () => {
     expect(result.current.catalog?.shots[0]?.coffeeName).toBe('House')
     expect(result.current.busy).toBe(false)
     expect(result.current.saveError).toBeNull()
+  })
+
+  it('does not skip a page when load more arrives while a save refresh is resolving', async () => {
+    const PAGE = SHOT_PAGE_SIZE
+    const listing = Array.from({ length: PAGE * 3 }, (_, index) =>
+      shot({
+        id: `shot-${index + 1}`,
+        coffeeName: `Shot ${index + 1}`,
+      }),
+    )
+    const saved = shot({ id: 'shot-saved', coffeeName: 'Saved' })
+    const afterSave = [saved, ...listing]
+    const page1 = listing.slice(0, PAGE)
+    const page2 = listing.slice(PAGE, PAGE * 2)
+    const page3 = listing.slice(PAGE * 2)
+    const refreshed = afterSave.slice(0, PAGE)
+    const afterRefresh = afterSave.slice(PAGE, PAGE * 2)
+    const cursorAfter = (rows: Array<ShotRow>): ShotCursor =>
+      `after:${rows[rows.length - 1].id}`
+    const cursorPage1 = cursorAfter(page1)
+    const cursorPage2 = cursorAfter(page2)
+    const cursorRefreshed = cursorAfter(refreshed)
+    const totalAfterSave = afterSave.length
+    const listCursors: Array<ShotCursor | null> = []
+    let resolveRefresh: (page: ShotPage) => void = () => {}
+    const pendingRefresh = new Promise<ShotPage>((resolve) => {
+      resolveRefresh = resolve
+    })
+    const api: EspressoApi = {
+      load: () =>
+        Promise.resolve(
+          catalog({
+            shots: page1,
+            total: listing.length,
+            nextCursor: cursorPage1,
+          }),
+        ),
+      listShots: (cursor) => {
+        listCursors.push(cursor ?? null)
+        if (cursor == null) return pendingRefresh
+        if (cursor === cursorPage1) {
+          return Promise.resolve({
+            items: page2,
+            total: listing.length,
+            nextCursor: cursorPage2,
+          })
+        }
+        if (cursor === cursorPage2) {
+          return Promise.resolve({
+            items: page3,
+            total: listing.length,
+            nextCursor: null,
+          })
+        }
+        if (cursor === cursorRefreshed) {
+          return Promise.resolve({
+            items: afterRefresh,
+            total: totalAfterSave,
+            nextCursor: cursorAfter(afterRefresh),
+          })
+        }
+        return Promise.reject(new Error(`unexpected cursor ${cursor}`))
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {},
+    }
+    const { result } = await renderHook(() => useEspressoCatalog(api, USER))
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+      expect(result.current.catalog?.shots).toHaveLength(PAGE)
+    })
+
+    await act(async () => {
+      result.current.loadMore()
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE * 2),
+    )
+
+    await act(async () => {
+      result.current.save(shotInput)
+      await Promise.resolve()
+    })
+    expect(listCursors).toEqual([cursorPage1, null])
+
+    await act(async () => {
+      result.current.loadMore()
+      await Promise.resolve()
+    })
+    expect(listCursors).toEqual([cursorPage1, null])
+
+    await act(async () => {
+      resolveRefresh({
+        items: refreshed,
+        total: totalAfterSave,
+        nextCursor: cursorRefreshed,
+      })
+      await Promise.resolve()
+      result.current.loadMore()
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots[0]?.id).toBe(saved.id),
+    )
+    const ids = result.current.catalog?.shots.map((row) => row.id) ?? []
+    expect(ids).toEqual(afterSave.slice(0, ids.length).map((row) => row.id))
+    expect(ids).not.toContain(page3[0].id)
+
+    await act(async () => {
+      result.current.loadMore()
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE * 2),
+    )
+    expect(result.current.catalog?.shots.map((row) => row.id)).toEqual(
+      afterSave.slice(0, PAGE * 2).map((row) => row.id),
+    )
   })
 })
