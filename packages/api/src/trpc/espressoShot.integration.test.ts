@@ -512,6 +512,67 @@ describe('espressoShot.create idempotency', () => {
     expect(afterRetry.items.some((shot) => shot.id === created.id)).toBe(false)
   })
 
+  it('returns the recorded shot when the device type changes before retry', async () => {
+    const espressoTypeId = await findOrCreateDeviceType(ESPRESSO_DEVICE_TYPE)
+    const pourOverTypeId = await findOrCreateDeviceType('Pour Over')
+    const device = await asA.brewingDevice.getById(espressoDeviceId)
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    const first = await asA.espressoShot.create(input)
+    try {
+      await asA.brewingDevice.update({
+        id: espressoDeviceId,
+        name: device.name,
+        brand: device.brand,
+        typeId: pourOverTypeId,
+      })
+      const replayed = await asA.espressoShot.create(input)
+      expect(replayed.id).toBe(first.id)
+    } finally {
+      await asA.brewingDevice.update({
+        id: espressoDeviceId,
+        name: device.name,
+        brand: device.brand,
+        typeId: espressoTypeId,
+      })
+    }
+  })
+
+  it('returns the deleted-key conflict when the device is gone before retry', async () => {
+    const espressoTypeId = await findOrCreateDeviceType(ESPRESSO_DEVICE_TYPE)
+    const device = await asA.brewingDevice.create({
+      name: uniq('Gone Linea'),
+      brand: 'La Marzocco',
+      typeId: espressoTypeId,
+    })
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: device.id,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    await asA.espressoShot.create(input)
+    await asA.brewingDevice.delete(device.id)
+    await expect(asA.espressoShot.create(input)).rejects.toMatchObject({
+      code: TRPC_CONFLICT,
+      message: SHOT_IDEMPOTENCY_DELETED,
+    })
+  })
+
   it('rejects a reused key when the shot fields differ', async () => {
     const idempotencyKey = crypto.randomUUID()
     const input = {

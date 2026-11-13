@@ -324,6 +324,99 @@ describe('log espresso shot', () => {
     expect(screen.getByRole('button', { name: LOG_SHOT })).toBeTruthy()
   })
 
+  it('shows a loading indicator instead of the empty list while the first save refresh is pending', async () => {
+    let resolveList: (page: ReturnType<typeof pageFrom>) => void = () => {}
+    const listPending = new Promise<ReturnType<typeof pageFrom>>((resolve) => {
+      resolveList = resolve
+    })
+    const { api, created } = fakeApi(catalog({ shots: [] }))
+    const espresso: EspressoApi = {
+      ...api,
+      listShots: () => listPending,
+    }
+    await render(<App auth={signedIn} espresso={espresso} />)
+    expect(screen.getByText(EMPTY_SHOTS)).toBeTruthy()
+
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await fireEvent.changeText(
+      screen.getByLabelText(LABEL_ROAST_DATE),
+      '2026-05-01',
+    )
+    await enterRecipe()
+    await press(LOG)
+
+    expect(created).toHaveLength(1)
+    expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+    expect(screen.queryByText(EMPTY_SHOTS)).toBeNull()
+    expect(screen.getByLabelText(LOADING_SHOTS)).toBeTruthy()
+
+    await act(async () => {
+      resolveList({
+        items: [
+          {
+            id: 'shot-1',
+            coffeeId: COFFEE,
+            coffeeName: 'Ethiopia Guji',
+            grinderId: GRINDER,
+            brewingDeviceId: ESP_DEVICE,
+            roastDate: '2026-05-01',
+            grindSetting: GRIND_MARKER,
+            dose: '18',
+            yield: '36',
+            time: 30,
+            sealed: false,
+          },
+        ],
+        total: 1,
+        nextCursor: null,
+      })
+      await listPending
+    })
+
+    expect(screen.getByText(LOGGED_RECIPE)).toBeTruthy()
+    expect(screen.queryByText(EMPTY_SHOTS)).toBeNull()
+    expect(screen.queryByLabelText(LOADING_SHOTS)).toBeNull()
+  })
+
+  it('shows the empty list after a first-page refresh returns no shots', async () => {
+    let resolveList: (page: ReturnType<typeof pageFrom>) => void = () => {}
+    const listPending = new Promise<ReturnType<typeof pageFrom>>((resolve) => {
+      resolveList = resolve
+    })
+    const { api, created } = fakeApi(catalog({ shots: [] }))
+    const espresso: EspressoApi = {
+      ...api,
+      listShots: () => listPending,
+    }
+    await render(<App auth={signedIn} espresso={espresso} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await fireEvent.changeText(
+      screen.getByLabelText(LABEL_ROAST_DATE),
+      '2026-05-01',
+    )
+    await enterRecipe()
+    await press(LOG)
+
+    expect(created).toHaveLength(1)
+    expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+    expect(screen.queryByText(EMPTY_SHOTS)).toBeNull()
+    expect(screen.getByLabelText(LOADING_SHOTS)).toBeTruthy()
+
+    await act(async () => {
+      resolveList({ items: [], total: 0, nextCursor: null })
+      await listPending
+    })
+
+    expect(screen.getByText(EMPTY_SHOTS)).toBeTruthy()
+    expect(screen.queryByLabelText(LOADING_SHOTS)).toBeNull()
+  })
+
   it('names missing required fields without calling create', async () => {
     const { api, created } = fakeApi(catalog({ shots: [] }))
     await render(<App auth={signedIn} espresso={api} />)
