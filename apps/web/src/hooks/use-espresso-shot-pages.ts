@@ -75,6 +75,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   >(undefined)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
+  const [extraReloadFailed, setExtraReloadFailed] = useState(false)
   const loadMoreSeq = useRef(0)
   const firstPageFetch = useRef(false)
   const extraBoundTo = useRef<EspressoShotCursor | undefined>(undefined)
@@ -95,6 +96,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
     setExtra([])
     setExtraCursor(undefined)
     setLoadMoreError(null)
+    setExtraReloadFailed(false)
     setLoadingMore(false)
   }, [])
 
@@ -117,6 +119,19 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
       const held = extraRef.current
       if (held.length === 0) return
       const seq = loadMoreSeq.current
+      const requeueIfStillBound = () => {
+        if (extraBoundTo.current == null || extraRef.current.length === 0) {
+          return
+        }
+        extraReloadQueued.current = true
+        if (loadingMoreRef.current) return
+        queueMicrotask(() => {
+          if (!extraReloadQueued.current || loadingMoreRef.current) return
+          const bound = extraBoundTo.current
+          if (bound == null) return
+          void reloadExtraPages(bound)
+        })
+      }
       let cursor: EspressoShotCursor | null = boundary
       const items: Array<EspressoShotWithRelations> = []
       try {
@@ -129,17 +144,28 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
             // Extra cache can still look fresh inside ESPRESSO_SHOT_STALE_TIME_MS.
             staleTime: 0,
           })
-          if (seq !== loadMoreSeq.current) return
+          if (seq !== loadMoreSeq.current) {
+            requeueIfStillBound()
+            return
+          }
           items.push(...page.items)
           cursor = page.nextCursor
         }
-        if (seq !== loadMoreSeq.current) return
+        if (seq !== loadMoreSeq.current) {
+          requeueIfStillBound()
+          return
+        }
         setExtra(items)
         setExtraCursor(cursor)
+        setExtraReloadFailed(false)
         // No next page left to retry.
         if (cursor == null) setLoadMoreError(null)
       } catch {
-        if (seq !== loadMoreSeq.current) return
+        if (seq !== loadMoreSeq.current) {
+          requeueIfStillBound()
+          return
+        }
+        setExtraReloadFailed(true)
       }
     },
     [queryClient, trpc],
@@ -218,8 +244,11 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const loading =
     (first.isPending && pageItems.length === 0 && extra.length === 0) ||
     filterPending
-  const loadError = first.isError ? ESPRESSO_LOAD_FAILED : null
-  const stale = Boolean(first.isError && items.length > 0)
+  const loadError =
+    first.isError || extraReloadFailed ? ESPRESSO_LOAD_FAILED : null
+  const stale = Boolean(
+    (first.isError || extraReloadFailed) && items.length > 0,
+  )
 
   const loadMore = useCallback(async () => {
     if (nextCursor == null || loadingMore) return

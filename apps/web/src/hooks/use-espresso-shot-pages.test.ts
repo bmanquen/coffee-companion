@@ -871,10 +871,16 @@ describe('useEspressoShotPages', () => {
     const extraReplayPending = new Promise<Response>((resolve) => {
       resolveExtraReplay = resolve
     })
+    let pageThreeReleased = false
+    let resolvePageThree: (value: Response) => void = () => {}
+    const pageThreePending = new Promise<Response>((resolve) => {
+      resolvePageThree = resolve
+    })
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
       async (input, init) => {
         const body = await requestText(input, init)
         if (body.includes(extraBoundary)) {
+          if (!pageThreeReleased) return pageThreePending
           return trpcSuccess({
             items: [{ ...pageThree, isDialedIn: false }],
             total: first.length + 2,
@@ -951,6 +957,18 @@ describe('useEspressoShotPages', () => {
             items: [{ ...extraShot, isDialedIn: false }],
             total: first.length + 2,
             nextCursor: extraBoundary,
+          }),
+        )
+      })
+      expect(result.current.loadingMore).toBe(true)
+
+      await act(async () => {
+        pageThreeReleased = true
+        resolvePageThree(
+          trpcSuccess({
+            items: [{ ...pageThree, isDialedIn: false }],
+            total: first.length + 2,
+            nextCursor: null,
           }),
         )
         await loadMoreDone

@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useReducer,
+  useRef,
+} from 'react'
 import { apiErrorMessage } from '../api-error'
 import {
   ERROR_LOAD_FAILED,
@@ -150,15 +156,17 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const refreshCommitSeq = useRef(0)
   const loadMoreInFlight = useRef(false)
   const catalogRef = useRef(state.catalog)
-  catalogRef.current = state.catalog
-  // Keep the gate closed until this render publishes the latest refresh.
-  if (
-    refreshCommitSeq.current !== 0 &&
-    refreshCommitSeq.current === refreshSeq.current
-  ) {
-    refreshCommitSeq.current = 0
-    refreshPending.current = false
-  }
+  useLayoutEffect(() => {
+    // After commit: a discarded render must not leak catalog or release the gate.
+    catalogRef.current = state.catalog
+    if (
+      refreshCommitSeq.current !== 0 &&
+      refreshCommitSeq.current === refreshSeq.current
+    ) {
+      refreshCommitSeq.current = 0
+      refreshPending.current = false
+    }
+  }, [state.catalog])
 
   const invalidatePagedLoads = useCallback(() => {
     pageSeq.current += 1
