@@ -41,6 +41,16 @@ const SESSION_BODY = {
   session: { id: 'session-1', userId: SESSION_USER_ID },
 }
 
+function persistedSessionCache() {
+  return JSON.stringify({
+    user: SESSION_BODY.user,
+    session: {
+      ...SESSION_BODY.session,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    },
+  })
+}
+
 function jsonResponse(body: unknown) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -79,6 +89,7 @@ function loadAuthClient(
     url: string,
     headers: Headers,
   ) => Promise<Response>,
+  options?: { persistMemory?: boolean; sessionData?: string },
 ) {
   globalThis.fetch = jest.fn((input, init) => {
     return fetchImpl(requestUrl(input), requestHeaders(input, init))
@@ -95,33 +106,48 @@ function loadAuthClient(
   }
   const sessionStore = require('./session-store') as {
     SESSION_COOKIE_KEY: string
+    SESSION_DATA_KEY: string
   }
-  memory.clear()
   SecureStore.getItem.mockImplementation(
     (key: string) => memory.get(key) ?? null,
   )
   SecureStore.setItem.mockImplementation((key: string, value: string) => {
     memory.set(key, value)
   })
-  memory.set(sessionStore.SESSION_COOKIE_KEY, SESSION_COOKIE_JSON)
+  if (!options?.persistMemory) {
+    memory.clear()
+    memory.set(sessionStore.SESSION_COOKIE_KEY, SESSION_COOKIE_JSON)
+    if (options?.sessionData) {
+      memory.set(sessionStore.SESSION_DATA_KEY, options.sessionData)
+    }
+  }
 
   const auth = require('./auth-client') as SignOutAuth
   auth.sessionAtom().listen(() => {})
-  return { auth, SESSION_COOKIE_KEY: sessionStore.SESSION_COOKIE_KEY }
+  return {
+    auth,
+    SESSION_COOKIE_KEY: sessionStore.SESSION_COOKIE_KEY,
+    SESSION_DATA_KEY: sessionStore.SESSION_DATA_KEY,
+  }
 }
 
 function loadAuthWithSignOutFetch(
   memory: Map<string, string>,
   signOutFetch: (headers: Headers) => Promise<Response>,
+  options?: { persistMemory?: boolean; sessionData?: string },
 ) {
   const cookieHeaders: Array<string | null> = []
-  const loaded = loadAuthClient(memory, (url, headers) => {
-    if (url.includes('/sign-out')) {
-      cookieHeaders.push(headers.get('cookie'))
-      return signOutFetch(headers)
-    }
-    return Promise.resolve(jsonResponse(null))
-  })
+  const loaded = loadAuthClient(
+    memory,
+    (url, headers) => {
+      if (url.includes('/sign-out')) {
+        cookieHeaders.push(headers.get('cookie'))
+        return signOutFetch(headers)
+      }
+      return Promise.resolve(jsonResponse(null))
+    },
+    options,
+  )
   return { ...loaded, cookieHeaders }
 }
 
@@ -264,5 +290,39 @@ describe('authClient sign-out', () => {
     await laterRefresh.catch(() => undefined)
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(auth.sessionAtom().get().data?.user?.id).toBeUndefined()
+  })
+
+  it('restores the signed-in session after a failed sign-out and a restart', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+    const sessionData = persistedSessionCache()
+    const hangGetSession = (url: string) => {
+      if (url.includes('/get-session')) {
+        return new Promise<Response>(() => {})
+      }
+      return Promise.resolve(jsonResponse(null))
+    }
+    const { auth, SESSION_COOKIE_KEY, SESSION_DATA_KEY } = loadAuthClient(
+      memory,
+      (url) => {
+        if (url.includes('/sign-out')) {
+          return Promise.reject(new Error('offline'))
+        }
+        return hangGetSession(url)
+      },
+      { sessionData },
+    )
+    expect(auth.sessionAtom().get().data?.user?.id).toBe(SESSION_USER_ID)
+
+    await signOutIgnoringFailure(auth)
+    expect(memory.get(SESSION_COOKIE_KEY)).toBe(SESSION_COOKIE_JSON)
+    expect(memory.get(SESSION_DATA_KEY)).toBe(sessionData)
+
+    const restarted = loadAuthClient(memory, hangGetSession, {
+      persistMemory: true,
+    })
+    expect(restarted.auth.sessionAtom().get().data?.user?.id).toBe(
+      SESSION_USER_ID,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 50))
   })
 })
