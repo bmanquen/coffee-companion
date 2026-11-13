@@ -39,17 +39,8 @@ describe('ShotList', () => {
     expect(view.getByTestId(SHOT_LIST_TEST_ID).props.data).toBe(pendingRows)
   })
 
-  it('reuses the empty rows when the list failed', async () => {
+  it('keeps loaded shots visible when a later load fails', async () => {
     const view = await render(
-      <ShotList
-        {...emptyProps}
-        shots={null}
-        loading={true}
-        failed={false}
-      />,
-    )
-    const pendingRows = view.getByTestId(SHOT_LIST_TEST_ID).props.data
-    await view.rerender(
       <ShotList
         {...emptyProps}
         shots={[shot]}
@@ -57,6 +48,6 @@ describe('ShotList', () => {
         failed={true}
       />,
     )
-    expect(view.getByTestId(SHOT_LIST_TEST_ID).props.data).toBe(pendingRows)
+    expect(view.getByText('Ethiopia Guji')).toBeTruthy()
   })
 })

@@ -37,10 +37,11 @@ describe('seedEspressoShotPage', () => {
     )
     expect(
       queryClient.getQueryData(
-        trpc.espressoShot.getRecent.queryKey(
-          espressoShotPageInput(cursor),
-        ),
+        trpc.espressoShot.getRecent.infiniteQueryKey(espressoShotPageInput()),
       ),
-    ).toEqual({ items, total: ESPRESSO_SHOT_PAGE_SIZE, nextCursor: null })
+    ).toEqual({
+      pages: [{ items, total: ESPRESSO_SHOT_PAGE_SIZE, nextCursor: null }],
+      pageParams: [cursor],
+    })
   })
 })

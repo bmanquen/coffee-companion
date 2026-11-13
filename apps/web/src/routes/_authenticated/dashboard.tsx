@@ -1,4 +1,4 @@
-import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import type {
   DashboardMethod,
@@ -17,8 +17,7 @@ import {
 } from '@/components/dashboard/methods'
 import {
   ESPRESSO_COFFEES_STALE_TIME_MS,
-  ESPRESSO_SHOT_STALE_TIME_MS,
-  espressoShotPageInput,
+  espressoShotInfiniteOptions,
 } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 
@@ -35,9 +34,9 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
   },
   // Warm the first espresso page and the other methods' full histories so any
   // tab renders server-side instead of flashing a spinner when selected. Other
-  // methods read with useSuspenseQuery; espresso uses useQuery so a failed first
-  // page stays in the feed with its own retry. The session is guaranteed by the
-  // _authenticated layout.
+  // methods read with useSuspenseQuery; espresso uses useInfiniteQuery so a
+  // failed first page stays in the feed with its own retry. The session is
+  // guaranteed by the _authenticated layout.
   loader: async ({ context }) => {
     void context.queryClient
       .prefetchQuery({
@@ -46,12 +45,7 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
       })
       .catch(() => {})
     void context.queryClient
-      .prefetchQuery({
-        ...context.trpc.espressoShot.getRecent.queryOptions(
-          espressoShotPageInput(),
-        ),
-        staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
-      })
+      .prefetchInfiniteQuery(espressoShotInfiniteOptions(context.trpc))
       .catch(() => {})
     await Promise.all([
       context.queryClient.ensureQueryData(
@@ -78,11 +72,8 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
 // supply the recency fallback when no method is in the URL.
 export function DashboardContainer() {
   const trpc = useTRPC()
-  const espressoQuery = useQuery({
-    ...trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
-    staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
-  })
-  const espresso = espressoQuery.data?.items ?? []
+  const espressoQuery = useInfiniteQuery(espressoShotInfiniteOptions(trpc))
+  const espresso = espressoQuery.data?.pages[0]?.items ?? []
   const { data: pourover } = useSuspenseQuery(
     trpc.pouroverBrew.getAll.queryOptions(),
   )

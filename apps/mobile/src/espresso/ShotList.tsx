@@ -41,8 +41,8 @@ export function ShotList({
   onLogShot: () => void
   onEndReached: () => void
 }) {
-  const canLog = !loading && !failed && shots != null
-  const rows = failed || shots == null ? NO_SHOT_ROWS : shots
+  const canLog = !loading && shots != null
+  const rows = shots ?? NO_SHOT_ROWS
   // A failed next page stays failed until Retry; scroll must not retry it.
   const handleEndReached = () => {
     if (loadMoreError) return
@@ -79,7 +79,7 @@ export function ShotList({
           <View accessibilityLabel={LOADING_SHOTS}>
             <ActivityIndicator />
           </View>
-        ) : failed ? null : (
+        ) : failed && rows.length === 0 ? null : (
           <Text>{EMPTY_SHOTS}</Text>
         )
       }

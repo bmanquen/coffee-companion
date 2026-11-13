@@ -15,7 +15,7 @@ import {
   ESPRESSO_SHOT_FILTER_DEBOUNCE_MS,
   ESPRESSO_SHOT_PAGE_SIZE,
   ESPRESSO_SHOT_Q_MAX,
-  espressoShotPageInput,
+  espressoShotInfiniteOptions,
 } from '@/hooks/use-espresso-shot-pages'
 import {
   espressoShotCursor,
@@ -166,8 +166,8 @@ describe('EspressoBrewsSection', () => {
   it('shows loading instead of the empty state while the first page is pending', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     seedCoffees(queryClient, trpc, [])
-    void queryClient.prefetchQuery({
-      ...trpc.espressoShot.getRecent.queryOptions(espressoShotPageInput()),
+    void queryClient.prefetchInfiniteQuery({
+      ...espressoShotInfiniteOptions(trpc),
       queryFn: () => new Promise<never>(() => {}),
     })
 
@@ -716,7 +716,21 @@ describe('EspressoBrewsSection', () => {
   })
 
   it('loads the next page when Load more is pressed', async () => {
-    const { queryClient, trpc, Wrapper } = createTestProviders()
+    const extra = makeRecentShot({
+      id: 's-next',
+      coffeeId: 'c-next',
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      trpcSuccess({
+        items: [extra],
+        total: ESPRESSO_SHOT_PAGE_SIZE + 1,
+        nextCursor: null,
+      }),
+    )
+    const { queryClient, trpc, Wrapper } = createTestProviders({
+      fetch: fetchMock,
+    })
     const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
       makeRecentShot({
         id: espressoShotFixtureId(index),
@@ -725,19 +739,6 @@ describe('EspressoBrewsSection', () => {
       }),
     )
     seedLog(queryClient, trpc, first, first.length + 1)
-    seedLog(
-      queryClient,
-      trpc,
-      [
-        makeRecentShot({
-          id: 's-next',
-          coffeeId: 'c-next',
-          coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
-        }),
-      ],
-      first.length + 1,
-      { cursor: espressoShotCursor(first[first.length - 1]) },
-    )
 
     render(<EspressoBrewsSection />, { wrapper: Wrapper })
 
@@ -901,9 +902,11 @@ describe('EspressoBrewsSection', () => {
 
       render(<EspressoBrewsSection />, { wrapper: Wrapper })
       fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
-      expect(
-        screen.getByRole('button', { name: 'Load more' }),
-      ).toHaveProperty('disabled', true)
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Load more' }),
+        ).toHaveProperty('disabled', true),
+      )
 
       fireEvent.change(screen.getByPlaceholderText('Filter shots...'), {
         target: { value: 'Huila' },
@@ -1067,7 +1070,6 @@ describe('EspressoBrewsSection', () => {
 
       render(<EspressoBrewsSection />, { wrapper: Wrapper })
       const table = within(screen.getByRole('table'))
-      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
       expect(await table.findByText('Coffee kept')).toBeTruthy()
       expect(table.getByText('Coffee removed')).toBeTruthy()
 
@@ -1161,10 +1163,8 @@ describe('EspressoBrewsSection', () => {
       coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
     })
     seedLog(queryClient, trpc, [guji])
-    void queryClient.prefetchQuery({
-      ...trpc.espressoShot.getRecent.queryOptions(
-        espressoShotPageInput(undefined, { q: 'zzz' }),
-      ),
+    void queryClient.prefetchInfiniteQuery({
+      ...espressoShotInfiniteOptions(trpc, { q: 'zzz' }),
       queryFn: () => new Promise<never>(() => {}),
     })
 
@@ -1207,15 +1207,20 @@ describe('EspressoBrewsSection', () => {
       cursor,
     )
     seedCoffees(queryClient, trpc, coffeesFrom(first))
-    seedEspressoShotPage(queryClient, trpc, [], first.length, cursor, {}, null)
-
-    render(<EspressoBrewsSection />, { wrapper: Wrapper })
-    expect(screen.getByRole('button', { name: 'Load more' })).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull(),
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      trpcSuccess({ items: [], total: first.length, nextCursor: null }),
     )
-    expect(within(screen.getByRole('table')).getByText('Coffee 0')).toBeTruthy()
+    try {
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+      expect(screen.getByRole('button', { name: 'Load more' })).toBeTruthy()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull(),
+      )
+      expect(within(screen.getByRole('table')).getByText('Coffee 0')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })
