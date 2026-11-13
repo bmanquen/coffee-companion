@@ -147,9 +147,15 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const refreshSeq = useRef(0)
   const pageSeq = useRef(0)
   const refreshPending = useRef(false)
+  const refreshCommit = useRef(false)
   const loadMoreInFlight = useRef(false)
   const catalogRef = useRef(state.catalog)
   catalogRef.current = state.catalog
+  // Keep the gate closed until this render publishes the replacement catalog.
+  if (refreshCommit.current) {
+    refreshCommit.current = false
+    refreshPending.current = false
+  }
 
   const invalidatePagedLoads = useCallback(() => {
     pageSeq.current += 1
@@ -215,10 +221,10 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
           if (forUser !== activeUser.current || seq !== refreshSeq.current) {
             return
           }
-          refreshPending.current = false
           // A catalog-backed refresh is newer than any in-flight full load.
           // With no catalog yet, leave catalogSeq alone so that load can settle.
           if (catalogRef.current) catalogSeq.current += 1
+          refreshCommit.current = true
           dispatch({
             type: 'shotsRefreshed',
             shots: page.items,
@@ -268,7 +274,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   )
 
   const loadMore = useCallback(() => {
-    const catalog = state.catalog
+    const catalog = catalogRef.current
     if (
       loadMoreInFlight.current ||
       refreshPending.current ||
@@ -304,7 +310,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
         })
       },
     )
-  }, [api, state.catalog, state.loadingMore, state.status, userId])
+  }, [api, state.loadingMore, state.status, userId])
 
   const loadPrefill = useCallback(
     (coffeeId: string) => api.loadPrefill(coffeeId),
