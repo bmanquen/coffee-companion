@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
+import type { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ESPRESSO_LOAD_FAILED,
@@ -27,6 +28,16 @@ async function requestText(
 ): Promise<string> {
   if (input instanceof Request) return input.clone().text()
   return String(init?.body ?? input)
+}
+
+function bumpFirstPage(
+  queryClient: QueryClient,
+  trpc: Parameters<typeof seedEspressoShotPage>[1],
+) {
+  queryClient.setQueryData(
+    trpc.espressoShot.getRecent.queryKey(espressoShotPageInput()),
+    (page) => (page == null ? page : { ...page }),
+  )
 }
 
 function pageOf(
@@ -481,6 +492,199 @@ describe('useEspressoShotPages', () => {
     expect(ids).toContain(KEPT_EXTRA_ID)
     expect(ids).not.toContain(REMOVED_EXTRA_ID)
     expect(ids).toHaveLength(ESPRESSO_SHOT_PAGE_SIZE + 1)
+  })
+
+  it('keeps a removed extra shot gone when an in-flight extra refresh finishes with it', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const kept = makeRecentShot({
+      id: KEPT_EXTRA_ID,
+      coffeeId: 'c-kept',
+      coffee: makeRecentCoffee({ id: 'c-kept', name: 'Coffee kept' }),
+    })
+    const removed = makeRecentShot({
+      id: REMOVED_EXTRA_ID,
+      coffeeId: 'c-removed',
+      coffee: makeRecentCoffee({ id: 'c-removed', name: 'Coffee removed' }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    let replayStarted = false
+    let extraCursorFetches = 0
+    let resolveExtra: (value: Response) => void = () => {}
+    const extraPending = new Promise<Response>((resolve) => {
+      resolveExtra = resolve
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(boundary)) {
+          extraCursorFetches += 1
+          if (replayStarted) return extraPending
+          return trpcSuccess({
+            items: [kept, removed],
+            total: first.length + 2,
+            nextCursor: null,
+          })
+        }
+        return trpcSuccess({
+          items: first,
+          total: first.length + 2,
+          nextCursor: boundary,
+        })
+      },
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 2)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [kept, removed],
+        first.length + 2,
+        boundary,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.some((shot) => shot.id === REMOVED_EXTRA_ID),
+      ).toBe(true)
+
+      replayStarted = true
+      extraCursorFetches = 0
+      await act(async () => {
+        bumpFirstPage(queryClient, trpc)
+      })
+      await waitFor(() => expect(extraCursorFetches).toBe(1))
+
+      act(() => {
+        result.current.removeShot(REMOVED_EXTRA_ID)
+      })
+      expect(
+        result.current.items.some((shot) => shot.id === REMOVED_EXTRA_ID),
+      ).toBe(false)
+
+      await act(async () => {
+        resolveExtra(
+          trpcSuccess({
+            items: [kept, removed],
+            total: first.length + 2,
+            nextCursor: null,
+          }),
+        )
+      })
+
+      await waitFor(() => {
+        expect(
+          result.current.items.some((shot) => shot.id === KEPT_EXTRA_ID),
+        ).toBe(true)
+        expect(
+          result.current.items.some((shot) => shot.id === REMOVED_EXTRA_ID),
+        ).toBe(false)
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('keeps a removed extra shot gone when a later extra refresh joins the pre-delete fetch', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const kept = makeRecentShot({
+      id: KEPT_EXTRA_ID,
+      coffeeId: 'c-kept',
+      coffee: makeRecentCoffee({ id: 'c-kept', name: 'Coffee kept' }),
+    })
+    const removed = makeRecentShot({
+      id: REMOVED_EXTRA_ID,
+      coffeeId: 'c-removed',
+      coffee: makeRecentCoffee({ id: 'c-removed', name: 'Coffee removed' }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    let replayStarted = false
+    let extraCursorFetches = 0
+    let resolveExtra: (value: Response) => void = () => {}
+    const extraPending = new Promise<Response>((resolve) => {
+      resolveExtra = resolve
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(boundary)) {
+          extraCursorFetches += 1
+          if (replayStarted) return extraPending
+          return trpcSuccess({
+            items: [kept, removed],
+            total: first.length + 2,
+            nextCursor: null,
+          })
+        }
+        return trpcSuccess({
+          items: first,
+          total: first.length + 2,
+          nextCursor: boundary,
+        })
+      },
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 2)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [kept, removed],
+        first.length + 2,
+        boundary,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+
+      replayStarted = true
+      extraCursorFetches = 0
+      await act(async () => {
+        bumpFirstPage(queryClient, trpc)
+      })
+      await waitFor(() => expect(extraCursorFetches).toBe(1))
+
+      act(() => {
+        result.current.removeShot(REMOVED_EXTRA_ID)
+      })
+
+      await act(async () => {
+        bumpFirstPage(queryClient, trpc)
+      })
+      await waitFor(() => expect(extraCursorFetches).toBe(1))
+
+      await act(async () => {
+        resolveExtra(
+          trpcSuccess({
+            items: [kept, removed],
+            total: first.length + 2,
+            nextCursor: null,
+          }),
+        )
+      })
+
+      await waitFor(() => {
+        expect(
+          result.current.items.some((shot) => shot.id === KEPT_EXTRA_ID),
+        ).toBe(true)
+        expect(
+          result.current.items.some((shot) => shot.id === REMOVED_EXTRA_ID),
+        ).toBe(false)
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 
   it('refreshes extra-row dialed-in after a same-boundary first-page refetch', async () => {
