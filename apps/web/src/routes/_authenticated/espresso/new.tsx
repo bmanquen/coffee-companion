@@ -27,7 +27,6 @@ import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 import { submitFormMutation } from '@/lib/form-error'
-import { createIdempotencyKey } from '@/lib/idempotency-key'
 
 export const Route = createFileRoute('/_authenticated/espresso/new')({
   loader: async ({ context }) => {
@@ -118,7 +117,7 @@ export function NewEspressoShot() {
       const fingerprint = draftFingerprint(value)
       let idempotencyKey = idempotencyKeys.current.get(fingerprint)
       if (!idempotencyKey) {
-        idempotencyKey = createIdempotencyKey()
+        idempotencyKey = crypto.randomUUID()
         idempotencyKeys.current.set(fingerprint, idempotencyKey)
       }
       saveGen.current += 1

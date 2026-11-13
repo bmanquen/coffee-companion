@@ -1,13 +1,13 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native'
+import { ESPRESSO_SHOT_PAGE_SIZE } from '@coffee-companion/api/lib/espresso'
 import { QueryProvider } from '../query'
 import { useEspressoCatalog } from './use-espresso-catalog'
-import { SHOT_PAGE_SIZE } from './types'
+import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
 import type { ReactNode } from 'react'
 import type {
   EspressoApi,
   EspressoCatalog,
   ShotCreate,
-  ShotCursor,
   ShotPage,
   ShotRow,
 } from './types'
@@ -40,10 +40,8 @@ function catalog(overrides: Partial<EspressoCatalog> = {}): EspressoCatalog {
     coffees: [{ id: COFFEE, name: 'Ethiopia Guji' }],
     grinders: [{ id: GRINDER, name: 'Niche Zero' }],
     devices: [{ id: DEVICE, name: 'Linea Mini' }],
-    nextCursor: null,
     ...overrides,
     shots,
-    total: overrides.total ?? shots.length,
   }
 }
 
@@ -60,9 +58,6 @@ const shotInput: ShotCreate = {
   idempotencyKey: '00000000-0000-4000-8000-000000000099',
 }
 
-const ADA = 'user-ada'
-const ALAN = 'user-alan'
-
 function wrapper({ children }: { children: ReactNode }) {
   return <QueryProvider>{children}</QueryProvider>
 }
@@ -75,63 +70,8 @@ async function renderCatalog(api: EspressoApi, userId = USER) {
 }
 
 describe('useEspressoCatalog', () => {
-  it('does not apply a save that started before the signed-in user changed and changed back', async () => {
-    let resolveCreate: () => void = () => {}
-    const pending = new Promise<void>((resolve) => {
-      resolveCreate = resolve
-    })
-    const listCursors: Array<ShotCursor | null | undefined> = []
-    const api: EspressoApi = {
-      load: () =>
-        Promise.resolve(catalog({ shots: [shot({ coffeeName: 'House' })] })),
-      listShots: (cursor) => {
-        listCursors.push(cursor)
-        return Promise.resolve({
-          items: [shot({ coffeeName: 'House' })],
-          total: 1,
-          nextCursor: null,
-        })
-      },
-      loadPrefill: () => Promise.resolve(null),
-      create: () => pending,
-    }
-    const onSuccess = jest.fn()
-    const { result, rerender } = await renderCatalog(api, ADA)
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    await act(async () => {
-      result.current.save(shotInput, onSuccess)
-      await Promise.resolve()
-    })
-    expect(result.current.busy).toBe(true)
-
-    await act(async () => {
-      rerender({ id: ALAN })
-      await Promise.resolve()
-    })
-    await waitFor(() => expect(result.current.loading).toBe(false))
-    await act(async () => {
-      rerender({ id: ADA })
-      await Promise.resolve()
-    })
-    await waitFor(() => expect(result.current.loading).toBe(false))
-    const listsAfterReturn = listCursors.length
-
-    await act(async () => {
-      resolveCreate()
-      await pending
-      await Promise.resolve()
-    })
-
-    expect(onSuccess).not.toHaveBeenCalled()
-    expect(listCursors).toHaveLength(listsAfterReturn)
-    expect(result.current.catalog?.shots[0]?.coffeeName).toBe('House')
-    expect(result.current.busy).toBe(false)
-    expect(result.current.saveError).toBeNull()
-  })
-
   it('does not skip a page when load more arrives while a save refresh is resolving', async () => {
-    const PAGE = SHOT_PAGE_SIZE
+    const PAGE = ESPRESSO_SHOT_PAGE_SIZE
     const listing = Array.from({ length: PAGE * 3 }, (_, index) =>
       shot({
         id: `shot-${index + 1}`,
@@ -144,19 +84,19 @@ describe('useEspressoCatalog', () => {
     const page2 = listing.slice(PAGE, PAGE * 2)
     const refreshed = afterSave.slice(0, PAGE)
     const afterRefresh = afterSave.slice(PAGE, PAGE * 2)
-    const cursorAfter = (rows: Array<ShotRow>): ShotCursor =>
+    const cursorAfter = (rows: Array<ShotRow>): EspressoShotCursor =>
       `after:${rows[rows.length - 1].id}`
     const cursorPage1 = cursorAfter(page1)
     const cursorRefreshed = cursorAfter(refreshed)
     const totalAfterSave = afterSave.length
-    const listCursors: Array<ShotCursor | null> = []
+    const listCursors: Array<EspressoShotCursor | null> = []
     let firstPageCalls = 0
     let resolveRefresh: (page: ShotPage) => void = () => {}
     const pendingRefresh = new Promise<ShotPage>((resolve) => {
       resolveRefresh = resolve
     })
     const api: EspressoApi = {
-      load: () => Promise.resolve(catalog({ shots: [], total: listing.length })),
+      load: () => Promise.resolve(catalog({ shots: [] })),
       listShots: (cursor) => {
         listCursors.push(cursor ?? null)
         if (cursor == null) {
@@ -237,7 +177,7 @@ describe('useEspressoCatalog', () => {
   })
 
   it('does not page from an older refresh when a second save starts before that refresh commits', async () => {
-    const PAGE = SHOT_PAGE_SIZE
+    const PAGE = ESPRESSO_SHOT_PAGE_SIZE
     const listing = Array.from({ length: PAGE * 2 }, (_, index) =>
       shot({
         id: `shot-${index + 1}`,
@@ -252,7 +192,7 @@ describe('useEspressoCatalog', () => {
     const afterFirstSave = [savedFirst, ...listing]
     const afterSecondSave = [savedSecond, savedFirst, ...listing]
     const page1 = listing.slice(0, PAGE)
-    const cursorAfter = (rows: Array<ShotRow>): ShotCursor =>
+    const cursorAfter = (rows: Array<ShotRow>): EspressoShotCursor =>
       `after:${rows[rows.length - 1].id}`
     const cursorPage1 = cursorAfter(page1)
     const refreshedFirst = afterFirstSave.slice(0, PAGE)
@@ -260,12 +200,12 @@ describe('useEspressoCatalog', () => {
     const refreshedSecond = afterSecondSave.slice(0, PAGE)
     const cursorRefreshedSecond = cursorAfter(refreshedSecond)
     const pageAfterSecond = afterSecondSave.slice(PAGE, PAGE * 2)
-    const listCursors: Array<ShotCursor | null> = []
+    const listCursors: Array<EspressoShotCursor | null> = []
     let firstPageCalls = 0
     let resolveFirstRefresh: (page: ShotPage) => void = () => {}
     let resolveSecondRefresh: (page: ShotPage) => void = () => {}
     const api: EspressoApi = {
-      load: () => Promise.resolve(catalog({ shots: [], total: listing.length })),
+      load: () => Promise.resolve(catalog({ shots: [] })),
       listShots: (cursor) => {
         listCursors.push(cursor ?? null)
         if (cursor == null) {

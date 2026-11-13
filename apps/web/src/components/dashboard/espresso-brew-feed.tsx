@@ -59,8 +59,6 @@ const columns = [
   expanderColumn<EspressoShotWithRelations>(),
 ]
 
-// The Espresso tab of the dashboard: paged Shot history as a reference-only
-// feed. Hands loaded pages to BrewFeed and offers Load more for the rest.
 export function EspressoBrewFeed() {
   const trpc = useTRPC()
   const coffeesQuery = useQuery({

@@ -5,8 +5,6 @@ function parseWeight(value: string | number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-// 1:x from output / dose (espresso yield, or water on the other methods).
-// Null when either weight is missing or dose is zero — derived, never stored.
 export function formatBrewRatio(
   dose: string | number | null | undefined,
   output: string | number | null | undefined,

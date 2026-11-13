@@ -73,28 +73,8 @@ function likeContains(value: string) {
 }
 
 function shotMatchesReplay(
-  stored: {
-    coffeeId: string
-    grinderId: string
-    brewingDeviceId: string
-    roastDate: string | null
-    dose: string | null
-    yield: string | null
-    time: number | null
-    grindSetting: string | null
-    notes: string | null
-  },
-  input: {
-    coffeeId: string
-    grinderId: string
-    brewingDeviceId: string
-    roastDate?: string | null
-    dose: string
-    yield: string
-    time?: number | null
-    grindSetting: string
-    notes?: string | null
-  },
+  stored: typeof espressoShots.$inferSelect,
+  input: z.infer<typeof insertEspressoShotSchema>,
 ) {
   return (
     stored.coffeeId === input.coffeeId &&
@@ -292,8 +272,8 @@ async function loadIdempotencyKey(userId: string, idempotencyKey: string) {
   return rows[0]
 }
 
-function throwIfKeyDeleted(shotId: string | null) {
-  if (shotId != null) return
+function throwIfKeyDeleted<T>(value: T | null | undefined): asserts value is T {
+  if (value != null) return
   throw new TRPCError({
     code: TRPC_CONFLICT,
     message: SHOT_IDEMPOTENCY_DELETED,
@@ -345,14 +325,9 @@ async function replayShotId(
 ) {
   throwIfKeyDeleted(shotId)
   const existing = await db.query.espressoShots.findFirst({
-    where: { id: shotId!, userId },
+    where: { id: shotId, userId },
   })
-  if (!existing) {
-    throw new TRPCError({
-      code: TRPC_CONFLICT,
-      message: SHOT_IDEMPOTENCY_DELETED,
-    })
-  }
+  throwIfKeyDeleted(existing)
   if (!shotMatchesReplay(existing, input)) {
     throw new TRPCError({
       code: TRPC_CONFLICT,

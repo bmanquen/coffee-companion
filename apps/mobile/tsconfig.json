@@ -5,7 +5,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "skipLibCheck": true,
     "types": ["jest", "node"]
   },
   "include": ["**/*.ts", "**/*.tsx", "eslint.config.js"]

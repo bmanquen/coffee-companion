@@ -29,7 +29,6 @@ type BrewRow = {
   sealed: boolean
 }
 
-// Value + handler travel together so a parent cannot own one without the other.
 export type BrewFeedFilter<T> = {
   value: T
   onChange: (value: T) => void
