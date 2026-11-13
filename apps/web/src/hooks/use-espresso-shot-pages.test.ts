@@ -20,6 +20,7 @@ const KEPT_EXTRA_ID = 'kept-extra'
 const REMOVED_EXTRA_ID = 'removed-extra'
 const REFRESHED_FIRST_ID = 'refreshed-0'
 const PAGE_THREE_ID = 'page-three'
+const NEWLY_MATCHING_ID = 'newly-matching'
 
 async function requestText(
   input: RequestInfo | URL,
@@ -1564,6 +1565,141 @@ describe('useEspressoShotPages', () => {
         expect(
           result.current.items.find((shot) => shot.id === PAGE_THREE_ID),
         ).toBeUndefined()
+        expect(result.current.hasMore).toBe(false)
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('reopens load more after an empty extra page when a same-boundary refresh has no extra rows', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const newlyMatching = makeRecentShot({
+      id: NEWLY_MATCHING_ID,
+      coffeeId: 'c-late',
+      coffee: makeRecentCoffee({ id: 'c-late', name: 'Coffee late' }),
+    })
+    const pending: Array<(value: Response) => void> = []
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pending.push(resolve)
+        }),
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+      await waitFor(() =>
+        expect(result.current.items).toHaveLength(ESPRESSO_SHOT_PAGE_SIZE),
+      )
+      expect(result.current.hasMore).toBe(true)
+      pending.length = 0
+
+      let loadMoreDone: Promise<void> = Promise.resolve()
+      await act(async () => {
+        loadMoreDone = result.current.loadMore()
+      })
+      await waitFor(() => expect(pending).toHaveLength(1))
+      await act(async () => {
+        pending[0](
+          trpcSuccess({ items: [], total: first.length, nextCursor: null }),
+        )
+        await loadMoreDone
+      })
+      expect(result.current.hasMore).toBe(false)
+
+      await act(async () => {
+        bumpFirstPage(queryClient, trpc)
+      })
+      await waitFor(() => expect(result.current.hasMore).toBe(true))
+
+      pending.length = 0
+      await act(async () => {
+        loadMoreDone = result.current.loadMore()
+      })
+      await waitFor(() => expect(pending).toHaveLength(1))
+      await act(async () => {
+        pending[0](
+          trpcSuccess({
+            items: [newlyMatching],
+            total: first.length + 1,
+            nextCursor: null,
+          }),
+        )
+        await loadMoreDone
+      })
+      expect(
+        result.current.items.some((shot) => shot.id === NEWLY_MATCHING_ID),
+      ).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('keeps the extra cursor when a same-boundary refresh retains extra rows', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extraShot = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const pending: Array<(value: Response) => void> = []
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pending.push(resolve)
+        }),
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 1,
+        espressoShotCursor(first[first.length - 1]),
+        {},
+        null,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+      await waitFor(() =>
+        expect(result.current.items).toHaveLength(ESPRESSO_SHOT_PAGE_SIZE),
+      )
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+      ).toBe(true)
+      expect(result.current.hasMore).toBe(false)
+      pending.length = 0
+
+      await act(async () => {
+        bumpFirstPage(queryClient, trpc)
+      })
+      await waitFor(() => expect(pending.length).toBeGreaterThan(0))
+      await act(async () => {
+        pending[0](
+          trpcSuccess({
+            items: [extraShot],
+            total: first.length + 1,
+            nextCursor: null,
+          }),
+        )
+      })
+      await waitFor(() => {
+        expect(
+          result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+        ).toBe(true)
         expect(result.current.hasMore).toBe(false)
       })
     } finally {

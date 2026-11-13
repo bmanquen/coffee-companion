@@ -295,6 +295,68 @@ describe('authClient sign-out', () => {
     expect(auth.sessionAtom().get().data?.user?.id).toBeUndefined()
   })
 
+  it('does not consume the sign-out snapshot on a get-session error', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+    const getSessionWaiters: Array<(value: Response) => void> = []
+    let rejectSignOut: (reason: Error) => void = () => {}
+    const signOutPending = new Promise<Response>((_resolve, reject) => {
+      rejectSignOut = reject
+    })
+
+    const sessionData = persistedSessionCache()
+    const { auth, SESSION_COOKIE_KEY, SESSION_DATA_KEY } = loadAuthClient(
+      memory,
+      (url) => {
+        if (url.includes('/sign-out')) {
+          return signOutPending
+        }
+        if (url.includes('/get-session')) {
+          return new Promise((resolve) => {
+            getSessionWaiters.push(resolve)
+          })
+        }
+        return Promise.resolve(jsonResponse(null))
+      },
+      { sessionData },
+    )
+
+    await waitUntil(() => getSessionWaiters.length > 0, 'first get-session')
+    getSessionWaiters.shift()?.(jsonResponse(SESSION_BODY))
+    await waitUntil(
+      () => auth.sessionAtom().get().data?.user?.id === SESSION_USER_ID,
+      'session atom to load',
+    )
+
+    const signOutDone = auth.authClient.signOut()
+    await waitUntil(
+      () => memory.get(SESSION_COOKIE_KEY) === '{}',
+      'cookie clear during sign-out',
+    )
+
+    const refreshDone = auth.sessionAtom().get().refetch()
+    await waitUntil(
+      () => getSessionWaiters.length > 0,
+      'get-session during sign-out',
+    )
+    getSessionWaiters.shift()?.(
+      new Response(JSON.stringify({ message: 'unavailable' }), {
+        status: 500,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    await refreshDone.catch(() => undefined)
+
+    memory.set(SESSION_COOKIE_KEY, '{}')
+    memory.set(SESSION_DATA_KEY, '{}')
+
+    rejectSignOut(new Error('network'))
+    await signOutDone.catch(() => undefined)
+    expect(memory.get(SESSION_COOKIE_KEY)).toBe(SESSION_COOKIE_JSON)
+    expect(memory.get(SESSION_DATA_KEY)).toBe(sessionData)
+    expect(auth.sessionAtom().get().data?.user?.id).toBe(SESSION_USER_ID)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  })
+
   it('restores the signed-in session after a failed sign-out and a restart', async () => {
     jest.spyOn(console, 'log').mockImplementation(() => {})
     const sessionData = persistedSessionCache()
