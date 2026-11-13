@@ -53,13 +53,10 @@ export function createLiveEspressoApi(): EspressoApi {
 
   return {
     async load(): Promise<EspressoCatalog> {
-      const [coffees, grinders, devices, page] = await Promise.all([
+      const [coffees, grinders, devices] = await Promise.all([
         client.coffee.getAll.query(),
         client.grinder.list.query(),
         client.brewingDevice.list.query(),
-        client.espressoShot.getRecent.query({
-          limit: ESPRESSO_SHOT_PAGE_SIZE,
-        }),
       ])
       return {
         coffees: coffees.map((coffee) => ({
@@ -69,9 +66,9 @@ export function createLiveEspressoApi(): EspressoApi {
         })),
         grinders: grinders.map(({ id, name }) => ({ id, name })),
         devices: espressoDevicesFrom(devices),
-        shots: page.items.map(toShotRow),
-        total: page.total,
-        nextCursor: page.nextCursor,
+        shots: [],
+        total: 0,
+        nextCursor: null,
       }
     },
     async listShots(cursor?: ShotPage['nextCursor']): Promise<ShotPage> {

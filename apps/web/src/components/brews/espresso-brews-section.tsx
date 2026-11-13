@@ -65,12 +65,6 @@ function DialedInCell({ row }: CellContext<Shot, unknown>) {
   return <BrewDialedInCell brewingMethod="espresso" brew={row.original} />
 }
 
-type ShotPage = {
-  items: Array<Shot>
-  total: number
-  nextCursor: string | null
-}
-
 function ActionsCell({ row }: CellContext<Shot, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
@@ -79,20 +73,9 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
     trpc.espressoShot.delete.mutationOptions({
       onSuccess: (_deleted, shotId) => {
         removeShot(shotId)
-        queryClient.setQueriesData(
-          trpc.espressoShot.getRecent.queryFilter(),
-          (page: ShotPage | undefined) => {
-            if (!page) return page
-            const items = page.items.filter((shot) => shot.id !== shotId)
-            if (items.length === page.items.length) return page
-            return {
-              ...page,
-              items,
-              total: Math.max(0, page.total - 1),
-            }
-          },
+        queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.infiniteQueryFilter(),
         )
-        queryClient.invalidateQueries(trpc.espressoShot.getRecent.queryFilter())
         queryClient.invalidateQueries(
           trpc.espressoShot.getLatestUnsealed.queryFilter(),
         )

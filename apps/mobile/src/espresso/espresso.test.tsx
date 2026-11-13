@@ -330,9 +330,16 @@ describe('log espresso shot', () => {
       resolveList = resolve
     })
     const { api, created } = fakeApi(catalog({ shots: [] }))
+    let listCalls = 0
     const espresso: EspressoApi = {
       ...api,
-      listShots: () => listPending,
+      listShots: () => {
+        listCalls += 1
+        if (listCalls === 1) {
+          return Promise.resolve({ items: [], total: 0, nextCursor: null })
+        }
+        return listPending
+      },
     }
     await render(<App auth={signedIn} espresso={espresso} />)
     expect(screen.getByText(EMPTY_SHOTS)).toBeTruthy()
@@ -387,9 +394,16 @@ describe('log espresso shot', () => {
       resolveList = resolve
     })
     const { api, created } = fakeApi(catalog({ shots: [] }))
+    let listCalls = 0
     const espresso: EspressoApi = {
       ...api,
-      listShots: () => listPending,
+      listShots: () => {
+        listCalls += 1
+        if (listCalls === 1) {
+          return Promise.resolve({ items: [], total: 0, nextCursor: null })
+        }
+        return listPending
+      },
     }
     await render(<App auth={signedIn} espresso={espresso} />)
     await openForm()
@@ -618,9 +632,14 @@ describe('log espresso shot', () => {
         return next
       },
     })
+    let listCalls = 0
     const espresso: EspressoApi = {
       ...api,
-      listShots: () => Promise.reject(new Error('Network request failed')),
+      listShots: (cursor) => {
+        listCalls += 1
+        if (listCalls === 1) return api.listShots(cursor)
+        return Promise.reject(new Error('Network request failed'))
+      },
     }
     await render(<App auth={signedIn} espresso={espresso} />)
     await openForm()
@@ -913,14 +932,13 @@ describe('log espresso shot', () => {
 
   it('reloads the catalog when the signed-in user changes, even if the api object does not', async () => {
     let owner = ADA_ID
+    const shotsForOwner = () =>
+      owner === ADA_ID
+        ? [seedShot({ coffeeName: 'Ada House' })]
+        : [seedShot({ coffeeName: 'Alan House' })]
     const api: EspressoApi = {
-      ...pagingFor(() => []),
-      load: () =>
-        Promise.resolve(
-          owner === ADA_ID
-            ? catalog({ shots: [seedShot({ coffeeName: 'Ada House' })] })
-            : catalog({ shots: [seedShot({ coffeeName: 'Alan House' })] }),
-        ),
+      ...pagingFor(shotsForOwner),
+      load: () => Promise.resolve(catalog({ shots: shotsForOwner() })),
       create: async () => {},
     }
     const view = await render(
@@ -1011,6 +1029,7 @@ describe('log espresso shot', () => {
       }),
     )
     let owner = ADA_ID
+    let adaFirstPages = 0
     const cursors: Array<ShotCursor | null | undefined> = []
     const api: EspressoApi = {
       load: () =>
@@ -1023,6 +1042,10 @@ describe('log espresso shot', () => {
       listShots: (cursor) => {
         cursors.push(cursor)
         if (owner === ADA_ID && !cursor) {
+          adaFirstPages += 1
+          if (adaFirstPages === 1) {
+            return Promise.resolve(pageFrom(adaAll, cursor))
+          }
           return new Promise(() => {})
         }
         return Promise.resolve(
@@ -1047,7 +1070,7 @@ describe('log espresso shot', () => {
     await enterRecipe()
     await press(LOG)
     expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
-    expect(cursors).toEqual([undefined])
+    expect(cursors).toEqual([undefined, undefined])
 
     owner = ALAN_ID
     await view.rerender(
@@ -1175,7 +1198,7 @@ describe('log espresso shot', () => {
     const view = await render(<App auth={signedIn} espresso={first} />)
 
     await view.rerender(<App auth={signedIn} espresso={second} />)
-    expect(screen.getByText(EMPTY_SHOTS)).toBeTruthy()
+    expect(await screen.findByText(EMPTY_SHOTS)).toBeTruthy()
 
     await act(async () => {
       rejectFirst(new Error('Network request failed'))
@@ -1813,13 +1836,23 @@ describe('log espresso shot', () => {
     > = []
     let shots = [seedShot({ id: 'shot-old', coffeeName: 'Old Guji' })]
     const initial = catalog({ shots })
+    let firstPages = 0
     const api: EspressoApi = {
       load: () =>
         Promise.resolve({ ...initial, shots: [...shots], total: shots.length }),
-      listShots: () =>
-        new Promise((resolve) => {
+      listShots: () => {
+        firstPages += 1
+        if (firstPages === 1) {
+          return Promise.resolve({
+            items: [...shots],
+            total: shots.length,
+            nextCursor: null,
+          })
+        }
+        return new Promise((resolve) => {
           pages.push(resolve)
-        }),
+        })
+      },
       loadPrefill: () => Promise.resolve(seedShot()),
       create: (input) =>
         Promise.resolve().then(() => {
@@ -1891,12 +1924,17 @@ describe('log espresso shot', () => {
           nextCursor: ShotCursor | null
         }) => void)
       | null = null
+    let firstPages = 0
     const api: EspressoApi = {
       load: () =>
         Promise.resolve(catalog({ shots: all.slice(0, 20), total: all.length })),
       listShots: (cursor) => {
         cursors.push(cursor)
         if (!cursor) {
+          firstPages += 1
+          if (firstPages === 1) {
+            return Promise.resolve(pageFrom(all, cursor))
+          }
           return new Promise((resolve) => {
             resolveRefresh = resolve
           })
@@ -1914,10 +1952,10 @@ describe('log espresso shot', () => {
     await enterRecipe()
     await press(LOG)
     expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
-    expect(cursors).toEqual([undefined])
+    expect(cursors).toEqual([undefined, undefined])
 
     await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
-    expect(cursors).toEqual([undefined])
+    expect(cursors).toEqual([undefined, undefined])
     expect(screen.queryByText('Coffee 20')).toBeNull()
 
     await act(async () => {
@@ -1933,7 +1971,7 @@ describe('log espresso shot', () => {
     expect(cursors).not.toContain('shot-19')
   })
 
-  it('does not append a page started during the refresh-failure fallback load', async () => {
+  it('keeps the loaded list when a save refresh fails', async () => {
     const all = Array.from({ length: 25 }, (_, index) =>
       seedShot({
         id: `shot-${index}`,
@@ -1941,30 +1979,19 @@ describe('log espresso shot', () => {
       }),
     )
     const cursors: Array<ShotCursor | null | undefined> = []
-    let resolveFallback: ((catalog: EspressoCatalog) => void) | null = null
-    let loads = 0
-    const replacement = catalog({
-      shots: [
-        seedShot({ id: 'shot-new', coffeeName: 'Logged new' }),
-        ...all.slice(0, 19),
-      ],
-      total: 26,
-    })
+    let firstPages = 0
     const api: EspressoApi = {
-      load: () => {
-        loads += 1
-        if (loads === 1) {
-          return Promise.resolve(
-            catalog({ shots: all.slice(0, 20), total: all.length }),
-          )
-        }
-        return new Promise((resolve) => {
-          resolveFallback = resolve
-        })
-      },
+      load: () =>
+        Promise.resolve(
+          catalog({ shots: all.slice(0, 20), total: all.length }),
+        ),
       listShots: (cursor) => {
         cursors.push(cursor)
-        if (!cursor) return Promise.reject(new Error('Network request failed'))
+        if (!cursor) {
+          firstPages += 1
+          if (firstPages === 1) return Promise.resolve(pageFrom(all, cursor))
+          return Promise.reject(new Error('Network request failed'))
+        }
         return Promise.resolve(pageFrom(all, cursor))
       },
       loadPrefill: () => Promise.resolve(seedShot()),
@@ -1978,17 +2005,11 @@ describe('log espresso shot', () => {
     await enterRecipe()
     await press(LOG)
     expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
-    await waitFor(() => expect(resolveFallback).toBeTruthy())
-    expect(cursors).toEqual([undefined])
+    await waitFor(() => expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy())
+    expect(cursors).toEqual([undefined, undefined])
 
-    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
-    expect(cursors).toEqual([undefined])
-
-    await act(async () => {
-      resolveFallback?.(replacement)
-      await Promise.resolve()
-    })
-    expect(await screen.findByText('Logged new')).toBeTruthy()
+    expect(screen.getByText('Coffee 0')).toBeTruthy()
+    expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
     expect(screen.queryByText('Coffee 20')).toBeNull()
   })
 
@@ -2074,10 +2095,24 @@ describe('log espresso shot', () => {
           nextCursor: ShotCursor | null
         }) => void)
       | null = null
+    let firstPages = 0
     const api: EspressoApi = {
       load: () => Promise.resolve(catalog({ shots, total })),
       listShots: (cursor) => {
-        if (!cursor) return Promise.reject(new Error('Network request failed'))
+        if (!cursor) {
+          firstPages += 1
+          if (firstPages === 1) {
+            return Promise.resolve({
+              items: shots,
+              total,
+              nextCursor:
+                shots.length < total
+                  ? pageCursor(shots[shots.length - 1].id)
+                  : null,
+            })
+          }
+          return Promise.reject(new Error('Network request failed'))
+        }
         return new Promise((resolve) => {
           resolveMore = resolve
         })
@@ -2102,8 +2137,9 @@ describe('log espresso shot', () => {
     await pickCoffee()
     await enterRecipe()
     await press(LOG)
-    expect(await screen.findByText('Logged new')).toBeTruthy()
+    expect(await screen.findByText(ERROR_LOAD_FAILED)).toBeTruthy()
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
+    expect(screen.getByText('Coffee 0')).toBeTruthy()
   })
 
   it('retries the next page from the list footer when loading more fails', async () => {
@@ -2123,6 +2159,7 @@ describe('log espresso shot', () => {
         ),
       listShots: (cursor) => {
         cursors.push(cursor)
+        if (!cursor) return Promise.resolve(pageFrom(all, cursor))
         attempts += 1
         if (attempts === 1) {
           return Promise.reject(new Error('Network request failed'))
@@ -2143,12 +2180,13 @@ describe('log espresso shot', () => {
     expect(screen.queryByText('Coffee 20')).toBeNull()
 
     await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
-    expect(cursors).toEqual([pageCursor('shot-19')])
+    expect(cursors).toEqual([undefined, pageCursor('shot-19')])
     expect(screen.getByText(ERROR_LOAD_MORE_FAILED)).toBeTruthy()
 
     await press(TRY_AGAIN)
     await waitFor(() =>
       expect(cursors).toEqual([
+        undefined,
         pageCursor('shot-19'),
         pageCursor('shot-19'),
       ]),

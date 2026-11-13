@@ -5,6 +5,7 @@ import { ShotList } from '../espresso/ShotList'
 import { TRY_AGAIN } from '../espresso/copy'
 import { idleEspressoApi } from '../espresso/types'
 import { useEspressoCatalog } from '../espresso/use-espresso-catalog'
+import { QueryProvider } from '../query'
 import {
   SIGN_OUT_TEST_ID,
   WELCOME_A11Y_LABEL,
@@ -31,6 +32,32 @@ export function SignedInHome({
   onSignOut: () => void
   error?: AuthError | null
   espresso?: EspressoApi
+}) {
+  return (
+    <QueryProvider>
+      <Home
+        name={name}
+        userId={userId}
+        onSignOut={onSignOut}
+        error={error}
+        espresso={espresso}
+      />
+    </QueryProvider>
+  )
+}
+
+function Home({
+  name,
+  userId,
+  onSignOut,
+  error,
+  espresso,
+}: {
+  name: string
+  userId: string
+  onSignOut: () => void
+  error?: AuthError | null
+  espresso: EspressoApi
 }) {
   const [screen, setScreen] = useState<Screen>('list')
   const {

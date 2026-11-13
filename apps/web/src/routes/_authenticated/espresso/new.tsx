@@ -89,7 +89,9 @@ export function NewEspressoShot() {
     trpc.espressoShot.create.mutationOptions({
       onSuccess: () => {
         saveSucceeded.current = true
-        queryClient.invalidateQueries(trpc.espressoShot.getRecent.queryFilter())
+        queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.infiniteQueryFilter(),
+        )
         queryClient.invalidateQueries(
           trpc.espressoShot.getLatestUnsealed.queryFilter(),
         )

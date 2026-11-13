@@ -1,362 +1,233 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useReducer,
-  useRef,
-} from 'react'
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { apiErrorMessage } from '../api-error'
 import {
   ERROR_LOAD_FAILED,
   ERROR_LOAD_MORE_FAILED,
   ERROR_SAVE_FAILED,
 } from './copy'
+import type { InfiniteData } from '@tanstack/react-query'
 import type {
   EspressoApi,
   EspressoCatalog,
   ShotCreate,
   ShotCursor,
+  ShotPage,
   ShotRow,
 } from './types'
 
-type LoadStatus = 'loading' | 'loaded' | 'failed'
+export const ESPRESSO_EQUIPMENT_QUERY_KEY = 'espresso-equipment'
+export const ESPRESSO_SHOTS_QUERY_KEY = 'espresso-shots'
 
-type State = {
-  status: LoadStatus
-  catalog: EspressoCatalog | null
-  loadError: string | null
-  busy: boolean
-  saveError: string | null
-  loadingMore: boolean
-  loadMoreError: string | null
-  refreshing: boolean
-}
-
-type Action =
-  | { type: 'loadStarted' }
-  | { type: 'loadSucceeded'; catalog: EspressoCatalog }
-  | { type: 'loadFailed'; error: string }
-  | { type: 'saveStarted' }
-  | { type: 'saveSucceeded' }
-  | { type: 'saveFailed'; error: string }
-  | { type: 'saveErrorCleared' }
-  | { type: 'reset' }
-  | { type: 'loadMoreStarted' }
-  | { type: 'pageInvalidated' }
-  | {
-      type: 'shotsRefreshed'
-      shots: Array<ShotRow>
-      total: number
-      nextCursor: ShotCursor | null
-    }
-  | {
-      type: 'shotsAppended'
-      shots: Array<ShotRow>
-      total: number
-      nextCursor: ShotCursor | null
-    }
-  | { type: 'loadMoreFailed'; error: string }
-
-const initial: State = {
-  status: 'loading',
-  catalog: null,
-  loadError: null,
-  busy: false,
-  saveError: null,
-  loadingMore: false,
-  loadMoreError: null,
-  refreshing: false,
-}
-
-function reducer(state: State, action: Action): State {
-  switch (action.type) {
-    case 'loadStarted':
-      return {
-        ...state,
-        status: 'loading',
-        loadError: null,
-        loadingMore: false,
-        loadMoreError: null,
-        refreshing: false,
-      }
-    case 'loadSucceeded':
-      return {
-        ...state,
-        status: 'loaded',
-        catalog: action.catalog,
-        loadError: null,
-        loadingMore: false,
-        loadMoreError: null,
-        refreshing: false,
-      }
-    case 'loadFailed':
-      return {
-        ...state,
-        status: 'failed',
-        loadError: action.error,
-        loadingMore: false,
-        refreshing: false,
-      }
-    case 'saveStarted':
-      return { ...state, busy: true, saveError: null }
-    case 'saveSucceeded':
-      return { ...state, busy: false, saveError: null, refreshing: true }
-    case 'saveFailed':
-      return { ...state, busy: false, saveError: action.error }
-    case 'saveErrorCleared':
-      return state.saveError ? { ...state, saveError: null } : state
-    case 'reset':
-      return initial
-    case 'loadMoreStarted':
-      return { ...state, loadingMore: true, loadMoreError: null }
-    case 'pageInvalidated':
-      return {
-        ...state,
-        loadingMore: false,
-        loadMoreError: null,
-        refreshing: true,
-      }
-    case 'shotsRefreshed':
-      if (!state.catalog) {
-        return { ...state, loadingMore: false, refreshing: false }
-      }
-      return {
-        ...state,
-        status: 'loaded',
-        loadError: null,
-        loadingMore: false,
-        loadMoreError: null,
-        refreshing: false,
-        catalog: {
-          ...state.catalog,
-          shots: action.shots,
-          total: action.total,
-          nextCursor: action.nextCursor,
-        },
-      }
-    case 'shotsAppended': {
-      if (!state.catalog) return { ...state, loadingMore: false }
-      const seen = new Set(state.catalog.shots.map((shot) => shot.id))
-      return {
-        ...state,
-        loadingMore: false,
-        loadMoreError: null,
-        catalog: {
-          ...state.catalog,
-          shots: [
-            ...state.catalog.shots,
-            ...action.shots.filter((shot) => !seen.has(shot.id)),
-          ],
-          total: action.total,
-          nextCursor: action.nextCursor,
-        },
-      }
-    }
-    case 'loadMoreFailed':
-      return { ...state, loadingMore: false, loadMoreError: action.error }
+function linkedShotPages(
+  data: { pages: Array<ShotPage>; pageParams: Array<unknown> } | undefined,
+): Array<ShotPage> {
+  if (!data?.pages.length) return []
+  const linked = [data.pages[0]]
+  for (let i = 1; i < data.pages.length; i++) {
+    const previous = linked[linked.length - 1]
+    if (previous.nextCursor == null) break
+    if (data.pageParams[i] !== previous.nextCursor) break
+    linked.push(data.pages[i])
   }
+  return linked
 }
 
 export function useEspressoCatalog(api: EspressoApi, userId: string) {
-  const [state, dispatch] = useReducer(reducer, initial)
-  const catalogSeq = useRef(0)
-  const accountGen = useRef(0)
-  const saveInFlight = useRef(false)
-  const activeUser = useRef(userId)
-  const refreshSeq = useRef(0)
-  const pageSeq = useRef(0)
-  const refreshPending = useRef(false)
-  const refreshCommitSeq = useRef(0)
-  const loadMoreInFlight = useRef(false)
-  const catalogRef = useRef(state.catalog)
-  useLayoutEffect(() => {
-    // After commit: a discarded render must not leak catalog or release the gate.
-    catalogRef.current = state.catalog
-    if (
-      refreshCommitSeq.current !== 0 &&
-      refreshCommitSeq.current === refreshSeq.current
-    ) {
-      refreshCommitSeq.current = 0
-      refreshPending.current = false
-    }
-  }, [state.catalog])
-
-  const invalidatePagedLoads = useCallback(() => {
-    pageSeq.current += 1
-    loadMoreInFlight.current = false
-  }, [])
-
-  const runLoad = useCallback(() => {
-    const seq = ++catalogSeq.current
-    invalidatePagedLoads()
-    // A full load is a new catalog. Drop an in-flight first-page refresh so it
-    // cannot overwrite this result or hold loadMore.
-    refreshSeq.current += 1
-    refreshCommitSeq.current = 0
-    refreshPending.current = false
-    const forUser = userId
-    dispatch({ type: 'loadStarted' })
-    void api.load().then(
-      (catalog) => {
-        // A newer load or refresh replaces this one; a late failure must not
-        // hide that catalog.
-        if (seq !== catalogSeq.current || forUser !== activeUser.current) return
-        dispatch({ type: 'loadSucceeded', catalog })
-      },
-      (error) => {
-        if (seq !== catalogSeq.current || forUser !== activeUser.current) return
-        dispatch({
-          type: 'loadFailed',
-          error: apiErrorMessage(error, ERROR_LOAD_FAILED),
-        })
-      },
-    )
-  }, [api, invalidatePagedLoads, userId])
+  const queryClient = useQueryClient()
+  const userIdRef = useRef(userId)
+  userIdRef.current = userId
+  const apiRef = useRef(api)
+  const sourceRef = useRef(0)
+  if (apiRef.current !== api) {
+    apiRef.current = api
+    sourceRef.current += 1
+  }
+  const source = sourceRef.current
+  const saveGen = useRef(0)
+  const [busy, setBusy] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    const previousUser = activeUser.current
-    activeUser.current = userId
-    if (previousUser !== userId) {
-      accountGen.current += 1
-      saveInFlight.current = false
-      catalogSeq.current += 1
-      invalidatePagedLoads()
-      refreshCommitSeq.current = 0
-      refreshPending.current = false
-      dispatch({ type: 'reset' })
+    saveGen.current += 1
+    setBusy(false)
+    setSaveError(null)
+  }, [userId])
+
+  const equipment = useQuery({
+    queryKey: [ESPRESSO_EQUIPMENT_QUERY_KEY, userId, source],
+    queryFn: () => api.load(),
+  })
+  const shots = useInfiniteQuery({
+    queryKey: [ESPRESSO_SHOTS_QUERY_KEY, userId, source],
+    queryFn: ({ pageParam }) => api.listShots(pageParam),
+    initialPageParam: undefined as ShotCursor | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  })
+
+  useEffect(() => {
+    // Infinite refetch keeps stored pageParams. Extra pages that no longer
+    // follow the first page's nextCursor belong to a different chain.
+    if (shots.isFetching) return
+    const data = shots.data
+    if (!data || data.pages.length < 2) return
+    const linked = linkedShotPages(data)
+    if (linked.length === data.pages.length) return
+    queryClient.setQueryData(
+      [ESPRESSO_SHOTS_QUERY_KEY, userId, source],
+      (current: InfiniteData<ShotPage, unknown> | undefined) => {
+        if (!current || current.pages.length < 2) return current
+        const nextLinked = linkedShotPages(current)
+        if (nextLinked.length === current.pages.length) return current
+        return {
+          pages: nextLinked,
+          pageParams: current.pageParams.slice(0, nextLinked.length),
+        }
+      },
+    )
+  }, [queryClient, shots.data, shots.isFetching, source, userId])
+
+  const items = useMemo(() => {
+    const linked = linkedShotPages(shots.data)
+    const rows: Array<ShotRow> = []
+    const seen = new Set<string>()
+    for (const page of linked) {
+      for (const row of page.items) {
+        if (seen.has(row.id)) continue
+        seen.add(row.id)
+        rows.push(row)
+      }
     }
-    runLoad()
-    return () => {
-      catalogSeq.current += 1
-    }
-  }, [invalidatePagedLoads, runLoad, userId])
+    return rows
+  }, [shots.data])
+
+  const catalog: EspressoCatalog | null = equipment.data
+    ? {
+        ...equipment.data,
+        shots: items,
+        total: shots.data?.pages[0]?.total ?? equipment.data.total,
+        nextCursor: linkedShotPages(shots.data).at(-1)?.nextCursor ?? null,
+      }
+    : null
 
   const loading =
-    state.status === 'loading' ||
-    (state.refreshing && (state.catalog?.shots.length ?? 0) === 0)
+    equipment.isPending ||
+    (shots.isPending && items.length === 0) ||
+    (shots.isFetching && items.length === 0 && !shots.isFetchingNextPage)
+
+  const loadError =
+    equipment.isError && !equipment.data
+      ? apiErrorMessage(equipment.error, ERROR_LOAD_FAILED)
+      : shots.isError && !shots.isFetchNextPageError
+        ? apiErrorMessage(shots.error, ERROR_LOAD_FAILED)
+        : null
+
+  const loadMoreError = shots.isFetchNextPageError
+    ? apiErrorMessage(shots.error, ERROR_LOAD_MORE_FAILED)
+    : null
+
   const reload = useCallback(() => {
-    if (!loading) runLoad()
-  }, [loading, runLoad])
-
-  const refreshFirstPage = useCallback(
-    (forUser: string) => {
-      const seq = ++refreshSeq.current
-      invalidatePagedLoads()
-      refreshPending.current = true
-      dispatch({ type: 'pageInvalidated' })
-      void api.listShots().then(
-        (page) => {
-          if (forUser !== activeUser.current || seq !== refreshSeq.current) {
-            return
-          }
-          // A catalog-backed refresh is newer than any in-flight full load.
-          // With no catalog yet, leave catalogSeq alone so that load can settle.
-          if (catalogRef.current) catalogSeq.current += 1
-          refreshCommitSeq.current = seq
-          dispatch({
-            type: 'shotsRefreshed',
-            shots: page.items,
-            total: page.total,
-            nextCursor: page.nextCursor,
-          })
-        },
-        () => {
-          if (forUser !== activeUser.current || seq !== refreshSeq.current) {
-            return
-          }
-          refreshPending.current = false
-          runLoad()
-        },
-      )
-    },
-    [api, invalidatePagedLoads, runLoad],
-  )
-
-  const save = useCallback(
-    (input: ShotCreate, onSuccess?: () => void) => {
-      if (saveInFlight.current) return
-      saveInFlight.current = true
-      const forUser = userId
-      const startedAccountGen = accountGen.current
-      dispatch({ type: 'saveStarted' })
-      void api.create(input).then(
-        () => {
-          if (startedAccountGen !== accountGen.current) return
-          saveInFlight.current = false
-          refreshPending.current = true
-          dispatch({ type: 'saveSucceeded' })
-          onSuccess?.()
-          refreshFirstPage(forUser)
-        },
-        (error) => {
-          if (startedAccountGen !== accountGen.current) return
-          saveInFlight.current = false
-          dispatch({
-            type: 'saveFailed',
-            error: apiErrorMessage(error, ERROR_SAVE_FAILED),
-          })
-        },
-      )
-    },
-    [api, refreshFirstPage, userId],
-  )
+    if (loading) return
+    void equipment.refetch()
+    void shots.refetch()
+  }, [equipment, loading, shots])
 
   const loadMore = useCallback(() => {
-    const catalog = catalogRef.current
     if (
-      loadMoreInFlight.current ||
-      refreshPending.current ||
-      state.status === 'loading' ||
-      state.loadingMore ||
-      !catalog ||
-      !catalog.nextCursor
+      shots.isFetchingNextPage ||
+      shots.isRefetching ||
+      equipment.isPending ||
+      !shots.hasNextPage
     ) {
       return
     }
-    const forUser = userId
-    const seq = pageSeq.current
-    const cursor = catalog.nextCursor
-    loadMoreInFlight.current = true
-    dispatch({ type: 'loadMoreStarted' })
-    void api.listShots(cursor).then(
-      (page) => {
-        if (forUser !== activeUser.current || seq !== pageSeq.current) return
-        loadMoreInFlight.current = false
-        dispatch({
-          type: 'shotsAppended',
-          shots: page.items,
-          total: page.total,
-          nextCursor: page.nextCursor,
-        })
-      },
-      (error) => {
-        if (forUser !== activeUser.current || seq !== pageSeq.current) return
-        loadMoreInFlight.current = false
-        dispatch({
-          type: 'loadMoreFailed',
-          error: apiErrorMessage(error, ERROR_LOAD_MORE_FAILED),
-        })
-      },
-    )
-  }, [api, state.loadingMore, state.status, userId])
+    const pages = linkedShotPages(shots.data)
+    if (pages.length === 0) return
+    const last = pages[pages.length - 1]
+    if (last.nextCursor == null) return
+    if (shots.data && pages.length < shots.data.pages.length) {
+      queryClient.setQueryData([ESPRESSO_SHOTS_QUERY_KEY, userId, source], {
+        pages,
+        pageParams: shots.data.pageParams.slice(0, pages.length),
+      })
+    }
+    void shots.fetchNextPage()
+  }, [equipment.isPending, queryClient, shots, source, userId])
+
+  const createShot = useMutation({
+    mutationFn: (input: ShotCreate) => api.create(input),
+  })
+
+  const save = useCallback(
+    (input: ShotCreate, onSuccess?: () => void) => {
+      if (busy || createShot.isPending) return
+      const startedUser = userId
+      const startedGen = saveGen.current
+      setBusy(true)
+      setSaveError(null)
+      createShot.mutate(input, {
+        onSuccess: () => {
+          if (
+            startedUser !== userIdRef.current ||
+            startedGen !== saveGen.current
+          ) {
+            return
+          }
+          onSuccess?.()
+          void queryClient.invalidateQueries({
+            queryKey: [ESPRESSO_SHOTS_QUERY_KEY, startedUser, source],
+          })
+        },
+        onError: (error) => {
+          if (
+            startedUser !== userIdRef.current ||
+            startedGen !== saveGen.current
+          ) {
+            return
+          }
+          setSaveError(apiErrorMessage(error, ERROR_SAVE_FAILED))
+        },
+        onSettled: () => {
+          if (
+            startedUser !== userIdRef.current ||
+            startedGen !== saveGen.current
+          ) {
+            return
+          }
+          setBusy(false)
+        },
+      })
+    },
+    [busy, createShot, queryClient, source, userId],
+  )
 
   const loadPrefill = useCallback(
-    (coffeeId: string) => api.loadPrefill(coffeeId),
-    [api],
+    (coffeeId: string) =>
+      queryClient.fetchQuery({
+        queryKey: ['espresso-prefill', userId, coffeeId],
+        queryFn: () => api.loadPrefill(coffeeId),
+        staleTime: 0,
+      }),
+    [api, queryClient, userId],
   )
 
   const clearSaveError = useCallback(() => {
-    dispatch({ type: 'saveErrorCleared' })
+    setSaveError(null)
   }, [])
 
   return {
-    catalog: state.catalog,
+    catalog,
     loading,
-    loadingMore: state.loadingMore,
-    loadMoreError: state.loadMoreError,
-    loadError: state.status === 'failed' ? state.loadError : null,
-    busy: state.busy,
-    saveError: state.saveError,
+    loadingMore: shots.isFetchingNextPage,
+    loadMoreError,
+    loadError,
+    busy,
+    saveError,
     reload,
     loadMore,
     loadPrefill,

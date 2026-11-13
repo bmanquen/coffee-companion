@@ -3,18 +3,22 @@ import {
   encodeEspressoShotCursor,
 } from '@coffee-companion/api/lib/espresso'
 import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
-import type { QueryClient } from '@tanstack/react-query'
+import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { EspressoShotWithRelations } from '@/types'
 import type { EspressoShotPageFilters } from '@/hooks/use-espresso-shot-pages'
 import { espressoShotPageInput } from '@/hooks/use-espresso-shot-pages'
 
 type Shot = EspressoShotWithRelations
+type ShotPage = {
+  items: Array<Shot>
+  total: number
+  nextCursor: EspressoShotCursor | null
+}
 type Trpc = {
   espressoShot: {
     getRecent: {
-      queryKey: (input: {
+      infiniteQueryKey: (input: {
         limit: number
-        cursor?: EspressoShotCursor
         coffeeId?: string
         q?: string
         dialedIn?: boolean
@@ -75,11 +79,34 @@ export function seedEspressoShotPage(
           items.length < total
         ? espressoShotCursor(items[items.length - 1])
         : null
+  const page = { items, total, nextCursor: resolvedNextCursor }
+  const key = trpc.espressoShot.getRecent.infiniteQueryKey(
+    espressoShotPageInput(filters),
+  )
   queryClient.setQueryData(
-    trpc.espressoShot.getRecent.queryKey(
-      espressoShotPageInput(cursor, filters),
-    ),
-    { items, total, nextCursor: resolvedNextCursor },
+    key,
+    (current: InfiniteData<ShotPage, string | undefined> | undefined) => {
+      if (!cursor) {
+        if (!current?.pages.length) {
+          return { pages: [page], pageParams: [undefined] }
+        }
+        return {
+          pages: [page, ...current.pages.slice(1)],
+          pageParams: current.pageParams,
+        }
+      }
+      const data = current ?? { pages: [], pageParams: [] }
+      const index = data.pageParams.findIndex((param) => param === cursor)
+      if (index >= 0) {
+        const pages = data.pages.slice()
+        pages[index] = page
+        return { pages, pageParams: data.pageParams }
+      }
+      return {
+        pages: [...data.pages, page],
+        pageParams: [...data.pageParams, cursor],
+      }
+    },
   )
 }
 

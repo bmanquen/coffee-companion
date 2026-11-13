@@ -20,7 +20,9 @@ function invalidateMethodFeed(
 ) {
   switch (brewingMethod) {
     case 'espresso':
-      queryClient.invalidateQueries(trpc.espressoShot.getRecent.queryFilter())
+      queryClient.invalidateQueries(
+        trpc.espressoShot.getRecent.infiniteQueryFilter(),
+      )
       queryClient.invalidateQueries(
         trpc.espressoShot.getLatestUnsealed.queryFilter(),
       )
