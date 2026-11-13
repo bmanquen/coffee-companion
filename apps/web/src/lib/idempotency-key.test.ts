@@ -7,14 +7,21 @@ const UUID_V4_PATTERN =
 describe('createIdempotencyKey', () => {
   it('builds a version-4 UUID from getRandomValues', () => {
     const zeros = new Uint8Array(16)
-    vi.spyOn(crypto, 'getRandomValues').mockImplementation((buffer) => {
-      const target = buffer as Uint8Array
-      target.set(zeros)
-      return target
-    })
-    expect(createIdempotencyKey()).toBe(
-      '00000000-0000-4000-8000-000000000000',
-    )
+    const spy = vi
+      .spyOn(crypto, 'getRandomValues')
+      .mockImplementation((buffer) => {
+        const target = buffer as Uint8Array
+        target.set(zeros)
+        return target
+      })
+    try {
+      expect(createIdempotencyKey()).toBe(
+        '00000000-0000-4000-8000-000000000000',
+      )
+    } finally {
+      spy.mockRestore()
+    }
+    expect(createIdempotencyKey()).not.toBe(createIdempotencyKey())
   })
 
   it('matches the version-4 UUID format', () => {
