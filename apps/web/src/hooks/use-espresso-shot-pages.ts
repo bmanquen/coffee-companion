@@ -78,6 +78,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const loadMoreSeq = useRef(0)
   const firstPageFetch = useRef(false)
   const extraBoundTo = useRef<EspressoShotCursor | undefined>(undefined)
+  const extraReloadQueued = useRef(false)
   const extraRef = useRef(extra)
   extraRef.current = extra
   const loadingMoreRef = useRef(loadingMore)
@@ -90,6 +91,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const dropExtraPages = useCallback(() => {
     loadMoreSeq.current += 1
     extraBoundTo.current = undefined
+    extraReloadQueued.current = false
     setExtra([])
     setExtraCursor(undefined)
     setLoadMoreError(null)
@@ -106,7 +108,12 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
 
   const reloadExtraPages = useCallback(
     async (boundary: EspressoShotCursor) => {
-      if (loadingMoreRef.current) return
+      // Load more still owns extraRef. Replay after that page commits.
+      if (loadingMoreRef.current) {
+        extraReloadQueued.current = true
+        return
+      }
+      extraReloadQueued.current = false
       const held = extraRef.current
       if (held.length === 0) return
       const seq = loadMoreSeq.current
@@ -170,6 +177,24 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
     first.isSuccess,
     reloadExtraPages,
   ])
+
+  useEffect(() => {
+    // A same-boundary first-page fetch can sit in isFetching until the extra
+    // HTTP batch unblocks, so dataUpdatedAt never queues the extra reload.
+    if (!loadingMore || !first.isFetching) return
+    if (extraBoundTo.current == null) return
+    extraReloadQueued.current = true
+  }, [first.isFetching, loadingMore])
+
+  useEffect(() => {
+    if (loadingMore) return
+    if (!extraReloadQueued.current) return
+    extraReloadQueued.current = false
+    const bound = extraBoundTo.current
+    const boundary = first.data?.nextCursor ?? null
+    if (bound == null || bound !== boundary) return
+    void reloadExtraPages(bound)
+  }, [first.data?.nextCursor, loadingMore, reloadExtraPages])
 
   useEffect(() => {
     if (first.isPlaceholderData) return
