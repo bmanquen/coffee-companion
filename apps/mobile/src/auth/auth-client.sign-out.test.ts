@@ -208,19 +208,22 @@ describe('authClient sign-out', () => {
 
   it('clears the session cookie after a successful sign-out', async () => {
     jest.spyOn(console, 'log').mockImplementation(() => {})
-    const { auth, SESSION_COOKIE_KEY } = loadAuthWithSignOutFetch(
-      memory,
-      () =>
-        Promise.resolve(
-          new Response(JSON.stringify({ success: true }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          }),
-        ),
-    )
+    const { auth, SESSION_COOKIE_KEY, SESSION_DATA_KEY } =
+      loadAuthWithSignOutFetch(
+        memory,
+        () =>
+          Promise.resolve(
+            new Response(JSON.stringify({ success: true }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }),
+          ),
+        { sessionData: persistedSessionCache() },
+      )
 
     await signOutIgnoringFailure(auth)
     expect(memory.get(SESSION_COOKIE_KEY)).toBe('{}')
+    expect(memory.get(SESSION_DATA_KEY)).toBe('{}')
     expect(auth.getSessionCookie()).not.toContain(SESSION_TOKEN)
     await new Promise((resolve) => setTimeout(resolve, 50))
   })

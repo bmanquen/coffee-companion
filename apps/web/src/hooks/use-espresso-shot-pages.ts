@@ -3,7 +3,14 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   ESPRESSO_SHOT_PAGE_SIZE,
   ESPRESSO_SHOT_Q_MAX,
@@ -77,15 +84,20 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const [extraReloadFailed, setExtraReloadFailed] = useState(false)
   const loadMoreSeq = useRef(0)
+  // Distinct from loadMoreSeq: overlapping extra refreshes, not load-more order.
+  const extraReplaySeq = useRef(0)
   const firstPageFetch = useRef(false)
   const extraBoundTo = useRef<EspressoShotCursor | undefined>(undefined)
   const extraReloadQueued = useRef(false)
   const extraRef = useRef(extra)
-  extraRef.current = extra
   const loadingMoreRef = useRef(loadingMore)
-  loadingMoreRef.current = loadingMore
   const filtersRef = useRef(filters)
-  filtersRef.current = filters
+  useLayoutEffect(() => {
+    // After commit: a discarded render must not leak extra pages or filters.
+    extraRef.current = extra
+    loadingMoreRef.current = loadingMore
+    filtersRef.current = filters
+  }, [extra, loadingMore, filters])
   const prevFirstUpdatedAt = useRef(0)
   const filterKey = `${filters.coffeeId ?? ''}\0${filters.q?.trim() ?? ''}\0${filters.dialedIn ? '1' : ''}`
 
@@ -119,6 +131,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
       const held = extraRef.current
       if (held.length === 0) return
       const seq = loadMoreSeq.current
+      const replay = ++extraReplaySeq.current
       const requeueIfStillBound = () => {
         if (extraBoundTo.current == null || extraRef.current.length === 0) {
           return
@@ -155,6 +168,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
           requeueIfStillBound()
           return
         }
+        if (replay !== extraReplaySeq.current) return
         setExtra(items)
         setExtraCursor(cursor)
         setExtraReloadFailed(false)
@@ -165,6 +179,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
           requeueIfStillBound()
           return
         }
+        if (replay !== extraReplaySeq.current) return
         setExtraReloadFailed(true)
       }
     },
