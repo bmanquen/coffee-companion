@@ -9,7 +9,7 @@ import {
   espressoShots,
   roasters,
 } from '../db/schema'
-import { insertEspressoShotSchema } from '../db/zod'
+import { insertEspressoShotSchema, uuidInput } from '../db/zod'
 import {
   brewIdsForMethod,
   sealBrewPageWithDialedIn,
@@ -64,7 +64,7 @@ type RecentPage = {
 const getRecentInput = z.object({
   limit: z.number().min(1).max(50),
   cursor: z.string().min(1).max(256).optional(),
-  coffeeId: z.uuid().optional(),
+  coffeeId: uuidInput().optional(),
   q: z.string().trim().max(ESPRESSO_SHOT_Q_MAX).optional(),
   dialedIn: z.boolean().optional(),
 })
@@ -381,7 +381,7 @@ export const espressoShotRouter = createTRPCRouter({
     }),
 
   getLatestUnsealed: authedProcedure
-    .input(z.object({ coffeeId: z.uuid() }))
+    .input(z.object({ coffeeId: uuidInput() }))
     .query(async ({ ctx, input }) => {
       const shelf = await ctx.shelf()
       if (shelf !== null && !shelf.has(input.coffeeId)) return null
@@ -423,7 +423,7 @@ export const espressoShotRouter = createTRPCRouter({
 
   // Sealed here too: the edit form would otherwise hand back every setting the
   // feeds withhold.
-  getById: authedProcedure.input(z.uuid()).query(({ ctx, input }) =>
+  getById: authedProcedure.input(uuidInput()).query(({ ctx, input }) =>
     sealBrewWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {
       const shot = await db.query.espressoShots.findFirst({
         where: { id: input, userId: ctx.session.user.id },
@@ -436,7 +436,7 @@ export const espressoShotRouter = createTRPCRouter({
   ),
 
   create: authedProcedure
-    .input(insertEspressoShotSchema.extend({ idempotencyKey: z.uuid() }))
+    .input(insertEspressoShotSchema.extend({ idempotencyKey: uuidInput() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id
       await assertEspressoDevice(input.brewingDeviceId, userId)
@@ -481,7 +481,7 @@ export const espressoShotRouter = createTRPCRouter({
     }),
 
   update: authedProcedure
-    .input(insertEspressoShotSchema.extend({ id: z.uuid() }))
+    .input(insertEspressoShotSchema.extend({ id: uuidInput() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
       await assertEspressoDevice(data.brewingDeviceId, ctx.session.user.id)
@@ -517,7 +517,7 @@ export const espressoShotRouter = createTRPCRouter({
     }),
 
   delete: authedProcedure
-    .input(z.uuid())
+    .input(uuidInput())
     .mutation(async ({ ctx, input }) => {
       await stampFallenBrews(ctx.session.user.id, ctx.plan)
 

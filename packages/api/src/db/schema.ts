@@ -320,6 +320,7 @@ export const espressoShotIdempotencyKeys = pgTable(
     primaryKey({
       columns: [table.userId, table.idempotencyKey],
     }),
+    index('espresso_shot_idempotency_keys_shot_id_idx').on(table.shotId),
   ],
 )
 

@@ -78,6 +78,13 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const loadMoreSeq = useRef(0)
   const firstPageFetch = useRef(false)
   const extraBoundTo = useRef<EspressoShotCursor | undefined>(undefined)
+  const extraRef = useRef(extra)
+  extraRef.current = extra
+  const loadingMoreRef = useRef(loadingMore)
+  loadingMoreRef.current = loadingMore
+  const filtersRef = useRef(filters)
+  filtersRef.current = filters
+  const prevFirstUpdatedAt = useRef(0)
   const filterKey = `${filters.coffeeId ?? ''}\0${filters.q?.trim() ?? ''}\0${filters.dialedIn ? '1' : ''}`
 
   const dropExtraPages = useCallback(() => {
@@ -91,11 +98,43 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
 
   // Extra pages are a local copy of cursor fetches. A filter change, a first
   // page whose next-page cursor moved, or a first page that now has no next
-  // page is a new listing. A cache patch, a failed refetch, or a refetch that
-  // keeps the same cursor boundary is not.
+  // page is a new listing. A same-boundary refetch keeps the extra rows but
+  // reloads them so fields such as isDialedIn are not left stale.
   useEffect(() => {
     dropExtraPages()
   }, [dropExtraPages, filterKey])
+
+  const reloadExtraPages = useCallback(
+    async (boundary: EspressoShotCursor) => {
+      if (loadingMoreRef.current) return
+      const held = extraRef.current
+      if (held.length === 0) return
+      const seq = loadMoreSeq.current
+      let cursor: EspressoShotCursor | null = boundary
+      const items: Array<EspressoShotWithRelations> = []
+      try {
+        while (cursor && items.length < held.length) {
+          const requestCursor: EspressoShotCursor = cursor
+          const page = await queryClient.fetchQuery({
+            ...trpc.espressoShot.getRecent.queryOptions(
+              espressoShotPageInput(requestCursor, filtersRef.current),
+            ),
+            // Extra cache can still look fresh inside ESPRESSO_SHOT_STALE_TIME_MS.
+            staleTime: 0,
+          })
+          if (seq !== loadMoreSeq.current) return
+          items.push(...page.items)
+          cursor = page.nextCursor
+        }
+        if (seq !== loadMoreSeq.current) return
+        setExtra(items)
+        setExtraCursor(cursor)
+      } catch {
+        if (seq !== loadMoreSeq.current) return
+      }
+    },
+    [queryClient, trpc],
+  )
 
   useEffect(() => {
     if (first.isFetching) {
@@ -115,6 +154,22 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
     }
     firstPageFetch.current = false
   }, [dropExtraPages, first.data?.nextCursor, first.isFetching, first.isSuccess])
+
+  useEffect(() => {
+    const prev = prevFirstUpdatedAt.current
+    prevFirstUpdatedAt.current = first.dataUpdatedAt
+    if (prev === 0 || prev === first.dataUpdatedAt) return
+    if (!first.isSuccess || first.isPlaceholderData) return
+    const boundary = first.data.nextCursor ?? null
+    if (boundary == null || extraBoundTo.current !== boundary) return
+    void reloadExtraPages(boundary)
+  }, [
+    first.data?.nextCursor,
+    first.dataUpdatedAt,
+    first.isPlaceholderData,
+    first.isSuccess,
+    reloadExtraPages,
+  ])
 
   useEffect(() => {
     if (first.isPlaceholderData) return

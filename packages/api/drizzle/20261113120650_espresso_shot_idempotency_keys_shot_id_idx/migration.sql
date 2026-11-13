@@ -1,0 +1,1 @@
+CREATE INDEX "espresso_shot_idempotency_keys_shot_id_idx" ON "espresso_shot_idempotency_keys" ("shot_id");
