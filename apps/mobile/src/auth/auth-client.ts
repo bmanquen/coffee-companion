@@ -85,8 +85,10 @@ const preserveSessionOnFailedSignOut = {
       const url = String(context.request?.url ?? '')
       if (isSignOutRequest(url)) signOutSnapshot = null
     },
-    onError() {
-      restoreSignOutSnapshot()
+    onError(context: { request?: { url?: string } }) {
+      if (isSignOutRequest(String(context.request?.url ?? ''))) {
+        restoreSignOutSnapshot()
+      }
     },
   },
 }

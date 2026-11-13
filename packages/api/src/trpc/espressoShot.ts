@@ -439,8 +439,6 @@ export const espressoShotRouter = createTRPCRouter({
     .input(insertEspressoShotSchema.extend({ idempotencyKey: uuidInput() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id
-      await assertEspressoDevice(input.brewingDeviceId, userId)
-
       const keyRow = await loadIdempotencyKey(userId, input.idempotencyKey)
       let shotId: string
       if (keyRow) {
@@ -462,6 +460,7 @@ export const espressoShotRouter = createTRPCRouter({
         }
         shotId = existing.id
       } else {
+        await assertEspressoDevice(input.brewingDeviceId, userId)
         await stampFallenBrews(userId, ctx.plan)
         shotId = await insertShotWithKey(userId, input)
       }
