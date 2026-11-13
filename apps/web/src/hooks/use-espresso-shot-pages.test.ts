@@ -1059,4 +1059,135 @@ describe('useEspressoShotPages', () => {
       fetchSpy.mockRestore()
     }
   })
+
+  it('keeps newer extra rows and cursor when an older extra refresh finishes last', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extraShot = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const pageThree = makeRecentShot({
+      id: PAGE_THREE_ID,
+      coffeeId: 'c-three',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-three', name: 'Coffee three' }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    const extraBoundary = espressoShotCursor(extraShot)
+    let extraPage2Calls = 0
+    let pageThreeReleased = false
+    let resolvePageThree: (value: Response) => void = () => {}
+    const pageThreePending = new Promise<Response>((resolve) => {
+      resolvePageThree = resolve
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(extraBoundary)) {
+          if (!pageThreeReleased) return pageThreePending
+          return trpcSuccess({
+            items: [{ ...pageThree, isDialedIn: false }],
+            total: first.length + 2,
+            nextCursor: null,
+          })
+        }
+        if (body.includes(boundary)) {
+          extraPage2Calls += 1
+          return trpcSuccess({
+            items: [
+              {
+                ...extraShot,
+                isDialedIn: extraPage2Calls === 1,
+              },
+            ],
+            total: first.length + 2,
+            nextCursor: extraBoundary,
+          })
+        }
+        return trpcSuccess({
+          items: first,
+          total: first.length + 2,
+          nextCursor: boundary,
+        })
+      },
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 2)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 2,
+        boundary,
+        {},
+        extraBoundary,
+      )
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [pageThree],
+        first.length + 2,
+        extraBoundary,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+          ?.isDialedIn,
+      ).toBe(true)
+      expect(result.current.hasMore).toBe(false)
+
+      extraPage2Calls = 0
+      await act(async () => {
+        void queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.queryFilter(),
+        )
+      })
+      await waitFor(() => expect(extraPage2Calls).toBe(1))
+
+      await act(async () => {
+        void queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.queryFilter(),
+        )
+      })
+      await waitFor(() => expect(extraPage2Calls).toBeGreaterThan(1))
+
+      await act(async () => {
+        pageThreeReleased = true
+        resolvePageThree(
+          trpcSuccess({
+            items: [{ ...pageThree, isDialedIn: false }],
+            total: first.length + 2,
+            nextCursor: null,
+          }),
+        )
+      })
+
+      await waitFor(() => {
+        expect(
+          result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+            ?.isDialedIn,
+        ).toBe(false)
+        expect(
+          result.current.items.find((shot) => shot.id === PAGE_THREE_ID)
+            ?.isDialedIn,
+        ).toBe(false)
+        expect(result.current.hasMore).toBe(false)
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })

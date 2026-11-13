@@ -17,38 +17,71 @@ const SESSION_COOKIE_JSON = JSON.stringify({
   'better-auth.session_token': { value: SESSION_TOKEN, expires: null },
 })
 
+type SessionAtomValue = {
+  data: { user?: { id?: string } | null } | null
+  error: unknown
+  isPending: boolean
+  isRefetching: boolean
+  refetch: () => Promise<unknown>
+}
+
 type SignOutAuth = {
   authClient: { signOut: () => Promise<unknown> }
   getSessionCookie: () => string
-  sessionAtom: () => { listen: (listener: () => void) => () => void }
+  sessionAtom: () => {
+    get: () => SessionAtomValue
+    set: (value: SessionAtomValue) => void
+    listen: (listener: () => void) => () => void
+  }
 }
 
-function loadAuthWithSignOutFetch(
-  memory: Map<string, string>,
-  signOutFetch: (headers: Headers) => Promise<Response>,
-) {
-  const cookieHeaders: Array<string | null> = []
-  globalThis.fetch = jest.fn((input, init) => {
-    const url =
-      typeof input === 'string'
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url
-    const headers = new Headers(
-      init?.headers ??
-        (input instanceof Request ? input.headers : undefined),
-    )
-    if (url.includes('/sign-out')) {
-      cookieHeaders.push(headers.get('cookie'))
-      return signOutFetch(headers)
+const SESSION_USER_ID = 'user-signed-in'
+const SESSION_BODY = {
+  user: { id: SESSION_USER_ID, name: 'Pat', email: 'pat@example.com' },
+  session: { id: 'session-1', userId: SESSION_USER_ID },
+}
+
+function jsonResponse(body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
+async function waitUntil(predicate: () => boolean, label: string) {
+  const started = Date.now()
+  while (!predicate()) {
+    if (Date.now() - started > 1000) {
+      throw new Error(`timed out waiting for ${label}`)
     }
-    return Promise.resolve(
-      new Response('null', {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    )
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
+function requestUrl(input: RequestInfo | URL) {
+  return typeof input === 'string'
+    ? input
+    : input instanceof URL
+      ? input.href
+      : input.url
+}
+
+function requestHeaders(input: RequestInfo | URL, init?: RequestInit) {
+  return new Headers(
+    init?.headers ??
+      (input instanceof Request ? input.headers : undefined),
+  )
+}
+
+function loadAuthClient(
+  memory: Map<string, string>,
+  fetchImpl: (
+    url: string,
+    headers: Headers,
+  ) => Promise<Response>,
+) {
+  globalThis.fetch = jest.fn((input, init) => {
+    return fetchImpl(requestUrl(input), requestHeaders(input, init))
   }) as typeof fetch
 
   jest.resetModules()
@@ -74,7 +107,22 @@ function loadAuthWithSignOutFetch(
 
   const auth = require('./auth-client') as SignOutAuth
   auth.sessionAtom().listen(() => {})
-  return { auth, cookieHeaders, SESSION_COOKIE_KEY: sessionStore.SESSION_COOKIE_KEY }
+  return { auth, SESSION_COOKIE_KEY: sessionStore.SESSION_COOKIE_KEY }
+}
+
+function loadAuthWithSignOutFetch(
+  memory: Map<string, string>,
+  signOutFetch: (headers: Headers) => Promise<Response>,
+) {
+  const cookieHeaders: Array<string | null> = []
+  const loaded = loadAuthClient(memory, (url, headers) => {
+    if (url.includes('/sign-out')) {
+      cookieHeaders.push(headers.get('cookie'))
+      return signOutFetch(headers)
+    }
+    return Promise.resolve(jsonResponse(null))
+  })
+  return { ...loaded, cookieHeaders }
 }
 
 async function signOutIgnoringFailure(auth: SignOutAuth) {
@@ -149,5 +197,61 @@ describe('authClient sign-out', () => {
     expect(memory.get(SESSION_COOKIE_KEY)).toBe('{}')
     expect(auth.getSessionCookie()).not.toContain(SESSION_TOKEN)
     await new Promise((resolve) => setTimeout(resolve, 50))
+  })
+
+  it('keeps the session after a cookie-less get-session returns null past a failed sign-out', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+    const getSessionWaiters: Array<(value: Response) => void> = []
+    const getSessionCookies: Array<string | null> = []
+    let rejectSignOut: (reason: Error) => void = () => {}
+    const signOutPending = new Promise<Response>((_resolve, reject) => {
+      rejectSignOut = reject
+    })
+
+    const { auth, SESSION_COOKIE_KEY } = loadAuthClient(
+      memory,
+      (url, headers) => {
+        if (url.includes('/sign-out')) {
+          return signOutPending
+        }
+        if (url.includes('/get-session')) {
+          getSessionCookies.push(headers.get('cookie'))
+          return new Promise((resolve) => {
+            getSessionWaiters.push(resolve)
+          })
+        }
+        return Promise.resolve(jsonResponse(null))
+      },
+    )
+
+    await waitUntil(() => getSessionWaiters.length > 0, 'first get-session')
+    getSessionWaiters.shift()?.(jsonResponse(SESSION_BODY))
+    await waitUntil(
+      () => auth.sessionAtom().get().data?.user?.id === SESSION_USER_ID,
+      'session atom to load',
+    )
+
+    const signOutDone = auth.authClient.signOut()
+    await waitUntil(
+      () => memory.get(SESSION_COOKIE_KEY) === '{}',
+      'cookie clear during sign-out',
+    )
+
+    const refreshDone = auth.sessionAtom().get().refetch()
+    await waitUntil(
+      () => getSessionWaiters.length > 0,
+      'cookie-less get-session',
+    )
+    expect(getSessionCookies.at(-1) ?? '').not.toContain(SESSION_TOKEN)
+
+    rejectSignOut(new Error('network'))
+    await signOutDone.catch(() => undefined)
+    expect(memory.get(SESSION_COOKIE_KEY)).toBe(SESSION_COOKIE_JSON)
+    expect(auth.sessionAtom().get().data?.user?.id).toBe(SESSION_USER_ID)
+
+    getSessionWaiters.shift()?.(jsonResponse(null))
+    await refreshDone.catch(() => undefined)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(auth.sessionAtom().get().data?.user?.id).toBe(SESSION_USER_ID)
   })
 })
