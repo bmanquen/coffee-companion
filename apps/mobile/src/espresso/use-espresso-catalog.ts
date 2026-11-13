@@ -147,13 +147,16 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const refreshSeq = useRef(0)
   const pageSeq = useRef(0)
   const refreshPending = useRef(false)
-  const refreshCommit = useRef(false)
+  const refreshCommitSeq = useRef(0)
   const loadMoreInFlight = useRef(false)
   const catalogRef = useRef(state.catalog)
   catalogRef.current = state.catalog
-  // Keep the gate closed until this render publishes the replacement catalog.
-  if (refreshCommit.current) {
-    refreshCommit.current = false
+  // Keep the gate closed until this render publishes the latest refresh.
+  if (
+    refreshCommitSeq.current !== 0 &&
+    refreshCommitSeq.current === refreshSeq.current
+  ) {
+    refreshCommitSeq.current = 0
     refreshPending.current = false
   }
 
@@ -168,6 +171,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     // A full load is a new catalog. Drop an in-flight first-page refresh so it
     // cannot overwrite this result or hold loadMore.
     refreshSeq.current += 1
+    refreshCommitSeq.current = 0
     refreshPending.current = false
     const forUser = userId
     dispatch({ type: 'loadStarted' })
@@ -196,6 +200,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
       saveInFlight.current = false
       catalogSeq.current += 1
       invalidatePagedLoads()
+      refreshCommitSeq.current = 0
       refreshPending.current = false
       dispatch({ type: 'reset' })
     }
@@ -224,7 +229,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
           // A catalog-backed refresh is newer than any in-flight full load.
           // With no catalog yet, leave catalogSeq alone so that load can settle.
           if (catalogRef.current) catalogSeq.current += 1
-          refreshCommit.current = true
+          refreshCommitSeq.current = seq
           dispatch({
             type: 'shotsRefreshed',
             shots: page.items,
