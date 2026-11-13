@@ -136,6 +136,8 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
         if (seq !== loadMoreSeq.current) return
         setExtra(items)
         setExtraCursor(cursor)
+        // No next page left to retry.
+        if (cursor == null) setLoadMoreError(null)
       } catch {
         if (seq !== loadMoreSeq.current) return
       }
