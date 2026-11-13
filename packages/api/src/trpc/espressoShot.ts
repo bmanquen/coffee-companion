@@ -391,7 +391,7 @@ export const espressoShotRouter = createTRPCRouter({
           coffeeId: input.coffeeId,
           ...(shelf !== null ? { sealedAt: { isNull: true } } : {}),
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: 'desc', id: 'desc' },
         with: withRelations,
       })
       if (!shot) return null
@@ -414,7 +414,7 @@ export const espressoShotRouter = createTRPCRouter({
       return sealBrewsWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
         db.query.espressoShots.findMany({
           where: { userId: ctx.session.user.id, id: { in: ids } },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: 'desc', id: 'desc' },
           with: withRelations,
           limit: input?.limit,
         }),

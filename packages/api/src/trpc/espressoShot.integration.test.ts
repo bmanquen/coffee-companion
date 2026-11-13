@@ -1080,6 +1080,48 @@ describe('espressoShot.getLatestUnsealed', () => {
     })
     expect(fromSource).toBeNull()
   })
+
+  it('breaks a createdAt tie the same way getRecent does', async () => {
+    const coffee = await createCoffee(uniq('Tied Prefill Coffee'))
+    const first = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '16',
+      yield: '32',
+      time: 28,
+      grindSetting: 'tied-a',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const second = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: 'tied-b',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const [row] = await db
+      .select({ createdAt: espressoShots.createdAt })
+      .from(espressoShots)
+      .where(eq(espressoShots.id, second.id))
+    await db
+      .update(espressoShots)
+      .set({ createdAt: row.createdAt })
+      .where(inArray(espressoShots.id, [first.id, second.id]))
+
+    const found = await asA.espressoShot.getLatestUnsealed({
+      coffeeId: coffee.id,
+    })
+    const page = await asA.espressoShot.getRecent({
+      limit: 1,
+      coffeeId: coffee.id,
+    })
+    expect(found?.id).toBe(page.items[0]?.id)
+    expect(found?.id).toBe(first.id > second.id ? first.id : second.id)
+  })
 })
 
 describe('espressoShot.getDialedIn', () => {
