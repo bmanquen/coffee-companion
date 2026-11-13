@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "f178de46-50e9-41cb-9987-ac82f1c3e8b2",
+  "id": "b1de9605-2c46-46e5-aafe-cdd090e2fbc2",
   "prevIds": [
-    "5b3d491a-9ffb-48c2-bc4e-52de14a9ba0d"
+    "1f35e0cc-d67a-4db6-9d5c-2af70241195e"
   ],
   "ddl": [
     {
@@ -1608,19 +1608,6 @@
       "generated": null,
       "identity": null,
       "name": "time",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "idempotency_key",
       "entityType": "columns",
       "schema": "public",
       "table": "espresso_shots"
@@ -4113,55 +4100,6 @@
       "entityType": "indexes",
       "schema": "public",
       "table": "espresso_shot_idempotency_keys"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "espresso_shots_user_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "coffee_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "espresso_shots_user_coffee_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "espresso_shots"
     },
     {
       "nameExplicit": true,

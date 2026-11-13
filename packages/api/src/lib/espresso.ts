@@ -18,7 +18,7 @@ export const ESPRESSO_CURSOR_TIMESTAMP_PATTERN =
 // Opaque next-page token. Clients pass it back as-is and never parse it.
 export type EspressoShotCursor = string
 
-type EspressoShotCursorKey = {
+export type EspressoShotCursorKey = {
   createdAt: string
   id: string
 }

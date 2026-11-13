@@ -1,2 +1,0 @@
-CREATE INDEX "espresso_shots_user_created_id_idx" ON "espresso_shots" ("user_id","created_at","id");--> statement-breakpoint
-CREATE INDEX "espresso_shots_user_coffee_created_id_idx" ON "espresso_shots" ("user_id","coffee_id","created_at","id");

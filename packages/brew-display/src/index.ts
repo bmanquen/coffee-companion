@@ -1,3 +1,5 @@
 export { coffeeOptionLabel } from './coffee-option-label'
 export { formatBrewRatio } from './format-brew-ratio'
 export { SEALED_SHOT } from './copy'
+export { applyCoffeePrefill } from './coffee-prefill'
+export type { PrefillKeep } from './coffee-prefill'

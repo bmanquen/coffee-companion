@@ -15,7 +15,6 @@ import {
   welcomeMessage,
 } from '../welcome'
 import { SIGN_OUT } from './copy'
-import type { AuthError } from './use-auth'
 import type { EspressoApi } from '../espresso/types'
 
 type Screen = 'list' | 'form'
@@ -24,13 +23,11 @@ export function SignedInHome({
   name,
   userId,
   onSignOut,
-  error,
   espresso = idleEspressoApi,
 }: {
   name: string
   userId: string
   onSignOut: () => void
-  error?: AuthError | null
   espresso?: EspressoApi
 }) {
   return (
@@ -39,7 +36,6 @@ export function SignedInHome({
         name={name}
         userId={userId}
         onSignOut={onSignOut}
-        error={error}
         espresso={espresso}
       />
     </QueryProvider>
@@ -50,13 +46,11 @@ function Home({
   name,
   userId,
   onSignOut,
-  error,
   espresso,
 }: {
   name: string
   userId: string
   onSignOut: () => void
-  error?: AuthError | null
   espresso: EspressoApi
 }) {
   const [screen, setScreen] = useState<Screen>('list')
@@ -102,11 +96,6 @@ function Home({
           <Text>{SIGN_OUT}</Text>
         </Pressable>
       </View>
-      {error ? (
-        <Text accessibilityRole="alert" style={styles.signOutError}>
-          {error.title}
-        </Text>
-      ) : null}
       {loadError && screen === 'list' ? (
         <View style={styles.loadError}>
           <Text accessibilityRole="alert">{loadError}</Text>
@@ -169,9 +158,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 16,
-  },
-  signOutError: {
-    paddingHorizontal: 16,
-    textAlign: 'center',
   },
 })

@@ -1,6 +1,5 @@
 import * as SecureStore from 'expo-secure-store'
 import {
-  adoptCurrentAuthFetchEpoch,
   applySessionAtomSet,
   invalidatePendingAuthFetches,
   loggedAuthFetch,
@@ -452,7 +451,6 @@ describe('loggedAuthFetch', () => {
       jest.fn(() => pending),
     )
     invalidatePendingAuthFetches()
-    adoptCurrentAuthFetchEpoch()
     applySessionAtomSet(setAtom, { data: null })
     memory.delete(SESSION_DATA_KEY)
     release(sessionResponse())

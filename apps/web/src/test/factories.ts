@@ -52,7 +52,6 @@ export function makeRecentShot(
     time: 28,
     grindSetting: '4.5',
     notes: 'tasty',
-    idempotencyKey: null,
     createdAt,
     updatedAt,
     coffee: {

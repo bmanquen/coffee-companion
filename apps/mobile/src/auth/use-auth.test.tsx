@@ -163,18 +163,29 @@ describe('useAuth', () => {
     )
   })
 
-  it('keeps the session when remote sign-out fails', async () => {
+  it('signs out locally and reports it when remote sign-out fails', async () => {
     mocks.signOut.mockResolvedValueOnce({ error: { message: 'network' } })
     const { result } = await renderHook(() => useAuth())
 
     await act(async () => {
-      await expect(result.current.signOut()).rejects.toEqual({
-        message: 'network',
-      })
+      await result.current.signOut()
     })
 
-    expect(mocks.clearSessionStore).not.toHaveBeenCalled()
-    expect(mocks.clearClientSession).not.toHaveBeenCalled()
+    expect(mocks.clearSessionStore).toHaveBeenCalled()
+    expect(mocks.clearClientSession).toHaveBeenCalled()
+    expect(result.current.error).toEqual({ title: ERROR_SIGN_OUT_FAILED })
+  })
+
+  it('signs out locally when the sign-out request throws', async () => {
+    mocks.signOut.mockRejectedValueOnce(new Error('network'))
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signOut()
+    })
+
+    expect(mocks.clearSessionStore).toHaveBeenCalled()
+    expect(mocks.clearClientSession).toHaveBeenCalled()
     expect(result.current.error).toEqual({ title: ERROR_SIGN_OUT_FAILED })
   })
 

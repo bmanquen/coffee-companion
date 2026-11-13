@@ -232,10 +232,9 @@ describe('NewEspressoShot form', () => {
 
     expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
     expect(screen.getByDisplayValue('Niche Zero')).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: 'Brewing Device' })).toHaveProperty(
-      'value',
-      '',
-    )
+    expect(
+      screen.getByRole('combobox', { name: 'Brewing Device' }),
+    ).toHaveProperty('value', '')
   })
 
   it('surfaces the Dialed-in Brew for the prefilled device', async () => {
@@ -474,6 +473,64 @@ describe('NewEspressoShot form', () => {
     }
   })
 
+  it('reuses the first key when a failed draft is edited back to it', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates < 3) throw new Error('Network request failed')
+        return trpcSuccess({ id: 'shot-new', dose: '18' })
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      const logWithDose = async (dose: string, count: number) => {
+        fireEvent.change(screen.getByLabelText(/^Dose/), {
+          target: { value: dose },
+        })
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        )
+      }
+      await logWithDose('18', 1)
+      await logWithDose('22', 2)
+      await logWithDose('18', 3)
+
+      const keys = createCalls(fetchSpy).map(
+        (call) =>
+          String((call[1] as RequestInit | undefined)?.body ?? '').match(
+            /"idempotencyKey"\s*:\s*"([^"]+)"/,
+          )?.[1],
+      )
+      expect(keys[0]).not.toBe(keys[1])
+      expect(keys[2]).toBe(keys[0])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('clears the previous coffee’s roast date as soon as another coffee is chosen', async () => {
     const { Wrapper } = seeded()
     render(<NewEspressoShot />, { wrapper: Wrapper })
@@ -498,11 +555,14 @@ describe('NewEspressoShot form', () => {
         coffeeId: COFFEE,
       }),
     })
-    let resolvePrefill: (shot: ReturnType<typeof makeRecentShot>) => void =
-      () => {}
-    const pending = new Promise<ReturnType<typeof makeRecentShot>>((resolve) => {
-      resolvePrefill = resolve
-    })
+    let resolvePrefill: (
+      shot: ReturnType<typeof makeRecentShot>,
+    ) => void = () => {}
+    const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+      (resolve) => {
+        resolvePrefill = resolve
+      },
+    )
     void queryClient.prefetchQuery({
       ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId: COFFEE }),
       queryFn: () => pending,
@@ -574,8 +634,9 @@ describe('NewEspressoShot form', () => {
           coffeeId: COFFEE,
         }),
       })
-      let resolvePrefill: (shot: ReturnType<typeof makeRecentShot>) => void =
-        () => {}
+      let resolvePrefill: (
+        shot: ReturnType<typeof makeRecentShot>,
+      ) => void = () => {}
       const pending = new Promise<ReturnType<typeof makeRecentShot>>(
         (resolve) => {
           resolvePrefill = resolve
@@ -595,9 +656,12 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
         target: { value: GRINDER },
       })
-      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
-        target: { value: ESP_DEVICE },
-      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '18' },
       })
@@ -689,9 +753,12 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
         target: { value: GRINDER },
       })
-      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
-        target: { value: ESP_DEVICE },
-      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '18' },
       })
@@ -738,9 +805,12 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
         target: { value: GRINDER },
       })
-      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
-        target: { value: ESP_DEVICE },
-      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '18' },
       })
@@ -779,8 +849,9 @@ describe('NewEspressoShot form', () => {
         coffeeId: COFFEE,
       }),
     })
-    let resolvePrefill: (shot: ReturnType<typeof makeRecentShot>) => void =
-      () => {}
+    let resolvePrefill: (
+      shot: ReturnType<typeof makeRecentShot>,
+    ) => void = () => {}
     const pending = new Promise<ReturnType<typeof makeRecentShot>>(
       (resolve) => {
         resolvePrefill = resolve
@@ -805,9 +876,12 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
         target: { value: GRINDER },
       })
-      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
-        target: { value: ESP_DEVICE },
-      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '18' },
       })
@@ -874,9 +948,12 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
         target: { value: GRINDER },
       })
-      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
-        target: { value: ESP_DEVICE },
-      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '18' },
       })
@@ -948,9 +1025,12 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
         target: { value: GRINDER },
       })
-      fireEvent.change(screen.getByRole('combobox', { name: 'Brewing Device' }), {
-        target: { value: ESP_DEVICE },
-      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '18' },
       })
@@ -1028,9 +1108,11 @@ describe('NewEspressoShot form', () => {
     const providers = seeded()
     const { Wrapper, fetchSpy } = providers
     let resolveB: (shot: ReturnType<typeof makeRecentShot>) => void = () => {}
-    const pendingB = new Promise<ReturnType<typeof makeRecentShot>>((resolve) => {
-      resolveB = resolve
-    })
+    const pendingB = new Promise<ReturnType<typeof makeRecentShot>>(
+      (resolve) => {
+        resolveB = resolve
+      },
+    )
     fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
       if (isPrefillCall(call) && coffeeIdFromCall(call) === COFFEE_B) {
         return trpcSuccess(await pendingB)

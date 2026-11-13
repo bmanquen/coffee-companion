@@ -19,10 +19,6 @@ export function invalidatePendingAuthFetches() {
   authFetchEpoch += 1
 }
 
-export function adoptCurrentAuthFetchEpoch() {
-  parsedAuthFetchEpoch = authFetchEpoch
-}
-
 export function sessionWriteAllowed() {
   if (parsedAuthFetchEpoch == null) return true
   return parsedAuthFetchEpoch === authFetchEpoch
@@ -32,7 +28,7 @@ export function applySessionAtomSet<T extends { data?: unknown }>(
   set: (value: T) => void,
   value: T,
 ) {
-  if (!sessionWriteAllowed()) return
+  if (value.data != null && !sessionWriteAllowed()) return
   set(value)
 }
 

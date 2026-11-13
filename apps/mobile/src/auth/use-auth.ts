@@ -136,7 +136,6 @@ export function useAuth(): Auth {
       inFlight.current = true
       setError(null)
       setBusy(true)
-      let remoteDone = false
       try {
         try {
           await signOutGoogle()
@@ -144,23 +143,24 @@ export function useAuth(): Auth {
           // Google's client can throw while offline; the server session
           // still has to be revoked.
         }
-        const { error: remoteError } = await authClient.signOut()
-        if (remoteError) throw remoteError
-        remoteDone = true
+        let remoteError: unknown
+        try {
+          remoteError = (await authClient.signOut()).error
+        } catch (caught) {
+          remoteError = caught
+        }
+        if (remoteError) {
+          logAuthFailure('sign-out', {
+            ...serverFailureDetail(remoteError),
+            message: failureMessage(remoteError),
+          })
+          setError({ title: ERROR_SIGN_OUT_FAILED })
+        }
         try {
           await clearSessionStore()
         } finally {
           clearClientSession()
         }
-      } catch (caught) {
-        if (!remoteDone) {
-          logAuthFailure('sign-out', {
-            ...serverFailureDetail(caught),
-            message: failureMessage(caught),
-          })
-          setError({ title: ERROR_SIGN_OUT_FAILED })
-        }
-        throw caught
       } finally {
         inFlight.current = false
         setBusy(false)
