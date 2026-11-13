@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   BackHandler,
   Pressable,
@@ -82,7 +82,10 @@ export function ShotForm({
   const saveInFlight = useRef(false)
   const prefillQueued = useRef(false)
   const draftRef = useRef(draft)
-  draftRef.current = draft
+  useLayoutEffect(() => {
+    // After commit: a discarded render must not leak an uncommitted draft.
+    draftRef.current = draft
+  }, [draft])
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () =>

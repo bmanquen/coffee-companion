@@ -41,6 +41,14 @@ export const ESPRESSO_SHOT_FILTER_DEBOUNCE_MS = 300
 
 const NO_SHOTS: Array<EspressoShotWithRelations> = []
 
+function withoutRemovedShots(
+  items: Array<EspressoShotWithRelations>,
+  removed: Set<string>,
+) {
+  if (removed.size === 0) return items
+  return items.filter((shot) => !removed.has(shot.id))
+}
+
 export type EspressoShotPageFilters = {
   coffeeId?: string
   q?: string
@@ -89,6 +97,8 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const firstPageFetch = useRef(false)
   const extraBoundTo = useRef<EspressoShotCursor | undefined>(undefined)
   const extraReloadQueued = useRef(false)
+  // Stale extra fetches can still include ids removed in this listing.
+  const removedShotIds = useRef(new Set<string>())
   const extraRef = useRef(extra)
   const loadingMoreRef = useRef(loadingMore)
   const filtersRef = useRef(filters)
@@ -105,6 +115,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
     loadMoreSeq.current += 1
     extraBoundTo.current = undefined
     extraReloadQueued.current = false
+    removedShotIds.current = new Set()
     setExtra([])
     setExtraCursor(undefined)
     setLoadMoreError(null)
@@ -169,7 +180,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
           return
         }
         if (replay !== extraReplaySeq.current) return
-        setExtra(items)
+        setExtra(withoutRemovedShots(items, removedShotIds.current))
         setExtraCursor(cursor)
         setExtraReloadFailed(false)
         // No next page left to retry.
@@ -282,7 +293,10 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
         staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
       })
       if (seq !== loadMoreSeq.current) return
-      setExtra((current) => [...current, ...page.items])
+      setExtra((current) => [
+        ...current,
+        ...withoutRemovedShots(page.items, removedShotIds.current),
+      ])
       setExtraCursor(page.nextCursor)
     } catch {
       if (seq !== loadMoreSeq.current) return
@@ -295,6 +309,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const retry = useCallback(() => first.refetch(), [first])
 
   const removeShot = useCallback((shotId: string) => {
+    removedShotIds.current.add(shotId)
     setExtra((current) => current.filter((shot) => shot.id !== shotId))
   }, [])
 
