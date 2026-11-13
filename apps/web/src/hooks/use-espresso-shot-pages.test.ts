@@ -848,4 +848,197 @@ describe('useEspressoShotPages', () => {
       fetchSpy.mockRestore()
     }
   })
+
+  it('refreshes extra-row dialed-in after load more interrupts a same-boundary extra refresh', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extraShot = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const pageThree = makeRecentShot({
+      id: PAGE_THREE_ID,
+      coffeeId: 'c-three',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-three', name: 'Coffee three' }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    const extraBoundary = espressoShotCursor(extraShot)
+    let hangExtraReplay = false
+    let extraReplayReleased = false
+    let resolveExtraReplay: (value: Response) => void = () => {}
+    const extraReplayPending = new Promise<Response>((resolve) => {
+      resolveExtraReplay = resolve
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(extraBoundary)) {
+          return trpcSuccess({
+            items: [{ ...pageThree, isDialedIn: false }],
+            total: first.length + 2,
+            nextCursor: null,
+          })
+        }
+        if (body.includes(boundary)) {
+          if (hangExtraReplay && !extraReplayReleased) return extraReplayPending
+          return trpcSuccess({
+            items: [
+              { ...extraShot, isDialedIn: hangExtraReplay ? false : true },
+            ],
+            total: first.length + 2,
+            nextCursor: extraBoundary,
+          })
+        }
+        return trpcSuccess({
+          items: first,
+          total: first.length + 2,
+          nextCursor: boundary,
+        })
+      },
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 2)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 2,
+        boundary,
+        {},
+        extraBoundary,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+          ?.isDialedIn,
+      ).toBe(true)
+      expect(result.current.hasMore).toBe(true)
+
+      hangExtraReplay = true
+      const callsBeforeInvalidate = fetchSpy.mock.calls.length
+      await act(async () => {
+        void queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.queryFilter(),
+        )
+      })
+      await waitFor(() =>
+        expect(fetchSpy.mock.calls.length).toBeGreaterThan(
+          callsBeforeInvalidate,
+        ),
+      )
+      expect(result.current.loadingMore).toBe(false)
+
+      let loadMoreDone: Promise<void> = Promise.resolve()
+      await act(async () => {
+        loadMoreDone = result.current.loadMore()
+      })
+      expect(result.current.loadingMore).toBe(true)
+
+      await act(async () => {
+        extraReplayReleased = true
+        resolveExtraReplay(
+          trpcSuccess({
+            items: [{ ...extraShot, isDialedIn: false }],
+            total: first.length + 2,
+            nextCursor: extraBoundary,
+          }),
+        )
+        await loadMoreDone
+      })
+
+      await waitFor(() => {
+        expect(
+          result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+            ?.isDialedIn,
+        ).toBe(false)
+        expect(
+          result.current.items.find((shot) => shot.id === PAGE_THREE_ID)
+            ?.isDialedIn,
+        ).toBe(false)
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('shows retry when a same-boundary extra refresh fails after the first page succeeds', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extraShot = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    let failExtraReplay = false
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(boundary)) {
+          if (failExtraReplay) throw new Error('Network request failed')
+          return trpcSuccess({
+            items: [extraShot],
+            total: first.length + 1,
+            nextCursor: null,
+          })
+        }
+        return trpcSuccess({
+          items: first,
+          total: first.length + 1,
+          nextCursor: boundary,
+        })
+      },
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 1,
+        boundary,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(
+        result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+          ?.isDialedIn,
+      ).toBe(true)
+
+      failExtraReplay = true
+      await act(async () => {
+        void queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.queryFilter(),
+        )
+      })
+      await waitFor(() =>
+        expect(result.current.loadError).toBe(ESPRESSO_LOAD_FAILED),
+      )
+      expect(result.current.stale).toBe(true)
+      expect(result.current.loadMoreError).toBeNull()
+      expect(
+        result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+          ?.isDialedIn,
+      ).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })
