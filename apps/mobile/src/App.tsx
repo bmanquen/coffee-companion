@@ -50,7 +50,6 @@ function Shell({ auth, espresso }: { auth: Auth; espresso: EspressoApi }) {
           userId={auth.session.user.id}
           name={auth.session.user.name}
           espresso={espresso}
-          error={auth.error}
           onSignOut={() => {
             void auth.signOut().catch(() => {})
           }}

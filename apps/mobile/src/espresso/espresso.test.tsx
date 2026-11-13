@@ -1830,6 +1830,33 @@ describe('log espresso shot', () => {
     expect(screen.queryByText('This shot was already saved with different settings.')).toBeNull()
   })
 
+  it('reuses the first key when a failed save is edited and then edited back', async () => {
+    const keys: Array<string> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog({ shots: [], total: 0 })),
+      loadPrefill: () => Promise.resolve(seedShot()),
+      create: (input) =>
+        Promise.resolve().then(() => {
+          keys.push(input.idempotencyKey)
+          throw new Error('Network request failed')
+        }),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '22')
+    await press(LOG)
+    await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '18')
+    await press(LOG)
+
+    expect(keys).toHaveLength(3)
+    expect(keys[1]).not.toBe(keys[0])
+    expect(keys[2]).toBe(keys[0])
+  })
+
   it('keeps a newer first page when an older refresh arrives late', async () => {
     const pages: Array<
       (page: { items: Array<ShotRow>; total: number; nextCursor: ShotCursor | null }) => void

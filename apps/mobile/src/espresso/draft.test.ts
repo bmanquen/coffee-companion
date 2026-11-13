@@ -1,5 +1,4 @@
 import {
-  applyCoffeePrefill,
   emptyShotDraft,
   parseShotDraft,
   shotSummary,
@@ -65,7 +64,7 @@ describe('parseShotDraft', () => {
     })
   })
 
-  it('names empty recipe fields', () => {
+  it('names empty settings fields', () => {
     const parsed = parseShotDraft(emptyShotDraft())
     expect(parsed.ok).toBe(false)
     if (parsed.ok) return
@@ -114,92 +113,6 @@ describe('parseShotDraft', () => {
     expect(parsed.ok).toBe(false)
     if (parsed.ok) return
     expect(parsed.errors).toEqual({ roastDate: 'Use YYYY-MM-DD' })
-  })
-})
-
-describe('applyCoffeePrefill', () => {
-  it('carries grinder, device, and roast date from the latest unsealed shot', () => {
-    const next = applyCoffeePrefill(emptyShotDraft(), COFFEE, shot())
-    expect(next).toEqual(
-      expect.objectContaining({
-        coffeeId: COFFEE,
-        grinderId: GRINDER,
-        brewingDeviceId: DEVICE,
-        roastDate: '2026-05-01',
-        dose: '',
-        grindSetting: '',
-      }),
-    )
-  })
-
-  it('does not prefill from a sealed shot', () => {
-    const next = applyCoffeePrefill(
-      emptyShotDraft(),
-      COFFEE,
-      shot({ sealed: true, grinderId: null, brewingDeviceId: null }),
-    )
-    expect(next.grinderId).toBe('')
-    expect(next.brewingDeviceId).toBe('')
-  })
-
-  it('clears the roast date when the next coffee has no unsealed shot', () => {
-    const other = '00000000-0000-4000-8000-000000000009'
-    const draft = {
-      ...emptyShotDraft(),
-      coffeeId: COFFEE,
-      roastDate: '2026-05-01',
-    }
-    const next = applyCoffeePrefill(draft, other, null)
-    expect(next.coffeeId).toBe(other)
-    expect(next.roastDate).toBe('')
-  })
-
-  it('keeps grinder, device, and roast date the user already chose', () => {
-    const draft = {
-      ...emptyShotDraft(),
-      coffeeId: COFFEE,
-      grinderId: 'keep-grinder',
-      brewingDeviceId: 'keep-device',
-      roastDate: '2026-06-15',
-    }
-    const next = applyCoffeePrefill(draft, COFFEE, shot(), {
-      grinderId: true,
-      brewingDeviceId: true,
-      roastDate: true,
-    })
-    expect(next.grinderId).toBe('keep-grinder')
-    expect(next.brewingDeviceId).toBe('keep-device')
-    expect(next.roastDate).toBe('2026-06-15')
-  })
-
-  it('applies each present field independently', () => {
-    const draft = {
-      ...emptyShotDraft(),
-      grinderId: 'typed-grinder',
-      brewingDeviceId: 'typed-device',
-      roastDate: '2026-06-15',
-    }
-    const next = applyCoffeePrefill(draft, COFFEE, shot(), { grinderId: true })
-    expect(next.grinderId).toBe('typed-grinder')
-    expect(next.brewingDeviceId).toBe(DEVICE)
-    expect(next.roastDate).toBe('2026-05-01')
-  })
-
-  it('falls back only for a field the latest shot does not have', () => {
-    const draft = {
-      ...emptyShotDraft(),
-      grinderId: 'typed-grinder',
-      brewingDeviceId: '',
-      roastDate: '2026-06-15',
-    }
-    const next = applyCoffeePrefill(
-      draft,
-      COFFEE,
-      shot({ grinderId: null, roastDate: null }),
-    )
-    expect(next.grinderId).toBe('typed-grinder')
-    expect(next.brewingDeviceId).toBe(DEVICE)
-    expect(next.roastDate).toBe('')
   })
 })
 

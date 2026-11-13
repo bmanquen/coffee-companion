@@ -35,7 +35,6 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const DECIMAL_PATTERN = /^\d+(\.\d+)?$/
 const WHOLE_NUMBER_PATTERN = /^\d+$/
-const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 export function decimalFieldText(value: string): string {
   return value.replace(/,/g, '.')
@@ -92,10 +91,7 @@ export function parseShotDraft(draft: ShotDraft): ParseResult {
 
   let roastDate: string | null = null
   if (draft.roastDate.length > 0) {
-    if (
-      !CALENDAR_DATE_PATTERN.test(draft.roastDate) ||
-      !isCalendarDate(draft.roastDate)
-    ) {
+    if (!isCalendarDate(draft.roastDate)) {
       errors.roastDate = USE_CALENDAR_DATE
     } else {
       roastDate = draft.roastDate
@@ -119,31 +115,6 @@ export function parseShotDraft(draft: ShotDraft): ParseResult {
       grindSetting: draft.grindSetting,
       notes: draft.notes.length > 0 ? draft.notes : null,
     },
-  }
-}
-
-export type PrefillKeep = {
-  grinderId?: boolean
-  brewingDeviceId?: boolean
-  roastDate?: boolean
-}
-
-export function applyCoffeePrefill(
-  draft: ShotDraft,
-  coffeeId: string,
-  latest: ShotRow | null,
-  keep: PrefillKeep = {},
-): ShotDraft {
-  return {
-    ...draft,
-    coffeeId,
-    grinderId: keep.grinderId
-      ? draft.grinderId
-      : (latest?.grinderId ?? draft.grinderId),
-    brewingDeviceId: keep.brewingDeviceId
-      ? draft.brewingDeviceId
-      : (latest?.brewingDeviceId ?? draft.brewingDeviceId),
-    roastDate: keep.roastDate ? draft.roastDate : (latest?.roastDate ?? ''),
   }
 }
 

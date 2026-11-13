@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { applyCoffeePrefill } from '@coffee-companion/brew-display'
 import {
   BackHandler,
   Pressable,
@@ -34,13 +35,13 @@ import {
   TRY_AGAIN,
 } from './copy'
 import {
-  applyCoffeePrefill,
   decimalFieldText,
   emptyShotDraft,
   parseShotDraft,
 } from './draft'
 import { newIdempotencyKey } from './idempotency'
-import type { FieldErrors, PrefillKeep, ShotDraft } from './draft'
+import type { PrefillKeep } from '@coffee-companion/brew-display'
+import type { FieldErrors, ShotDraft } from './draft'
 import type { EspressoCatalog, ShotCreate, ShotRow } from './types'
 
 export function consumeHardwareBack(busy: boolean, onBack: () => void) {
@@ -73,8 +74,7 @@ export function ShotForm({
   const [draft, setDraft] = useState<ShotDraft>(emptyShotDraft)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [prefillError, setPrefillError] = useState(false)
-  const idempotencyKey = useRef(newIdempotencyKey())
-  const lastSubmitted = useRef<string | null>(null)
+  const idempotencyKeys = useRef(new Map<string, string>())
   const prefillSeq = useRef(0)
   const prefillCoffeeId = useRef('')
   const keepPrefill = useRef<PrefillKeep>({})
@@ -125,6 +125,7 @@ export function ShotForm({
       coffeeId,
       latest,
       keepPrefill.current,
+      '',
     )
     const filled =
       keepPrefill.current.brewingDeviceId ||
@@ -331,16 +332,14 @@ export function ShotForm({
             return
           }
           const fingerprint = draftFingerprint(parsed.value)
-          if (
-            lastSubmitted.current != null &&
-            lastSubmitted.current !== fingerprint
-          ) {
-            idempotencyKey.current = newIdempotencyKey()
+          let idempotencyKey = idempotencyKeys.current.get(fingerprint)
+          if (!idempotencyKey) {
+            idempotencyKey = newIdempotencyKey()
+            idempotencyKeys.current.set(fingerprint, idempotencyKey)
           }
-          lastSubmitted.current = fingerprint
           saveInFlight.current = true
           saveGen.current += 1
-          onSubmit({ ...parsed.value, idempotencyKey: idempotencyKey.current })
+          onSubmit({ ...parsed.value, idempotencyKey })
         }}
       >
         <Text>{busy ? LOGGING : LOG}</Text>

@@ -35,14 +35,7 @@ export type BrewFeedFilter<T> = {
   onChange: (value: T) => void
 }
 
-// The dashboard's reference-only per-method Brew feed. Given the rows already
-// loaded for that method, it renders a glanceable, paginated feed of
-// cards with the dialed-in Brew highlighted, a "dialed-in only" toggle and a
-// by-coffee filter, and a per-method log button. It carries no edit/delete/
-// dialed-in controls — managing Brews stays on the Brews page. Filtering is
-// client-side over `brews` unless the parent owns the coffee/dialed-in state
-// (espresso pages the server). Pagination is client-side and keeps its page
-// when more rows append.
+// Filters run client-side unless the parent owns them (espresso filters on the server).
 export function BrewFeed<T extends BrewRow>({
   title,
   brews,

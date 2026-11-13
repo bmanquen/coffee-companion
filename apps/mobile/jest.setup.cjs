@@ -73,3 +73,6 @@ jest.mock('superjson', () => ({
   __esModule: true,
   default: {},
 }))
+
+// React Query batches notifications on setTimeout(0); flush them inside act.
+require('@tanstack/react-query').notifyManager.setScheduler(queueMicrotask)

@@ -1,4 +1,5 @@
 import { insertEspressoShotSchema } from '@coffee-companion/api/db/zod'
+import { applyCoffeePrefill } from '@coffee-companion/brew-display'
 import {
   ESPRESSO_DEVICE_TYPE,
   isEspressoDevice,
@@ -12,6 +13,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
+import type { PrefillKeep } from '@coffee-companion/brew-display'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
 import { brewsLogLocation } from '@/components/brews/methods'
 import { FormBanner } from '@/components/form/form-banner'
@@ -45,12 +47,6 @@ export const Route = createFileRoute('/_authenticated/espresso/new')({
 const PREFILL_FAILED =
   "We couldn't load this coffee's last shot. Enter it yourself, or try again."
 
-type PrefillKeep = {
-  grinderId?: boolean
-  brewingDeviceId?: boolean
-  roastDate?: boolean
-}
-
 function draftFingerprint(value: InsertEspressoShot) {
   return JSON.stringify(value)
 }
@@ -59,8 +55,7 @@ export function NewEspressoShot() {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const idempotencyKey = useRef(createIdempotencyKey())
-  const lastSubmitted = useRef<string | null>(null)
+  const idempotencyKeys = useRef(new Map<string, string>())
   const prefillSeq = useRef(0)
   const prefillCoffeeId = useRef('')
   const keepPrefill = useRef<PrefillKeep>({})
@@ -95,8 +90,7 @@ export function NewEspressoShot() {
         queryClient.invalidateQueries(
           trpc.espressoShot.getLatestUnsealed.queryFilter(),
         )
-        idempotencyKey.current = createIdempotencyKey()
-        lastSubmitted.current = null
+        idempotencyKeys.current.clear()
         track('brew_logged', { method: 'espresso' })
         navigate(brewsLogLocation('espresso'))
       },
@@ -122,17 +116,15 @@ export function NewEspressoShot() {
     },
     onSubmit: async ({ value }) => {
       const fingerprint = draftFingerprint(value)
-      if (
-        lastSubmitted.current != null &&
-        lastSubmitted.current !== fingerprint
-      ) {
-        idempotencyKey.current = createIdempotencyKey()
+      let idempotencyKey = idempotencyKeys.current.get(fingerprint)
+      if (!idempotencyKey) {
+        idempotencyKey = createIdempotencyKey()
+        idempotencyKeys.current.set(fingerprint, idempotencyKey)
       }
-      lastSubmitted.current = fingerprint
       saveGen.current += 1
       await submitFormMutation(form, createShot.mutateAsync, {
         ...value,
-        idempotencyKey: idempotencyKey.current,
+        idempotencyKey,
       })
     },
   })
@@ -152,22 +144,31 @@ export function NewEspressoShot() {
     }
     if (startedSaveGen !== saveGen.current) return
     const keep = keepPrefill.current
+    const values = form.state.values
+    const next = applyCoffeePrefill(
+      {
+        coffeeId,
+        grinderId: values.grinderId,
+        brewingDeviceId: values.brewingDeviceId,
+        roastDate: values.roastDate ?? null,
+      },
+      coffeeId,
+      latest,
+      keep,
+      null,
+    )
+    const device = brewingDevices.find(
+      (item) => item.id === next.brewingDeviceId,
+    )
     applyingPrefill.current = true
-    if (latest?.grinderId && !keep.grinderId) {
-      form.setFieldValue('grinderId', latest.grinderId)
-    }
+    if (!keep.grinderId) form.setFieldValue('grinderId', next.grinderId)
     if (!keep.brewingDeviceId) {
-      const device = brewingDevices.find(
-        (item) => item.id === latest?.brewingDeviceId,
-      )
       form.setFieldValue(
         'brewingDeviceId',
         device && isEspressoDevice(device) ? device.id : '',
       )
     }
-    if (!keep.roastDate) {
-      form.setFieldValue('roastDate', latest?.roastDate ?? null)
-    }
+    if (!keep.roastDate) form.setFieldValue('roastDate', next.roastDate)
     applyingPrefill.current = false
   }
 
