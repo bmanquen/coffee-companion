@@ -780,4 +780,72 @@ describe('useEspressoShotPages', () => {
       fetchSpy.mockRestore()
     }
   })
+
+  it('clears load-more try-again after a same-boundary refresh reaches the last extra page', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extraShot = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const boundary = espressoShotCursor(first[first.length - 1])
+    const extraBoundary = espressoShotCursor(extraShot)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input, init) => {
+        const body = await requestText(input, init)
+        if (body.includes(extraBoundary)) {
+          throw new Error('Network request failed')
+        }
+        if (body.includes(boundary)) {
+          return trpcSuccess({
+            items: [extraShot],
+            total: first.length + 1,
+            nextCursor: null,
+          })
+        }
+        return trpcSuccess({
+          items: first,
+          total: first.length + 1,
+          nextCursor: boundary,
+        })
+      },
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 2)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        [extraShot],
+        first.length + 2,
+        boundary,
+        {},
+        extraBoundary,
+      )
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(result.current.hasMore).toBe(true)
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(result.current.loadMoreError).toBe(ESPRESSO_LOAD_MORE_FAILED)
+
+      await act(async () => {
+        void queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.queryFilter(),
+        )
+      })
+      await waitFor(() => expect(result.current.hasMore).toBe(false))
+      expect(result.current.loadMoreError).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })
