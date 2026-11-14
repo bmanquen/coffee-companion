@@ -21,15 +21,17 @@ export function wireReactNativeQueryLifecycle() {
     })
     return () => sub.remove()
   })
-  onlineManager.setEventListener((setOnline) => {
-    const sub = Network.addNetworkStateListener((state) => {
-      setOnline(state.isConnected === true)
-    })
-    void Network.getNetworkStateAsync().then((state) => {
-      setOnline(state.isConnected === true)
-    })
-    return () => sub.remove()
+  onlineManager.setEventListener(subscribeNetworkOnline)
+}
+
+export function subscribeNetworkOnline(setOnline: (online: boolean) => void) {
+  const sub = Network.addNetworkStateListener((state) => {
+    setOnline(state.isConnected === true)
   })
+  void Network.getNetworkStateAsync().then((state) => {
+    setOnline(state.isConnected === true)
+  })
+  return () => sub.remove()
 }
 
 const isTest = process.env.NODE_ENV === 'test'
