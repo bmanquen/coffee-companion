@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -853,7 +854,22 @@ describe('EspressoBrewsSection', () => {
     let settleLoadMore = () => {}
     const pendingLoadMore = new Promise<Response>((resolve) => {
       settleLoadMore = () =>
-        resolve(trpcSuccess({ items: [], total: 0, nextCursor: null }))
+        resolve(
+          trpcSuccess({
+            items: [
+              makeRecentShot({
+                id: espressoShotFixtureId(999),
+                coffeeId: 'c-stale',
+                coffee: makeRecentCoffee({
+                  id: 'c-stale',
+                  name: 'Stale extra',
+                }),
+              }),
+            ],
+            total: ESPRESSO_SHOT_PAGE_SIZE + 1,
+            nextCursor: null,
+          }),
+        )
     })
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
@@ -931,10 +947,20 @@ describe('EspressoBrewsSection', () => {
         { timeout: FILTER_SETTLE_TIMEOUT_MS },
       )
       settleLoadMore()
+      await act(async () => {
+        await pendingLoadMore
+      })
+      await waitFor(() => {
+        expect(
+          within(screen.getByRole('table')).getByText('Colombia Huila'),
+        ).toBeTruthy()
+        expect(
+          screen.getByRole('button', { name: 'Load more' }),
+        ).toHaveProperty('disabled', false)
+      })
       expect(
-        within(screen.getByRole('table')).getByText('Colombia Huila'),
-      ).toBeTruthy()
-      expect(screen.getByRole('button', { name: 'Load more' })).toBeTruthy()
+        within(screen.getByRole('table')).queryByText('Stale extra'),
+      ).toBeNull()
     } finally {
       settleLoadMore()
       fetchSpy.mockRestore()
