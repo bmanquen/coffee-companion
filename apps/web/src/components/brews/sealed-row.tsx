@@ -1,3 +1,4 @@
+import { SEALED_SHOT } from '@coffee-companion/brew-display'
 import { Link } from '@tanstack/react-router'
 import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -10,7 +11,7 @@ export function SealedRowNotice() {
     <div className="flex w-full items-center justify-between gap-3 text-sm">
       <span className="flex items-center gap-2">
         <Lock className="h-3.5 w-3.5 shrink-0" />
-        Sealed — Subscribe to Pro to read this brew
+        {SEALED_SHOT}
       </span>
       {/* An anchor wearing a button: navigation, so it still opens in a new tab
           and shows its destination on hover. */}

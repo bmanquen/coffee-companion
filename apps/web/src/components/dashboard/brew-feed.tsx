@@ -6,10 +6,11 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { LinkProps } from '@tanstack/react-router'
-import type { ColumnDef, Row } from '@tanstack/react-table'
+import type { ColumnDef, PaginationState, Row } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
+import type { CoffeeFilterOption } from '@/components/coffee-filter'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { SealedRowNotice, sealedRowClass } from '@/components/brews/sealed-row'
 import { CoffeeFilter } from '@/components/coffee-filter'
@@ -28,13 +29,12 @@ type BrewRow = {
   sealed: boolean
 }
 
-// The dashboard's reference-only per-method Brew feed. Given a method's full
-// brew history (from its getAll), it renders a glanceable, paginated feed of
-// cards with the dialed-in Brew highlighted, a "dialed-in only" toggle and a
-// by-coffee filter (both applied across the whole history before pagination),
-// and a per-method log button. It carries no edit/delete/dialed-in controls —
-// managing Brews stays on the Brews page. All filtering and pagination happen
-// client-side over `brews`.
+export type BrewFeedFilter<T> = {
+  value: T
+  onChange: (value: T) => void
+}
+
+// Filters run client-side unless the parent owns them (espresso filters on the server).
 export function BrewFeed<T extends BrewRow>({
   title,
   brews,
@@ -45,6 +45,12 @@ export function BrewFeed<T extends BrewRow>({
   emptyMessage,
   emptyLinkLabel,
   pageSize = 5,
+  coffeeOptions: coffeeOptionsProp,
+  coffeeFilter,
+  dialedInFilter,
+  banner,
+  stale,
+  status,
 }: {
   title: string
   brews: Array<T>
@@ -56,16 +62,30 @@ export function BrewFeed<T extends BrewRow>({
   emptyMessage: string
   emptyLinkLabel: string
   pageSize?: number
+  coffeeOptions?: Array<CoffeeFilterOption>
+  coffeeFilter?: BrewFeedFilter<string>
+  dialedInFilter?: BrewFeedFilter<boolean>
+  banner?: ReactNode
+  stale?: boolean
+  status?: ReactNode
 }) {
   // TanStack Table's instance is a stable, mutable object the React Compiler
   // would otherwise over-memoize; opt this component out (mirrors DataTable).
   'use no memo'
-  const [coffeeId, setCoffeeId] = useState('')
-  const [dialedInOnly, setDialedInOnly] = useState(false)
+  const [internalCoffeeId, setInternalCoffeeId] = useState('')
+  const [internalDialedInOnly, setInternalDialedInOnly] = useState(false)
+  const coffeeId = coffeeFilter?.value ?? internalCoffeeId
+  const setCoffeeId = coffeeFilter?.onChange ?? setInternalCoffeeId
+  const dialedInOnly = dialedInFilter?.value ?? internalDialedInOnly
+  const setDialedInOnly = dialedInFilter?.onChange ?? setInternalDialedInOnly
   const expansion = useAccordionExpansion()
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize,
+  })
 
   // Unique coffees that actually appear in this method's history, sorted by name.
-  const coffeeOptions = useMemo(
+  const derivedCoffeeOptions = useMemo(
     () =>
       Array.from(
         new Map(brews.map((b) => [b.coffeeId, b.coffee.name])).entries(),
@@ -74,6 +94,11 @@ export function BrewFeed<T extends BrewRow>({
         .sort((a, b) => a.label.localeCompare(b.label)),
     [brews],
   )
+  const coffeeOptions = coffeeOptionsProp ?? derivedCoffeeOptions
+  const filterCoffeeOnClient = coffeeFilter == null
+  const filterDialedInOnClient = dialedInFilter == null
+  const filtering = Boolean(coffeeId || dialedInOnly)
+  const showEmpty = status == null && brews.length === 0 && !filtering
 
   // Memoized so the filtered array keeps a stable reference between renders —
   // a fresh array each render trips the table's autoReset* state and loops.
@@ -81,25 +106,51 @@ export function BrewFeed<T extends BrewRow>({
     () =>
       brews.filter(
         (b) =>
-          (!coffeeId || b.coffeeId === coffeeId) &&
-          (!dialedInOnly || b.isDialedIn),
+          (!filterCoffeeOnClient || !coffeeId || b.coffeeId === coffeeId) &&
+          (!filterDialedInOnClient || !dialedInOnly || b.isDialedIn),
       ),
-    [brews, coffeeId, dialedInOnly],
+    [
+      brews,
+      coffeeId,
+      dialedInOnly,
+      filterCoffeeOnClient,
+      filterDialedInOnClient,
+    ],
   )
+
+  useEffect(() => {
+    setPagination((current) =>
+      current.pageIndex === 0 ? current : { ...current, pageIndex: 0 },
+    )
+  }, [coffeeId, dialedInOnly])
+
+  useEffect(() => {
+    setPagination((current) => {
+      const pageCount = Math.max(
+        1,
+        Math.ceil(visibleBrews.length / current.pageSize),
+      )
+      const pageIndex = Math.min(current.pageIndex, pageCount - 1)
+      return pageIndex === current.pageIndex
+        ? current
+        : { ...current, pageIndex }
+    })
+  }, [visibleBrews.length])
 
   const table = useReactTable({
     data: visibleBrews,
     columns,
     // Accordion: opening one brew collapses the others (see grilling decision).
-    state: { expanded: expansion.expanded },
+    state: { expanded: expansion.expanded, pagination },
     onExpandedChange: expansion.onExpandedChange,
+    onPaginationChange: setPagination,
+    autoResetPageIndex: false,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     // A Sealed Brew has no settings to reveal.
     getRowCanExpand: (row) => !row.original.sealed,
     enableSorting: false,
-    initialState: { pagination: { pageSize } },
   })
 
   return (
@@ -113,12 +164,15 @@ export function BrewFeed<T extends BrewRow>({
           </Button>
         </Link>
       </div>
-      {brews.length === 0 ? (
-        <BrewsEmptyState
-          message={emptyMessage}
-          to={newTo}
-          linkLabel={emptyLinkLabel}
-        />
+      {showEmpty ? (
+        <>
+          {banner}
+          <BrewsEmptyState
+            message={emptyMessage}
+            to={newTo}
+            linkLabel={emptyLinkLabel}
+          />
+        </>
       ) : (
         <>
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
@@ -131,26 +185,34 @@ export function BrewFeed<T extends BrewRow>({
               type="button"
               variant={dialedInOnly ? 'default' : 'outline'}
               aria-pressed={dialedInOnly}
-              onClick={() => setDialedInOnly((v) => !v)}
+              onClick={() => setDialedInOnly(!dialedInOnly)}
             >
               Dialed-in only
             </Button>
           </div>
-          <DataTable
-            table={table}
-            renderSubComponent={renderDetails}
-            replaceRow={(row) =>
-              row.original.sealed ? <SealedRowNotice /> : null
-            }
-            paginated
-            rowClassName={(row) =>
-              row.original.sealed
-                ? sealedRowClass
-                : row.original.isDialedIn
-                  ? 'bg-primary/10 hover:bg-primary/15'
-                  : undefined
-            }
-          />
+          {banner}
+          {status ?? (
+            <div
+              aria-busy={stale || undefined}
+              className={stale ? 'opacity-60' : undefined}
+            >
+              <DataTable
+                table={table}
+                renderSubComponent={renderDetails}
+                replaceRow={(row) =>
+                  row.original.sealed ? <SealedRowNotice /> : null
+                }
+                paginated
+                rowClassName={(row) =>
+                  row.original.sealed
+                    ? sealedRowClass
+                    : row.original.isDialedIn
+                      ? 'bg-primary/10 hover:bg-primary/15'
+                      : undefined
+                }
+              />
+            </div>
+          )}
         </>
       )}
     </Card>

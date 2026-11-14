@@ -62,6 +62,19 @@ function downloadJson(filename: string, data: unknown) {
   URL.revokeObjectURL(url)
 }
 
+export async function finishAccountDeletion(
+  signOut: () => Promise<void>,
+  queryClient: { clear: () => void },
+  goHome: () => void,
+) {
+  try {
+    await signOut()
+  } catch {
+    queryClient.clear()
+    goHome()
+  }
+}
+
 function AccountContainer() {
   const { session } = Route.useRouteContext()
   const trpc = useTRPC()
@@ -81,11 +94,9 @@ function AccountContainer() {
 
   const onDelete = async () => {
     await deleteAccount.mutateAsync()
-    try {
-      await signOut()
-    } catch {
+    await finishAccountDeletion(signOut, queryClient, () => {
       navigate({ to: '/' })
-    }
+    })
   }
 
   return (

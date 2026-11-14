@@ -162,11 +162,11 @@ const requiredInt = () =>
         ctx.addIssue({ code: 'custom', message: 'Enter a number' })
         return
       }
-      if (typeof value === 'number' && !Number.isInteger(value)) {
+      if (typeof value === 'number' && (!Number.isInteger(value) || value < 0)) {
         ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
         return
       }
-      if (typeof value === 'string' && !/^-?\d+$/.test(value)) {
+      if (typeof value === 'string' && !/^\d+$/.test(value)) {
         ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
       }
     })
@@ -176,11 +176,17 @@ const requiredGrindSetting = () => z.string().min(1, 'Enter a grind setting')
 
 const roastDate = () => calendarDateSchema.nullable().optional()
 
+export function uuidInput(message?: string) {
+  return (message === undefined ? z.uuid() : z.uuid(message)).transform((id) =>
+    id.toLowerCase(),
+  )
+}
+
 // Espresso Shots
 export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
-  coffeeId: () => z.uuid('Select a coffee'),
-  grinderId: () => z.uuid('Select a grinder'),
-  brewingDeviceId: () => z.uuid('Select a brewing device'),
+  coffeeId: () => uuidInput('Select a coffee'),
+  grinderId: () => uuidInput('Select a grinder'),
+  brewingDeviceId: () => uuidInput('Select a brewing device'),
 })
   .omit({
     id: true,

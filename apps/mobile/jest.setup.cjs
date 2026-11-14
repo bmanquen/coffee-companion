@@ -1,3 +1,7 @@
+jest.mock('expo-crypto', () => ({
+  randomUUID: () => globalThis.crypto.randomUUID(),
+}))
+
 jest.mock('expo-secure-store', () => ({
   getItem: jest.fn(() => null),
   setItem: jest.fn(),
@@ -33,3 +37,42 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
 jest.mock('@better-auth/expo/client', () => ({
   expoClient: () => ({}),
 }))
+
+jest.mock('@trpc/client', () => {
+  const query = (value) => ({
+    query: () => Promise.resolve(value),
+    mutate: () => Promise.resolve(value),
+  })
+  const emptyPage = { items: [], total: 0, nextCursor: null }
+  return {
+    createTRPCClient: () => ({
+      coffee: { getAll: query([]) },
+      grinder: { list: query([]) },
+      brewingDevice: { list: query([]) },
+      espressoShot: {
+        getAll: query([]),
+        getRecent: query(emptyPage),
+        getLatestUnsealed: query(null),
+        create: query({}),
+      },
+    }),
+    httpBatchLink: () => ({}),
+  }
+})
+
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: jest.fn(async () => ({
+    isConnected: true,
+    isInternetReachable: true,
+    type: 'WIFI',
+  })),
+  addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
+}))
+
+jest.mock('superjson', () => ({
+  __esModule: true,
+  default: {},
+}))
+
+// React Query batches notifications on setTimeout(0); flush them inside act.
+require('@tanstack/react-query').notifyManager.setScheduler(queueMicrotask)

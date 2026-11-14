@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react-native'
 import { App } from './App'
 import { SIGN_OUT } from './auth/copy'
+import { SHOT_LIST_TEST_ID } from './espresso/copy'
 import { writeHostTreeArtifacts } from './test/host-tree'
 import {
   SIGN_OUT_TEST_ID,
@@ -14,7 +15,11 @@ import type { Auth } from './auth/use-auth'
 
 const signedIn: Auth = {
   session: {
-    user: { name: 'Ada Lovelace', email: 'ada@example.com' },
+    user: {
+      id: 'user-ada',
+      name: 'Ada Lovelace',
+      email: 'ada@example.com',
+    },
   },
   loading: false,
   busy: false,
@@ -43,7 +48,8 @@ describe('App welcome screen', () => {
     expect(screen.getByText('Ada Lovelace')).toBeTruthy()
     expect(screen.getByRole('button', { name: SIGN_OUT })).toBeTruthy()
     expect(screen.getByTestId(SIGN_OUT_TEST_ID)).toHaveTextContent(SIGN_OUT)
+    expect(screen.getByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
 
-    writeHostTreeArtifacts(view.toJSON())
+    writeHostTreeArtifacts(view)
   })
 })

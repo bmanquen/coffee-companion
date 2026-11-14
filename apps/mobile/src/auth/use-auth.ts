@@ -7,6 +7,7 @@ import {
   ERROR_SIGN_IN_CONFLICT_TITLE,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
+  ERROR_SIGN_OUT_FAILED,
 } from './copy'
 import {
   PlayServicesMissing,
@@ -28,7 +29,7 @@ import {
 export type AuthMode = 'sign-in' | 'sign-up'
 
 export type AuthSession = {
-  user: { name: string; email: string }
+  user: { id: string; name: string; email: string }
 }
 
 export type AuthError = {
@@ -131,6 +132,10 @@ export function useAuth(): Auth {
         }
       }),
     signOut: async () => {
+      if (inFlight.current) return
+      inFlight.current = true
+      setError(null)
+      setBusy(true)
       try {
         try {
           await signOutGoogle()
@@ -138,13 +143,27 @@ export function useAuth(): Auth {
           // Google's client can throw while offline; the server session
           // still has to be revoked.
         }
-        await authClient.signOut()
-      } finally {
+        let remoteError: unknown
+        try {
+          remoteError = (await authClient.signOut()).error
+        } catch (caught) {
+          remoteError = caught
+        }
+        if (remoteError) {
+          logAuthFailure('sign-out', {
+            ...serverFailureDetail(remoteError),
+            message: failureMessage(remoteError),
+          })
+          setError({ title: ERROR_SIGN_OUT_FAILED })
+        }
         try {
           await clearSessionStore()
         } finally {
           clearClientSession()
         }
+      } finally {
+        inFlight.current = false
+        setBusy(false)
       }
     },
   }

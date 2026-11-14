@@ -1,3 +1,4 @@
+import { coffeeOptionLabel } from '@coffee-companion/brew-display'
 import { createColumnHelper } from '@tanstack/react-table'
 import { Crosshair } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -106,22 +107,28 @@ export function brewEnvironmentExtra(brewEnvironment: string | null) {
 // name with a dialed-in crosshair icon. (The dialed-in cards use a plain coffee
 // column, since every row there is dialed in.)
 export function dialedInCoffeeColumn<
-  T extends { isDialedIn: boolean; coffee: { name: string } },
+  T extends {
+    isDialedIn: boolean
+    coffee: { name: string; roaster?: { name: string | null } | null }
+  },
 >() {
-  return createColumnHelper<T>().accessor((row) => row.coffee.name, {
-    id: 'coffee',
-    header: 'Coffee',
-    cell: (info) => (
-      <span className="flex items-center gap-1.5">
-        {info.row.original.isDialedIn && (
-          <Crosshair
-            aria-label="Dialed in"
-            className="h-4 w-4 shrink-0 text-primary"
-          />
-        )}
-        {info.getValue()}
-      </span>
-    ),
-    meta: { cardTitle: true },
-  })
+  return createColumnHelper<T>().accessor(
+    (row) => coffeeOptionLabel(row.coffee),
+    {
+      id: 'coffee',
+      header: 'Coffee',
+      cell: (info) => (
+        <span className="flex items-center gap-1.5">
+          {info.row.original.isDialedIn && (
+            <Crosshair
+              aria-label="Dialed in"
+              className="h-4 w-4 shrink-0 text-primary"
+            />
+          )}
+          {info.getValue()}
+        </span>
+      ),
+      meta: { cardTitle: true },
+    },
+  )
 }

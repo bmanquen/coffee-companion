@@ -1,0 +1,119 @@
+appId: dev.offbyonelabs.coffeecompanion
+---
+- launchApp:
+    clearState: true
+# clearState cold-starts the Expo launcher; openLink only after that screen can take the intent.
+- extendedWaitUntil:
+    visible: "Fetch development servers"
+    timeout: 30000
+- openLink:
+    link: ${EXPO_DEV_CLIENT_URL}
+    browser: false
+- runFlow:
+    label: Re-open Metro deep link if still on the Expo launcher
+    when:
+      visible: "Fetch development servers"
+    commands:
+      - openLink:
+          link: ${EXPO_DEV_CLIENT_URL}
+          browser: false
+- extendedWaitUntil:
+    notVisible: "Fetch development servers"
+    timeout: 30000
+- evalScript: ${output.signInDeadlineMs = Date.now() + 60000}
+- repeat:
+    while:
+      notVisible:
+        id: sign-in-screen
+      true: ${Date.now() < output.signInDeadlineMs}
+    commands:
+      - evalScript: ${output.signInWaitTick = Date.now()}
+      - runFlow:
+          label: Dismiss first-run Continue sheet
+          when:
+            visible: "This is the developer menu.*"
+          commands:
+            - tapOn:
+                text: "Continue"
+      - runFlow:
+          label: Dismiss regular developer menu
+          when:
+            visible: "Runtime version.*"
+          commands:
+            - tapOn:
+                text: "Close"
+                optional: true
+            - runFlow:
+                when:
+                  visible: "Go home"
+                commands:
+                  - pressKey: back
+      - assertVisible:
+          id: sign-in-screen
+          optional: true
+- assertVisible:
+    id: sign-in-screen
+- tapOn:
+    id: e2e-sign-in
+- extendedWaitUntil:
+    visible:
+      id: welcome-screen
+    timeout: 60000
+- assertVisible:
+    id: shot-list
+- assertVisible:
+    id: log-shot
+    enabled: true
+- tapOn:
+    id: log-shot
+- assertVisible:
+    id: shot-form
+- tapOn:
+    id: select-trigger-coffee
+- assertVisible:
+    id: select-sheet-coffee
+- tapOn:
+    id: select-option-00000000-0000-4000-8000-000000000001
+- extendedWaitUntil:
+    visible:
+      id: select-value-grinder
+      text: "Niche Zero"
+    timeout: 15000
+- copyTextFrom:
+    id: select-value-grinder
+- assertTrue: ${maestro.copiedText == "Niche Zero"}
+- extendedWaitUntil:
+    visible:
+      id: select-value-brewing-device
+      text: "Linea Mini"
+    timeout: 15000
+- copyTextFrom:
+    id: select-value-brewing-device
+- assertTrue: ${maestro.copiedText == "Linea Mini"}
+- tapOn:
+    id: field-dose-g
+- inputText: "18"
+- tapOn:
+    id: field-yield-g
+- inputText: "36"
+- tapOn:
+    id: field-time-s
+- inputText: "30"
+- tapOn:
+    id: field-grind-setting
+- inputText: "7"
+- hideKeyboard
+- tapOn:
+    id: shot-form-log
+- extendedWaitUntil:
+    visible:
+      id: shot-summary
+      text: "Grind 7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"
+    timeout: 30000
+- copyTextFrom:
+    id: shot-summary
+    index: 0
+- assertTrue: ${maestro.copiedText == "Grind 7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"}
+- assertVisible:
+    id: shot-list
+- takeScreenshot: espresso-logged

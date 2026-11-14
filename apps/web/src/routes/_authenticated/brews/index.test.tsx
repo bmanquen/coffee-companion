@@ -1,10 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Brews } from './index'
+import { Brews, Route } from './index'
 import type * as ReactRouter from '@tanstack/react-router'
 import type { ReactNode } from 'react'
+import { seedCoffees, seedEspressoShotPage } from '@/test/espresso-shots'
+import {
+  makeAeropressBrew,
+  makeCoffee,
+  makeRecentShot,
+} from '@/test/factories'
 import { createTestProviders } from '@/test/providers'
-import { makeAeropressBrew, makeRecentShot } from '@/test/factories'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
@@ -55,10 +60,10 @@ vi.mock('@/components/ui/command', () => ({
 
 function seeded() {
   const providers = createTestProviders()
-  providers.queryClient.setQueryData(
-    providers.trpc.espressoShot.getAll.queryKey(),
-    [makeRecentShot()],
-  )
+  seedEspressoShotPage(providers.queryClient, providers.trpc, [makeRecentShot()])
+  seedCoffees(providers.queryClient, providers.trpc, [
+    makeCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+  ])
   providers.queryClient.setQueryData(
     providers.trpc.aeropressBrew.getAll.queryKey(),
     [makeAeropressBrew()],
@@ -104,5 +109,34 @@ describe('Brews method select', () => {
 
     expect(screen.getByText('Log Brew')).toBeTruthy()
     expect(screen.queryByText('Log Shot')).toBeNull()
+  })
+})
+
+describe('Brews loader', () => {
+  it('keeps loading the route when coffee.getAll rejects', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    const rejections: Array<unknown> = []
+    const onUnhandled = (reason: unknown) => {
+      rejections.push(reason)
+    }
+    process.on('unhandledRejection', onUnhandled)
+    try {
+      const { queryClient, trpc } = createTestProviders()
+      const loader = Route.options.loader
+      expect(loader).toBeTypeOf('function')
+      expect(
+        loader?.({
+          context: { queryClient, trpc },
+        } as never),
+      ).toBeUndefined()
+      await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(rejections).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+      fetchSpy.mockRestore()
+    }
   })
 })

@@ -35,6 +35,18 @@ describe('insertEspressoShotSchema', () => {
     ).toBe(true)
   })
 
+  it('rejects a negative time and accepts zero', () => {
+    expect(
+      insertEspressoShotSchema.safeParse({ ...valid, time: -10 }).success,
+    ).toBe(false)
+    expect(
+      insertEspressoShotSchema.safeParse({ ...valid, time: '-10' }).success,
+    ).toBe(false)
+    expect(
+      insertEspressoShotSchema.safeParse({ ...valid, time: 0 }).success,
+    ).toBe(true)
+  })
+
   it('keeps roast date as a YYYY-MM-DD string', () => {
     const parsed = insertEspressoShotSchema.parse({
       ...valid,
@@ -135,6 +147,19 @@ describe('insertEspressoShotSchema', () => {
       insertEspressoShotSchema.safeParse({ ...valid, coffeeId: 'not-a-uuid' })
         .success,
     ).toBe(false)
+  })
+
+  it('lowercases relation ids', () => {
+    const mixed = 'ABCDEFAB-CDEF-4000-8000-0000000000AA'
+    const parsed = insertEspressoShotSchema.parse({
+      ...valid,
+      coffeeId: mixed,
+      grinderId: mixed,
+      brewingDeviceId: mixed,
+    })
+    expect(parsed.coffeeId).toBe(mixed.toLowerCase())
+    expect(parsed.grinderId).toBe(mixed.toLowerCase())
+    expect(parsed.brewingDeviceId).toBe(mixed.toLowerCase())
   })
 })
 

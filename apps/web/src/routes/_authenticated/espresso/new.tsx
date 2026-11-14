@@ -1,5 +1,9 @@
 import { insertEspressoShotSchema } from '@coffee-companion/api/db/zod'
-import { ESPRESSO_DEVICE_TYPE } from '@coffee-companion/api/lib/espresso'
+import { applyCoffeePrefill } from '@coffee-companion/brew-display'
+import {
+  ESPRESSO_DEVICE_TYPE,
+  isEspressoDevice,
+} from '@coffee-companion/api/lib/espresso'
 import {
   useMutation,
   useQueryClient,
@@ -7,9 +11,12 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
+import { useRef, useState } from 'react'
 import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
+import type { PrefillKeep } from '@coffee-companion/brew-display'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
 import { brewsLogLocation } from '@/components/brews/methods'
+import { FormBanner } from '@/components/form/form-banner'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
@@ -32,28 +39,41 @@ export const Route = createFileRoute('/_authenticated/espresso/new')({
     await context.queryClient.ensureQueryData(
       context.trpc.brewingDevice.list.queryOptions(),
     )
-    // Used to prefill the form from the coffee's most recent shot.
-    await context.queryClient.ensureQueryData(
-      context.trpc.espressoShot.getAll.queryOptions(),
-    )
   },
   component: NewEspressoShot,
 })
 
-function NewEspressoShot() {
+const PREFILL_FAILED =
+  "We couldn't load this coffee's last shot. Enter it yourself, or try again."
+
+function draftFingerprint(value: InsertEspressoShot) {
+  return JSON.stringify(value)
+}
+
+export function NewEspressoShot() {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const idempotencyKeys = useRef(new Map<string, string>())
+  const prefillSeq = useRef(0)
+  const prefillCoffeeId = useRef('')
+  const keepPrefill = useRef<PrefillKeep>({})
+  const applyingPrefill = useRef(false)
+  const saveGen = useRef(0)
+  const saveInFlight = useRef(false)
+  const saveSucceeded = useRef(false)
+  const prefillQueued = useRef(false)
+  const [prefillError, setPrefillError] = useState(false)
 
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
   const coffee = useSearchSelectResource(coffees)
 
-  const { data: shots } = useSuspenseQuery(
-    trpc.espressoShot.getAll.queryOptions(),
-  )
-
   const { data: grinders } = useSuspenseQuery(trpc.grinder.list.queryOptions())
   const grinder = useSearchSelectResource(grinders)
+
+  const { data: brewingDevices } = useSuspenseQuery(
+    trpc.brewingDevice.list.queryOptions(),
+  )
 
   // Espresso shots must be brewed on an Espresso-type device (enforced again
   // server-side in espressoShot.create).
@@ -62,7 +82,14 @@ function NewEspressoShot() {
   const createShot = useMutation(
     trpc.espressoShot.create.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
+        saveSucceeded.current = true
+        queryClient.invalidateQueries(
+          trpc.espressoShot.getRecent.infiniteQueryFilter(),
+        )
+        queryClient.invalidateQueries(
+          trpc.espressoShot.getLatestUnsealed.queryFilter(),
+        )
+        idempotencyKeys.current.clear()
         track('brew_logged', { method: 'espresso' })
         navigate(brewsLogLocation('espresso'))
       },
@@ -87,9 +114,114 @@ function NewEspressoShot() {
       onChange: insertEspressoShotSchema as never,
     },
     onSubmit: async ({ value }) => {
-      await submitFormMutation(form, createShot.mutateAsync, value)
+      const fingerprint = draftFingerprint(value)
+      let idempotencyKey = idempotencyKeys.current.get(fingerprint)
+      if (!idempotencyKey) {
+        idempotencyKey = crypto.randomUUID()
+        idempotencyKeys.current.set(fingerprint, idempotencyKey)
+      }
+      saveGen.current += 1
+      await submitFormMutation(form, createShot.mutateAsync, {
+        ...value,
+        idempotencyKey,
+      })
     },
   })
+
+  const applyPrefill = (
+    coffeeId: string,
+    seq: number,
+    latest: {
+      grinderId: string | null
+      brewingDeviceId: string | null
+      roastDate: string | null
+    } | null,
+    startedSaveGen: number,
+  ) => {
+    if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
+      return
+    }
+    if (startedSaveGen !== saveGen.current) return
+    const keep = keepPrefill.current
+    const values = form.state.values
+    const next = applyCoffeePrefill(
+      {
+        coffeeId,
+        grinderId: values.grinderId,
+        brewingDeviceId: values.brewingDeviceId,
+        roastDate: values.roastDate ?? null,
+      },
+      coffeeId,
+      latest,
+      keep,
+      null,
+    )
+    const device = brewingDevices.find(
+      (item) => item.id === next.brewingDeviceId,
+    )
+    applyingPrefill.current = true
+    if (!keep.grinderId) form.setFieldValue('grinderId', next.grinderId)
+    if (!keep.brewingDeviceId) {
+      form.setFieldValue(
+        'brewingDeviceId',
+        device && isEspressoDevice(device) ? device.id : '',
+      )
+    }
+    if (!keep.roastDate) form.setFieldValue('roastDate', next.roastDate)
+    applyingPrefill.current = false
+  }
+
+  const loadPrefillFor = (coffeeId: string) => {
+    if (!coffeeId) return
+    if (saveInFlight.current) {
+      prefillQueued.current = true
+      return
+    }
+    prefillQueued.current = false
+    const seq = prefillSeq.current
+    const startedSaveGen = saveGen.current
+    void queryClient
+      .fetchQuery({
+        ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId }),
+        staleTime: 0,
+      })
+      .then(
+        (latest) => applyPrefill(coffeeId, seq, latest, startedSaveGen),
+        () => {
+          if (
+            seq !== prefillSeq.current ||
+            coffeeId !== prefillCoffeeId.current
+          ) {
+            return
+          }
+          setPrefillError(true)
+          applyPrefill(coffeeId, seq, null, startedSaveGen)
+        },
+      )
+  }
+
+  const requestPrefill = (coffeeId: string) => {
+    prefillSeq.current += 1
+    prefillCoffeeId.current = coffeeId
+    setPrefillError(false)
+    loadPrefillFor(coffeeId)
+  }
+
+  const flushQueuedPrefill = () => {
+    saveInFlight.current = false
+    if (
+      !saveSucceeded.current &&
+      prefillQueued.current &&
+      prefillCoffeeId.current
+    ) {
+      loadPrefillFor(prefillCoffeeId.current)
+    }
+  }
+
+  const markTouched = (key: keyof PrefillKeep) => {
+    if (applyingPrefill.current) return
+    keepPrefill.current = { ...keepPrefill.current, [key]: true }
+  }
 
   return (
     <Card className="flex flex-col items-center w-full max-w-2xl mx-auto p-4">
@@ -98,7 +230,11 @@ function NewEspressoShot() {
         className="w-full max-w-md flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault()
-          form.handleSubmit()
+          saveSucceeded.current = false
+          saveInFlight.current = true
+          void form.handleSubmit().finally(() => {
+            flushQueuedPrefill()
+          })
         }}
       >
         <form.AppField
@@ -108,23 +244,52 @@ function NewEspressoShot() {
             // recent shot. The recipe (dose/yield/time/grind) is left blank so
             // it's entered fresh each shot.
             onChange: ({ value }) => {
-              // A Sealed shot carries no settings to carry forward.
-              const latest = shots.find(
-                (s) => s.coffeeId === value && !s.sealed,
-              )
-              if (!latest?.grinderId || !latest.brewingDeviceId) return
-              form.setFieldValue('grinderId', latest.grinderId)
-              form.setFieldValue('brewingDeviceId', latest.brewingDeviceId)
-              form.setFieldValue('roastDate', latest.roastDate)
+              if (!value) {
+                prefillSeq.current += 1
+                prefillCoffeeId.current = ''
+                setPrefillError(false)
+                const keep = keepPrefill.current
+                applyingPrefill.current = true
+                if (!keep.roastDate) form.setFieldValue('roastDate', null)
+                if (!keep.grinderId) form.setFieldValue('grinderId', '')
+                if (!keep.brewingDeviceId) {
+                  form.setFieldValue('brewingDeviceId', '')
+                }
+                applyingPrefill.current = false
+                return
+              }
+              const keep = keepPrefill.current
+              keepPrefill.current = {
+                grinderId: keep.grinderId,
+                brewingDeviceId: keep.brewingDeviceId,
+              }
+              applyingPrefill.current = true
+              form.setFieldValue('roastDate', null)
+              if (!keep.grinderId) form.setFieldValue('grinderId', '')
+              if (!keep.brewingDeviceId) {
+                form.setFieldValue('brewingDeviceId', '')
+              }
+              applyingPrefill.current = false
+              requestPrefill(value)
             },
           }}
         >
           {(field) => <field.SearchSelect label="Coffee" {...coffee} />}
         </form.AppField>
-        <form.AppField name="grinderId">
+        <form.AppField
+          name="grinderId"
+          listeners={{
+            onChange: () => markTouched('grinderId'),
+          }}
+        >
           {(field) => <field.SearchSelect label="Grinder" {...grinder} />}
         </form.AppField>
-        <form.AppField name="brewingDeviceId">
+        <form.AppField
+          name="brewingDeviceId"
+          listeners={{
+            onChange: () => markTouched('brewingDeviceId'),
+          }}
+        >
           {(field) => (
             <>
               <field.SearchSelect label="Brewing Device" {...brewingDevice} />
@@ -140,7 +305,12 @@ function NewEspressoShot() {
             </>
           )}
         </form.AppField>
-        <form.AppField name="roastDate">
+        <form.AppField
+          name="roastDate"
+          listeners={{
+            onChange: () => markTouched('roastDate'),
+          }}
+        >
           {(field) => <field.DatePicker label="Roast Date" />}
         </form.AppField>
         <form.AppField name="dose">
@@ -174,13 +344,33 @@ function NewEspressoShot() {
             <field.TextArea label="Notes" placeholder="Tasting notes..." />
           )}
         </form.AppField>
+        {prefillError ? (
+          <>
+            <FormBanner message={PREFILL_FAILED} />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (prefillCoffeeId.current) {
+                  requestPrefill(prefillCoffeeId.current)
+                }
+              }}
+            >
+              Try again
+            </Button>
+          </>
+        ) : null}
         <MutationErrorNotices
           error={createShot.error}
           reset={createShot.reset}
           form={form}
         />
-        <Button type="submit" disabled={createShot.isPending}>
-          Log
+        <Button
+          type="submit"
+          disabled={createShot.isPending}
+          aria-busy={createShot.isPending}
+        >
+          {createShot.isPending ? 'Logging…' : 'Log'}
           <Plus />
         </Button>
       </form>

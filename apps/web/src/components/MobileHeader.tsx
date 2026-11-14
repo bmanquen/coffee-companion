@@ -1,13 +1,15 @@
 import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
-import { useSignOut } from '@/hooks/use-sign-out'
+import { SIGN_OUT_FAILED, useSignOut } from '@/hooks/use-sign-out'
 import { authClient } from '@/lib/auth-client'
 
 export default function MobileHeader() {
   const { data: session } = authClient.useSession()
-  const handleSignOut = useSignOut()
+  const signOut = useSignOut()
+  const [signOutError, setSignOutError] = useState<string | null>(null)
 
   const handleSignIn = () => {
     authClient.signIn.social({ provider: 'google' })
@@ -45,9 +47,18 @@ export default function MobileHeader() {
               <Button variant="outline" asChild>
                 <Link to="/account">Account</Link>
               </Button>
-              <Button variant="outline" onClick={handleSignOut}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSignOutError(null)
+                  void signOut().catch(() => {
+                    setSignOutError(SIGN_OUT_FAILED)
+                  })
+                }}
+              >
                 Sign Out
               </Button>
+              {signOutError ? <p role="alert">{signOutError}</p> : null}
             </div>
           </PopoverContent>
         </Popover>

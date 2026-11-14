@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
 import { E2E_USER_DELETE, E2E_USER_FREE, E2E_USER_WITH_DATA } from '../lib/e2e-auth'
 import {
+  E2E_ETHIOPIA_GUJI_ID,
   E2E_LIBRARY,
   FREE_GEAR,
   OFF_SHELF_DIALED_IN_COFFEE,
@@ -215,7 +216,11 @@ async function seedGrantedUser() {
   // anything added to the library has to stay older than this.
   const [coffee] = await db
     .insert(coffees)
-    .values({ userId: E2E_USER_WITH_DATA, name: 'Ethiopia Guji' })
+    .values({
+      id: E2E_ETHIOPIA_GUJI_ID,
+      userId: E2E_USER_WITH_DATA,
+      name: 'Ethiopia Guji',
+    })
     .returning()
 
   await attachOrigin(coffee.id, 'Ethiopia', 'Guji', 'Washed')

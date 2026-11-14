@@ -1,0 +1,358 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { applyCoffeePrefill } from '@coffee-companion/brew-display'
+import {
+  BackHandler,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+} from 'react-native'
+import { ErrorBanner, Field, SelectField } from '../ui/fields'
+import {
+  BACK,
+  ERROR_PREFILL_FAILED,
+  LABEL_COFFEE,
+  LABEL_DEVICE,
+  LABEL_DOSE,
+  LABEL_GRIND,
+  LABEL_GRINDER,
+  LABEL_NOTES,
+  LABEL_ROAST_DATE,
+  LABEL_TIME,
+  LABEL_YIELD,
+  LOG,
+  LOGGING,
+  LOG_ESPRESSO_HEADING,
+  LOG_TEST_ID,
+  SELECT_COFFEE,
+  SELECT_DEVICE,
+  SELECT_GRINDER,
+  SHOT_FORM_A11Y_LABEL,
+  SHOT_FORM_ERROR_TEST_ID,
+  SHOT_FORM_HEADING_TEST_ID,
+  SHOT_FORM_PREFILL_ERROR_TEST_ID,
+  SHOT_FORM_TEST_ID,
+  TRY_AGAIN,
+} from './copy'
+import {
+  decimalFieldText,
+  emptyShotDraft,
+  parseShotDraft,
+} from './draft'
+import { newIdempotencyKey } from './idempotency'
+import type { PrefillKeep } from '@coffee-companion/brew-display'
+import type { FieldErrors, ShotDraft } from './draft'
+import type { EspressoCatalog, ShotCreate, ShotRow } from './types'
+
+export function consumeHardwareBack(busy: boolean, onBack: () => void) {
+  if (busy) return true
+  onBack()
+  return true
+}
+
+function draftFingerprint(input: Omit<ShotCreate, 'idempotencyKey'>) {
+  return JSON.stringify(input)
+}
+
+export function ShotForm({
+  catalog,
+  busy,
+  error,
+  onBack,
+  onClearError,
+  onSubmit,
+  loadPrefill,
+}: {
+  catalog: EspressoCatalog
+  busy: boolean
+  error: string | null
+  onBack: () => void
+  onClearError: () => void
+  onSubmit: (input: ShotCreate) => void
+  loadPrefill: (coffeeId: string) => Promise<ShotRow | null>
+}) {
+  const [draft, setDraft] = useState<ShotDraft>(emptyShotDraft)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [prefillError, setPrefillError] = useState(false)
+  const idempotencyKeys = useRef(new Map<string, string>())
+  const prefillSeq = useRef(0)
+  const prefillCoffeeId = useRef('')
+  const keepPrefill = useRef<PrefillKeep>({})
+  const saveGen = useRef(0)
+  const saveInFlight = useRef(false)
+  const prefillQueued = useRef(false)
+  const draftRef = useRef(draft)
+  useLayoutEffect(() => {
+    // After commit: a discarded render must not leak an uncommitted draft.
+    draftRef.current = draft
+  }, [draft])
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () =>
+      consumeHardwareBack(busy, onBack),
+    )
+    return () => sub.remove()
+  }, [busy, onBack])
+
+  const setField = (key: keyof ShotDraft, value: string) => {
+    onClearError()
+    const next =
+      key === 'dose' || key === 'yield' ? decimalFieldText(value) : value
+    if (key === 'grinderId' || key === 'brewingDeviceId' || key === 'roastDate') {
+      keepPrefill.current = { ...keepPrefill.current, [key]: true }
+    }
+    setDraft((current) => ({ ...current, [key]: next }))
+    setFieldErrors((current) => {
+      if (!current[key]) return current
+      const remaining = { ...current }
+      delete remaining[key]
+      return remaining
+    })
+  }
+
+  const applyPrefill = (
+    coffeeId: string,
+    seq: number,
+    latest: ShotRow | null,
+    startedSaveGen: number,
+  ) => {
+    if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
+      return
+    }
+    if (startedSaveGen !== saveGen.current) return
+    const next = applyCoffeePrefill(
+      draftRef.current,
+      coffeeId,
+      latest,
+      keepPrefill.current,
+      '',
+    )
+    const filled =
+      keepPrefill.current.brewingDeviceId ||
+      catalog.devices.some((device) => device.id === next.brewingDeviceId)
+        ? next
+        : { ...next, brewingDeviceId: '' }
+    setDraft(filled)
+    setFieldErrors((current) => {
+      const updated = { ...current }
+      let changed = false
+      if (filled.grinderId && updated.grinderId) {
+        delete updated.grinderId
+        changed = true
+      }
+      if (filled.brewingDeviceId && updated.brewingDeviceId) {
+        delete updated.brewingDeviceId
+        changed = true
+      }
+      return changed ? updated : current
+    })
+  }
+
+  const loadPrefillFor = (coffeeId: string) => {
+    if (!coffeeId) return
+    if (saveInFlight.current || busy) {
+      prefillQueued.current = true
+      return
+    }
+    prefillQueued.current = false
+    const seq = prefillSeq.current
+    const startedSaveGen = saveGen.current
+    void loadPrefill(coffeeId).then(
+      (latest) => applyPrefill(coffeeId, seq, latest, startedSaveGen),
+      () => {
+        if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
+          return
+        }
+        setPrefillError(true)
+        applyPrefill(coffeeId, seq, null, startedSaveGen)
+      },
+    )
+  }
+
+  const requestPrefill = (coffeeId: string) => {
+    prefillSeq.current += 1
+    prefillCoffeeId.current = coffeeId
+    setPrefillError(false)
+    loadPrefillFor(coffeeId)
+  }
+
+  useEffect(() => {
+    if (!error) return
+    saveInFlight.current = false
+    if (prefillQueued.current && prefillCoffeeId.current) {
+      loadPrefillFor(prefillCoffeeId.current)
+    }
+  }, [error])
+
+  return (
+    <ScrollView
+      accessibilityLabel={SHOT_FORM_A11Y_LABEL}
+      testID={SHOT_FORM_TEST_ID}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.form}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busy }}
+        disabled={busy}
+        onPress={onBack}
+      >
+        <Text>{BACK}</Text>
+      </Pressable>
+      <Text
+        accessibilityRole="header"
+        testID={SHOT_FORM_HEADING_TEST_ID}
+      >
+        {LOG_ESPRESSO_HEADING}
+      </Text>
+      <SelectField
+        label={LABEL_COFFEE}
+        value={draft.coffeeId}
+        options={catalog.coffees}
+        placeholder={SELECT_COFFEE}
+        error={fieldErrors.coffeeId}
+        disabled={busy}
+        onChange={(coffeeId) => {
+          onClearError()
+          setFieldErrors((current) => {
+            if (!current.coffeeId) return current
+            const next = { ...current }
+            delete next.coffeeId
+            return next
+          })
+          const keep = keepPrefill.current
+          keepPrefill.current = {
+            grinderId: keep.grinderId,
+            brewingDeviceId: keep.brewingDeviceId,
+          }
+          setDraft((current) => ({
+            ...current,
+            coffeeId,
+            roastDate: '',
+            grinderId: keep.grinderId ? current.grinderId : '',
+            brewingDeviceId: keep.brewingDeviceId
+              ? current.brewingDeviceId
+              : '',
+          }))
+          requestPrefill(coffeeId)
+        }}
+      />
+      <SelectField
+        label={LABEL_GRINDER}
+        value={draft.grinderId}
+        options={catalog.grinders}
+        placeholder={SELECT_GRINDER}
+        error={fieldErrors.grinderId}
+        disabled={busy}
+        onChange={(id) => setField('grinderId', id)}
+      />
+      <SelectField
+        label={LABEL_DEVICE}
+        value={draft.brewingDeviceId}
+        options={catalog.devices}
+        placeholder={SELECT_DEVICE}
+        error={fieldErrors.brewingDeviceId}
+        disabled={busy}
+        onChange={(id) => setField('brewingDeviceId', id)}
+      />
+      <Field
+        label={LABEL_ROAST_DATE}
+        value={draft.roastDate}
+        error={fieldErrors.roastDate}
+        disabled={busy}
+        onChange={(value) => setField('roastDate', value)}
+      />
+      <Field
+        label={LABEL_DOSE}
+        value={draft.dose}
+        keyboardType="decimal-pad"
+        error={fieldErrors.dose}
+        disabled={busy}
+        onChange={(value) => setField('dose', value)}
+      />
+      <Field
+        label={LABEL_YIELD}
+        value={draft.yield}
+        keyboardType="decimal-pad"
+        error={fieldErrors.yield}
+        disabled={busy}
+        onChange={(value) => setField('yield', value)}
+      />
+      <Field
+        label={LABEL_TIME}
+        value={draft.time}
+        keyboardType="number-pad"
+        error={fieldErrors.time}
+        disabled={busy}
+        onChange={(value) => setField('time', value)}
+      />
+      <Field
+        label={LABEL_GRIND}
+        value={draft.grindSetting}
+        error={fieldErrors.grindSetting}
+        disabled={busy}
+        onChange={(value) => setField('grindSetting', value)}
+      />
+      <Field
+        label={LABEL_NOTES}
+        value={draft.notes}
+        multiline
+        disabled={busy}
+        onChange={(value) => setField('notes', value)}
+      />
+      {prefillError ? (
+        <>
+          <ErrorBanner
+            message={ERROR_PREFILL_FAILED}
+            testID={SHOT_FORM_PREFILL_ERROR_TEST_ID}
+          />
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => {
+              if (prefillCoffeeId.current) requestPrefill(prefillCoffeeId.current)
+            }}
+          >
+            <Text>{TRY_AGAIN}</Text>
+          </Pressable>
+        </>
+      ) : null}
+      {error ? (
+        <ErrorBanner message={error} testID={SHOT_FORM_ERROR_TEST_ID} />
+      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busy, busy }}
+        testID={LOG_TEST_ID}
+        disabled={busy}
+        onPress={() => {
+          const parsed = parseShotDraft(draft)
+          if (!parsed.ok) {
+            setFieldErrors(parsed.errors)
+            return
+          }
+          const fingerprint = draftFingerprint(parsed.value)
+          let idempotencyKey = idempotencyKeys.current.get(fingerprint)
+          if (!idempotencyKey) {
+            idempotencyKey = newIdempotencyKey()
+            idempotencyKeys.current.set(fingerprint, idempotencyKey)
+          }
+          saveInFlight.current = true
+          saveGen.current += 1
+          onSubmit({ ...parsed.value, idempotencyKey })
+        }}
+      >
+        <Text>{busy ? LOGGING : LOG}</Text>
+      </Pressable>
+    </ScrollView>
+  )
+}
+
+const styles = StyleSheet.create({
+  form: {
+    width: '100%',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
+})

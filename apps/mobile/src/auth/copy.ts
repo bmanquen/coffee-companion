@@ -18,6 +18,7 @@ export const NO_ACCOUNT_LINE = `${NO_ACCOUNT_PROMPT} ${NO_ACCOUNT_ACTION}`
 export const HAS_ACCOUNT_LINE = `${HAS_ACCOUNT_PROMPT} ${HAS_ACCOUNT_ACTION}`
 
 export const ERROR_SIGN_IN_FAILED = "We couldn't sign you in. Try again."
+export const ERROR_SIGN_OUT_FAILED = "We couldn't sign you out. Try again."
 export const ERROR_SIGN_IN_CONFLICT_TITLE = "Couldn't sign you in"
 export const ERROR_SIGN_IN_CONFLICT_BODY =
   "Try signing in with the method you used when you created your account. If you're still stuck, contact support."

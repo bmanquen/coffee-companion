@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query'
 import {
   fireEvent,
   render,
@@ -6,7 +7,7 @@ import {
   within,
 } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AccountScreen } from './account'
+import { AccountScreen, finishAccountDeletion } from './account'
 import type * as ReactRouter from '@tanstack/react-router'
 
 const restoreBy = new Date('2026-11-07T12:00:00.000Z')
@@ -485,5 +486,44 @@ describe('AccountScreen', () => {
       ).toBe(false),
     )
     expect(onDelete).not.toHaveBeenCalled()
+  })
+})
+
+describe('finishAccountDeletion', () => {
+  it('leaves the query cache in place when sign-out succeeds', async () => {
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(['coffee.getAll'], [{ id: 'c1', name: 'Kept' }])
+    const clear = vi.spyOn(queryClient, 'clear')
+    const goHome = vi.fn()
+
+    await finishAccountDeletion(async () => {}, queryClient, goHome)
+
+    expect(clear).not.toHaveBeenCalled()
+    expect(goHome).not.toHaveBeenCalled()
+    expect(queryClient.getQueryData(['coffee.getAll'])).toEqual([
+      { id: 'c1', name: 'Kept' },
+    ])
+  })
+
+  it('clears the query cache before going home when sign-out fails', async () => {
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(['coffee.getAll'], [{ id: 'c1', name: 'Kept' }])
+    const clear = vi.spyOn(queryClient, 'clear')
+    const goHome = vi.fn()
+
+    await finishAccountDeletion(
+      async () => {
+        throw new Error('network')
+      },
+      queryClient,
+      goHome,
+    )
+
+    expect(clear).toHaveBeenCalledOnce()
+    expect(goHome).toHaveBeenCalledOnce()
+    expect(clear.mock.invocationCallOrder[0]).toBeLessThan(
+      goHome.mock.invocationCallOrder[0],
+    )
+    expect(queryClient.getQueryData(['coffee.getAll'])).toBeUndefined()
   })
 })

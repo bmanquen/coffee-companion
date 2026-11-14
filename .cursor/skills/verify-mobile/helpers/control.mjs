@@ -4024,13 +4024,41 @@ const DRIVES = {
       toggleTestID: 'sign-in-toggle',
     },
   },
+  espresso: {
+    test: 'src/espresso/espresso.test.tsx',
+    identity: 'data',
+    fail: 'espresso drive failed — the RNTL render did not log a shot and show it in the list',
+    required: [
+      'Coffee Companion',
+      'shot-list',
+      'Ethiopia Guji',
+      'Grind verify-grind-7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s',
+    ],
+    observed: {
+      heading: 'Coffee Companion',
+      listTestID: 'shot-list',
+      coffee: 'Ethiopia Guji',
+      grind: 'verify-grind-7',
+      dose: '18',
+      yield: '36',
+      time: '30',
+    },
+    handles: {
+      formTestID: 'shot-form',
+      logShotTestID: 'log-shot',
+      coffeeTriggerTestID: 'select-trigger-coffee',
+      coffeeSheetTestID: 'select-sheet-coffee',
+      coffeeOptionTestID: 'select-option-00000000-0000-4000-8000-000000000001',
+      coffeeSearchTestID: 'select-search-coffee',
+    },
+  },
 }
 
 async function cmdDrive(feature) {
   const recipe = DRIVES[feature]
   if (!recipe) {
     die(
-      `Only \`drive welcome\` and \`drive sign-in\` are implemented as one-shot recipes. ` +
+      `Only \`drive welcome\`, \`drive sign-in\`, and \`drive espresso\` are implemented as one-shot recipes. ` +
         `${feature ? `"${feature}"` : 'That feature'} is mapped under features/ — drive it from its file. ` +
         `Do not treat a missing drive stub as verification.`,
     )
@@ -4076,6 +4104,7 @@ async function cmdDrive(feature) {
     capturedAt: new Date().toISOString(),
     artifacts: [treePath, treeJsonPath, join(dest, 'proof.json')],
     observed: recipe.observed,
+    ...(recipe.handles ? { handles: recipe.handles } : {}),
     note:
       'In-process React Native Testing Library render. No iOS simulator or Android emulator was attached. Native Google and Apple sheets were not presented.',
   }
@@ -4214,6 +4243,7 @@ function usage() {
   doctor              Read-only check that this instance is worth driving
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
+  drive espresso      Log an Espresso Shot through the signed-in list and form
   drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}; refuse clearState when ownedPackage is false
   verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); refuse a clearState flow on an attached preexisting install before Expo; the instance stays up if a later step fails
   cleanup             Stop recorded pids, free ports this helper recorded, uninstall a package this run owns; keep artifacts/

@@ -1,7 +1,18 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import MobileHeader from './MobileHeader'
 import type { ReactNode } from 'react'
+import { SIGN_OUT_FAILED } from '@/hooks/use-sign-out'
+
+function renderHeader(ui: ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  )
+}
 
 const authState = vi.hoisted(() => ({
   session: null as {
@@ -10,7 +21,7 @@ const authState = vi.hoisted(() => ({
 }))
 const mocks = vi.hoisted(() => ({
   signInSocial: vi.fn(),
-  signOut: vi.fn(),
+  signOut: vi.fn(async () => ({})),
   navigate: vi.fn(),
   resetAnalytics: vi.fn(),
   setSentryUser: vi.fn(),
@@ -65,7 +76,7 @@ describe('MobileHeader', () => {
     authState.session = {
       user: { name: 'Test User', email: 'test@example.com', image: null },
     }
-    render(<MobileHeader />)
+    renderHeader(<MobileHeader />)
 
     expect(screen.getByText('Coffee Companion')).toBeTruthy()
     expect(screen.getByText('Test User')).toBeTruthy()
@@ -91,9 +102,25 @@ describe('MobileHeader', () => {
     expect(mocks.navigate).toHaveBeenCalledWith({ to: '/' })
   })
 
+  it('shows an error when sign-out fails', async () => {
+    authState.session = {
+      user: { name: 'Test User', email: 'test@example.com', image: null },
+    }
+    mocks.navigate.mockClear()
+    mocks.signOut.mockResolvedValueOnce({ error: { message: 'nope' } })
+    renderHeader(<MobileHeader />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sign Out' }))
+    })
+
+    expect(screen.getByRole('alert').textContent).toBe(SIGN_OUT_FAILED)
+    expect(mocks.navigate).not.toHaveBeenCalled()
+  })
+
   it('shows a sign-in button and no account details when signed out', async () => {
     authState.session = null
-    render(<MobileHeader />)
+    renderHeader(<MobileHeader />)
 
     expect(screen.getByText('Coffee Companion')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Sign Out' })).toBeNull()
@@ -112,7 +139,7 @@ describe('MobileHeader', () => {
         image: 'https://example.com/avatar.png',
       },
     }
-    const { container } = render(<MobileHeader />)
+    const { container } = renderHeader(<MobileHeader />)
 
     // The avatar mock renders a decorative img (empty alt), so it has no
     // accessible role to query by.
