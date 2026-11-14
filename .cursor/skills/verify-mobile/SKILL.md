@@ -149,11 +149,11 @@ Stable handles (use these, not coordinates or visible text):
 The same queries as a raw Jest file. This renders in-process and does not check Metro — only `helpers/control drive <feature>` does:
 
 ```bash
-VERIFY_MOBILE_ARTIFACTS=.cursor/skills/verify-mobile/artifacts/<run>/welcome \
+VERIFY_MOBILE_ARTIFACTS="$PWD"/.cursor/skills/verify-mobile/artifacts/<run>/welcome \
   pnpm --filter @coffee-companion/mobile exec jest --ci src/welcome.test.tsx
-VERIFY_MOBILE_ARTIFACTS=.cursor/skills/verify-mobile/artifacts/<run>/sign-in \
+VERIFY_MOBILE_ARTIFACTS="$PWD"/.cursor/skills/verify-mobile/artifacts/<run>/sign-in \
   pnpm --filter @coffee-companion/mobile exec jest --ci src/auth/sign-in.test.tsx
-VERIFY_MOBILE_ARTIFACTS=.cursor/skills/verify-mobile/artifacts/<run>/espresso \
+VERIFY_MOBILE_ARTIFACTS="$PWD"/.cursor/skills/verify-mobile/artifacts/<run>/espresso \
   pnpm --filter @coffee-companion/mobile exec jest --ci src/espresso/espresso.test.tsx
 ```
 
