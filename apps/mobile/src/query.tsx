@@ -25,13 +25,21 @@ export function wireReactNativeQueryLifecycle() {
 }
 
 export function subscribeNetworkOnline(setOnline: (online: boolean) => void) {
+  let active = true
+  let listenerDelivered = false
   const sub = Network.addNetworkStateListener((state) => {
+    if (!active) return
+    listenerDelivered = true
     setOnline(state.isConnected === true)
   })
   void Network.getNetworkStateAsync().then((state) => {
+    if (!active || listenerDelivered) return
     setOnline(state.isConnected === true)
   })
-  return () => sub.remove()
+  return () => {
+    active = false
+    sub.remove()
+  }
 }
 
 const isTest = process.env.NODE_ENV === 'test'
