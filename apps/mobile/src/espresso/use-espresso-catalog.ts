@@ -89,6 +89,8 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
       setSaveError(null)
       createShot.mutate(input, {
         onSuccess: () => {
+          // fetchQuery would otherwise hand the next form a prefill read before this shot
+          queryClient.removeQueries({ queryKey: ['espresso-prefill', userId] })
           onSuccess?.()
           void queryClient.invalidateQueries({
             queryKey: [ESPRESSO_SHOTS_QUERY_KEY, userId],

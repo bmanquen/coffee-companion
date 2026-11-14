@@ -1425,6 +1425,34 @@ describe('log espresso shot', () => {
     expect(created[1].roastDate).toBeNull()
   })
 
+  it('requests a fresh prefill after a save instead of reusing a pending one', async () => {
+    const stale = new Promise<ShotRow | null>(() => {})
+    let prefills = 0
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      loadPrefill: () => {
+        prefills += 1
+        return prefills === 1
+          ? stale
+          : Promise.resolve(seedShot())
+      },
+      create: () => Promise.resolve(),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    await press(LOG)
+
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    expect(prefills).toBe(2)
+    expect(screen.getByDisplayValue('2026-05-01')).toBeTruthy()
+  })
+
   it('shows a retry when the last shot cannot be loaded and still lets you log one', async () => {
     const { api, created } = fakeApi(catalog(), {})
     const espresso: EspressoApi = {
