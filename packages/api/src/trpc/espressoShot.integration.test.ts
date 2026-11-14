@@ -1,7 +1,11 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '../db'
-import { brewingDeviceTypes, espressoShots } from '../db/schema'
+import {
+  brewingDeviceTypes,
+  espressoShotIdempotencyKeys,
+  espressoShots,
+} from '../db/schema'
 import {
   ESPRESSO_DEVICE_TYPE,
   encodeEspressoShotCursor,
@@ -398,6 +402,50 @@ describe('espressoShot.create idempotency', () => {
     expect(second.dose).toBe('18')
     const page = await asA.espressoShot.getRecent({ limit: 50 })
     expect(page.items.filter((shot) => shot.id === first.id)).toHaveLength(1)
+  })
+
+  it('returns one shot when two identical creates overlap', async () => {
+    const idempotencyKey = crypto.randomUUID()
+    const grindSetting = `overlap-${idempotencyKey}`
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting,
+      idempotencyKey,
+    }
+    const [first, second] = await Promise.all([
+      asA.espressoShot.create(input),
+      asA.espressoShot.create(input),
+    ])
+    expect(second.id).toBe(first.id)
+    const shots = await db
+      .select({ id: espressoShots.id })
+      .from(espressoShots)
+      .where(
+        and(
+          eq(espressoShots.userId, USER_A),
+          eq(espressoShots.grindSetting, grindSetting),
+        ),
+      )
+    expect(shots).toHaveLength(1)
+    expect(shots[0].id).toBe(first.id)
+    const keys = await db
+      .select({
+        shotId: espressoShotIdempotencyKeys.shotId,
+      })
+      .from(espressoShotIdempotencyKeys)
+      .where(
+        and(
+          eq(espressoShotIdempotencyKeys.userId, USER_A),
+          eq(espressoShotIdempotencyKeys.idempotencyKey, idempotencyKey),
+        ),
+      )
+    expect(keys).toHaveLength(1)
+    expect(keys[0].shotId).toBe(first.id)
   })
 
   it('does not stamp again when a displacing shot is replayed', async () => {
