@@ -76,7 +76,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     ) {
       return
     }
-    void shots.fetchNextPage()
+    void shots.fetchNextPage({ cancelRefetch: false })
   }, [equipment.isPending, shots])
 
   const createShot = useMutation({

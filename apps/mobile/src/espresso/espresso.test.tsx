@@ -2184,8 +2184,11 @@ describe('log espresso shot', () => {
     await render(<App auth={signedIn} espresso={api} />)
     expect(screen.getByText('Coffee 0')).toBeTruthy()
 
-    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
-    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    const { onEndReached } = screen.getByTestId(SHOT_LIST_TEST_ID).props
+    await act(() => {
+      onEndReached()
+      onEndReached()
+    })
     expect(attempts).toBe(1)
     expect(resolveFirst).toBeTruthy()
     expect(screen.queryByText(ERROR_LOAD_MORE_FAILED)).toBeNull()

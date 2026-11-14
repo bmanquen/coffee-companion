@@ -112,7 +112,7 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
     if (!query.hasNextPage || query.isFetchingNextPage || query.isRefetching) {
       return Promise.resolve()
     }
-    return query.fetchNextPage().then(() => undefined)
+    return query.fetchNextPage({ cancelRefetch: false }).then(() => undefined)
   }, [query])
 
   const retry = useCallback(
