@@ -17,6 +17,7 @@ import {
   SHOT_LIST_A11Y_LABEL,
   SHOT_LIST_TEST_ID,
   SHOT_ROW_TEST_ID_PREFIX,
+  SHOT_SUMMARY_TEST_ID,
   TRY_AGAIN,
 } from './copy'
 import { shotSummary } from './draft'
@@ -103,7 +104,7 @@ export function ShotList({
           style={styles.row}
         >
           <Text>{item.coffeeName}</Text>
-          <Text>{shotSummary(item)}</Text>
+          <Text testID={SHOT_SUMMARY_TEST_ID}>{shotSummary(item)}</Text>
         </View>
       )}
     />

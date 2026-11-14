@@ -75,11 +75,21 @@ appId: dev.offbyonelabs.coffeecompanion
 - tapOn:
     id: select-option-00000000-0000-4000-8000-000000000001
 - extendedWaitUntil:
-    visible: "Niche Zero"
+    visible:
+      id: select-value-grinder
+      text: "Niche Zero"
     timeout: 15000
+- copyTextFrom:
+    id: select-value-grinder
+- assertTrue: ${maestro.copiedText == "Niche Zero"}
 - extendedWaitUntil:
-    visible: "Linea Mini"
+    visible:
+      id: select-value-brewing-device
+      text: "Linea Mini"
     timeout: 15000
+- copyTextFrom:
+    id: select-value-brewing-device
+- assertTrue: ${maestro.copiedText == "Linea Mini"}
 - tapOn:
     id: field-dose-g
 - inputText: "18"
@@ -96,10 +106,14 @@ appId: dev.offbyonelabs.coffeecompanion
 - tapOn:
     id: shot-form-log
 - extendedWaitUntil:
-    visible: "Grind 7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"
+    visible:
+      id: shot-summary
+      text: "Grind 7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"
     timeout: 30000
-- assertVisible:
-    text: "Grind 7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"
+- copyTextFrom:
+    id: shot-summary
+    index: 0
+- assertTrue: ${maestro.copiedText == "Grind 7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"}
 - assertVisible:
     id: shot-list
 - takeScreenshot: espresso-logged

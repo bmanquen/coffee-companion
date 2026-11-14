@@ -32,6 +32,10 @@ export function selectTriggerTestId(label: string) {
   return `select-trigger-${fieldSlug(label)}`
 }
 
+export function selectValueTestId(label: string) {
+  return `select-value-${fieldSlug(label)}`
+}
+
 export function selectSheetTestId(label: string) {
   return `select-sheet-${fieldSlug(label)}`
 }
@@ -145,7 +149,10 @@ export function SelectField({
         }}
         style={styles.input}
       >
-        <Text style={selected ? styles.value : styles.placeholder}>
+        <Text
+          testID={selectValueTestId(label)}
+          style={selected ? styles.value : styles.placeholder}
+        >
           {selectedText}
         </Text>
       </Pressable>
