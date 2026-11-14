@@ -1,8 +1,7 @@
 import { onlineManager } from '@tanstack/react-query'
 import * as Network from 'expo-network'
+import type { NetworkState } from 'expo-network'
 import { subscribeNetworkOnline } from './query'
-
-type NetworkState = { isConnected: boolean | null }
 
 function mockNetwork(probe: Promise<NetworkState>) {
   let listener: (state: NetworkState) => void = () => {}
@@ -26,7 +25,6 @@ describe('subscribeNetworkOnline', () => {
     jest.mocked(Network.getNetworkStateAsync).mockResolvedValue({
       isConnected: true,
       isInternetReachable: true,
-      type: 'WIFI',
     })
     jest.mocked(Network.addNetworkStateListener).mockReturnValue({
       remove: jest.fn(),
