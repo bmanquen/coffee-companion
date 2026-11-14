@@ -1,7 +1,7 @@
 import { onlineManager } from '@tanstack/react-query'
 import * as Network from 'expo-network'
-import type { NetworkState } from 'expo-network'
 import { subscribeNetworkOnline } from './query'
+import type { NetworkState } from 'expo-network'
 
 function mockNetwork(probe: Promise<NetworkState>) {
   let listener: (state: NetworkState) => void = () => {}
