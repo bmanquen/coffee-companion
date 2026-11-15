@@ -120,19 +120,22 @@ export function ShotForm({
       return
     }
     if (startedSaveGen !== saveGen.current) return
-    const next = applyCoffeePrefill(
-      draftRef.current,
-      coffeeId,
-      latest,
-      keepPrefill.current,
-      '',
-    )
-    const filled =
-      keepPrefill.current.brewingDeviceId ||
-      catalog.devices.some((device) => device.id === next.brewingDeviceId)
+    const fill = (current: ShotDraft) => {
+      const next = applyCoffeePrefill(
+        current,
+        coffeeId,
+        latest,
+        keepPrefill.current,
+        '',
+      )
+      return keepPrefill.current.brewingDeviceId ||
+        catalog.devices.some((device) => device.id === next.brewingDeviceId)
         ? next
         : { ...next, brewingDeviceId: '' }
-    setDraft(filled)
+    }
+    // A queued edit has already cleared its own error, so the committed draft suffices here.
+    const filled = fill(draftRef.current)
+    setDraft(fill)
     setFieldErrors((current) => {
       const updated = { ...current }
       let changed = false

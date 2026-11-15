@@ -1320,6 +1320,31 @@ describe('log espresso shot', () => {
     expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
   })
 
+  it('keeps a dose edit made in the same tick the prefill lands', async () => {
+    let resolvePrefill: (shot: ShotRow | null) => void = () => {}
+    const pending = new Promise<ShotRow | null>((resolve) => {
+      resolvePrefill = resolve
+    })
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog()),
+      loadPrefill: () => pending,
+      create: async () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+
+    const { onChangeText } = screen.getByLabelText(LABEL_DOSE).props
+    await act(async () => {
+      onChangeText('19')
+      resolvePrefill(seedShot())
+      await pending
+    })
+    expect(screen.getByDisplayValue('19')).toBeTruthy()
+    expect(screen.getByDisplayValue('2026-05-01')).toBeTruthy()
+  })
+
   it('keeps a chosen grinder and still prefills roast date and device', async () => {
     let resolvePrefill: (shot: ShotRow | null) => void = () => {}
     const pending = new Promise<ShotRow | null>((resolve) => {
