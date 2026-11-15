@@ -7,7 +7,6 @@ import {
   ERROR_SIGN_IN_CONFLICT_TITLE,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
-  ERROR_SIGN_OUT_FAILED,
 } from './copy'
 import {
   PlayServicesMissing,
@@ -154,7 +153,6 @@ export function useAuth(): Auth {
             ...serverFailureDetail(remoteError),
             message: failureMessage(remoteError),
           })
-          setError({ title: ERROR_SIGN_OUT_FAILED })
         }
         try {
           await clearSessionStore()

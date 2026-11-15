@@ -5,7 +5,6 @@ import {
   ERROR_SIGN_IN_CONFLICT_TITLE,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
-  ERROR_SIGN_OUT_FAILED,
 } from './copy'
 import {
   PlayServicesMissing,
@@ -163,7 +162,7 @@ describe('useAuth', () => {
     )
   })
 
-  it('signs out locally and reports it when remote sign-out fails', async () => {
+  it('signs out locally without an error when remote sign-out fails', async () => {
     mocks.signOut.mockResolvedValueOnce({ error: { message: 'network' } })
     const { result } = await renderHook(() => useAuth())
 
@@ -173,7 +172,7 @@ describe('useAuth', () => {
 
     expect(mocks.clearSessionStore).toHaveBeenCalled()
     expect(mocks.clearClientSession).toHaveBeenCalled()
-    expect(result.current.error).toEqual({ title: ERROR_SIGN_OUT_FAILED })
+    expect(result.current.error).toBeNull()
   })
 
   it('signs out locally when the sign-out request throws', async () => {
@@ -186,7 +185,7 @@ describe('useAuth', () => {
 
     expect(mocks.clearSessionStore).toHaveBeenCalled()
     expect(mocks.clearClientSession).toHaveBeenCalled()
-    expect(result.current.error).toEqual({ title: ERROR_SIGN_OUT_FAILED })
+    expect(result.current.error).toBeNull()
   })
 
   it('clears the client session when store deletion fails', async () => {
