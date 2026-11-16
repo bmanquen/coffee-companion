@@ -180,11 +180,9 @@ export function NewEspressoShot() {
     if (!keep.roastDate) form.setFieldValue('roastDate', next.roastDate)
     applyingPrefill.current = false
     // A prefill is not an edit: a lost save must replay under its first key.
-    if (priorKey) {
-      idempotencyKeys.current.set(
-        draftFingerprint(form.state.values),
-        priorKey,
-      )
+    const fingerprint = draftFingerprint(form.state.values)
+    if (priorKey && !idempotencyKeys.current.has(fingerprint)) {
+      idempotencyKeys.current.set(fingerprint, priorKey)
     }
   }
 

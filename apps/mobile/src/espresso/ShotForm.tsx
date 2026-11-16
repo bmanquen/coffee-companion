@@ -145,8 +145,9 @@ export function ShotForm({
     const priorKey = before.ok
       ? idempotencyKeys.get(draftFingerprint(before.value))
       : undefined
-    if (priorKey && after.ok) {
-      idempotencyKeys.set(draftFingerprint(after.value), priorKey)
+    const fingerprint = after.ok ? draftFingerprint(after.value) : undefined
+    if (priorKey && fingerprint && !idempotencyKeys.has(fingerprint)) {
+      idempotencyKeys.set(fingerprint, priorKey)
     }
     setDraft(fill)
     setFieldErrors((current) => {

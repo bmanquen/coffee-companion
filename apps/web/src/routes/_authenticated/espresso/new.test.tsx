@@ -853,6 +853,92 @@ describe('NewEspressoShot form', () => {
     }
   })
 
+  it('keeps the first key when a prefill restores an earlier failed draft', async () => {
+    const { Wrapper, fetchSpy } = seeded()
+    let lookups = 0
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) {
+        if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
+        lookups += 1
+        if (lookups === 2) throw new Error('Network request failed')
+        return trpcSuccess(
+          makeRecentShot({
+            id: 'shot-1',
+            coffeeId: COFFEE,
+            grinderId: GRINDER,
+            brewingDeviceId: ESP_DEVICE,
+            roastDate: '2026-05-01',
+          }),
+        )
+      }
+      if (isCreateCall(call)) throw new Error('Network request failed')
+      return trpcSuccess()
+    })
+    const pickCoffee = (id: string) =>
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: id },
+      })
+    const logAndSettle = async (count: number) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+    }
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      pickCoffee(COFFEE)
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        { target: { value: ESP_DEVICE } },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      await logAndSettle(1)
+
+      pickCoffee(COFFEE_B)
+      await waitFor(() => expect(prefillCalls(fetchSpy)).toHaveLength(2))
+      pickCoffee(COFFEE)
+      expect(
+        await screen.findByRole('button', { name: 'Try again' }),
+      ).toBeTruthy()
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      await logAndSettle(2)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      await logAndSettle(3)
+
+      const keys = createCalls(fetchSpy).map(
+        (call) =>
+          String((call[1] as RequestInit | undefined)?.body ?? '').match(
+            /"idempotencyKey"\s*:\s*"([^"]+)"/,
+          )?.[1],
+      )
+      expect(keys[1]).not.toBe(keys[0])
+      expect(keys[2]).toBe(keys[0])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('prefills a newly chosen coffee after a failed save', async () => {
     const providers = seeded()
     const { Wrapper, fetchSpy } = providers
