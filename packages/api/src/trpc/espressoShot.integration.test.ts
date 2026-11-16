@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '../db'
+import { daysAgo } from '../db/seed-e2e'
 import {
   brewingDeviceTypes,
   espressoShotIdempotencyKeys,
@@ -48,6 +49,43 @@ async function findOrCreateDeviceType(name: string): Promise<string> {
   const [row] = await db.insert(brewingDeviceTypes).values({ name }).returning()
   createdTypeIds.push(row.id)
   return row.id
+}
+
+// Node in this suite is America/Chicago. A session west of that is the
+// JS-Date vs defaultNow() split that UTC CI Postgres does not show.
+// Warm every pool slot (and await SET) so create() cannot check out a
+// fresh connection that still has the cluster TimeZone — pg does not
+// wait for 'connect' listeners.
+async function withPoolTimeZone<T>(
+  tz: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  const pool = db.$client
+  const original = (await pool.query<{ TimeZone: string }>('SHOW timezone'))
+    .rows[0]?.TimeZone
+  if (!original) {
+    throw new Error('SHOW timezone returned no TimeZone')
+  }
+  try {
+    await applyPoolTimeZone(pool, tz)
+    return await run()
+  } finally {
+    await applyPoolTimeZone(pool, original)
+  }
+}
+
+async function applyPoolTimeZone(pool: typeof db.$client, tz: string) {
+  const max = pool.options.max
+  const held: Array<Awaited<ReturnType<typeof pool.connect>>> = []
+  try {
+    for (let i = 0; i < max; i++) {
+      const client = await pool.connect()
+      await client.query('SELECT set_config($1, $2, false)', ['TimeZone', tz])
+      held.push(client)
+    }
+  } finally {
+    for (const client of held) client.release()
+  }
 }
 
 seedUsers([USER_A, USER_B, USER_REPLAY_STAMP], async () => {
@@ -708,6 +746,36 @@ describe('espressoShot.create idempotency', () => {
 })
 
 describe('espressoShot.getRecent', () => {
+  it('returns a later API create ahead of a daysAgo(0) seed row', async () => {
+    const coffee = await createCoffee(uniq('Js Clock Seed Coffee'))
+    await withPoolTimeZone('Pacific/Honolulu', async () => {
+      await db.insert(espressoShots).values({
+        userId: USER_A,
+        coffeeId: coffee.id,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+        createdAt: daysAgo(0),
+      })
+      const created = await asA.espressoShot.create({
+        coffeeId: coffee.id,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: '7',
+        idempotencyKey: crypto.randomUUID(),
+      })
+      const page = await asA.espressoShot.getRecent({
+        limit: 1,
+        coffeeId: coffee.id,
+      })
+      expect(page.items[0]?.id).toBe(created.id)
+    })
+  })
+
   it('returns the user shots with relations', async () => {
     const shots = (await asA.espressoShot.getRecent({ limit: 50 })).items
     expect(shots.length).toBeGreaterThanOrEqual(1)

@@ -28,7 +28,7 @@ import {
 import { db } from './index'
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS)
+export const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS)
 
 // Shared defaults (null userId); reuse or create so repeated runs don't
 // collide on the per-user unique name.
