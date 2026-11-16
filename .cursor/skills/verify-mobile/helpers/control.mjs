@@ -1295,6 +1295,71 @@ function ensureAdbReverses(serial, ports, reverse = adbReverse) {
   for (const port of ports) reverse(serial, port)
 }
 
+// Gboard's first text-keyboard focus opens a stylus handwriting sheet on
+// Pixel system images unless this secure setting is off.
+const STYLUS_HANDWRITING_SETTING = 'stylus_handwriting_enabled'
+const STYLUS_HANDWRITING_OFF = '0'
+
+function adbSettingsPutSecureArgs(serial, name, value) {
+  return ['-s', serial, 'shell', 'settings', 'put', 'secure', name, value]
+}
+
+function adbSettingsGetSecureArgs(serial, name) {
+  return ['-s', serial, 'shell', 'settings', 'get', 'secure', name]
+}
+
+function parseSecureSetting(stdout) {
+  const value = `${stdout ?? ''}`.trim()
+  if (!value || value === 'null') return null
+  return value
+}
+
+function stylusHandwritingIsOff(value) {
+  return parseSecureSetting(value) === STYLUS_HANDWRITING_OFF
+}
+
+function stylusHandwritingOnMessage(value) {
+  const current = parseSecureSetting(value) ?? 'unset'
+  return (
+    `emulator stylus handwriting is on ` +
+    `(secure ${STYLUS_HANDWRITING_SETTING}=${current}). ` +
+    `Set it to ${STYLUS_HANDWRITING_OFF} so a text field does not open ` +
+    `Gboard's stylus onboarding sheet.`
+  )
+}
+
+function ensureStylusHandwritingOff(
+  serial,
+  { put, get } = {},
+) {
+  const putFn =
+    put ??
+    ((target, name, value) => {
+      const result = runCapture(
+        adbBin(),
+        adbSettingsPutSecureArgs(target, name, value),
+        { allowFail: true },
+      )
+      if (result.status !== 0) {
+        throw new Error(
+          `adb settings put secure ${name} failed: ` +
+            `${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
+        )
+      }
+    })
+  const getFn =
+    get ??
+    ((target, name) =>
+      runCapture(adbBin(), adbSettingsGetSecureArgs(target, name), {
+        allowFail: true,
+      }).stdout)
+  putFn(serial, STYLUS_HANDWRITING_SETTING, STYLUS_HANDWRITING_OFF)
+  const got = getFn(serial, STYLUS_HANDWRITING_SETTING)
+  if (!stylusHandwritingIsOff(got)) {
+    throw new Error(stylusHandwritingOnMessage(got))
+  }
+}
+
 function adbOpenDevClientArgs({ serial, url, pkg }) {
   return [
     '-s',
@@ -1701,6 +1766,7 @@ function deviceReadyProblems({
   deviceStatusBody = null,
   checkedDeviceMetro = false,
   ui = null,
+  stylusHandwritingEnabled,
 } = {}) {
   const problems = []
   for (const port of missingAdbReverses(
@@ -1719,6 +1785,12 @@ function deviceReadyProblems({
     problems.push(
       `Metro is not reachable from the device at 127.0.0.1 (expected ${METRO_READY_MARKER})`,
     )
+  }
+  if (
+    stylusHandwritingEnabled !== undefined &&
+    !stylusHandwritingIsOff(stylusHandwritingEnabled)
+  ) {
+    problems.push(stylusHandwritingOnMessage(stylusHandwritingEnabled))
   }
   if (ui?.hasDevMenuOnboarding) {
     problems.push(devMenuOnboardingMessage())
@@ -3262,10 +3334,11 @@ async function cmdLaunchDevice(opts = {}) {
     persistLaunchPartial(partial)
 
     console.error(
-      `adb reverse tcp:${metroPort} and tcp:${webPort}; opening expo-development-client`,
+      `adb reverse tcp:${metroPort} and tcp:${webPort}; disable stylus handwriting; opening expo-development-client`,
     )
     adbReverse(DEVICE_SERIAL, metroPort)
     adbReverse(DEVICE_SERIAL, webPort)
+    ensureStylusHandwritingOff(DEVICE_SERIAL)
     const devClientUrl = expoDevClientUrl({ scheme, metroPort })
     openDevClient(DEVICE_SERIAL, devClientUrl, ANDROID_PACKAGE)
     await waitForAppForeground(DEVICE_SERIAL, APP_READY_TIMEOUT_MS)
@@ -3390,6 +3463,7 @@ async function cmdDriveDevice(flow) {
     die(preexistingInstallClearStateMessage(), EXIT_NOT_DRIVABLE)
   }
   ensureAdbReverses(state.serial, driveDeviceReversePorts(state))
+  ensureStylusHandwritingOff(state.serial)
   await requireDrivableDevice(state)
   const dest = join(artifactsDir, state.runId, flow)
   ensureDir(dest)
@@ -3880,6 +3954,11 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     ui = parseUiDump(adbUiDump(serial))
     deviceMetro = fetchDeviceMetroStatus(serial, metroPort)
     deviceE2E = fetchDeviceE2ESession(serial, webPort)
+    const stylusHandwritingEnabled = runCapture(
+      adbBin(),
+      adbSettingsGetSecureArgs(serial, STYLUS_HANDWRITING_SETTING),
+      { allowFail: true },
+    ).stdout
     problems.push(
       ...deviceReadyProblems({
         reverseList,
@@ -3887,6 +3966,7 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
         checkedDeviceMetro: deviceMetro.checked,
         deviceStatusBody: deviceMetro.body,
         ui,
+        stylusHandwritingEnabled,
       }),
     )
   }
@@ -4239,12 +4319,12 @@ function usage() {
   console.log(`Usage: helpers/control <launch|launch-device|doctor|drive|drive-device|verify-device|cleanup>
 
   launch              Start Expo Metro on VERIFY_METRO_PORT (default 8081)
-  launch-device       Attach or boot ${DEVICE_SERIAL} (AVD verify-pixel unless VERIFY_AVD is set); web on VERIFY_PORT (default 3910); rebuild if versionName is stale; reverse Metro/web; open the expo-development-client deep link
+  launch-device       Attach or boot ${DEVICE_SERIAL} (AVD verify-pixel unless VERIFY_AVD is set); web on VERIFY_PORT (default 3910); rebuild if versionName is stale; reverse Metro/web; disable stylus handwriting; open the expo-development-client deep link
   doctor              Read-only check that this instance is worth driving
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
   drive espresso      Log an Espresso Shot through the signed-in list and form
-  drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}; refuse clearState when ownedPackage is false
+  drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}; refuse clearState when ownedPackage is false; re-apply reverses and disable stylus handwriting
   verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); refuse a clearState flow on an attached preexisting install before Expo; the instance stays up if a later step fails
   cleanup             Stop recorded pids, free ports this helper recorded, uninstall a package this run owns; keep artifacts/
 
@@ -4280,6 +4360,14 @@ export {
   adbReverseArgs,
   driveDeviceReversePorts,
   ensureAdbReverses,
+  STYLUS_HANDWRITING_SETTING,
+  STYLUS_HANDWRITING_OFF,
+  adbSettingsPutSecureArgs,
+  adbSettingsGetSecureArgs,
+  parseSecureSetting,
+  stylusHandwritingIsOff,
+  stylusHandwritingOnMessage,
+  ensureStylusHandwritingOff,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   adbShellCookieGetCommands,

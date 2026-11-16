@@ -61,6 +61,14 @@ import {
   adbReverseArgs,
   driveDeviceReversePorts,
   ensureAdbReverses,
+  STYLUS_HANDWRITING_SETTING,
+  STYLUS_HANDWRITING_OFF,
+  adbSettingsPutSecureArgs,
+  adbSettingsGetSecureArgs,
+  parseSecureSetting,
+  stylusHandwritingIsOff,
+  stylusHandwritingOnMessage,
+  ensureStylusHandwritingOff,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   adbShellCookieGetCommands,
@@ -1361,6 +1369,75 @@ describe('driveDeviceReversePorts', () => {
   })
 })
 
+describe('stylus handwriting setting', () => {
+  it('puts and reads the secure stylus_handwriting_enabled flag', () => {
+    assert.deepEqual(
+      adbSettingsPutSecureArgs(
+        DEVICE_SERIAL,
+        STYLUS_HANDWRITING_SETTING,
+        STYLUS_HANDWRITING_OFF,
+      ),
+      [
+        '-s',
+        DEVICE_SERIAL,
+        'shell',
+        'settings',
+        'put',
+        'secure',
+        STYLUS_HANDWRITING_SETTING,
+        STYLUS_HANDWRITING_OFF,
+      ],
+    )
+    assert.deepEqual(
+      adbSettingsGetSecureArgs(DEVICE_SERIAL, STYLUS_HANDWRITING_SETTING),
+      [
+        '-s',
+        DEVICE_SERIAL,
+        'shell',
+        'settings',
+        'get',
+        'secure',
+        STYLUS_HANDWRITING_SETTING,
+      ],
+    )
+    assert.equal(parseSecureSetting('0\n'), '0')
+    assert.equal(parseSecureSetting('null'), null)
+    assert.equal(parseSecureSetting(''), null)
+    assert.equal(stylusHandwritingIsOff('0'), true)
+    assert.equal(stylusHandwritingIsOff('1'), false)
+    assert.equal(stylusHandwritingIsOff('null'), false)
+    assert.match(stylusHandwritingOnMessage('1'), /stylus_handwriting_enabled=1/)
+  })
+
+  it('puts 0 then fails closed if the emulator still reports it on', () => {
+    const puts = []
+    ensureStylusHandwritingOff(DEVICE_SERIAL, {
+      put: (serial, name, value) => {
+        puts.push([serial, name, value])
+      },
+      get: () => '0',
+    })
+    assert.deepEqual(puts, [
+      [DEVICE_SERIAL, STYLUS_HANDWRITING_SETTING, STYLUS_HANDWRITING_OFF],
+    ])
+    ensureStylusHandwritingOff(DEVICE_SERIAL, {
+      put: (serial, name, value) => {
+        puts.push([serial, name, value])
+      },
+      get: () => '0',
+    })
+    assert.equal(puts.length, 2)
+    assert.throws(
+      () =>
+        ensureStylusHandwritingOff(DEVICE_SERIAL, {
+          put: () => {},
+          get: () => '1',
+        }),
+      /stylus_handwriting_enabled=1/,
+    )
+  })
+})
+
 describe('quoteForAdbShell', () => {
   it('single-quotes so device sh does not split on &', () => {
     assert.equal(quoteForAdbShell('a&b'), "'a&b'")
@@ -1944,6 +2021,7 @@ describe('verify-mobile usage defaults', () => {
     assert.match(usage, /VERIFY_PORT \(default 3910\)/)
     assert.match(usage, /refuse clearState when ownedPackage is false/)
     assert.match(usage, /refuse a clearState flow on an attached preexisting install before Expo/)
+    assert.match(usage, /disable stylus handwriting/)
     assert.doesNotMatch(usage, /VERIFY_AVD=Pixel_7/)
   })
 
@@ -1974,6 +2052,13 @@ describe('verify-mobile usage defaults', () => {
     assert.match(text, /launchApp. without .clearState/)
     assert.match(text, /session restore/)
     assert.match(text, /as soon as the process is spawned/)
+  })
+
+  it('documents stylus handwriting is disabled on the emulator', () => {
+    const text = skill()
+    assert.match(text, /stylus_handwriting_enabled/)
+    assert.match(controlSrc(), /ensureStylusHandwritingOff\(DEVICE_SERIAL\)/)
+    assert.match(controlSrc(), /ensureStylusHandwritingOff\(state\.serial\)/)
   })
 
   it('documents Homebrew trees are skipped and a named-parent Studio SDK is accepted', () => {
@@ -3118,6 +3203,30 @@ describe('deviceReadyProblems', () => {
       ),
     })
     assert.ok(problems.some((problem) => /developer menu is covering/.test(problem)))
+  })
+
+  it('flags stylus handwriting left on', () => {
+    const problems = deviceReadyProblems({
+      reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
+      requiredPorts: [8081, 3910],
+      checkedDeviceMetro: true,
+      deviceStatusBody: 'packager-status:running',
+      ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
+      stylusHandwritingEnabled: '1',
+    })
+    assert.ok(problems.some((problem) => /stylus handwriting is on/.test(problem)))
+  })
+
+  it('is empty when stylus handwriting is off', () => {
+    const problems = deviceReadyProblems({
+      reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
+      requiredPorts: [8081, 3910],
+      checkedDeviceMetro: true,
+      deviceStatusBody: 'packager-status:running',
+      ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
+      stylusHandwritingEnabled: '0',
+    })
+    assert.deepEqual(problems, [])
   })
 
   it('flags the first-run developer-menu sheet as covering the app', () => {
