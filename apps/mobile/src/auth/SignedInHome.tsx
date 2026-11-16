@@ -23,11 +23,13 @@ export function SignedInHome({
   name,
   userId,
   onSignOut,
+  signOutError = null,
   espresso = idleEspressoApi,
 }: {
   name: string
   userId: string
   onSignOut: () => void
+  signOutError?: string | null
   espresso?: EspressoApi
 }) {
   return (
@@ -36,6 +38,7 @@ export function SignedInHome({
         name={name}
         userId={userId}
         onSignOut={onSignOut}
+        signOutError={signOutError}
         espresso={espresso}
       />
     </QueryProvider>
@@ -46,11 +49,13 @@ function Home({
   name,
   userId,
   onSignOut,
+  signOutError,
   espresso,
 }: {
   name: string
   userId: string
   onSignOut: () => void
+  signOutError: string | null
   espresso: EspressoApi
 }) {
   const [screen, setScreen] = useState<Screen>('list')
@@ -91,6 +96,9 @@ function Home({
         >
           <Text>{SIGN_OUT}</Text>
         </Pressable>
+        {signOutError ? (
+          <Text accessibilityRole="alert">{signOutError}</Text>
+        ) : null}
       </View>
       {loadError && screen === 'list' ? (
         <View style={styles.loadError}>

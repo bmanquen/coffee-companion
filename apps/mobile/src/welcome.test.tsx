@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react-native'
 import { App } from './App'
-import { SIGN_OUT } from './auth/copy'
+import { ERROR_SIGN_OUT_FAILED, SIGN_OUT } from './auth/copy'
 import { SHOT_LIST_TEST_ID } from './espresso/copy'
 import { writeHostTreeArtifacts } from './test/host-tree'
 import {
@@ -51,5 +51,13 @@ describe('App welcome screen', () => {
     expect(screen.getByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
 
     writeHostTreeArtifacts(view)
+  })
+
+  it('shows a sign-out failure on the signed-in screen', async () => {
+    await render(
+      <App auth={{ ...signedIn, error: { title: ERROR_SIGN_OUT_FAILED } }} />,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent(ERROR_SIGN_OUT_FAILED)
   })
 })

@@ -5,6 +5,7 @@ import {
   ERROR_SIGN_IN_CONFLICT_TITLE,
   ERROR_SIGN_IN_FAILED,
   ERROR_SIGN_IN_UNAVAILABLE,
+  ERROR_SIGN_OUT_FAILED,
 } from './copy'
 import {
   PlayServicesMissing,
@@ -188,16 +189,24 @@ describe('useAuth', () => {
     expect(result.current.error).toBeNull()
   })
 
-  it('clears the client session when store deletion fails', async () => {
+  it('stays signed in and reports it when store deletion fails', async () => {
     mocks.clearSessionStore.mockRejectedValueOnce(new Error('secure store'))
     const { result } = await renderHook(() => useAuth())
 
     await act(async () => {
-      await expect(result.current.signOut()).rejects.toThrow('secure store')
+      await result.current.signOut()
     })
 
-    expect(mocks.clearSessionStore).toHaveBeenCalled()
+    expect(mocks.clearClientSession).not.toHaveBeenCalled()
+    expect(result.current.error).toEqual({ title: ERROR_SIGN_OUT_FAILED })
+
+    await act(async () => {
+      await result.current.signOut()
+    })
+
+    expect(mocks.clearSessionStore).toHaveBeenCalledTimes(2)
     expect(mocks.clearClientSession).toHaveBeenCalled()
+    expect(result.current.error).toBeNull()
   })
 
   it('still revokes the server session when Google sign-out throws', async () => {
