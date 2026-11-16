@@ -92,9 +92,11 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
           // fetchQuery would otherwise hand the next form a prefill read before this shot
           queryClient.removeQueries({ queryKey: ['espresso-prefill', userId] })
           onSuccess?.()
-          void queryClient.invalidateQueries({
-            queryKey: [ESPRESSO_SHOTS_QUERY_KEY, userId],
-          })
+          const shotsFilter = { queryKey: [ESPRESSO_SHOTS_QUERY_KEY, userId] }
+          // With no cached page, invalidate would reuse a read started before this save.
+          void queryClient
+            .cancelQueries(shotsFilter)
+            .then(() => queryClient.invalidateQueries(shotsFilter))
         },
         onError: (error) => {
           setSaveError(apiErrorMessage(error, ERROR_SAVE_FAILED))

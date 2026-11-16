@@ -299,6 +299,43 @@ describe('useEspressoCatalog', () => {
     )
   })
 
+  it('reads the shots again after a save when the only read in flight started before it', async () => {
+    const saved = shot({ id: 'shot-saved', coffeeName: 'Saved' })
+    let resolveStale: (page: ShotPage) => void = () => {}
+    const stale = new Promise<ShotPage>((resolve) => {
+      resolveStale = resolve
+    })
+    let listCalls = 0
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      listShots: () => {
+        listCalls += 1
+        if (listCalls === 1) return stale
+        return Promise.resolve({ items: [saved], total: 1, nextCursor: null })
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {},
+    }
+    const { result } = await renderCatalog(api)
+    await waitFor(() => expect(result.current.catalog).not.toBeNull())
+
+    await act(async () => {
+      result.current.save(shotInput)
+      await Promise.resolve()
+    })
+    await act(async () => {
+      resolveStale({ items: [], total: 0, nextCursor: null })
+      await Promise.resolve()
+    })
+
+    await waitFor(() =>
+      expect(result.current.catalog?.shots.map((row) => row.id)).toEqual([
+        saved.id,
+      ]),
+    )
+    expect(listCalls).toBe(2)
+  })
+
   it('reports a save that fails while offline instead of staying busy', async () => {
     const create = jest.fn(() => Promise.reject(new TypeError('Network request failed')))
     const api: EspressoApi = {
