@@ -967,6 +967,92 @@ describe('EspressoBrewsSection', () => {
     }
   }, LOAD_MORE_DURING_FILTER_TIMEOUT_MS)
 
+  it('keeps a deleted shot out of a history page that was loading', async () => {
+    let settleLoadMore = () => {}
+    const pendingLoadMore = new Promise<Response>((resolve) => {
+      settleLoadMore = () =>
+        resolve(
+          trpcSuccess({ items: [], total: ESPRESSO_SHOT_PAGE_SIZE, nextCursor: null }),
+        )
+    })
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input, init) => {
+        if (isEspressoCursorRequest(input, init)) return pendingLoadMore
+        if (String(input).includes('espressoShot.getRecent')) {
+          return Promise.resolve(
+            trpcSuccess({ items: [], total: 0, nextCursor: null }),
+          )
+        }
+        return Promise.resolve(trpcSuccess())
+      })
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+        makeRecentShot({
+          id: espressoShotFixtureId(index),
+          coffeeId: `c${index}`,
+          coffee: makeRecentCoffee({
+            id: `c${index}`,
+            name: index === 0 ? 'Colombia Huila' : `Coffee ${index}`,
+          }),
+        }),
+      )
+      seedLog(queryClient, trpc, first, first.length + 1)
+      seedEspressoShotPage(queryClient, trpc, [first[0]], 1, undefined, {
+        q: 'Huila',
+      })
+      queryClient.setQueryData(trpc.dialedInBrew.list.queryKey(), [])
+
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Load more' }),
+        ).toHaveProperty('disabled', true),
+      )
+      fireEvent.change(screen.getByPlaceholderText('Filter shots...'), {
+        target: { value: 'Huila' },
+      })
+      await waitFor(
+        () =>
+          expect(
+            within(screen.getByRole('table')).queryByText('Coffee 1'),
+          ).toBeNull(),
+        { timeout: FILTER_SETTLE_TIMEOUT_MS },
+      )
+
+      fireEvent.click(
+        within(screen.getByRole('table')).getByRole('button', {
+          name: 'Delete shot',
+        }),
+      )
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: 'Delete',
+        }),
+      )
+      await waitFor(() =>
+        expect(
+          within(screen.getByRole('table')).queryByText('Colombia Huila'),
+        ).toBeNull(),
+      )
+      settleLoadMore()
+      await act(async () => {
+        await pendingLoadMore
+      })
+
+      const history = queryClient.getQueryData(
+        espressoShotInfiniteOptions(trpc).queryKey,
+      )
+      const ids = history?.pages.flatMap((page) => page.items.map((s) => s.id))
+      expect(ids).not.toContain(first[0].id)
+    } finally {
+      settleLoadMore()
+      fetchSpy.mockRestore()
+    }
+  }, LOAD_MORE_DURING_FILTER_TIMEOUT_MS)
+
   it('retries a failed load-more from the error', async () => {
     const extra = makeRecentShot({
       id: espressoShotFixtureId(20),

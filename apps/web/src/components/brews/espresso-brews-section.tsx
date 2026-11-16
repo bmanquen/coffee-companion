@@ -71,7 +71,11 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
   const removeShot = useContext(RemoveShotContext)
   const deleteShot = useMutation(
     trpc.espressoShot.delete.mutationOptions({
-      onSuccess: (_deleted, shotId) => {
+      onSuccess: async (_deleted, shotId) => {
+        // An in-flight page would write its pre-delete snapshot back.
+        await queryClient.cancelQueries(
+          trpc.espressoShot.getRecent.infiniteQueryFilter(),
+        )
         removeShot(shotId)
         queryClient.invalidateQueries(
           trpc.espressoShot.getRecent.infiniteQueryFilter(),
