@@ -25,7 +25,6 @@ const mocks = {
   getSession: jest.fn(),
   refetchClientSession: jest.fn(),
   clearClientSession: jest.fn(),
-  hasClientSession: jest.fn(),
   clearSessionStore: jest.fn(),
   writeE2EAuthCookie: jest.fn(),
   readSessionCookie: jest.fn(),
@@ -61,7 +60,6 @@ jest.mock('./auth-client', () => ({
   },
   refetchClientSession: () => mocks.refetchClientSession(),
   clearClientSession: () => mocks.clearClientSession(),
-  hasClientSession: () => mocks.hasClientSession(),
 }))
 
 describe('useAuth', () => {
@@ -78,8 +76,6 @@ describe('useAuth', () => {
     mocks.getSession.mockReset()
     mocks.refetchClientSession.mockReset()
     mocks.clearClientSession.mockReset()
-    mocks.hasClientSession.mockReset()
-    mocks.hasClientSession.mockReturnValue(true)
     mocks.clearSessionStore.mockReset()
     mocks.writeE2EAuthCookie.mockReset()
     mocks.readSessionCookie.mockReset()
@@ -195,6 +191,7 @@ describe('useAuth', () => {
 
   it('stays signed in and reports it when store deletion fails', async () => {
     mocks.clearSessionStore.mockRejectedValueOnce(new Error('secure store'))
+    mocks.readSessionCookie.mockReturnValue('{"session_token":{"value":"t"}}')
     const { result } = await renderHook(() => useAuth())
 
     await act(async () => {
@@ -213,9 +210,9 @@ describe('useAuth', () => {
     expect(result.current.error).toBeNull()
   })
 
-  it('finishes signing out when store deletion fails after the library cleared the session', async () => {
+  it('finishes signing out when store deletion fails after the library blanked the cookie', async () => {
     mocks.clearSessionStore.mockRejectedValueOnce(new Error('secure store'))
-    mocks.hasClientSession.mockReturnValue(false)
+    mocks.readSessionCookie.mockReturnValue('{}')
     const { result } = await renderHook(() => useAuth())
 
     await act(async () => {
@@ -224,6 +221,21 @@ describe('useAuth', () => {
 
     expect(mocks.clearClientSession).toHaveBeenCalled()
     expect(result.current.error).toBeNull()
+  })
+
+  it('stays signed in when the stored cookie cannot be read after store deletion fails', async () => {
+    mocks.clearSessionStore.mockRejectedValueOnce(new Error('secure store'))
+    mocks.readSessionCookie.mockImplementation(() => {
+      throw new Error('keychain locked')
+    })
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signOut()
+    })
+
+    expect(mocks.clearClientSession).not.toHaveBeenCalled()
+    expect(result.current.error).toEqual({ title: ERROR_SIGN_OUT_FAILED })
   })
 
   it('still revokes the server session when Google sign-out throws', async () => {

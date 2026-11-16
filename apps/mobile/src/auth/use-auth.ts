@@ -3,7 +3,6 @@ import { appleSignInAvailable, signInWithApple } from './apple'
 import {
   authClient,
   clearClientSession,
-  hasClientSession,
   refetchClientSession,
 } from './auth-client'
 import {
@@ -54,6 +53,16 @@ export type Auth = {
   signInApple: () => Promise<void>
   signInE2E: () => Promise<void>
   signOut: () => Promise<void>
+}
+
+// expoClient blanks the stored cookie to "{}" on sign-out; anything else could sign back in.
+function storedCookieErased() {
+  try {
+    const cookie = readSessionCookie()
+    return !cookie || cookie === '{}'
+  } catch {
+    return false
+  }
 }
 
 export function useAuth(): Auth {
@@ -167,9 +176,7 @@ export function useAuth(): Auth {
             ...serverFailureDetail(caught),
             message: failureMessage(caught),
           })
-          // expoClient blanks the stored cookie before it clears the session,
-          // so only a live session could sign the user back in on next launch.
-          if (hasClientSession()) {
+          if (!storedCookieErased()) {
             setError({ title: ERROR_SIGN_OUT_FAILED })
             return
           }
