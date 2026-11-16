@@ -127,7 +127,10 @@ function Home({
           onClearError={clearSaveError}
           onSubmit={(input) => {
             save(input, () => {
-              idempotencyKeys.current.clear()
+              const keys = idempotencyKeys.current
+              for (const [draft, key] of keys) {
+                if (key === input.idempotencyKey) keys.delete(draft)
+              }
               setScreen('list')
             })
           }}
