@@ -81,8 +81,8 @@ async function applyPoolTimeZone(pool: typeof db.$client, tz: string) {
   try {
     for (let i = 0; i < max; i++) {
       const client = await pool.connect()
-      await client.query('SELECT set_config($1, $2, false)', ['TimeZone', tz])
       held.push(client)
+      await client.query('SELECT set_config($1, $2, false)', ['TimeZone', tz])
     }
   } finally {
     for (const client of held) client.release()
