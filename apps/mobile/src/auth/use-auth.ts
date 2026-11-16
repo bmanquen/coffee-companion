@@ -1,6 +1,11 @@
 import { useRef, useState } from 'react'
 import { appleSignInAvailable, signInWithApple } from './apple'
-import { authClient, clearClientSession, refetchClientSession } from './auth-client'
+import {
+  authClient,
+  clearClientSession,
+  hasClientSession,
+  refetchClientSession,
+} from './auth-client'
 import {
   ERROR_PLAY_SERVICES,
   ERROR_SIGN_IN_CONFLICT_BODY,
@@ -158,13 +163,16 @@ export function useAuth(): Auth {
         try {
           await clearSessionStore()
         } catch (caught) {
-          // The stored cookie would sign the user back in on next launch.
           logAuthFailure('sign-out', {
             ...serverFailureDetail(caught),
             message: failureMessage(caught),
           })
-          setError({ title: ERROR_SIGN_OUT_FAILED })
-          return
+          // expoClient blanks the stored cookie before it clears the session,
+          // so only a live session could sign the user back in on next launch.
+          if (hasClientSession()) {
+            setError({ title: ERROR_SIGN_OUT_FAILED })
+            return
+          }
         }
         clearClientSession()
       } finally {

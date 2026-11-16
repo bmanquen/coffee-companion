@@ -25,6 +25,7 @@ const mocks = {
   getSession: jest.fn(),
   refetchClientSession: jest.fn(),
   clearClientSession: jest.fn(),
+  hasClientSession: jest.fn(),
   clearSessionStore: jest.fn(),
   writeE2EAuthCookie: jest.fn(),
   readSessionCookie: jest.fn(),
@@ -60,6 +61,7 @@ jest.mock('./auth-client', () => ({
   },
   refetchClientSession: () => mocks.refetchClientSession(),
   clearClientSession: () => mocks.clearClientSession(),
+  hasClientSession: () => mocks.hasClientSession(),
 }))
 
 describe('useAuth', () => {
@@ -76,6 +78,8 @@ describe('useAuth', () => {
     mocks.getSession.mockReset()
     mocks.refetchClientSession.mockReset()
     mocks.clearClientSession.mockReset()
+    mocks.hasClientSession.mockReset()
+    mocks.hasClientSession.mockReturnValue(true)
     mocks.clearSessionStore.mockReset()
     mocks.writeE2EAuthCookie.mockReset()
     mocks.readSessionCookie.mockReset()
@@ -205,6 +209,19 @@ describe('useAuth', () => {
     })
 
     expect(mocks.clearSessionStore).toHaveBeenCalledTimes(2)
+    expect(mocks.clearClientSession).toHaveBeenCalled()
+    expect(result.current.error).toBeNull()
+  })
+
+  it('finishes signing out when store deletion fails after the library cleared the session', async () => {
+    mocks.clearSessionStore.mockRejectedValueOnce(new Error('secure store'))
+    mocks.hasClientSession.mockReturnValue(false)
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signOut()
+    })
+
     expect(mocks.clearClientSession).toHaveBeenCalled()
     expect(result.current.error).toBeNull()
   })

@@ -71,6 +71,10 @@ export async function refetchClientSession() {
 
 // signOut's delayed get-session can re-read the E2E cookie before SecureStore
 // delete finishes. Force the atom empty after the store is cleared.
+export function hasClientSession() {
+  return Boolean(sessionAtom().get().data)
+}
+
 export function clearClientSession() {
   // Drop in-flight get-session bodies so a late 200 cannot refill the atom
   // or the Expo session cache after sign-out.
