@@ -27,8 +27,12 @@ import {
 } from './schema'
 import { db } from './index'
 
-const DAY_MS = 24 * 60 * 60 * 1000
-export const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS)
+// Database clock, not `new Date()`. node-pg writes a Date as Node local wall
+// into timestamp-without-time-zone (offset dropped), while defaultNow() writes
+// the session TimeZone wall. Mixed writers invert recency when those walls
+// disagree — the e2e "brewed now" row sorted above a shot logged a minute later.
+export const daysAgo = (days: number) =>
+  sql`now() - (${days}::int * interval '1 day')`
 
 // Shared defaults (null userId); reuse or create so repeated runs don't
 // collide on the per-user unique name.
