@@ -64,6 +64,7 @@ export function ShotForm({
   onClearError,
   onSubmit,
   loadPrefill,
+  idempotencyKeys,
 }: {
   catalog: EspressoCatalog
   busy: boolean
@@ -72,11 +73,12 @@ export function ShotForm({
   onClearError: () => void
   onSubmit: (input: ShotCreate) => void
   loadPrefill: (coffeeId: string) => Promise<ShotRow | null>
+  // Owned above the form so a save whose response was lost replays after Back.
+  idempotencyKeys: Map<string, string>
 }) {
   const [draft, setDraft] = useState<ShotDraft>(emptyShotDraft)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [prefillError, setPrefillError] = useState(false)
-  const idempotencyKeys = useRef(new Map<string, string>())
   const prefillSeq = useRef(0)
   const prefillCoffeeId = useRef('')
   const keepPrefill = useRef<PrefillKeep>({})
@@ -346,10 +348,10 @@ export function ShotForm({
             return
           }
           const fingerprint = draftFingerprint(parsed.value)
-          let idempotencyKey = idempotencyKeys.current.get(fingerprint)
+          let idempotencyKey = idempotencyKeys.get(fingerprint)
           if (!idempotencyKey) {
             idempotencyKey = newIdempotencyKey()
-            idempotencyKeys.current.set(fingerprint, idempotencyKey)
+            idempotencyKeys.set(fingerprint, idempotencyKey)
           }
           saveInFlight.current = true
           saveGen.current += 1

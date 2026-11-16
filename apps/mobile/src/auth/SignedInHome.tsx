@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { ShotForm } from '../espresso/ShotForm'
 import { ShotList } from '../espresso/ShotList'
@@ -59,6 +59,7 @@ function Home({
   espresso: EspressoApi
 }) {
   const [screen, setScreen] = useState<Screen>('list')
+  const idempotencyKeys = useRef(new Map<string, string>())
   const {
     catalog,
     loading,
@@ -118,13 +119,17 @@ function Home({
           busy={busy}
           error={saveError}
           loadPrefill={loadPrefill}
+          idempotencyKeys={idempotencyKeys.current}
           onBack={() => {
             clearSaveError()
             setScreen('list')
           }}
           onClearError={clearSaveError}
           onSubmit={(input) => {
-            save(input, () => setScreen('list'))
+            save(input, () => {
+              idempotencyKeys.current.clear()
+              setScreen('list')
+            })
           }}
         />
       ) : (

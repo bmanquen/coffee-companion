@@ -1188,6 +1188,43 @@ describe('log espresso shot', () => {
     expect(screen.getAllByText('Ethiopia Guji')).toHaveLength(1)
   })
 
+  it('replays a lost create after Back and uses a new key once it saves', async () => {
+    const keys: Array<string> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog()),
+      loadPrefill: () => Promise.resolve(seedShot()),
+      create: (input) =>
+        Promise.resolve().then(() => {
+          keys.push(input.idempotencyKey)
+          if (keys.length === 1) throw new Error('Network request failed')
+        }),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
+    await press(BACK)
+
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
+
+    expect(keys).toHaveLength(3)
+    expect(keys[1]).toBe(keys[0])
+    expect(keys[2]).not.toBe(keys[0])
+  })
+
   it('loads the next page when the list reaches the end', async () => {
     const all = Array.from({ length: 25 }, (_, index) =>
       seedShot({
@@ -1560,6 +1597,7 @@ describe('log espresso shot', () => {
             { id: GRINDER_B, name: 'P64' },
           ],
         })}
+        idempotencyKeys={new Map()}
         busy={false}
         error={error}
         onBack={() => {}}
