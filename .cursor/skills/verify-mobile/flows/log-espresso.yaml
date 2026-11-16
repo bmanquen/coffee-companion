@@ -90,18 +90,50 @@ appId: dev.offbyonelabs.coffeecompanion
 - copyTextFrom:
     id: select-value-brewing-device
 - assertTrue: ${maestro.copiedText == "Linea Mini"}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: field-dose-g
+    visibilityPercentage: 100
 - tapOn:
     id: field-dose-g
 - inputText: "18"
+- copyTextFrom:
+    id: field-dose-g
+- assertTrue: ${maestro.copiedText == "18"}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: field-yield-g
+    visibilityPercentage: 100
 - tapOn:
     id: field-yield-g
 - inputText: "36"
+- copyTextFrom:
+    id: field-yield-g
+- assertTrue: ${maestro.copiedText == "36"}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: field-time-s
+    visibilityPercentage: 100
 - tapOn:
     id: field-time-s
 - inputText: "30"
+- copyTextFrom:
+    id: field-time-s
+- assertTrue: ${maestro.copiedText == "30"}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: field-grind-setting
+    visibilityPercentage: 100
 - tapOn:
     id: field-grind-setting
 - inputText: "7"
+- copyTextFrom:
+    id: field-grind-setting
+- assertTrue: ${maestro.copiedText == "7"}
 - hideKeyboard
 - tapOn:
     id: shot-form-log

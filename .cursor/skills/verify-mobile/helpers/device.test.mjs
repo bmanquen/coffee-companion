@@ -3175,6 +3175,38 @@ describe('maestroDeviceArgs', () => {
   })
 })
 
+describe('log-espresso flow', () => {
+  const flow = () =>
+    readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../flows/log-espresso.yaml'),
+      'utf8',
+    )
+
+  function fillVisibleField(id, value) {
+    return new RegExp(
+      `hideKeyboard\\n- scrollUntilVisible:\\n\\s+element:\\n\\s+id: ${id}\\n\\s+visibilityPercentage: 100\\n- tapOn:\\n\\s+id: ${id}\\n- inputText: "${value}"\\n- copyTextFrom:\\n\\s+id: ${id}\\n- assertTrue: \\$\\{maestro\\.copiedText == "${value}"\\}`,
+    )
+  }
+
+  it('dismisses the keyboard and scrolls each recipe field into view before typing', () => {
+    const yaml = flow()
+    assert.match(yaml, fillVisibleField('field-dose-g', '18'))
+    assert.match(yaml, fillVisibleField('field-yield-g', '36'))
+    assert.match(yaml, fillVisibleField('field-time-s', '30'))
+    assert.match(yaml, fillVisibleField('field-grind-setting', '7'))
+    const logAt = yaml.indexOf('id: shot-form-log')
+    assert.ok(logAt > yaml.lastIndexOf('hideKeyboard'))
+  })
+
+  it('still requires the new shot as the first summary row', () => {
+    const yaml = flow()
+    assert.match(
+      yaml,
+      /id: shot-summary\n\s+index: 0\n- assertTrue: \$\{maestro\.copiedText == "Grind 7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"\}/,
+    )
+  })
+})
+
 describe('sign-in-and-out flow', () => {
   const flow = () =>
     readFileSync(
