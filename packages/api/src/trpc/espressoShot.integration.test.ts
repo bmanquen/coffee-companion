@@ -28,6 +28,7 @@ import type { PoolClient } from 'pg'
 const USER_A = 'espresso-user-a'
 const USER_B = 'espresso-user-b'
 const USER_REPLAY_STAMP = 'espresso-user-replay-stamp'
+const USER_GEAR_OWNER = 'espresso-user-gear-owner'
 const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
 const uniq = uniqFor(USER_A)
@@ -37,6 +38,8 @@ let espressoDeviceId: string
 let pourOverDeviceId: string
 let grinderId: string
 let coffeeAId: string
+let foreignCoffeeId: string
+let foreignGrinderId: string
 
 // Device types are globally unique; reuse existing rows or create-and-track new
 // ones so cleanup never deletes seeded data on a shared database.
@@ -89,7 +92,7 @@ async function applyPoolTimeZone(pool: typeof db.$client, tz: string) {
   }
 }
 
-seedUsers([USER_A, USER_B, USER_REPLAY_STAMP], async () => {
+seedUsers([USER_A, USER_B, USER_REPLAY_STAMP, USER_GEAR_OWNER], async () => {
   if (createdTypeIds.length) {
     await db
       .delete(brewingDeviceTypes)
@@ -123,6 +126,15 @@ beforeAll(async () => {
 
   const coffee = await createCoffee(uniq('Ethiopia Guji'))
   coffeeAId = coffee.id
+
+  const asOwner = callerFor(USER_GEAR_OWNER)
+  const uniqOwner = uniqFor(USER_GEAR_OWNER)
+  const [foreignCoffee, foreignGrinder] = await Promise.all([
+    createCoffeeFor(asOwner, uniqOwner)(uniqOwner('Kenya')),
+    asOwner.grinder.create({ name: uniqOwner('Comandante'), brand: 'Comandante' }),
+  ])
+  foreignCoffeeId = foreignCoffee.id
+  foreignGrinderId = foreignGrinder.id
 })
 
 describe('espressoShot.create', () => {
@@ -190,6 +202,36 @@ describe('espressoShot.create', () => {
       idempotencyKey: crypto.randomUUID(),
       }),
     ).rejects.toThrow(/not found/i)
+  })
+
+  it("rejects another user's coffee", async () => {
+    await expect(
+      asA.espressoShot.create({
+        coffeeId: foreignCoffeeId,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: '1.5',
+        idempotencyKey: crypto.randomUUID(),
+      }),
+    ).rejects.toThrow(/Coffee not found/)
+  })
+
+  it("rejects another user's grinder", async () => {
+    await expect(
+      asA.espressoShot.create({
+        coffeeId: coffeeAId,
+        grinderId: foreignGrinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: '1.5',
+        idempotencyKey: crypto.randomUUID(),
+      }),
+    ).rejects.toThrow(/Grinder not found/)
   })
 })
 
@@ -312,6 +354,31 @@ describe('espressoShot.update', () => {
         grindSetting: '1.5',
       }),
     ).rejects.toThrow(/Espresso/)
+  })
+
+  it("rejects another user's coffee", async () => {
+    const created = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    await expect(
+      asA.espressoShot.update({
+        id: created.id,
+        coffeeId: foreignCoffeeId,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: '1.5',
+      }),
+    ).rejects.toThrow(/Coffee not found/)
   })
 
   it('throws NOT_FOUND for an unknown id', async () => {

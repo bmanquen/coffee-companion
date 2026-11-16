@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
-import { brewingDeviceTypes } from '../db/schema'
+import { brewingDeviceTypes, espressoShots } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
 import { COLD_BREW_DEVICE_TYPE } from '../lib/cold-brew'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
@@ -290,16 +290,20 @@ describe('account.export', () => {
   })
 
   it('omits another user’s Coffee or grinder nested on an owned Brew', async () => {
-    const shot = await asUser.espressoShot.create({
-      coffeeId: otherCoffeeId,
-      grinderId: otherGrinderId,
-      brewingDeviceId: userEspressoDeviceId,
-      dose: '20',
-      yield: '40',
-      time: 25,
-      grindSetting: 'cross-user',
-      idempotencyKey: crypto.randomUUID(),
-    })
+    // The API now refuses this; rows saved before it did can still exist.
+    const [shot] = await db
+      .insert(espressoShots)
+      .values({
+        userId: USER,
+        coffeeId: otherCoffeeId,
+        grinderId: otherGrinderId,
+        brewingDeviceId: userEspressoDeviceId,
+        dose: '20',
+        yield: '40',
+        time: 25,
+        grindSetting: 'cross-user',
+      })
+      .returning()
 
     const exported = await asUser.account.export()
     const brew = exported.brews.espresso.find((row) => row.id === shot.id)

@@ -237,13 +237,31 @@ async function loadRecentPage(
   }
 }
 
-// Espresso shots must be brewed on an Espresso-type device. Throws if the
-// device is missing, owned by another user, or not an espresso device.
-async function assertEspressoDevice(brewingDeviceId: string, userId: string) {
-  const device = await db.query.brewingDevices.findFirst({
-    where: { id: brewingDeviceId, userId },
-    with: { type: true },
-  })
+// Every reference must be the user's own, and the device an Espresso one.
+async function assertOwnEspressoGear(
+  input: { coffeeId: string; grinderId: string; brewingDeviceId: string },
+  userId: string,
+) {
+  const [coffee, grinder, device] = await Promise.all([
+    db.query.coffees.findFirst({
+      where: { id: input.coffeeId, userId },
+      columns: { id: true },
+    }),
+    db.query.grinders.findFirst({
+      where: { id: input.grinderId, userId },
+      columns: { id: true },
+    }),
+    db.query.brewingDevices.findFirst({
+      where: { id: input.brewingDeviceId, userId },
+      with: { type: true },
+    }),
+  ])
+  if (!coffee) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
+  }
+  if (!grinder) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Grinder not found' })
+  }
   if (!device) {
     throw new TRPCError({
       code: 'NOT_FOUND',
@@ -426,7 +444,7 @@ export const espressoShotRouter = createTRPCRouter({
       if (keyRow) {
         shotId = await replayShotId(userId, keyRow.shotId, input)
       } else {
-        await assertEspressoDevice(input.brewingDeviceId, userId)
+        await assertOwnEspressoGear(input, userId)
         await stampFallenBrews(userId, ctx.plan)
         shotId = await insertShotWithKey(userId, input)
       }
@@ -449,7 +467,7 @@ export const espressoShotRouter = createTRPCRouter({
     .input(insertEspressoShotSchema.extend({ id: uuidInput() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
-      await assertEspressoDevice(data.brewingDeviceId, ctx.session.user.id)
+      await assertOwnEspressoGear(data, ctx.session.user.id)
 
       // A Sealed shot reaches the form with its settings withheld, so saving it
       // would write those blanks over what is stored. Nothing is ever deleted
