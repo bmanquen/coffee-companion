@@ -3184,18 +3184,21 @@ describe('log-espresso flow', () => {
 
   function fillVisibleField(id, value) {
     return new RegExp(
-      `hideKeyboard\\n- scrollUntilVisible:\\n\\s+element:\\n\\s+id: ${id}\\n\\s+visibilityPercentage: 100\\n- tapOn:\\n\\s+id: ${id}\\n- inputText: "${value}"\\n- copyTextFrom:\\n\\s+id: ${id}\\n- assertTrue: \\$\\{maestro\\.copiedText == "${value}"\\}`,
+      `scrollUntilVisible:\\n\\s+element:\\n\\s+id: ${id}\\n\\s+visibilityPercentage: 100\\n\\s+centerElement: true\\n- tapOn:\\n\\s+id: ${id}\\n- inputText: "${value}"\\n- copyTextFrom:\\n\\s+id: ${id}\\n- assertTrue: \\$\\{maestro\\.copiedText == "${value}"\\}\\n- assertVisible:\\n\\s+id: shot-form`,
     )
   }
 
-  it('dismisses the keyboard and scrolls each recipe field into view before typing', () => {
+  it('scrolls each recipe field into view without hideKeyboard', () => {
     const yaml = flow()
+    assert.doesNotMatch(yaml, /hideKeyboard/)
     assert.match(yaml, fillVisibleField('field-dose-g', '18'))
     assert.match(yaml, fillVisibleField('field-yield-g', '36'))
     assert.match(yaml, fillVisibleField('field-time-s', '30'))
     assert.match(yaml, fillVisibleField('field-grind-setting', '7'))
-    const logAt = yaml.indexOf('id: shot-form-log')
-    assert.ok(logAt > yaml.lastIndexOf('hideKeyboard'))
+    assert.match(
+      yaml,
+      /scrollUntilVisible:\n\s+element:\n\s+id: shot-form-log\n\s+visibilityPercentage: 100\n\s+centerElement: true\n- assertVisible:\n\s+id: shot-form\n- tapOn:\n\s+id: shot-form-log/,
+    )
   })
 
   it('still requires the new shot as the first summary row', () => {
