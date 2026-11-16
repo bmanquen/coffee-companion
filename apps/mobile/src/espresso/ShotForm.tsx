@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { applyCoffeePrefill } from '@coffee-companion/brew-display'
 import {
   BackHandler,
+  KeyboardAvoidingView,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,6 +31,7 @@ import {
   SHOT_FORM_A11Y_LABEL,
   SHOT_FORM_ERROR_TEST_ID,
   SHOT_FORM_HEADING_TEST_ID,
+  SHOT_FORM_KEYBOARD_TEST_ID,
   SHOT_FORM_PREFILL_ERROR_TEST_ID,
   SHOT_FORM_TEST_ID,
   TRY_AGAIN,
@@ -188,11 +190,20 @@ export function ShotForm({
   }, [error])
 
   return (
+    <KeyboardAvoidingView
+      // Android IME overlays this ScrollView instead of resizing it, so
+      // padding applies on both platforms. The picker sheet leaves Android
+      // undefined because it lives in a Modal.
+      behavior="padding"
+      testID={SHOT_FORM_KEYBOARD_TEST_ID}
+      style={styles.keyboard}
+    >
     <ScrollView
       accessibilityLabel={SHOT_FORM_A11Y_LABEL}
       testID={SHOT_FORM_TEST_ID}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.form}
+      style={styles.scroll}
     >
       <Pressable
         accessibilityRole="button"
@@ -348,10 +359,17 @@ export function ShotForm({
         <Text>{busy ? LOGGING : LOG}</Text>
       </Pressable>
     </ScrollView>
+    </KeyboardAvoidingView>
   )
 }
 
 const styles = StyleSheet.create({
+  keyboard: {
+    flex: 1,
+  },
+  scroll: {
+    flex: 1,
+  },
   form: {
     width: '100%',
     gap: 12,

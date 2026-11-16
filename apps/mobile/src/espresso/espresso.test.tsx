@@ -10,6 +10,7 @@ import { App } from '../App'
 import { SignedInHome } from '../auth/SignedInHome'
 import { writeHostTreeArtifacts } from '../test/host-tree'
 import {
+  fieldTestId,
   selectKeyboardTestId,
   selectOptionTestId,
   selectSearchTestId,
@@ -46,6 +47,7 @@ import {
   SELECT_DEVICE_ERROR,
   SELECT_GRINDER,
   SELECT_GRINDER_ERROR,
+  SHOT_FORM_KEYBOARD_TEST_ID,
   SHOT_FORM_PREFILL_ERROR_TEST_ID,
   SHOT_FORM_TEST_ID,
   SHOT_LIST_TEST_ID,
@@ -764,6 +766,17 @@ describe('log espresso shot', () => {
 
     expect(screen.queryByTestId(selectOptionTestId(sey))).toBeNull()
     expect(screen.getByTestId(selectOptionTestId(heart))).toBeTruthy()
+  })
+
+  it('raises recipe fields above the keyboard', async () => {
+    const { api } = fakeApi(catalog())
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await fireEvent(screen.getByTestId(fieldTestId(LABEL_DOSE)), 'focus')
+
+    expect(screen.getByTestId(SHOT_FORM_KEYBOARD_TEST_ID)).toBeTruthy()
+    expect(screen.getByTestId(fieldTestId(LABEL_TIME))).toBeTruthy()
+    expect(screen.getByTestId(fieldTestId(LABEL_GRIND))).toBeTruthy()
   })
 
   it('raises the picker sheet above the keyboard', async () => {
