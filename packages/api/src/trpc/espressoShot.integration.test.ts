@@ -23,6 +23,7 @@ import {
   TRPC_BAD_REQUEST,
   TRPC_CONFLICT,
 } from './espressoShot'
+import type { PoolClient } from 'pg'
 
 const USER_A = 'espresso-user-a'
 const USER_B = 'espresso-user-b'
@@ -76,7 +77,7 @@ async function withPoolTimeZone<T>(
 
 async function applyPoolTimeZone(pool: typeof db.$client, tz: string) {
   const max = pool.options.max
-  const held: Array<Awaited<ReturnType<typeof pool.connect>>> = []
+  const held: Array<PoolClient> = []
   try {
     for (let i = 0; i < max; i++) {
       const client = await pool.connect()
