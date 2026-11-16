@@ -160,7 +160,14 @@ export function NewEspressoShot() {
       (item) => item.id === next.brewingDeviceId,
     )
     applyingPrefill.current = true
-    if (!keep.grinderId) form.setFieldValue('grinderId', next.grinderId)
+    if (!keep.grinderId) {
+      form.setFieldValue(
+        'grinderId',
+        grinders.some((item) => item.id === next.grinderId)
+          ? next.grinderId
+          : '',
+      )
+    }
     if (!keep.brewingDeviceId) {
       form.setFieldValue(
         'brewingDeviceId',

@@ -237,6 +237,58 @@ describe('NewEspressoShot form', () => {
     ).toHaveProperty('value', '')
   })
 
+  it('does not submit a prefilled grinder that is not in the list', async () => {
+    const { queryClient, trpc, Wrapper, fetchSpy } = seeded()
+    try {
+      seedLatestUnsealed(
+        queryClient,
+        trpc,
+        COFFEE,
+        makeRecentShot({
+          id: 'shot-1',
+          coffeeId: COFFEE,
+          grinderId: '00000000-0000-4000-8000-0000000000ff',
+          brewingDeviceId: ESP_DEVICE,
+          roastDate: '2026-05-01',
+        }),
+      )
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await act(async () => {})
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBeGreaterThan(0))
+      expect(createCalls(fetchSpy)).toHaveLength(1)
+      const body = String(
+        (createCalls(fetchSpy)[0][1] as RequestInit | undefined)?.body ?? '',
+      )
+      expect(body).toContain(GRINDER)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('surfaces the Dialed-in Brew for the prefilled device', async () => {
     const { queryClient, trpc, Wrapper } = seeded()
     queryClient.setQueryData(
