@@ -62,12 +62,7 @@ import {
   driveDeviceReversePorts,
   ensureAdbReverses,
   STYLUS_HANDWRITING_SETTING,
-  STYLUS_HANDWRITING_OFF,
-  adbSettingsPutSecureArgs,
-  adbSettingsGetSecureArgs,
-  parseSecureSetting,
-  stylusHandwritingIsOff,
-  stylusHandwritingOnMessage,
+  stylusHandwritingProblem,
   ensureStylusHandwritingOff,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
@@ -1370,70 +1365,27 @@ describe('driveDeviceReversePorts', () => {
 })
 
 describe('stylus handwriting setting', () => {
-  it('puts and reads the secure stylus_handwriting_enabled flag', () => {
-    assert.deepEqual(
-      adbSettingsPutSecureArgs(
-        DEVICE_SERIAL,
-        STYLUS_HANDWRITING_SETTING,
-        STYLUS_HANDWRITING_OFF,
-      ),
-      [
-        '-s',
-        DEVICE_SERIAL,
-        'shell',
-        'settings',
-        'put',
-        'secure',
-        STYLUS_HANDWRITING_SETTING,
-        STYLUS_HANDWRITING_OFF,
-      ],
-    )
-    assert.deepEqual(
-      adbSettingsGetSecureArgs(DEVICE_SERIAL, STYLUS_HANDWRITING_SETTING),
-      [
-        '-s',
-        DEVICE_SERIAL,
-        'shell',
-        'settings',
-        'get',
-        'secure',
-        STYLUS_HANDWRITING_SETTING,
-      ],
-    )
-    assert.equal(parseSecureSetting('0\n'), '0')
-    assert.equal(parseSecureSetting('null'), null)
-    assert.equal(parseSecureSetting(''), null)
-    assert.equal(stylusHandwritingIsOff('0'), true)
-    assert.equal(stylusHandwritingIsOff('1'), false)
-    assert.equal(stylusHandwritingIsOff('null'), false)
-    assert.match(stylusHandwritingOnMessage('1'), /stylus_handwriting_enabled=1/)
+  it('is a problem unless the setting reads 0', () => {
+    assert.equal(stylusHandwritingProblem('0\n'), null)
+    assert.match(stylusHandwritingProblem('1'), /stylus_handwriting_enabled=1/)
+    assert.match(stylusHandwritingProblem('null'), /stylus_handwriting_enabled=unset/)
+    assert.match(stylusHandwritingProblem(''), /stylus_handwriting_enabled=unset/)
   })
 
   it('puts 0 then fails closed if the emulator still reports it on', () => {
     const puts = []
     ensureStylusHandwritingOff(DEVICE_SERIAL, {
-      put: (serial, name, value) => {
-        puts.push([serial, name, value])
-      },
+      put: (serial) => puts.push(serial),
       get: () => '0',
     })
-    assert.deepEqual(puts, [
-      [DEVICE_SERIAL, STYLUS_HANDWRITING_SETTING, STYLUS_HANDWRITING_OFF],
-    ])
-    ensureStylusHandwritingOff(DEVICE_SERIAL, {
-      put: (serial, name, value) => {
-        puts.push([serial, name, value])
-      },
-      get: () => '0',
-    })
-    assert.equal(puts.length, 2)
+    assert.deepEqual(puts, [DEVICE_SERIAL])
     assert.throws(
       () =>
         ensureStylusHandwritingOff(DEVICE_SERIAL, {
           put: () => {},
           get: () => '1',
         }),
-      /stylus_handwriting_enabled=1/,
+      new RegExp(`${STYLUS_HANDWRITING_SETTING}=1`),
     )
   })
 })

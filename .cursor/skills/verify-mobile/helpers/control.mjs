@@ -1298,66 +1298,48 @@ function ensureAdbReverses(serial, ports, reverse = adbReverse) {
 // Gboard's first text-keyboard focus opens a stylus handwriting sheet on
 // Pixel system images unless this secure setting is off.
 const STYLUS_HANDWRITING_SETTING = 'stylus_handwriting_enabled'
-const STYLUS_HANDWRITING_OFF = '0'
 
-function adbSettingsPutSecureArgs(serial, name, value) {
-  return ['-s', serial, 'shell', 'settings', 'put', 'secure', name, value]
+function adbPutStylusHandwritingOff(serial) {
+  const result = runCapture(
+    adbBin(),
+    ['-s', serial, 'shell', 'settings', 'put', 'secure', STYLUS_HANDWRITING_SETTING, '0'],
+    { allowFail: true },
+  )
+  if (result.status !== 0) {
+    throw new Error(
+      `adb settings put secure ${STYLUS_HANDWRITING_SETTING} failed: ` +
+        `${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
+    )
+  }
 }
 
-function adbSettingsGetSecureArgs(serial, name) {
-  return ['-s', serial, 'shell', 'settings', 'get', 'secure', name]
+function adbStylusHandwriting(serial) {
+  return runCapture(
+    adbBin(),
+    ['-s', serial, 'shell', 'settings', 'get', 'secure', STYLUS_HANDWRITING_SETTING],
+    { allowFail: true },
+  ).stdout
 }
 
-function parseSecureSetting(stdout) {
+function stylusHandwritingProblem(stdout) {
   const value = `${stdout ?? ''}`.trim()
-  if (!value || value === 'null') return null
-  return value
-}
-
-function stylusHandwritingIsOff(value) {
-  return parseSecureSetting(value) === STYLUS_HANDWRITING_OFF
-}
-
-function stylusHandwritingOnMessage(value) {
-  const current = parseSecureSetting(value) ?? 'unset'
+  if (value === '0') return null
+  const current = value && value !== 'null' ? value : 'unset'
   return (
     `emulator stylus handwriting is on ` +
     `(secure ${STYLUS_HANDWRITING_SETTING}=${current}). ` +
-    `Set it to ${STYLUS_HANDWRITING_OFF} so a text field does not open ` +
+    `Set it to 0 so a text field does not open ` +
     `Gboard's stylus onboarding sheet.`
   )
 }
 
 function ensureStylusHandwritingOff(
   serial,
-  { put, get } = {},
+  { put = adbPutStylusHandwritingOff, get = adbStylusHandwriting } = {},
 ) {
-  const putFn =
-    put ??
-    ((target, name, value) => {
-      const result = runCapture(
-        adbBin(),
-        adbSettingsPutSecureArgs(target, name, value),
-        { allowFail: true },
-      )
-      if (result.status !== 0) {
-        throw new Error(
-          `adb settings put secure ${name} failed: ` +
-            `${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
-        )
-      }
-    })
-  const getFn =
-    get ??
-    ((target, name) =>
-      runCapture(adbBin(), adbSettingsGetSecureArgs(target, name), {
-        allowFail: true,
-      }).stdout)
-  putFn(serial, STYLUS_HANDWRITING_SETTING, STYLUS_HANDWRITING_OFF)
-  const got = getFn(serial, STYLUS_HANDWRITING_SETTING)
-  if (!stylusHandwritingIsOff(got)) {
-    throw new Error(stylusHandwritingOnMessage(got))
-  }
+  put(serial)
+  const problem = stylusHandwritingProblem(get(serial))
+  if (problem) throw new Error(problem)
 }
 
 function adbOpenDevClientArgs({ serial, url, pkg }) {
@@ -1786,12 +1768,11 @@ function deviceReadyProblems({
       `Metro is not reachable from the device at 127.0.0.1 (expected ${METRO_READY_MARKER})`,
     )
   }
-  if (
-    stylusHandwritingEnabled !== undefined &&
-    !stylusHandwritingIsOff(stylusHandwritingEnabled)
-  ) {
-    problems.push(stylusHandwritingOnMessage(stylusHandwritingEnabled))
-  }
+  const stylusProblem =
+    stylusHandwritingEnabled === undefined
+      ? null
+      : stylusHandwritingProblem(stylusHandwritingEnabled)
+  if (stylusProblem) problems.push(stylusProblem)
   if (ui?.hasDevMenuOnboarding) {
     problems.push(devMenuOnboardingMessage())
   } else if (ui?.hasDevMenu) {
@@ -3954,11 +3935,7 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     ui = parseUiDump(adbUiDump(serial))
     deviceMetro = fetchDeviceMetroStatus(serial, metroPort)
     deviceE2E = fetchDeviceE2ESession(serial, webPort)
-    const stylusHandwritingEnabled = runCapture(
-      adbBin(),
-      adbSettingsGetSecureArgs(serial, STYLUS_HANDWRITING_SETTING),
-      { allowFail: true },
-    ).stdout
+    const stylusHandwritingEnabled = adbStylusHandwriting(serial)
     problems.push(
       ...deviceReadyProblems({
         reverseList,
@@ -4361,12 +4338,7 @@ export {
   driveDeviceReversePorts,
   ensureAdbReverses,
   STYLUS_HANDWRITING_SETTING,
-  STYLUS_HANDWRITING_OFF,
-  adbSettingsPutSecureArgs,
-  adbSettingsGetSecureArgs,
-  parseSecureSetting,
-  stylusHandwritingIsOff,
-  stylusHandwritingOnMessage,
+  stylusHandwritingProblem,
   ensureStylusHandwritingOff,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
