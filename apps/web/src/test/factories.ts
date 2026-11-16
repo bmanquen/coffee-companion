@@ -42,7 +42,7 @@ export function makeRecentShot(
     sealed: false,
     sealedAt: null,
     userId: 'u1',
-    coffeeId: 'c1',
+    coffeeId: coffee?.id ?? 'c1',
     grinderId: 'g1',
     brewingDeviceId: 'd1',
     roastDate: null,
