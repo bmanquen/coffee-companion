@@ -1633,7 +1633,7 @@ describe('log espresso shot', () => {
     expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
     expect(screen.queryByDisplayValue('2026-04-01')).toBeNull()
 
-    view.rerender(form(ERROR_SAVE_FAILED))
+    await view.rerender(form(ERROR_SAVE_FAILED))
     expect(await screen.findByDisplayValue('2026-04-01')).toBeTruthy()
     expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
     expect(loadIds.at(-1)).toBe(COFFEE_B)
@@ -1673,6 +1673,11 @@ describe('log espresso shot', () => {
     await press(TRY_AGAIN)
     expect(prefillCalls).toBe(2)
     expect(await screen.findByDisplayValue('2026-05-01')).toBeTruthy()
+
+    await press(LOG)
+    expect(created).toHaveLength(2)
+    expect(created[1].roastDate).not.toBe(created[0].roastDate)
+    expect(created[1].idempotencyKey).toBe(created[0].idempotencyKey)
   })
 
   it('prefills a newly chosen coffee after a failed save', async () => {

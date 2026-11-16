@@ -159,6 +159,9 @@ export function NewEspressoShot() {
     const device = brewingDevices.find(
       (item) => item.id === next.brewingDeviceId,
     )
+    const priorKey = idempotencyKeys.current.get(
+      draftFingerprint(form.state.values),
+    )
     applyingPrefill.current = true
     if (!keep.grinderId) {
       form.setFieldValue(
@@ -176,6 +179,13 @@ export function NewEspressoShot() {
     }
     if (!keep.roastDate) form.setFieldValue('roastDate', next.roastDate)
     applyingPrefill.current = false
+    // A prefill is not an edit: a lost save must replay under its first key.
+    if (priorKey) {
+      idempotencyKeys.current.set(
+        draftFingerprint(form.state.values),
+        priorKey,
+      )
+    }
   }
 
   const loadPrefillFor = (coffeeId: string) => {

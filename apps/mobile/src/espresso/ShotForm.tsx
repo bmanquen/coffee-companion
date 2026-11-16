@@ -139,6 +139,15 @@ export function ShotForm({
     }
     // A queued edit has already cleared its own error, so the committed draft suffices here.
     const filled = fill(draftRef.current)
+    // A prefill is not an edit: a lost save must replay under its first key.
+    const before = parseShotDraft(draftRef.current)
+    const after = parseShotDraft(filled)
+    const priorKey = before.ok
+      ? idempotencyKeys.get(draftFingerprint(before.value))
+      : undefined
+    if (priorKey && after.ok) {
+      idempotencyKeys.set(draftFingerprint(after.value), priorKey)
+    }
     setDraft(fill)
     setFieldErrors((current) => {
       const updated = { ...current }

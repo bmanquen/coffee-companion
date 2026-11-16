@@ -835,6 +835,19 @@ describe('NewEspressoShot form', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
       await waitFor(() => expect(lookups).toBe(2))
       expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
+      const bodies = createCalls(fetchSpy).map((call) =>
+        String((call[1] as RequestInit | undefined)?.body ?? ''),
+      )
+      expect(bodies[1]).toContain('2026-05-01')
+      expect(bodies[0]).not.toContain('2026-05-01')
+      const keys = bodies.map(
+        (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
+      )
+      expect(keys[0]).toBeTruthy()
+      expect(keys[1]).toBe(keys[0])
     } finally {
       fetchSpy.mockRestore()
     }
