@@ -59,6 +59,8 @@ export function createMobileQueryClient() {
         gcTime: isTest ? 0 : undefined,
       },
       mutations: {
+        // A paused save would leave the form busy until reconnect.
+        networkMode: 'always',
         retry: false,
         gcTime: isTest ? 0 : undefined,
       },

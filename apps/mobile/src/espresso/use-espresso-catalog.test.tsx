@@ -1,6 +1,8 @@
+import { onlineManager } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react-native'
 import { ESPRESSO_SHOT_PAGE_SIZE } from '@coffee-companion/api/lib/espresso'
 import { QueryProvider } from '../query'
+import { ERROR_SAVE_FAILED } from './copy'
 import { useEspressoCatalog } from './use-espresso-catalog'
 import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
 import type { ReactNode } from 'react'
@@ -295,5 +297,30 @@ describe('useEspressoCatalog', () => {
     expect(result.current.catalog?.shots.map((row) => row.id)).toEqual(
       afterSecondSave.slice(0, PAGE * 2).map((row) => row.id),
     )
+  })
+
+  it('reports a save that fails while offline instead of staying busy', async () => {
+    const create = jest.fn(() => Promise.reject(new TypeError('Network request failed')))
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog()),
+      listShots: () => Promise.resolve({ items: [shot()], total: 1, nextCursor: null }),
+      loadPrefill: () => Promise.resolve(null),
+      create,
+    }
+    const { result } = await renderCatalog(api)
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    onlineManager.setOnline(false)
+    try {
+      await act(async () => {
+        result.current.save(shotInput)
+        await Promise.resolve()
+      })
+      await waitFor(() => expect(result.current.saveError).toBe(ERROR_SAVE_FAILED))
+      expect(result.current.busy).toBe(false)
+      expect(create).toHaveBeenCalledTimes(1)
+    } finally {
+      onlineManager.setOnline(true)
+    }
   })
 })
