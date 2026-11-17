@@ -1,5 +1,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { espressoShotCursor, seedEspressoShotPage } from '@/test/espresso-shots'
+import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
+import { createTestProviders } from '@/test/providers'
+import { trpcSuccess } from '@/test/trpc-response'
 import {
   ESPRESSO_LOAD_FAILED,
   ESPRESSO_LOAD_MORE_FAILED,
@@ -8,10 +12,6 @@ import {
   espressoShotPageInput,
   useEspressoShotPages,
 } from './use-espresso-shot-pages'
-import { espressoShotCursor, seedEspressoShotPage } from '@/test/espresso-shots'
-import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
-import { createTestProviders } from '@/test/providers'
-import { trpcSuccess } from '@/test/trpc-response'
 
 const FILTERED_COFFEE_ID = 'c-filtered'
 const RETRY_EXTRA_ID = 'retry-extra'

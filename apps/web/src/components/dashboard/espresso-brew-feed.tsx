@@ -2,7 +2,6 @@ import { coffeeOptionLabel } from '@coffee-companion/brew-display'
 import { useQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
 import { useMemo, useState } from 'react'
-import type { EspressoShotWithRelations } from '@/types'
 import {
   dialedInCoffeeColumn,
   renderBrewDetails,
@@ -19,6 +18,7 @@ import {
   useEspressoShotPages,
 } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
+import type { EspressoShotWithRelations } from '@/types'
 
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 

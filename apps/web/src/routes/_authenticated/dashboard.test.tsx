@@ -7,10 +7,6 @@ import {
   within,
 } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Dashboard, DashboardContainer, Route } from './dashboard'
-import type * as ReactRouter from '@tanstack/react-router'
-import type { ReactNode } from 'react'
-import type { DashboardMethod } from '@/components/dashboard/methods'
 import { dashboardMethods } from '@/components/dashboard/methods'
 import {
   ESPRESSO_COFFEES_LOAD_FAILED,
@@ -36,6 +32,10 @@ import {
   makeRecentShot,
 } from '@/test/factories'
 import { createTestProviders } from '@/test/providers'
+import { Dashboard, DashboardContainer, Route } from './dashboard'
+import type { DashboardMethod } from '@/components/dashboard/methods'
+import type { ReactNode } from 'react'
+import type * as ReactRouter from '@tanstack/react-router'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
@@ -842,9 +842,9 @@ describe('Dashboard', () => {
       queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
       queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
       const loader = Route.options.loader
-      expect(loader).toBeTypeOf('function')
+      if (typeof loader !== 'function') throw new Error('no loader')
       await expect(
-        loader?.({
+        loader({
           context: { queryClient, trpc },
         } as never),
       ).resolves.toBeUndefined()

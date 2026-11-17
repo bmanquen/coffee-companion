@@ -12,8 +12,6 @@ import {
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { useRef, useState } from 'react'
-import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
-import type { PrefillKeep } from '@coffee-companion/brew-display'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
 import { brewsLogLocation } from '@/components/brews/methods'
 import { FormBanner } from '@/components/form/form-banner'
@@ -27,6 +25,8 @@ import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 import { submitFormMutation } from '@/lib/form-error'
+import type { PrefillKeep } from '@coffee-companion/brew-display'
+import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
 
 export const Route = createFileRoute('/_authenticated/espresso/new')({
   loader: async ({ context }) => {

@@ -2,11 +2,11 @@ import {
   ESPRESSO_SHOT_PAGE_SIZE,
   encodeEspressoShotCursor,
 } from '@coffee-companion/api/lib/espresso'
+import { espressoShotPageInput } from '@/hooks/use-espresso-shot-pages'
 import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { EspressoShotWithRelations } from '@/types'
 import type { EspressoShotPageFilters } from '@/hooks/use-espresso-shot-pages'
-import { espressoShotPageInput } from '@/hooks/use-espresso-shot-pages'
 
 type Shot = EspressoShotWithRelations
 type ShotPage = {

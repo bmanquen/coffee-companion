@@ -1,7 +1,5 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { EspressoBrewsSection } from './espresso-brews-section'
-import type { ReactNode } from 'react'
 import { createTestProviders } from '@/test/providers'
 import { seedCoffees, seedEspressoShotPage } from '@/test/espresso-shots'
 import {
@@ -9,6 +7,8 @@ import {
   makeRecentCoffee,
   makeRecentShot,
 } from '@/test/factories'
+import { EspressoBrewsSection } from './espresso-brews-section'
+import type { ReactNode } from 'react'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ to, children }: { to: string; children: ReactNode }) => (

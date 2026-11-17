@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
 import { BrewFeed } from './brew-feed'
 import type * as ReactRouter from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
-import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
 
 vi.mock('@/components/ui/command', () => ({
   Command: ({ children }: { children: ReactNode }) => <div>{children}</div>,

@@ -4,9 +4,9 @@ import {
 } from '@coffee-companion/api/lib/espresso'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo } from 'react'
+import { useTRPC } from '@/integrations/trpc/react'
 import type { InfiniteData } from '@tanstack/react-query'
 import type { EspressoShotWithRelations } from '@/types'
-import { useTRPC } from '@/integrations/trpc/react'
 
 export { ESPRESSO_SHOT_PAGE_SIZE, ESPRESSO_SHOT_Q_MAX }
 

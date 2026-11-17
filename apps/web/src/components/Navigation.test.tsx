@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { SIGN_OUT_FAILED } from '@/hooks/use-sign-out'
 import Navigation from './Navigation'
 import type { ReactNode } from 'react'
-import { SIGN_OUT_FAILED } from '@/hooks/use-sign-out'
 
 function renderNav(ui: ReactNode) {
   const queryClient = new QueryClient({

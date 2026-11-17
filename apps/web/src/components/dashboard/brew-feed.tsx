@@ -7,10 +7,6 @@ import {
 } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import type { LinkProps } from '@tanstack/react-router'
-import type { ColumnDef, PaginationState, Row } from '@tanstack/react-table'
-import type { ReactNode } from 'react'
-import type { CoffeeFilterOption } from '@/components/coffee-filter'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { SealedRowNotice, sealedRowClass } from '@/components/brews/sealed-row'
 import { CoffeeFilter } from '@/components/coffee-filter'
@@ -18,6 +14,10 @@ import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
+import type { CoffeeFilterOption } from '@/components/coffee-filter'
+import type { ReactNode } from 'react'
+import type { ColumnDef, PaginationState, Row } from '@tanstack/react-table'
+import type { LinkProps } from '@tanstack/react-router'
 
 // The minimum a brew needs to expose to be shown in the feed: an id, whether
 // it's the dialed-in reference, and its coffee (for the highlight and filter).

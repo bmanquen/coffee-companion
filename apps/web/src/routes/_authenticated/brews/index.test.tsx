@@ -1,8 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Brews, Route } from './index'
-import type * as ReactRouter from '@tanstack/react-router'
-import type { ReactNode } from 'react'
 import { seedCoffees, seedEspressoShotPage } from '@/test/espresso-shots'
 import {
   makeAeropressBrew,
@@ -10,6 +7,9 @@ import {
   makeRecentShot,
 } from '@/test/factories'
 import { createTestProviders } from '@/test/providers'
+import { Brews, Route } from './index'
+import type * as ReactRouter from '@tanstack/react-router'
+import type { ReactNode } from 'react'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
@@ -125,9 +125,9 @@ describe('Brews loader', () => {
     try {
       const { queryClient, trpc } = createTestProviders()
       const loader = Route.options.loader
-      expect(loader).toBeTypeOf('function')
+      if (typeof loader !== 'function') throw new Error('no loader')
       expect(
-        loader?.({
+        loader({
           context: { queryClient, trpc },
         } as never),
       ).toBeUndefined()

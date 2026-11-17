@@ -1,5 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router'
-import type { BrewMethod } from '@/components/brews/methods'
 import { AeropressBrewsSection } from '@/components/brews/aeropress-brews-section'
 import { BrewsMethodSelect } from '@/components/brews/brews-method-select'
 import { ColdBrewBrewsSection } from '@/components/brews/cold-brew-brews-section'
@@ -9,6 +8,7 @@ import { isBrewMethod, resolveBrewMethod } from '@/components/brews/methods'
 import { PouroverBrewsSection } from '@/components/brews/pourover-brews-section'
 import { H1 } from '@/components/typography/h1'
 import { espressoShotInfiniteOptions } from '@/hooks/use-espresso-shot-pages'
+import type { BrewMethod } from '@/components/brews/methods'
 
 export const Route = createFileRoute('/_authenticated/brews/')({
   // The selected method lives in the URL so a shared or bookmarked link opens

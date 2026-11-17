@@ -1,11 +1,11 @@
 import { Link } from '@tanstack/react-router'
 import { Bean, Coffee, Home, Menu, UserRound, Wrench } from 'lucide-react'
 import { useState } from 'react'
+import { authClient } from '@/lib/auth-client'
+import { SIGN_OUT_FAILED, useSignOut } from '@/hooks/use-sign-out'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet'
-import { authClient } from '@/lib/auth-client'
-import { SIGN_OUT_FAILED, useSignOut } from '@/hooks/use-sign-out'
 
 interface NavigationProps {
   open: boolean

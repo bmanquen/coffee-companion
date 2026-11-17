@@ -10,7 +10,6 @@ import {
 } from '@tanstack/react-table'
 import { Pencil, Plus } from 'lucide-react'
 import { createContext, useContext, useMemo, useState } from 'react'
-import type { CellContext, SortingState } from '@tanstack/react-table'
 import {
   brewLogRowClass,
   renderBrewDetails,
@@ -38,6 +37,7 @@ import {
   useEspressoShotPages,
 } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
+import type { CellContext, SortingState } from '@tanstack/react-table'
 
 type Shot = {
   id: string

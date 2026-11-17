@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decodeEspressoShotCursor } from '@coffee-companion/api/lib/espresso'
+import { espressoShotPageInput } from '@/hooks/use-espresso-shot-pages'
 import {
   ESPRESSO_SHOT_PAGE_SIZE,
   espressoShotCursor,
@@ -8,7 +9,6 @@ import {
 } from './espresso-shots'
 import { makeRecentShot } from './factories'
 import { createTestProviders } from './providers'
-import { espressoShotPageInput } from '@/hooks/use-espresso-shot-pages'
 
 describe('seedEspressoShotPage', () => {
   it('encodes a cursor the API decoder accepts', () => {
