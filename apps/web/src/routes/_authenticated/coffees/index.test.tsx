@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Coffee } from './index'
-import type * as ReactRouter from '@tanstack/react-router'
 import { createTestProviders } from '@/test/providers'
 import { makeCoffee } from '@/test/factories'
+import { Coffee } from './index'
+import type * as ReactRouter from '@tanstack/react-router'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 // Resolve `params` into `to` (e.g. /coffees/$coffeeId/edit -> /coffees/cf1/edit)

@@ -1,12 +1,12 @@
 import { useStore } from '@tanstack/react-form'
 import { useEffect } from 'react'
-import { FormBanner } from './form-banner'
 import { PlanLimitNotice } from '@/components/plan-limit-notice'
 import {
   formLevelMessage,
   submittedValuesKey,
 } from '@/lib/form-error'
 import { planLimitMessage } from '@/lib/plan-limit'
+import { FormBanner } from './form-banner'
 
 type FormWithStore = { store: Parameters<typeof useStore>[0] }
 

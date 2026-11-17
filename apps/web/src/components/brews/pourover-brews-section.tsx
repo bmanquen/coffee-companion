@@ -14,8 +14,6 @@ import {
 } from '@tanstack/react-table'
 import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import type { CellContext, SortingState } from '@tanstack/react-table'
-import type { PouroverBrewWithRelations } from '@/types'
 import {
   brewLogRowClass,
   renderBrewDetails,
@@ -35,6 +33,8 @@ import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { formatBrewSeconds } from '@/lib/brew'
+import type { PouroverBrewWithRelations } from '@/types'
+import type { CellContext, SortingState } from '@tanstack/react-table'
 
 type Brew = PouroverBrewWithRelations
 

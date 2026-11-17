@@ -1,7 +1,5 @@
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
 import { useId, useLayoutEffect, useRef, useState } from 'react'
-import { brewMethods } from './methods'
-import type { BrewMethod } from './methods'
 import {
   Command,
   CommandEmpty,
@@ -12,6 +10,8 @@ import {
 } from '@/components/ui/command'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { brewMethods } from './methods'
+import type { BrewMethod } from './methods'
 
 // Searchable method switcher for /brews. Same Command dropdown as the
 // dashboard MethodPicker and CoffeeFilter; labelled so the control has a name

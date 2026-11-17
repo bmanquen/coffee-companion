@@ -9,12 +9,6 @@ import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { restoreDeadline } from '@coffee-companion/api/lib/account-restore-window'
 import { planName } from '@coffee-companion/api/lib/plan'
-import type {
-  CurrentGrant,
-  CurrentSubscription,
-  EndedGrant,
-  PlanId,
-} from '@coffee-companion/api/lib/plan'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,6 +31,12 @@ import { loadPersonDeleteConfigured } from '@/lib/person-delete-configured'
 import { authClient } from '@/lib/auth-client'
 import { useSignOut } from '@/hooks/use-sign-out'
 import { useTRPC } from '@/integrations/trpc/react'
+import type {
+  CurrentGrant,
+  CurrentSubscription,
+  EndedGrant,
+  PlanId,
+} from '@coffee-companion/api/lib/plan'
 
 export const Route = createFileRoute('/_authenticated/account')({
   loader: async ({ context }) => {

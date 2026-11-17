@@ -1,5 +1,5 @@
-import { isRequiredField, isRequiredSchema } from './is-required-field'
 import { useFieldContext } from '@/hooks/form-context'
+import { isRequiredField, isRequiredSchema } from './is-required-field'
 
 // Reads the field-level validator first, then the form-level onChange/onSubmit
 // schema, so the star matches whatever actually blocks submit.

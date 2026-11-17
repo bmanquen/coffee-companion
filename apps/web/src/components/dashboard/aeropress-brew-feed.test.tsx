@@ -1,9 +1,9 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { AeropressBrewFeed } from './aeropress-brew-feed'
-import type * as ReactRouter from '@tanstack/react-router'
 import { createTestProviders } from '@/test/providers'
 import { makeAeropressBrew, makeRecentCoffee } from '@/test/factories'
+import { AeropressBrewFeed } from './aeropress-brew-feed'
+import type * as ReactRouter from '@tanstack/react-router'
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactRouter>()

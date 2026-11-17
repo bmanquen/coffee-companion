@@ -1,6 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
-import type { ColdBrewBrewWithRelations } from '@/types'
 import {
   brewEnvironmentExtra,
   dialedInCoffeeColumn,
@@ -11,6 +10,7 @@ import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
 import { formatSteepMinutes } from '@/lib/brew'
+import type { ColdBrewBrewWithRelations } from '@/types'
 
 const columnHelper = createColumnHelper<ColdBrewBrewWithRelations>()
 

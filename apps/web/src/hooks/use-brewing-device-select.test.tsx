@@ -1,8 +1,8 @@
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { useBrewingDeviceSelect } from './use-brewing-device-select'
 import { createTestProviders } from '@/test/providers'
 import { makeBrewingDevice } from '@/test/factories'
+import { useBrewingDeviceSelect } from './use-brewing-device-select'
 
 const ts = new Date('2026-06-01T08:00:00.000Z')
 

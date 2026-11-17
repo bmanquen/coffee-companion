@@ -6,7 +6,6 @@ import {
   within,
 } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Route } from './new'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
 import { trpcSuccess } from '@/test/trpc-response'
@@ -17,6 +16,7 @@ import {
   makeFrenchpressMethod,
   makeGrinder,
 } from '@/test/factories'
+import { Route } from './new'
 
 const mocks = vi.hoisted(() => ({ navigate: vi.fn(), track: vi.fn() }))
 

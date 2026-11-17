@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { DeviceDialedInReference } from './device-dialed-in-reference'
 import { createTestProviders } from '@/test/providers'
+import { DeviceDialedInReference } from './device-dialed-in-reference'
 
 const DEVICE = '00000000-0000-4000-8000-000000000005'
 const COFFEE = '00000000-0000-4000-8000-000000000001'

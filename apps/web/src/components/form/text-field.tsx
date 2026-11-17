@@ -1,6 +1,3 @@
-import { FormLabel } from './form-label'
-import { useFieldError } from './use-field-error'
-import { useFieldRequired } from './use-field-required'
 import {
   Field,
   FieldContent,
@@ -9,6 +6,9 @@ import {
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useFieldContext } from '@/hooks/form-context'
+import { FormLabel } from './form-label'
+import { useFieldError } from './use-field-error'
+import { useFieldRequired } from './use-field-required'
 
 export function TextField({
   label,

@@ -1,18 +1,20 @@
 import { useStore } from '@tanstack/react-form'
+import { withForm } from '@/hooks/form'
 import { CoffeeOriginFields } from './coffee-origin-fields'
 import { CoffeeOriginRow } from './coffee-origin-row'
 import { emptyOrigin } from './coffee-form'
 import type { CoffeeFormValues } from './coffee-form'
 import type { useSearchSelectResource } from '@/hooks/use-search-select-resource'
-import { withForm } from '@/hooks/form'
+
+const defaultValues: CoffeeFormValues = {
+  name: '',
+  roasterId: '',
+  roastLevelId: '',
+  origins: [{ ...emptyOrigin }],
+}
 
 export const CoffeeOriginEditor = withForm({
-  defaultValues: {
-    name: '',
-    roasterId: '',
-    roastLevelId: '',
-    origins: [{ ...emptyOrigin }],
-  } as CoffeeFormValues,
+  defaultValues,
   props: {
     countries: {} as ReturnType<typeof useSearchSelectResource>,
     processes: {} as ReturnType<typeof useSearchSelectResource>,

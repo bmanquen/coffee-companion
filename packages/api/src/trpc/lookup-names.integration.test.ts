@@ -72,71 +72,71 @@ describe('lookup create procedures', () => {
   it('stamps the session user even when the client sends another id', async () => {
     const country = await alice.country.create({ name: uniq('SessionCountry') })
     const creates: Array<() => Promise<{ userId: string | null }>> = [
-      () => alice.country.create({ name: uniq('C'), userId: null } as never),
+      () => alice.country.create({ name: uniq('C'), userId: null }),
       () =>
-        alice.country.create({ name: uniq('C'), userId: BOB } as never),
-      () =>
-        alice.region.create({
-          name: uniq('R'),
-          countryId: country.id,
-          userId: null,
-        } as never),
+        alice.country.create({ name: uniq('C'), userId: BOB }),
       () =>
         alice.region.create({
           name: uniq('R'),
           countryId: country.id,
+          userId: null,
+        }),
+      () =>
+        alice.region.create({
+          name: uniq('R'),
+          countryId: country.id,
           userId: BOB,
-        } as never),
+        }),
       () =>
-        alice.roastLevel.create({ name: uniq('L'), userId: null } as never),
+        alice.roastLevel.create({ name: uniq('L'), userId: null }),
       () =>
-        alice.roastLevel.create({ name: uniq('L'), userId: BOB } as never),
-      () => alice.roaster.create({ name: uniq('Ro'), userId: null } as never),
-      () => alice.roaster.create({ name: uniq('Ro'), userId: BOB } as never),
+        alice.roastLevel.create({ name: uniq('L'), userId: BOB }),
+      () => alice.roaster.create({ name: uniq('Ro'), userId: null }),
+      () => alice.roaster.create({ name: uniq('Ro'), userId: BOB }),
       () =>
-        alice.coffeeProcess.create({ name: uniq('P'), userId: null } as never),
+        alice.coffeeProcess.create({ name: uniq('P'), userId: null }),
       () =>
-        alice.coffeeProcess.create({ name: uniq('P'), userId: BOB } as never),
+        alice.coffeeProcess.create({ name: uniq('P'), userId: BOB }),
       () =>
         alice.brewingDeviceType.create({
           name: uniq('T'),
           userId: null,
-        } as never),
+        }),
       () =>
         alice.brewingDeviceType.create({
           name: uniq('T'),
           userId: BOB,
-        } as never),
+        }),
       () =>
         alice.aeropressMethod.create({
           name: uniq('A'),
           userId: null,
-        } as never),
+        }),
       () =>
         alice.aeropressMethod.create({
           name: uniq('A'),
           userId: BOB,
-        } as never),
+        }),
       () =>
         alice.pouroverMethod.create({
           name: uniq('O'),
           userId: null,
-        } as never),
+        }),
       () =>
         alice.pouroverMethod.create({
           name: uniq('O'),
           userId: BOB,
-        } as never),
+        }),
       () =>
         alice.frenchpressMethod.create({
           name: uniq('F'),
           userId: null,
-        } as never),
+        }),
       () =>
         alice.frenchpressMethod.create({
           name: uniq('F'),
           userId: BOB,
-        } as never),
+        }),
     ]
     for (const create of creates) {
       expect((await create()).userId).toBe(ALICE)

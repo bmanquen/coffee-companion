@@ -1,6 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
-import type { FrenchpressBrewWithRelations } from '@/types'
 import {
   dialedInCoffeeColumn,
   renderBrewDetails,
@@ -11,6 +10,7 @@ import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
 import { formatBrewSeconds } from '@/lib/brew'
+import type { FrenchpressBrewWithRelations } from '@/types'
 
 const columnHelper = createColumnHelper<FrenchpressBrewWithRelations>()
 

@@ -1,10 +1,10 @@
 import { createColumnHelper } from '@tanstack/react-table'
 import { Crosshair } from 'lucide-react'
-import type { ReactNode } from 'react'
 import { SealedBrewNotice } from '@/components/brews/sealed-brew-notice'
 import { sealedRowClass } from '@/components/brews/sealed-row'
 import { DetailList } from '@/components/detail-list'
 import { daysOffRoast as computeDaysOffRoast } from '@/lib/brew'
+import type { ReactNode } from 'react'
 
 export function brewLogRowClass(sealed: boolean, isDialedIn: boolean) {
   if (sealed) return sealedRowClass

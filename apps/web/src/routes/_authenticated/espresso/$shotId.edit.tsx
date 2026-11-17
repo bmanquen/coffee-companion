@@ -7,7 +7,6 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
-import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
 import { brewsLogLocation } from '@/components/brews/methods'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
@@ -19,6 +18,7 @@ import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { submitFormMutation } from '@/lib/form-error'
+import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
 
 export const Route = createFileRoute('/_authenticated/espresso/$shotId/edit')({
   loader: async ({ context, params }) => {

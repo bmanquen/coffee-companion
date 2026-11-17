@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
 import { CoffeeFilter } from '@/components/coffee-filter'
+import type { ReactNode } from 'react'
 
 // Mock the cmdk command primitives with plain elements so we can unit-test
 // CoffeeFilter's own logic (open/select/toggle) without cmdk's browser-only

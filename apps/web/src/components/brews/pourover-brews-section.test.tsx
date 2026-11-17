@@ -6,11 +6,11 @@ import {
   within,
 } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PouroverBrewsSection } from './pourover-brews-section'
-import type * as ReactRouter from '@tanstack/react-router'
 import { createTestProviders } from '@/test/providers'
 import { trpcSuccess } from '@/test/trpc-response'
 import { makePouroverBrew, makeRecentCoffee } from '@/test/factories'
+import { PouroverBrewsSection } from './pourover-brews-section'
+import type * as ReactRouter from '@tanstack/react-router'
 
 const mocks = vi.hoisted(() => ({ track: vi.fn() }))
 

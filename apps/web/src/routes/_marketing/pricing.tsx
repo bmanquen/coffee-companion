@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import type { BillingPeriod, PlanId, PlanPrice } from '@/lib/plans'
 import { H1 } from '@/components/typography/h1'
 import { track } from '@/lib/analytics'
 import { authClient } from '@/lib/auth-client'
@@ -30,6 +29,7 @@ import {
 } from '@/lib/plans'
 import { pressFromSearch, returnLink } from '@/lib/pricing-press'
 import { marketingHead } from '@/lib/marketing-head'
+import type { BillingPeriod, PlanId, PlanPrice } from '@/lib/plans'
 
 const TITLE = 'Pricing — Coffee Companion'
 const DESCRIPTION =

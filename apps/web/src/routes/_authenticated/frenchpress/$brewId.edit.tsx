@@ -7,7 +7,6 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
-import type { InsertFrenchpressBrew } from '@coffee-companion/api/db/zod'
 import { brewsLogLocation } from '@/components/brews/methods'
 import { MinutesSecondsInput } from '@/components/form/minutes-seconds-input'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
@@ -20,6 +19,7 @@ import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { submitFormMutation } from '@/lib/form-error'
+import type { InsertFrenchpressBrew } from '@coffee-companion/api/db/zod'
 
 export const Route = createFileRoute(
   '/_authenticated/frenchpress/$brewId/edit',
@@ -175,7 +175,7 @@ function EditFrenchpressBrew() {
             <MinutesSecondsInput
               label="Steep Time"
               value={field.state.value}
-              onChange={(seconds) => field.handleChange(seconds as never)}
+              onChange={(seconds) => field.handleChange(seconds)}
               onBlur={field.handleBlur}
             />
           )}

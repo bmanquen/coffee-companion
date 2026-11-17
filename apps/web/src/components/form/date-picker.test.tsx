@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
 import { useAppForm } from '@/hooks/form'
+import type { ReactNode } from 'react'
 
 // Mock the Radix Popover + Calendar so the date-picker's own logic (display +
 // onSelect + close) runs without browser-only APIs. Real calendar use is

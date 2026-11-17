@@ -7,7 +7,6 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
-import type { InsertColdBrewBrew } from '@coffee-companion/api/db/zod'
 import { brewsLogLocation } from '@/components/brews/methods'
 import { SteepMinutesInput } from '@/components/form/steep-minutes-input'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
@@ -20,6 +19,7 @@ import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
 import { submitFormMutation } from '@/lib/form-error'
+import type { InsertColdBrewBrew } from '@coffee-companion/api/db/zod'
 
 export const Route = createFileRoute('/_authenticated/cold-brew/$brewId/edit')({
   loader: async ({ context, params }) => {
@@ -147,7 +147,7 @@ function EditColdBrewBrew() {
           {(field) => (
             <SteepMinutesInput
               value={field.state.value}
-              onChange={(minutes) => field.handleChange(minutes as never)}
+              onChange={(minutes) => field.handleChange(minutes)}
               onBlur={field.handleBlur}
             />
           )}

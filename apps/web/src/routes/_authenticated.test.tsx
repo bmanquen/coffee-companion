@@ -1,10 +1,10 @@
 import { render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { planLimits } from '@coffee-companion/api/lib/plan'
-import { AuthenticatedLayout } from './_authenticated'
-import type * as ReactRouter from '@tanstack/react-router'
 import { setAnalyticsClient } from '@/lib/analytics'
 import { createTestProviders } from '@/test/providers'
+import { AuthenticatedLayout } from './_authenticated'
+import type * as ReactRouter from '@tanstack/react-router'
 
 const mocks = vi.hoisted(() => ({
   identify: vi.fn(),

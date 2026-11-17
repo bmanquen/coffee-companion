@@ -6,7 +6,6 @@ import {
   within,
 } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Route } from './new'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
 import { trpcSuccess } from '@/test/trpc-response'
@@ -16,6 +15,7 @@ import {
   makeGrinder,
   makeRecentShot,
 } from '@/test/factories'
+import { Route } from './new'
 
 const COFFEE = '00000000-0000-4000-8000-000000000001'
 const GRINDER = '00000000-0000-4000-8000-000000000003'

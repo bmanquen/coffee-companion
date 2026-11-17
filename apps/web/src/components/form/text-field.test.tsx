@@ -5,8 +5,8 @@ import {
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import type { InsertCoffee } from '@coffee-companion/api/db/zod'
 import { useAppForm } from '@/hooks/form'
+import type { InsertCoffee } from '@coffee-companion/api/db/zod'
 
 function Harness() {
   const form = useAppForm({ defaultValues: { name: '' } })

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { SteepMinutesInput } from './steep-minutes-input'
 import { useAppForm } from '@/hooks/form'
+import { SteepMinutesInput } from './steep-minutes-input'
 
 // The value is stored as whole minutes but entered as hours + minutes, so the
 // conversion is the thing worth pinning: a cold brew steeps for 18 hours, and

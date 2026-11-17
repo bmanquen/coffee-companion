@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
 import { DetailList } from '@/components/detail-list'
+import type { ReactNode } from 'react'
 
 // The expandable detail region shared by the coffee card and the desktop table
 // sub-row (see ADR-0003), revealed on expand. Holds the fields demoted out of a

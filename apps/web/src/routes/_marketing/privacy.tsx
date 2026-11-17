@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import type { Recipient } from '@/lib/privacy'
 import { H1 } from '@/components/typography/h1'
 import { Card } from '@/components/ui/card'
 import { marketingHead } from '@/lib/marketing-head'
 import { loadPersonDeleteConfigured } from '@/lib/person-delete-configured'
 import { posthogPersonRetention, recipients } from '@/lib/privacy'
+import type { Recipient } from '@/lib/privacy'
 
 const TITLE = 'Privacy — Coffee Companion'
 const DESCRIPTION =
