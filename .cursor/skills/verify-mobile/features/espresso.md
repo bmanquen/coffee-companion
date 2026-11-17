@@ -26,7 +26,7 @@ Preconditions:
 - Drive injects a signed-in session and a fake catalog (Ethiopia Guji, Niche Zero, Linea Mini). It does not mint a real Google or Apple token and does not call the live API.
 
 - **Log a Shot.** Run `helpers/control drive espresso`. The drive opens `testID=select-trigger-coffee`, chooses `testID=select-option-00000000-0000-4000-8000-000000000001` on the sheet, fills the recipe fields, and saves. The host tree after save contains `shot-list`, `Ethiopia Guji`, and `Grind verify-grind-7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s`. The create payload includes coffee id `00000000-0000-4000-8000-000000000001`, dose `18`, yield `36`, time `30`, and grind `verify-grind-7`.
-- **Device (where an AVD exists).** Run `helpers/control drive-device log-espresso`. Maestro opens the Coffee picker by `select-trigger-coffee` and chooses `select-option-00000000-0000-4000-8000-000000000001`.
+- **Device (where an AVD exists).** Run `helpers/control verify-device log-espresso`. That is cleanup → launch-device → doctor → drive-device `log-espresso`. Maestro opens the Coffee picker by `select-trigger-coffee` and chooses `select-option-00000000-0000-4000-8000-000000000001`.
 - **Proof.** `drive espresso` writes `artifacts/<run>/espresso/tree.txt`, `tree.json`, and `proof.json`. `tree.txt` must show `Coffee Companion`, `shot-list`, and `Grind verify-grind-7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s`. There is no device screenshot from this harness.
 
 ## Gotchas
