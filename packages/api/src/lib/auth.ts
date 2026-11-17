@@ -72,6 +72,7 @@ export const auth = betterAuth({
           await releaseUnverifiedEmailFromVerifiedSocial(
             ctx.body,
             ctx.context.socialProviders,
+            ctx,
           ),
         )
         return

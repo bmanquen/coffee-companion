@@ -68,18 +68,25 @@ export async function restoreSessionCookie(raw: string | null) {
   })
 }
 
-// Sync get/set: the Expo client plugin reads the cookie on every request.
+function sessionWriteBlocked(key: string) {
+  return (
+    explicitSessionWrites === 0 && isSessionStoreKey(key) && !sessionWriteGate()
+  )
+}
+
+// The Expo client plugin reads the cookie synchronously on every request and
+// writes the cookie and cached session through the async methods, so both
+// write paths go through the same gate.
 export const sessionStore = {
   getItem: (key: string) => SecureStore.getItem(key),
+  getItemAsync: (key: string) => SecureStore.getItemAsync(key),
   setItem: (key: string, value: string) => {
-    if (
-      explicitSessionWrites === 0 &&
-      isSessionStoreKey(key) &&
-      !sessionWriteGate()
-    ) {
-      return
-    }
+    if (sessionWriteBlocked(key)) return
     SecureStore.setItem(key, value)
+  },
+  setItemAsync: async (key: string, value: string) => {
+    if (sessionWriteBlocked(key)) return
+    await SecureStore.setItemAsync(key, value)
   },
 }
 

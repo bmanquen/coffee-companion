@@ -176,12 +176,17 @@ describe('loggedAuthFetch', () => {
     jest.mocked(SecureStore.setItem).mockImplementation((key, value) => {
       memory.set(key, value)
     })
+    jest.mocked(SecureStore.setItemAsync).mockImplementation((key, value) => {
+      memory.set(key, value)
+      return Promise.resolve()
+    })
   })
 
   afterEach(() => {
     jest.restoreAllMocks()
     jest.mocked(SecureStore.getItem).mockReset()
     jest.mocked(SecureStore.setItem).mockReset()
+    jest.mocked(SecureStore.setItemAsync).mockReset()
   })
 
   it('logs status on success and still logs the URL when fetch throws', async () => {
@@ -453,6 +458,7 @@ describe('loggedAuthFetch', () => {
     const response = await fetchPromise
     const data = await response.json()
     sessionStore.setItem(SESSION_DATA_KEY, sessionBody)
+    await sessionStore.setItemAsync(SESSION_DATA_KEY, sessionBody)
     applySessionAtomSet(setAtom, {
       data: { user: { id: E2E_USER_WITH_DATA } },
     })
