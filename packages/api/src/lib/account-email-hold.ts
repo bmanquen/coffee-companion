@@ -1,4 +1,5 @@
 import { APIError, isAPIError } from 'better-auth/api'
+import { supportsIdTokenSignIn, verifyProviderIdToken } from 'better-auth/oauth2'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { user } from '../db/schema'
@@ -22,9 +23,11 @@ import type { EmailHold } from './account-email'
 // being refused — without joining the two users.
 type EmailHoldStore = Pick<typeof db, 'query' | 'update'>
 
-export type SocialProviderVerify = {
-  id: string
-  verifyIdToken?: (token: string, nonce?: string) => Promise<boolean>
+type VerifyIdTokenArgs = Parameters<typeof verifyProviderIdToken>
+
+// Verification goes through better-auth's own id_token verifier, the same one
+// /sign-in/social runs, so a hold is released only for a token sign-in accepts.
+export type SocialProviderVerify = VerifyIdTokenArgs[0] & {
   getUserInfo?: (token: { idToken: string }) => Promise<{
     user?: { email?: string | null; emailVerified?: boolean | string }
   } | null>
@@ -239,12 +242,15 @@ export async function restoreReleasedEmailHoldIfSignInFailed(
 export async function releaseUnverifiedEmailFromVerifiedSocial(
   body: unknown,
   providers: Array<SocialProviderVerify>,
+  ctx?: VerifyIdTokenArgs[3],
 ): Promise<ReleasedEmailHold | null> {
   const parsed = socialIdTokenFromBody(body)
   if (!parsed) return null
   const provider = providers.find((item) => item.id === parsed.provider)
-  if (!provider?.verifyIdToken) return null
-  if (!(await provider.verifyIdToken(parsed.token, parsed.nonce))) {
+  if (!provider || !supportsIdTokenSignIn(provider)) return null
+  if (
+    !(await verifyProviderIdToken(provider, parsed.token, parsed.nonce, ctx))
+  ) {
     const identity = identityFromVerifiedJwt(parsed.token)
     // Claims are untrusted here; restore still no-ops unless the address
     // is free and a placeholder encodes the holder's own id.

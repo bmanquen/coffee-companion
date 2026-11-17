@@ -112,28 +112,39 @@ async function withGoogleSocial(
   run: () => Promise<void>,
 ) {
   const ctx = await auth.$context
+  // better-auth verifies id tokens through the provider's
+  // options.verifyIdToken override, so the stub goes there. Google keys the
+  // account by the profile's `sub`, which the real provider returns as `data`.
+  const getUserInfo: typeof methods.getUserInfo = async (token) => {
+    const info = await methods.getUserInfo(token)
+    return info?.user ? { ...info, data: { sub: info.user.id } } : info
+  }
   const providers = ctx.socialProviders as Array<{
     id: string
-    verifyIdToken?: typeof methods.verifyIdToken
+    options?: { verifyIdToken?: typeof methods.verifyIdToken }
     getUserInfo?: typeof methods.getUserInfo
   }>
   const google = providers.find((item) => item.id === 'google')
   if (google) {
     const saved = {
-      verifyIdToken: google.verifyIdToken,
+      options: google.options,
       getUserInfo: google.getUserInfo,
     }
-    google.verifyIdToken = methods.verifyIdToken
-    google.getUserInfo = methods.getUserInfo
+    google.options = { ...google.options, verifyIdToken: methods.verifyIdToken }
+    google.getUserInfo = getUserInfo
     try {
       await run()
     } finally {
-      google.verifyIdToken = saved.verifyIdToken
+      google.options = saved.options
       google.getUserInfo = saved.getUserInfo
     }
     return
   }
-  providers.push({ id: 'google', ...methods })
+  providers.push({
+    id: 'google',
+    options: { verifyIdToken: methods.verifyIdToken },
+    getUserInfo,
+  })
   try {
     await run()
   } finally {
@@ -255,7 +266,7 @@ describe('Google account linking', () => {
       [
         {
           id: 'google',
-          verifyIdToken: async () => true,
+          options: { verifyIdToken: async () => true },
           getUserInfo: async () => ({
             user: { email, emailVerified: true },
           }),
@@ -291,7 +302,7 @@ describe('Google account linking', () => {
       [
         {
           id: 'google',
-          verifyIdToken: async () => true,
+          options: { verifyIdToken: async () => true },
           getUserInfo: async () => ({
             user: { email, emailVerified: false },
           }),

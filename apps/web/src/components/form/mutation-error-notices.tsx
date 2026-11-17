@@ -8,7 +8,9 @@ import {
 import { planLimitMessage } from '@/lib/plan-limit'
 import { FormBanner } from './form-banner'
 
-type FormWithStore = { store: Parameters<typeof useStore>[0] }
+type FormWithStore = {
+  store: Parameters<typeof useStore<{ values: unknown }>>[0]
+}
 
 export function MutationErrorNotices({
   error,
@@ -21,9 +23,7 @@ export function MutationErrorNotices({
   form: FormWithStore
   fieldByCode?: Partial<Record<string, string>>
 }) {
-  const encoded = useStore(form.store, (s: { values: unknown }) =>
-    JSON.stringify(s.values),
-  )
+  const encoded = useStore(form.store, (s) => JSON.stringify(s.values))
   const submitted = submittedValuesKey(form)
   const live = error != null && submitted === encoded
 

@@ -9,43 +9,46 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as RestoreAccountRouteImport } from './routes/restore-account'
-import { Route as MarketingRouteImport } from './routes/_marketing'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as MarketingIndexRouteImport } from './routes/_marketing/index'
-import { Route as ApiPurgeDeletedAccountsRouteImport } from './routes/api.purge-deleted-accounts'
-import { Route as ApiPersonDeleteConfiguredRouteImport } from './routes/api.person-delete-configured'
-import { Route as ApiHealthRouteImport } from './routes/api.health'
-import { Route as MarketingPrivacyRouteImport } from './routes/_marketing/privacy'
-import { Route as MarketingPricingRouteImport } from './routes/_marketing/pricing'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as MarketingRouteImport } from './routes/_marketing'
+import { Route as RestoreAccountRouteImport } from './routes/restore-account'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
-import { Route as AuthenticatedEquipmentIndexRouteImport } from './routes/_authenticated/equipment/index'
-import { Route as AuthenticatedCoffeesIndexRouteImport } from './routes/_authenticated/coffees/index'
-import { Route as AuthenticatedBrewsIndexRouteImport } from './routes/_authenticated/brews/index'
-import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
-import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
-import { Route as AuthenticatedPouroverNewRouteImport } from './routes/_authenticated/pourover/new'
-import { Route as AuthenticatedFrenchpressNewRouteImport } from './routes/_authenticated/frenchpress/new'
-import { Route as AuthenticatedEspressoNewRouteImport } from './routes/_authenticated/espresso/new'
-import { Route as AuthenticatedColdBrewNewRouteImport } from './routes/_authenticated/cold-brew/new'
-import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as MarketingIndexRouteImport } from './routes/_marketing/index'
+import { Route as MarketingPricingRouteImport } from './routes/_marketing/pricing'
+import { Route as MarketingPrivacyRouteImport } from './routes/_marketing/privacy'
+import { Route as ApiHealthRouteImport } from './routes/api.health'
+import { Route as ApiPersonDeleteConfiguredRouteImport } from './routes/api.person-delete-configured'
+import { Route as ApiPurgeDeletedAccountsRouteImport } from './routes/api.purge-deleted-accounts'
 import { Route as AuthenticatedAeropressNewRouteImport } from './routes/_authenticated/aeropress/new'
-import { Route as AuthenticatedPouroverBrewIdEditRouteImport } from './routes/_authenticated/pourover/$brewId.edit'
-import { Route as AuthenticatedFrenchpressBrewIdEditRouteImport } from './routes/_authenticated/frenchpress/$brewId.edit'
-import { Route as AuthenticatedEspressoShotIdEditRouteImport } from './routes/_authenticated/espresso/$shotId.edit'
-import { Route as AuthenticatedEquipmentGrindersNewRouteImport } from './routes/_authenticated/equipment/grinders/new'
-import { Route as AuthenticatedEquipmentBrewingDevicesNewRouteImport } from './routes/_authenticated/equipment/brewing-devices/new'
-import { Route as AuthenticatedColdBrewBrewIdEditRouteImport } from './routes/_authenticated/cold-brew/$brewId.edit'
-import { Route as AuthenticatedCoffeesCoffeeIdEditRouteImport } from './routes/_authenticated/coffees/$coffeeId.edit'
+import { Route as AuthenticatedBrewsIndexRouteImport } from './routes/_authenticated/brews/index'
+import { Route as AuthenticatedCoffeesIndexRouteImport } from './routes/_authenticated/coffees/index'
+import { Route as AuthenticatedCoffeesNewRouteImport } from './routes/_authenticated/coffees/new'
+import { Route as AuthenticatedColdBrewNewRouteImport } from './routes/_authenticated/cold-brew/new'
+import { Route as AuthenticatedEquipmentIndexRouteImport } from './routes/_authenticated/equipment/index'
+import { Route as AuthenticatedEspressoNewRouteImport } from './routes/_authenticated/espresso/new'
+import { Route as AuthenticatedFrenchpressNewRouteImport } from './routes/_authenticated/frenchpress/new'
+import { Route as AuthenticatedPouroverNewRouteImport } from './routes/_authenticated/pourover/new'
+import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
+import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as AuthenticatedAeropressBrewIdEditRouteImport } from './routes/_authenticated/aeropress/$brewId.edit'
-import { Route as AuthenticatedEquipmentGrindersGrinderIdEditRouteImport } from './routes/_authenticated/equipment/grinders/$grinderId.edit'
+import { Route as AuthenticatedCoffeesCoffeeIdEditRouteImport } from './routes/_authenticated/coffees/$coffeeId.edit'
+import { Route as AuthenticatedColdBrewBrewIdEditRouteImport } from './routes/_authenticated/cold-brew/$brewId.edit'
+import { Route as AuthenticatedEquipmentBrewingDevicesNewRouteImport } from './routes/_authenticated/equipment/brewing-devices/new'
+import { Route as AuthenticatedEquipmentGrindersNewRouteImport } from './routes/_authenticated/equipment/grinders/new'
+import { Route as AuthenticatedEspressoShotIdEditRouteImport } from './routes/_authenticated/espresso/$shotId.edit'
+import { Route as AuthenticatedFrenchpressBrewIdEditRouteImport } from './routes/_authenticated/frenchpress/$brewId.edit'
+import { Route as AuthenticatedPouroverBrewIdEditRouteImport } from './routes/_authenticated/pourover/$brewId.edit'
 import { Route as AuthenticatedEquipmentBrewingDevicesDeviceIdEditRouteImport } from './routes/_authenticated/equipment/brewing-devices/$deviceId.edit'
+import { Route as AuthenticatedEquipmentGrindersGrinderIdEditRouteImport } from './routes/_authenticated/equipment/grinders/$grinderId.edit'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarketingRoute = MarketingRouteImport.update({
+  id: '/_marketing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RestoreAccountRoute = RestoreAccountRouteImport.update({
@@ -53,22 +56,39 @@ const RestoreAccountRoute = RestoreAccountRouteImport.update({
   path: '/restore-account',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MarketingRoute = MarketingRouteImport.update({
-  id: '/_marketing',
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
+const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const MarketingIndexRoute = MarketingIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => MarketingRoute,
 } as any)
-const ApiPurgeDeletedAccountsRoute = ApiPurgeDeletedAccountsRouteImport.update({
-  id: '/api/purge-deleted-accounts',
-  path: '/api/purge-deleted-accounts',
+const MarketingPricingRoute = MarketingPricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => MarketingRoute,
+} as any)
+const MarketingPrivacyRoute = MarketingPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => MarketingRoute,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPersonDeleteConfiguredRoute =
@@ -77,41 +97,15 @@ const ApiPersonDeleteConfiguredRoute =
     path: '/api/person-delete-configured',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiHealthRoute = ApiHealthRouteImport.update({
-  id: '/api/health',
-  path: '/api/health',
+const ApiPurgeDeletedAccountsRoute = ApiPurgeDeletedAccountsRouteImport.update({
+  id: '/api/purge-deleted-accounts',
+  path: '/api/purge-deleted-accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MarketingPrivacyRoute = MarketingPrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => MarketingRoute,
-} as any)
-const MarketingPricingRoute = MarketingPricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
-  getParentRoute: () => MarketingRoute,
-} as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
-  id: '/account',
-  path: '/account',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedEquipmentIndexRoute =
-  AuthenticatedEquipmentIndexRouteImport.update({
-    id: '/equipment/',
-    path: '/equipment/',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedCoffeesIndexRoute =
-  AuthenticatedCoffeesIndexRouteImport.update({
-    id: '/coffees/',
-    path: '/coffees/',
+const AuthenticatedAeropressNewRoute =
+  AuthenticatedAeropressNewRouteImport.update({
+    id: '/aeropress/new',
+    path: '/aeropress/new',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedBrewsIndexRoute = AuthenticatedBrewsIndexRouteImport.update({
@@ -119,26 +113,27 @@ const AuthenticatedBrewsIndexRoute = AuthenticatedBrewsIndexRouteImport.update({
   path: '/brews/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
-  id: '/api/trpc/$',
-  path: '/api/trpc/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedPouroverNewRoute =
-  AuthenticatedPouroverNewRouteImport.update({
-    id: '/pourover/new',
-    path: '/pourover/new',
+const AuthenticatedCoffeesIndexRoute =
+  AuthenticatedCoffeesIndexRouteImport.update({
+    id: '/coffees/',
+    path: '/coffees/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedFrenchpressNewRoute =
-  AuthenticatedFrenchpressNewRouteImport.update({
-    id: '/frenchpress/new',
-    path: '/frenchpress/new',
+const AuthenticatedCoffeesNewRoute = AuthenticatedCoffeesNewRouteImport.update({
+  id: '/coffees/new',
+  path: '/coffees/new',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedColdBrewNewRoute =
+  AuthenticatedColdBrewNewRouteImport.update({
+    id: '/cold-brew/new',
+    path: '/cold-brew/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedEquipmentIndexRoute =
+  AuthenticatedEquipmentIndexRouteImport.update({
+    id: '/equipment/',
+    path: '/equipment/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedEspressoNewRoute =
@@ -147,57 +142,32 @@ const AuthenticatedEspressoNewRoute =
     path: '/espresso/new',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedColdBrewNewRoute =
-  AuthenticatedColdBrewNewRouteImport.update({
-    id: '/cold-brew/new',
-    path: '/cold-brew/new',
+const AuthenticatedFrenchpressNewRoute =
+  AuthenticatedFrenchpressNewRouteImport.update({
+    id: '/frenchpress/new',
+    path: '/frenchpress/new',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedCoffeesNewRoute = AuthenticatedCoffeesNewRouteImport.update({
-  id: '/coffees/new',
-  path: '/coffees/new',
-  getParentRoute: () => AuthenticatedRoute,
+const AuthenticatedPouroverNewRoute =
+  AuthenticatedPouroverNewRouteImport.update({
+    id: '/pourover/new',
+    path: '/pourover/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAeropressNewRoute =
-  AuthenticatedAeropressNewRouteImport.update({
-    id: '/aeropress/new',
-    path: '/aeropress/new',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedPouroverBrewIdEditRoute =
-  AuthenticatedPouroverBrewIdEditRouteImport.update({
-    id: '/pourover/$brewId/edit',
-    path: '/pourover/$brewId/edit',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedFrenchpressBrewIdEditRoute =
-  AuthenticatedFrenchpressBrewIdEditRouteImport.update({
-    id: '/frenchpress/$brewId/edit',
-    path: '/frenchpress/$brewId/edit',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedEspressoShotIdEditRoute =
-  AuthenticatedEspressoShotIdEditRouteImport.update({
-    id: '/espresso/$shotId/edit',
-    path: '/espresso/$shotId/edit',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedEquipmentGrindersNewRoute =
-  AuthenticatedEquipmentGrindersNewRouteImport.update({
-    id: '/equipment/grinders/new',
-    path: '/equipment/grinders/new',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedEquipmentBrewingDevicesNewRoute =
-  AuthenticatedEquipmentBrewingDevicesNewRouteImport.update({
-    id: '/equipment/brewing-devices/new',
-    path: '/equipment/brewing-devices/new',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedColdBrewBrewIdEditRoute =
-  AuthenticatedColdBrewBrewIdEditRouteImport.update({
-    id: '/cold-brew/$brewId/edit',
-    path: '/cold-brew/$brewId/edit',
+const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
+  id: '/api/trpc/$',
+  path: '/api/trpc/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAeropressBrewIdEditRoute =
+  AuthenticatedAeropressBrewIdEditRouteImport.update({
+    id: '/aeropress/$brewId/edit',
+    path: '/aeropress/$brewId/edit',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedCoffeesCoffeeIdEditRoute =
@@ -206,22 +176,52 @@ const AuthenticatedCoffeesCoffeeIdEditRoute =
     path: '/coffees/$coffeeId/edit',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAeropressBrewIdEditRoute =
-  AuthenticatedAeropressBrewIdEditRouteImport.update({
-    id: '/aeropress/$brewId/edit',
-    path: '/aeropress/$brewId/edit',
+const AuthenticatedColdBrewBrewIdEditRoute =
+  AuthenticatedColdBrewBrewIdEditRouteImport.update({
+    id: '/cold-brew/$brewId/edit',
+    path: '/cold-brew/$brewId/edit',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedEquipmentGrindersGrinderIdEditRoute =
-  AuthenticatedEquipmentGrindersGrinderIdEditRouteImport.update({
-    id: '/equipment/grinders/$grinderId/edit',
-    path: '/equipment/grinders/$grinderId/edit',
+const AuthenticatedEquipmentBrewingDevicesNewRoute =
+  AuthenticatedEquipmentBrewingDevicesNewRouteImport.update({
+    id: '/equipment/brewing-devices/new',
+    path: '/equipment/brewing-devices/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedEquipmentGrindersNewRoute =
+  AuthenticatedEquipmentGrindersNewRouteImport.update({
+    id: '/equipment/grinders/new',
+    path: '/equipment/grinders/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedEspressoShotIdEditRoute =
+  AuthenticatedEspressoShotIdEditRouteImport.update({
+    id: '/espresso/$shotId/edit',
+    path: '/espresso/$shotId/edit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedFrenchpressBrewIdEditRoute =
+  AuthenticatedFrenchpressBrewIdEditRouteImport.update({
+    id: '/frenchpress/$brewId/edit',
+    path: '/frenchpress/$brewId/edit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPouroverBrewIdEditRoute =
+  AuthenticatedPouroverBrewIdEditRouteImport.update({
+    id: '/pourover/$brewId/edit',
+    path: '/pourover/$brewId/edit',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedEquipmentBrewingDevicesDeviceIdEditRoute =
   AuthenticatedEquipmentBrewingDevicesDeviceIdEditRouteImport.update({
     id: '/equipment/brewing-devices/$deviceId/edit',
     path: '/equipment/brewing-devices/$deviceId/edit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedEquipmentGrindersGrinderIdEditRoute =
+  AuthenticatedEquipmentGrindersGrinderIdEditRouteImport.update({
+    id: '/equipment/grinders/$grinderId/edit',
+    path: '/equipment/grinders/$grinderId/edit',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 
@@ -445,18 +445,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/restore-account': {
-      id: '/restore-account'
-      path: '/restore-account'
-      fullPath: '/restore-account'
-      preLoaderRoute: typeof RestoreAccountRouteImport
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_marketing': {
@@ -466,46 +459,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteImport
+    '/restore-account': {
+      id: '/restore-account'
+      path: '/restore-account'
+      fullPath: '/restore-account'
+      preLoaderRoute: typeof RestoreAccountRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/account': {
+      id: '/_authenticated/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AuthenticatedAccountRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_marketing/': {
       id: '/_marketing/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof MarketingIndexRouteImport
-      parentRoute: typeof MarketingRoute
-    }
-    '/api/purge-deleted-accounts': {
-      id: '/api/purge-deleted-accounts'
-      path: '/api/purge-deleted-accounts'
-      fullPath: '/api/purge-deleted-accounts'
-      preLoaderRoute: typeof ApiPurgeDeletedAccountsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/person-delete-configured': {
-      id: '/api/person-delete-configured'
-      path: '/api/person-delete-configured'
-      fullPath: '/api/person-delete-configured'
-      preLoaderRoute: typeof ApiPersonDeleteConfiguredRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/health': {
-      id: '/api/health'
-      path: '/api/health'
-      fullPath: '/api/health'
-      preLoaderRoute: typeof ApiHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_marketing/privacy': {
-      id: '/_marketing/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof MarketingPrivacyRouteImport
       parentRoute: typeof MarketingRoute
     }
     '/_marketing/pricing': {
@@ -515,32 +501,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketingPricingRouteImport
       parentRoute: typeof MarketingRoute
     }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/_marketing/privacy': {
+      id: '/_marketing/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof MarketingPrivacyRouteImport
+      parentRoute: typeof MarketingRoute
     }
-    '/_authenticated/account': {
-      id: '/_authenticated/account'
-      path: '/account'
-      fullPath: '/account'
-      preLoaderRoute: typeof AuthenticatedAccountRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/equipment/': {
-      id: '/_authenticated/equipment/'
-      path: '/equipment'
-      fullPath: '/equipment/'
-      preLoaderRoute: typeof AuthenticatedEquipmentIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/api/person-delete-configured': {
+      id: '/api/person-delete-configured'
+      path: '/api/person-delete-configured'
+      fullPath: '/api/person-delete-configured'
+      preLoaderRoute: typeof ApiPersonDeleteConfiguredRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/coffees/': {
-      id: '/_authenticated/coffees/'
-      path: '/coffees'
-      fullPath: '/coffees/'
-      preLoaderRoute: typeof AuthenticatedCoffeesIndexRouteImport
+    '/api/purge-deleted-accounts': {
+      id: '/api/purge-deleted-accounts'
+      path: '/api/purge-deleted-accounts'
+      fullPath: '/api/purge-deleted-accounts'
+      preLoaderRoute: typeof ApiPurgeDeletedAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/aeropress/new': {
+      id: '/_authenticated/aeropress/new'
+      path: '/aeropress/new'
+      fullPath: '/aeropress/new'
+      preLoaderRoute: typeof AuthenticatedAeropressNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/brews/': {
@@ -550,46 +543,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBrewsIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/api/trpc/$': {
-      id: '/api/trpc/$'
-      path: '/api/trpc/$'
-      fullPath: '/api/trpc/$'
-      preLoaderRoute: typeof ApiTrpcSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/pourover/new': {
-      id: '/_authenticated/pourover/new'
-      path: '/pourover/new'
-      fullPath: '/pourover/new'
-      preLoaderRoute: typeof AuthenticatedPouroverNewRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/frenchpress/new': {
-      id: '/_authenticated/frenchpress/new'
-      path: '/frenchpress/new'
-      fullPath: '/frenchpress/new'
-      preLoaderRoute: typeof AuthenticatedFrenchpressNewRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/espresso/new': {
-      id: '/_authenticated/espresso/new'
-      path: '/espresso/new'
-      fullPath: '/espresso/new'
-      preLoaderRoute: typeof AuthenticatedEspressoNewRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/cold-brew/new': {
-      id: '/_authenticated/cold-brew/new'
-      path: '/cold-brew/new'
-      fullPath: '/cold-brew/new'
-      preLoaderRoute: typeof AuthenticatedColdBrewNewRouteImport
+    '/_authenticated/coffees/': {
+      id: '/_authenticated/coffees/'
+      path: '/coffees'
+      fullPath: '/coffees/'
+      preLoaderRoute: typeof AuthenticatedCoffeesIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/coffees/new': {
@@ -599,53 +557,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCoffeesNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/aeropress/new': {
-      id: '/_authenticated/aeropress/new'
-      path: '/aeropress/new'
-      fullPath: '/aeropress/new'
-      preLoaderRoute: typeof AuthenticatedAeropressNewRouteImport
+    '/_authenticated/cold-brew/new': {
+      id: '/_authenticated/cold-brew/new'
+      path: '/cold-brew/new'
+      fullPath: '/cold-brew/new'
+      preLoaderRoute: typeof AuthenticatedColdBrewNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/pourover/$brewId/edit': {
-      id: '/_authenticated/pourover/$brewId/edit'
-      path: '/pourover/$brewId/edit'
-      fullPath: '/pourover/$brewId/edit'
-      preLoaderRoute: typeof AuthenticatedPouroverBrewIdEditRouteImport
+    '/_authenticated/equipment/': {
+      id: '/_authenticated/equipment/'
+      path: '/equipment'
+      fullPath: '/equipment/'
+      preLoaderRoute: typeof AuthenticatedEquipmentIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/frenchpress/$brewId/edit': {
-      id: '/_authenticated/frenchpress/$brewId/edit'
-      path: '/frenchpress/$brewId/edit'
-      fullPath: '/frenchpress/$brewId/edit'
-      preLoaderRoute: typeof AuthenticatedFrenchpressBrewIdEditRouteImport
+    '/_authenticated/espresso/new': {
+      id: '/_authenticated/espresso/new'
+      path: '/espresso/new'
+      fullPath: '/espresso/new'
+      preLoaderRoute: typeof AuthenticatedEspressoNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/espresso/$shotId/edit': {
-      id: '/_authenticated/espresso/$shotId/edit'
-      path: '/espresso/$shotId/edit'
-      fullPath: '/espresso/$shotId/edit'
-      preLoaderRoute: typeof AuthenticatedEspressoShotIdEditRouteImport
+    '/_authenticated/frenchpress/new': {
+      id: '/_authenticated/frenchpress/new'
+      path: '/frenchpress/new'
+      fullPath: '/frenchpress/new'
+      preLoaderRoute: typeof AuthenticatedFrenchpressNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/equipment/grinders/new': {
-      id: '/_authenticated/equipment/grinders/new'
-      path: '/equipment/grinders/new'
-      fullPath: '/equipment/grinders/new'
-      preLoaderRoute: typeof AuthenticatedEquipmentGrindersNewRouteImport
+    '/_authenticated/pourover/new': {
+      id: '/_authenticated/pourover/new'
+      path: '/pourover/new'
+      fullPath: '/pourover/new'
+      preLoaderRoute: typeof AuthenticatedPouroverNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/equipment/brewing-devices/new': {
-      id: '/_authenticated/equipment/brewing-devices/new'
-      path: '/equipment/brewing-devices/new'
-      fullPath: '/equipment/brewing-devices/new'
-      preLoaderRoute: typeof AuthenticatedEquipmentBrewingDevicesNewRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/cold-brew/$brewId/edit': {
-      id: '/_authenticated/cold-brew/$brewId/edit'
-      path: '/cold-brew/$brewId/edit'
-      fullPath: '/cold-brew/$brewId/edit'
-      preLoaderRoute: typeof AuthenticatedColdBrewBrewIdEditRouteImport
+    '/api/trpc/$': {
+      id: '/api/trpc/$'
+      path: '/api/trpc/$'
+      fullPath: '/api/trpc/$'
+      preLoaderRoute: typeof ApiTrpcSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/aeropress/$brewId/edit': {
+      id: '/_authenticated/aeropress/$brewId/edit'
+      path: '/aeropress/$brewId/edit'
+      fullPath: '/aeropress/$brewId/edit'
+      preLoaderRoute: typeof AuthenticatedAeropressBrewIdEditRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/coffees/$coffeeId/edit': {
@@ -655,18 +620,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCoffeesCoffeeIdEditRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/aeropress/$brewId/edit': {
-      id: '/_authenticated/aeropress/$brewId/edit'
-      path: '/aeropress/$brewId/edit'
-      fullPath: '/aeropress/$brewId/edit'
-      preLoaderRoute: typeof AuthenticatedAeropressBrewIdEditRouteImport
+    '/_authenticated/cold-brew/$brewId/edit': {
+      id: '/_authenticated/cold-brew/$brewId/edit'
+      path: '/cold-brew/$brewId/edit'
+      fullPath: '/cold-brew/$brewId/edit'
+      preLoaderRoute: typeof AuthenticatedColdBrewBrewIdEditRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/equipment/grinders/$grinderId/edit': {
-      id: '/_authenticated/equipment/grinders/$grinderId/edit'
-      path: '/equipment/grinders/$grinderId/edit'
-      fullPath: '/equipment/grinders/$grinderId/edit'
-      preLoaderRoute: typeof AuthenticatedEquipmentGrindersGrinderIdEditRouteImport
+    '/_authenticated/equipment/brewing-devices/new': {
+      id: '/_authenticated/equipment/brewing-devices/new'
+      path: '/equipment/brewing-devices/new'
+      fullPath: '/equipment/brewing-devices/new'
+      preLoaderRoute: typeof AuthenticatedEquipmentBrewingDevicesNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/equipment/grinders/new': {
+      id: '/_authenticated/equipment/grinders/new'
+      path: '/equipment/grinders/new'
+      fullPath: '/equipment/grinders/new'
+      preLoaderRoute: typeof AuthenticatedEquipmentGrindersNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/espresso/$shotId/edit': {
+      id: '/_authenticated/espresso/$shotId/edit'
+      path: '/espresso/$shotId/edit'
+      fullPath: '/espresso/$shotId/edit'
+      preLoaderRoute: typeof AuthenticatedEspressoShotIdEditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/frenchpress/$brewId/edit': {
+      id: '/_authenticated/frenchpress/$brewId/edit'
+      path: '/frenchpress/$brewId/edit'
+      fullPath: '/frenchpress/$brewId/edit'
+      preLoaderRoute: typeof AuthenticatedFrenchpressBrewIdEditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/pourover/$brewId/edit': {
+      id: '/_authenticated/pourover/$brewId/edit'
+      path: '/pourover/$brewId/edit'
+      fullPath: '/pourover/$brewId/edit'
+      preLoaderRoute: typeof AuthenticatedPouroverBrewIdEditRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/equipment/brewing-devices/$deviceId/edit': {
@@ -674,6 +667,13 @@ declare module '@tanstack/react-router' {
       path: '/equipment/brewing-devices/$deviceId/edit'
       fullPath: '/equipment/brewing-devices/$deviceId/edit'
       preLoaderRoute: typeof AuthenticatedEquipmentBrewingDevicesDeviceIdEditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/equipment/grinders/$grinderId/edit': {
+      id: '/_authenticated/equipment/grinders/$grinderId/edit'
+      path: '/equipment/grinders/$grinderId/edit'
+      fullPath: '/equipment/grinders/$grinderId/edit'
+      preLoaderRoute: typeof AuthenticatedEquipmentGrindersGrinderIdEditRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
   }

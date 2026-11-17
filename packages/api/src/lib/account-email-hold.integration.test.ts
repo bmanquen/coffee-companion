@@ -152,7 +152,7 @@ describe('orphaned email hold restore', () => {
           provider: 'google',
           idToken: { token: jwtWithEmail(email) },
         },
-        [{ id: 'google', verifyIdToken: async () => false }],
+        [{ id: 'google', options: { verifyIdToken: async () => false } }],
       )
 
       expect((await db.query.user.findFirst({ where: { id } }))?.email).toBe(
@@ -298,7 +298,7 @@ describe('orphaned email hold restore', () => {
           [
             {
               id: 'google',
-              verifyIdToken: async () => true,
+              options: { verifyIdToken: async () => true },
               getUserInfo: async () => ({
                 user: { email, emailVerified: true },
               }),
