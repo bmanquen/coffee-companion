@@ -1913,6 +1913,33 @@ describe('log espresso shot', () => {
     expect(keys[2]).toBe(keys[0])
   })
 
+  it('reuses the key when a failed save only rewrites a weight as equal decimal text', async () => {
+    const keys: Array<string> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      loadPrefill: () => Promise.resolve(seedShot()),
+      create: (input) =>
+        Promise.resolve().then(() => {
+          keys.push(input.idempotencyKey)
+          throw new Error('Network request failed')
+        }),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '18.0')
+    await press(LOG)
+    await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '19')
+    await press(LOG)
+
+    expect(keys).toHaveLength(3)
+    expect(keys[1]).toBe(keys[0])
+    expect(keys[2]).not.toBe(keys[0])
+  })
+
   it('keeps a newer first page when an older refresh arrives late', async () => {
     const pages: Array<
       (page: { items: Array<ShotRow>; total: number; nextCursor: EspressoShotCursor | null }) => void

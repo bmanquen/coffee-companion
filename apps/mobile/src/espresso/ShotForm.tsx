@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { applyCoffeePrefill } from '@coffee-companion/brew-display'
+import { normalizeDecimal } from '@coffee-companion/api/lib/espresso'
 import {
   BackHandler,
   KeyboardAvoidingView,
@@ -53,7 +54,11 @@ export function consumeHardwareBack(busy: boolean, onBack: () => void) {
 }
 
 function draftFingerprint(input: Omit<ShotCreate, 'idempotencyKey'>) {
-  return JSON.stringify(input)
+  return JSON.stringify({
+    ...input,
+    dose: normalizeDecimal(input.dose),
+    yield: normalizeDecimal(input.yield),
+  })
 }
 
 export function ShotForm({
