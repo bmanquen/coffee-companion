@@ -100,7 +100,8 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
 
   const hasMore = query.hasNextPage
   const loading = query.isPending
-  const loadingMore = query.isFetchingNextPage
+  // loadMore waits out a refetch, so the pager must look busy during one.
+  const loadingMore = query.isFetchingNextPage || query.isRefetching
   const loadMoreError = query.isFetchNextPageError
     ? ESPRESSO_LOAD_MORE_FAILED
     : null

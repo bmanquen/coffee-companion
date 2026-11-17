@@ -199,6 +199,43 @@ describe('useEspressoShotPages', () => {
     }
   })
 
+  it('reports loading more while a refetch blocks the next page', async () => {
+    let finishRefetch: (response: Response) => void = () => {}
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockReturnValue(
+      new Promise<Response>((resolve) => {
+        finishRefetch = resolve
+      }),
+    )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+      let refetch: Promise<void> = Promise.resolve()
+      act(() => {
+        refetch = result.current.retry()
+      })
+      await waitFor(() => expect(result.current.loadingMore).toBe(true))
+
+      await act(async () => {
+        finishRefetch(
+          trpcSuccess({
+            items: first,
+            total: first.length + 1,
+            nextCursor: espressoShotCursor(first[first.length - 1]),
+          }),
+        )
+        await refetch
+      })
+      await waitFor(() => expect(result.current.loadingMore).toBe(false))
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('keeps extra shots when a refetch fails', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
