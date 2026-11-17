@@ -4,6 +4,7 @@ import { db } from '../db'
 import { daysAgo } from '../db/seed-e2e'
 import {
   brewingDeviceTypes,
+  coffees,
   espressoShotIdempotencyKeys,
   espressoShots,
 } from '../db/schema'
@@ -982,6 +983,43 @@ describe('espressoShot.getRecent', () => {
     expect(shots[0]?.coffee.roaster).toEqual(
       expect.objectContaining({ name: expect.any(String) }),
     )
+  })
+
+  it('hides and does not search another user’s private roaster', async () => {
+    const coffee = await createCoffee(uniq('Leaky roaster coffee'))
+    const secret = uniq('Secret roaster')
+    const hidden = await asB.roaster.create({ name: secret })
+    // Only a row written before the coffee router checked roasters can do this.
+    await db
+      .update(coffees)
+      .set({ roasterId: hidden.id })
+      .where(eq(coffees.id, coffee.id))
+    const shot = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+
+    const recent = await asA.espressoShot.getRecent({
+      limit: 50,
+      coffeeId: coffee.id,
+    })
+    expect(recent.items.map((item) => item.id)).toEqual([shot.id])
+    expect(recent.items[0]?.coffee.roaster).toBeNull()
+
+    const latest = await asA.espressoShot.getLatestUnsealed({
+      coffeeId: coffee.id,
+    })
+    expect(latest?.coffee.roaster).toBeNull()
+
+    const search = await asA.espressoShot.getRecent({ limit: 50, q: secret })
+    expect(search.items).toEqual([])
+    expect(search.total).toBe(0)
   })
 
   it('paginates with a cursor and stays stable when a shot is inserted', async () => {

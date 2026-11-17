@@ -39,16 +39,27 @@ export const TRPC_BAD_REQUEST = 'BAD_REQUEST' as const
 export const TRPC_CONFLICT = 'CONFLICT' as const
 export { SHOT_IDEMPOTENCY_DELETED, SHOT_REPLAY_CONFLICT }
 
-const withRelations = {
-  coffee: { with: { roaster: true } },
-  grinder: true,
-  brewingDevice: { with: { type: true } },
-} as const
+// A coffee written before roasters were checked may point at another user's.
+function withRelations(userId: string) {
+  const visible = { OR: [{ userId: { isNull: true as const } }, { userId }] }
+  return {
+    coffee: { with: { roaster: { where: visible } } },
+    grinder: true,
+    brewingDevice: { with: { type: true } },
+  } as const
+}
+
+function roasterVisibleTo(userId: string) {
+  return and(
+    eq(roasters.id, coffees.roasterId),
+    or(isNull(roasters.userId), eq(roasters.userId, userId)),
+  )
+}
 
 function loadShotsByIds(userId: string, ids: Array<string>) {
   return db.query.espressoShots.findMany({
     where: { userId, id: { in: ids } },
-    with: withRelations,
+    with: withRelations(userId),
   })
 }
 
@@ -199,12 +210,12 @@ async function loadRecentPage(
     })
     .from(espressoShots)
     .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
-    .leftJoin(roasters, eq(roasters.id, coffees.roasterId))
+    .leftJoin(roasters, roasterVisibleTo(userId))
   const countQuery = db
     .select({ total: count() })
     .from(espressoShots)
     .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
-    .leftJoin(roasters, eq(roasters.id, coffees.roasterId))
+    .leftJoin(roasters, roasterVisibleTo(userId))
   const [idRows, [{ total }]] = await Promise.all([
     (input.dialedIn ? pageQuery.innerJoin(dialedInBrews, dialedInOn) : pageQuery)
       .where(where)
@@ -392,7 +403,7 @@ export const espressoShotRouter = createTRPCRouter({
           ...(shelf !== null ? { sealedAt: { isNull: true } } : {}),
         },
         orderBy: { createdAt: 'desc', id: 'desc' },
-        with: withRelations,
+        with: withRelations(ctx.session.user.id),
       })
       if (!shot) return null
       return sealBrewWithDialedIn(
@@ -415,7 +426,7 @@ export const espressoShotRouter = createTRPCRouter({
         db.query.espressoShots.findMany({
           where: { userId: ctx.session.user.id, id: { in: ids } },
           orderBy: { createdAt: 'desc', id: 'desc' },
-          with: withRelations,
+          with: withRelations(ctx.session.user.id),
           limit: input?.limit,
         }),
       )

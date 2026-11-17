@@ -119,6 +119,20 @@ describe('coffee.create', () => {
     ).rejects.toThrow(/process not found/i)
   })
 
+  it('rejects another user’s private roaster', async () => {
+    const hidden = await asB.roaster.create({ name: uniq('Secret roaster') })
+    await expect(
+      createCoffee(uniq('Stolen roaster'), { roasterId: hidden.id }),
+    ).rejects.toThrow(/roaster not found/i)
+  })
+
+  it('rejects another user’s private roast level', async () => {
+    const hidden = await asB.roastLevel.create({ name: uniq('Secret level') })
+    await expect(
+      createCoffee(uniq('Stolen level'), { roastLevelId: hidden.id }),
+    ).rejects.toThrow(/roast level not found/i)
+  })
+
   it('stores multiple origin countries on a blend, one region each', async () => {
     const ethiopia = await asA.country.create({ name: uniq('Ethiopia') })
     const colombia = await asA.country.create({ name: uniq('Colombia') })
@@ -299,6 +313,19 @@ describe('coffee.update', () => {
     expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(
       new Date(updated.createdAt).getTime(),
     )
+  })
+
+  it('rejects moving a coffee onto another user’s private roaster', async () => {
+    const created = await createCoffee(uniq('Moved roaster'))
+    const hidden = await asB.roaster.create({ name: uniq('Secret target') })
+    await expect(
+      asA.coffee.update({
+        id: created.id,
+        name: created.name,
+        roasterId: hidden.id,
+        roastLevelId: created.roastLevelId!,
+      }),
+    ).rejects.toThrow(/roaster not found/i)
   })
 
   it('keeps stored origins when origins are omitted', async () => {
