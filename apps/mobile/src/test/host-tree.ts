@@ -52,13 +52,16 @@ export function formatHostTree(
   if (typeof node === 'string' || typeof node === 'number') {
     return `${' '.repeat(indent)}${node}\n`
   }
-  if (Array.isArray(node)) {
-    return node
-      .map((child) => formatHostTree(child, indent, ancestors))
-      .join('')
-  }
   if (typeof node !== 'object') return ''
   if (ancestors.includes(node)) return ''
+  if (Array.isArray(node)) {
+    ancestors.push(node)
+    const body = node
+      .map((child) => formatHostTree(child, indent, ancestors))
+      .join('')
+    ancestors.pop()
+    return body
+  }
   ancestors.push(node)
 
   const element = node as {

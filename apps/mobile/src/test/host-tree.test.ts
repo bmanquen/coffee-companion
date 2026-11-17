@@ -72,4 +72,11 @@ describe('formatHostTree', () => {
     expect(() => formatHostTree(node)).not.toThrow()
     expect(formatHostTree(node)).toContain('testID=cycle')
   })
+
+  it('stops at an array that contains itself', () => {
+    const children: Array<unknown> = ['Shot']
+    children.push(children)
+
+    expect(formatHostTree(children)).toBe('Shot\n')
+  })
 })
