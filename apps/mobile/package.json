@@ -30,7 +30,7 @@
     "react-native": "0.86.3"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.0",
+    "@babel/core": "^7.29.6",
     "@coffee-companion/api": "workspace:*",
     "@tanstack/eslint-config": "^0.5.0",
     "@testing-library/react-native": "^14.1.0",
