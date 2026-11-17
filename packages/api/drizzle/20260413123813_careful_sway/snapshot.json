@@ -1,108 +1,1473 @@
 {
-  "version": "8",
+  "type": "base",
+  "version": "9",
   "dialect": "postgres",
   "id": "59ed858f-6662-425a-ab1b-83e21718fdc9",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffee_processes"
+      ],
+      "writes": [
+        "s|tbl|public.coffee_processes",
+        "n|tbl|public.coffee_processes",
+        "e|tbl|public.coffee_processes",
+        "n|rel|public.coffee_processes",
+        "n|type|public.coffee_processes",
+        "n|rel|public.coffee_processes_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees"
+      ],
+      "writes": [
+        "s|tbl|public.coffees",
+        "n|tbl|public.coffees",
+        "e|tbl|public.coffees",
+        "n|rel|public.coffees",
+        "n|type|public.coffees",
+        "n|rel|public.coffees_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees_varieties"
+      ],
+      "writes": [
+        "s|tbl|public.coffees_varieties",
+        "n|tbl|public.coffees_varieties",
+        "e|tbl|public.coffees_varieties",
+        "n|rel|public.coffees_varieties",
+        "n|type|public.coffees_varieties",
+        "n|rel|public.coffees_varieties_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "countries"
+      ],
+      "writes": [
+        "s|tbl|public.countries",
+        "n|tbl|public.countries",
+        "e|tbl|public.countries",
+        "n|rel|public.countries",
+        "n|type|public.countries",
+        "n|rel|public.countries_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shots"
+      ],
+      "writes": [
+        "s|tbl|public.espresso_shots",
+        "n|tbl|public.espresso_shots",
+        "e|tbl|public.espresso_shots",
+        "n|rel|public.espresso_shots",
+        "n|type|public.espresso_shots",
+        "n|rel|public.espresso_shots_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "farms"
+      ],
+      "writes": [
+        "s|tbl|public.farms",
+        "n|tbl|public.farms",
+        "e|tbl|public.farms",
+        "n|rel|public.farms",
+        "n|type|public.farms",
+        "n|rel|public.farms_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "green_coffees"
+      ],
+      "writes": [
+        "s|tbl|public.green_coffees",
+        "n|tbl|public.green_coffees",
+        "e|tbl|public.green_coffees",
+        "n|rel|public.green_coffees",
+        "n|type|public.green_coffees",
+        "n|rel|public.green_coffees_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "green_coffees_varieties"
+      ],
+      "writes": [
+        "s|tbl|public.green_coffees_varieties",
+        "n|tbl|public.green_coffees_varieties",
+        "e|tbl|public.green_coffees_varieties",
+        "n|rel|public.green_coffees_varieties",
+        "n|type|public.green_coffees_varieties",
+        "n|rel|public.green_coffees_varieties_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "regions"
+      ],
+      "writes": [
+        "s|tbl|public.regions",
+        "n|tbl|public.regions",
+        "e|tbl|public.regions",
+        "n|rel|public.regions",
+        "n|type|public.regions",
+        "n|rel|public.regions_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "roast_levels"
+      ],
+      "writes": [
+        "s|tbl|public.roast_levels",
+        "n|tbl|public.roast_levels",
+        "e|tbl|public.roast_levels",
+        "n|rel|public.roast_levels",
+        "n|type|public.roast_levels",
+        "n|rel|public.roast_levels_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "roasters"
+      ],
+      "writes": [
+        "s|tbl|public.roasters",
+        "n|tbl|public.roasters",
+        "e|tbl|public.roasters",
+        "n|rel|public.roasters",
+        "n|type|public.roasters",
+        "n|rel|public.roasters_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "varieties"
+      ],
+      "writes": [
+        "s|tbl|public.varieties",
+        "n|tbl|public.varieties",
+        "e|tbl|public.varieties",
+        "n|rel|public.varieties",
+        "n|type|public.varieties",
+        "n|rel|public.varieties_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "account"
+      ],
+      "writes": [
+        "s|tbl|public.account",
+        "n|tbl|public.account",
+        "e|tbl|public.account",
+        "n|rel|public.account",
+        "n|type|public.account",
+        "n|rel|public.account_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "session"
+      ],
+      "writes": [
+        "s|tbl|public.session",
+        "n|tbl|public.session",
+        "e|tbl|public.session",
+        "n|rel|public.session",
+        "n|type|public.session",
+        "n|rel|public.session_pkey",
+        "n|rel|public.session_token_key"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "user"
+      ],
+      "writes": [
+        "s|tbl|public.user",
+        "n|tbl|public.user",
+        "e|tbl|public.user",
+        "n|rel|public.user",
+        "n|type|public.user",
+        "n|rel|public.user_pkey",
+        "n|rel|public.user_email_key"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "verification"
+      ],
+      "writes": [
+        "s|tbl|public.verification",
+        "n|tbl|public.verification",
+        "e|tbl|public.verification",
+        "n|rel|public.verification",
+        "n|type|public.verification",
+        "n|rel|public.verification_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "coffee_processes",
+        "coffee_processes_name_idx"
+      ],
+      "writes": [
+        "s|idx|public.coffee_processes_name_idx",
+        "n|idx|public.coffee_processes_name_idx",
+        "e|idx|public.coffee_processes_name_idx",
+        "n|rel|public.coffee_processes_name_idx"
+      ],
+      "reads": [
+        "n|tbl|public.coffee_processes",
+        "n|sch|public",
+        "n|col|public.coffee_processes.name"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "coffees",
+        "coffees_user_idx"
+      ],
+      "writes": [
+        "s|idx|public.coffees_user_idx",
+        "n|idx|public.coffees_user_idx",
+        "e|idx|public.coffees_user_idx",
+        "n|rel|public.coffees_user_idx"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.coffees.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "coffees",
+        "coffees_user_name_idx"
+      ],
+      "writes": [
+        "s|idx|public.coffees_user_name_idx",
+        "n|idx|public.coffees_user_name_idx",
+        "e|idx|public.coffees_user_name_idx",
+        "n|rel|public.coffees_user_name_idx"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.coffees.name",
+        "n|col|public.coffees.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "coffees",
+        "coffees_user_process_id_idx"
+      ],
+      "writes": [
+        "s|idx|public.coffees_user_process_id_idx",
+        "n|idx|public.coffees_user_process_id_idx",
+        "e|idx|public.coffees_user_process_id_idx",
+        "n|rel|public.coffees_user_process_id_idx"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.coffees.process_id",
+        "n|col|public.coffees.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "coffees",
+        "coffees_user_country_idx"
+      ],
+      "writes": [
+        "s|idx|public.coffees_user_country_idx",
+        "n|idx|public.coffees_user_country_idx",
+        "e|idx|public.coffees_user_country_idx",
+        "n|rel|public.coffees_user_country_idx"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.coffees.country_id",
+        "n|col|public.coffees.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "countries",
+        "countries_name_idx"
+      ],
+      "writes": [
+        "s|idx|public.countries_name_idx",
+        "n|idx|public.countries_name_idx",
+        "e|idx|public.countries_name_idx",
+        "n|rel|public.countries_name_idx"
+      ],
+      "reads": [
+        "n|tbl|public.countries",
+        "n|sch|public",
+        "n|col|public.countries.name"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "espresso_shots",
+        "espresso_shots_user_idx"
+      ],
+      "writes": [
+        "s|idx|public.espresso_shots_user_idx",
+        "n|idx|public.espresso_shots_user_idx",
+        "e|idx|public.espresso_shots_user_idx",
+        "n|rel|public.espresso_shots_user_idx"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|col|public.espresso_shots.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "espresso_shots",
+        "espresso_shots_user_coffee_idx"
+      ],
+      "writes": [
+        "s|idx|public.espresso_shots_user_coffee_idx",
+        "n|idx|public.espresso_shots_user_coffee_idx",
+        "e|idx|public.espresso_shots_user_coffee_idx",
+        "n|rel|public.espresso_shots_user_coffee_idx"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|col|public.espresso_shots.user_id",
+        "n|col|public.espresso_shots.coffee_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "farms",
+        "farms_name_region_idx"
+      ],
+      "writes": [
+        "s|idx|public.farms_name_region_idx",
+        "n|idx|public.farms_name_region_idx",
+        "e|idx|public.farms_name_region_idx",
+        "n|rel|public.farms_name_region_idx"
+      ],
+      "reads": [
+        "n|tbl|public.farms",
+        "n|sch|public",
+        "n|col|public.farms.name",
+        "n|col|public.farms.region_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "green_coffees",
+        "green_coffees_user_idx"
+      ],
+      "writes": [
+        "s|idx|public.green_coffees_user_idx",
+        "n|idx|public.green_coffees_user_idx",
+        "e|idx|public.green_coffees_user_idx",
+        "n|rel|public.green_coffees_user_idx"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|col|public.green_coffees.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "green_coffees",
+        "green_coffees_user_name_idx"
+      ],
+      "writes": [
+        "s|idx|public.green_coffees_user_name_idx",
+        "n|idx|public.green_coffees_user_name_idx",
+        "e|idx|public.green_coffees_user_name_idx",
+        "n|rel|public.green_coffees_user_name_idx"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|col|public.green_coffees.name",
+        "n|col|public.green_coffees.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "green_coffees",
+        "green_coffees_user_process_id_idx"
+      ],
+      "writes": [
+        "s|idx|public.green_coffees_user_process_id_idx",
+        "n|idx|public.green_coffees_user_process_id_idx",
+        "e|idx|public.green_coffees_user_process_id_idx",
+        "n|rel|public.green_coffees_user_process_id_idx"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|col|public.green_coffees.process_id",
+        "n|col|public.green_coffees.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "green_coffees",
+        "green_coffees_user_country_idx"
+      ],
+      "writes": [
+        "s|idx|public.green_coffees_user_country_idx",
+        "n|idx|public.green_coffees_user_country_idx",
+        "e|idx|public.green_coffees_user_country_idx",
+        "n|rel|public.green_coffees_user_country_idx"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|col|public.green_coffees.country_id",
+        "n|col|public.green_coffees.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "regions",
+        "regions_name_country_idx"
+      ],
+      "writes": [
+        "s|idx|public.regions_name_country_idx",
+        "n|idx|public.regions_name_country_idx",
+        "e|idx|public.regions_name_country_idx",
+        "n|rel|public.regions_name_country_idx"
+      ],
+      "reads": [
+        "n|tbl|public.regions",
+        "n|sch|public",
+        "n|col|public.regions.name",
+        "n|col|public.regions.country_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "roast_levels",
+        "roast_levels_name_idx"
+      ],
+      "writes": [
+        "s|idx|public.roast_levels_name_idx",
+        "n|idx|public.roast_levels_name_idx",
+        "e|idx|public.roast_levels_name_idx",
+        "n|rel|public.roast_levels_name_idx"
+      ],
+      "reads": [
+        "n|tbl|public.roast_levels",
+        "n|sch|public",
+        "n|col|public.roast_levels.name"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "roasters",
+        "roasters_name_idx"
+      ],
+      "writes": [
+        "s|idx|public.roasters_name_idx",
+        "n|idx|public.roasters_name_idx",
+        "e|idx|public.roasters_name_idx",
+        "n|rel|public.roasters_name_idx"
+      ],
+      "reads": [
+        "n|tbl|public.roasters",
+        "n|sch|public",
+        "n|col|public.roasters.name"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "varieties",
+        "varieties_name_idx"
+      ],
+      "writes": [
+        "s|idx|public.varieties_name_idx",
+        "n|idx|public.varieties_name_idx",
+        "e|idx|public.varieties_name_idx",
+        "n|rel|public.varieties_name_idx"
+      ],
+      "reads": [
+        "n|tbl|public.varieties",
+        "n|sch|public",
+        "n|col|public.varieties.name"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "account",
+        "account_userId_idx"
+      ],
+      "writes": [
+        "s|idx|public.account_userId_idx",
+        "n|idx|public.account_userId_idx",
+        "e|idx|public.account_userId_idx",
+        "n|rel|public.account_userId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.account",
+        "n|sch|public",
+        "n|col|public.account.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "session",
+        "session_userId_idx"
+      ],
+      "writes": [
+        "s|idx|public.session_userId_idx",
+        "n|idx|public.session_userId_idx",
+        "e|idx|public.session_userId_idx",
+        "n|rel|public.session_userId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.session",
+        "n|sch|public",
+        "n|col|public.session.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "verification",
+        "verification_identifier_idx"
+      ],
+      "writes": [
+        "s|idx|public.verification_identifier_idx",
+        "n|idx|public.verification_identifier_idx",
+        "e|idx|public.verification_identifier_idx",
+        "n|rel|public.verification_identifier_idx"
+      ],
+      "reads": [
+        "n|tbl|public.verification",
+        "n|sch|public",
+        "n|col|public.verification.identifier"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffee_processes"
+      ],
+      "writes": [
+        "s|fk|public.coffee_processes.coffee_processes_user_id_user_id_fkey",
+        "n|fk|public.coffee_processes.coffee_processes_user_id_user_id_fkey",
+        "e|fk|public.coffee_processes.coffee_processes_user_id_user_id_fkey",
+        "n|con|public.coffee_processes.coffee_processes_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.coffee_processes",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.coffee_processes.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees"
+      ],
+      "writes": [
+        "s|fk|public.coffees.coffees_user_id_user_id_fkey",
+        "n|fk|public.coffees.coffees_user_id_user_id_fkey",
+        "e|fk|public.coffees.coffees_user_id_user_id_fkey",
+        "n|con|public.coffees.coffees_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.coffees.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees"
+      ],
+      "writes": [
+        "s|fk|public.coffees.coffees_roaster_id_roasters_id_fkey",
+        "n|fk|public.coffees.coffees_roaster_id_roasters_id_fkey",
+        "e|fk|public.coffees.coffees_roaster_id_roasters_id_fkey",
+        "n|con|public.coffees.coffees_roaster_id_roasters_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|tbl|public.roasters",
+        "n|sch|public",
+        "n|col|public.coffees.roaster_id",
+        "n|col|public.roasters.id",
+        "e|uniqueness|public.roasters.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees"
+      ],
+      "writes": [
+        "s|fk|public.coffees.coffees_roast_level_id_roast_levels_id_fkey",
+        "n|fk|public.coffees.coffees_roast_level_id_roast_levels_id_fkey",
+        "e|fk|public.coffees.coffees_roast_level_id_roast_levels_id_fkey",
+        "n|con|public.coffees.coffees_roast_level_id_roast_levels_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|tbl|public.roast_levels",
+        "n|sch|public",
+        "n|col|public.coffees.roast_level_id",
+        "n|col|public.roast_levels.id",
+        "e|uniqueness|public.roast_levels.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees"
+      ],
+      "writes": [
+        "s|fk|public.coffees.coffees_country_id_countries_id_fkey",
+        "n|fk|public.coffees.coffees_country_id_countries_id_fkey",
+        "e|fk|public.coffees.coffees_country_id_countries_id_fkey",
+        "n|con|public.coffees.coffees_country_id_countries_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|tbl|public.countries",
+        "n|sch|public",
+        "n|col|public.coffees.country_id",
+        "n|col|public.countries.id",
+        "e|uniqueness|public.countries.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees"
+      ],
+      "writes": [
+        "s|fk|public.coffees.coffees_region_id_regions_id_fkey",
+        "n|fk|public.coffees.coffees_region_id_regions_id_fkey",
+        "e|fk|public.coffees.coffees_region_id_regions_id_fkey",
+        "n|con|public.coffees.coffees_region_id_regions_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|tbl|public.regions",
+        "n|sch|public",
+        "n|col|public.coffees.region_id",
+        "n|col|public.regions.id",
+        "e|uniqueness|public.regions.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees"
+      ],
+      "writes": [
+        "s|fk|public.coffees.coffees_process_id_coffee_processes_id_fkey",
+        "n|fk|public.coffees.coffees_process_id_coffee_processes_id_fkey",
+        "e|fk|public.coffees.coffees_process_id_coffee_processes_id_fkey",
+        "n|con|public.coffees.coffees_process_id_coffee_processes_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|tbl|public.coffee_processes",
+        "n|sch|public",
+        "n|col|public.coffees.process_id",
+        "n|col|public.coffee_processes.id",
+        "e|uniqueness|public.coffee_processes.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees_varieties"
+      ],
+      "writes": [
+        "s|fk|public.coffees_varieties.coffees_varieties_variety_id_varieties_id_fkey",
+        "n|fk|public.coffees_varieties.coffees_varieties_variety_id_varieties_id_fkey",
+        "e|fk|public.coffees_varieties.coffees_varieties_variety_id_varieties_id_fkey",
+        "n|con|public.coffees_varieties.coffees_varieties_variety_id_varieties_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.coffees_varieties",
+        "n|sch|public",
+        "n|tbl|public.varieties",
+        "n|sch|public",
+        "n|col|public.coffees_varieties.variety_id",
+        "n|col|public.varieties.id",
+        "e|uniqueness|public.varieties.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees_varieties"
+      ],
+      "writes": [
+        "s|fk|public.coffees_varieties.coffees_varieties_coffee_id_coffees_id_fkey",
+        "n|fk|public.coffees_varieties.coffees_varieties_coffee_id_coffees_id_fkey",
+        "e|fk|public.coffees_varieties.coffees_varieties_coffee_id_coffees_id_fkey",
+        "n|con|public.coffees_varieties.coffees_varieties_coffee_id_coffees_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.coffees_varieties",
+        "n|sch|public",
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.coffees_varieties.coffee_id",
+        "n|col|public.coffees.id",
+        "e|uniqueness|public.coffees.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "countries"
+      ],
+      "writes": [
+        "s|fk|public.countries.countries_user_id_user_id_fkey",
+        "n|fk|public.countries.countries_user_id_user_id_fkey",
+        "e|fk|public.countries.countries_user_id_user_id_fkey",
+        "n|con|public.countries.countries_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.countries",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.countries.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shots"
+      ],
+      "writes": [
+        "s|fk|public.espresso_shots.espresso_shots_user_id_user_id_fkey",
+        "n|fk|public.espresso_shots.espresso_shots_user_id_user_id_fkey",
+        "e|fk|public.espresso_shots.espresso_shots_user_id_user_id_fkey",
+        "n|con|public.espresso_shots.espresso_shots_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.espresso_shots.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shots"
+      ],
+      "writes": [
+        "s|fk|public.espresso_shots.espresso_shots_coffee_id_coffees_id_fkey",
+        "n|fk|public.espresso_shots.espresso_shots_coffee_id_coffees_id_fkey",
+        "e|fk|public.espresso_shots.espresso_shots_coffee_id_coffees_id_fkey",
+        "n|con|public.espresso_shots.espresso_shots_coffee_id_coffees_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.espresso_shots.coffee_id",
+        "n|col|public.coffees.id",
+        "e|uniqueness|public.coffees.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "farms"
+      ],
+      "writes": [
+        "s|fk|public.farms.farms_user_id_user_id_fkey",
+        "n|fk|public.farms.farms_user_id_user_id_fkey",
+        "e|fk|public.farms.farms_user_id_user_id_fkey",
+        "n|con|public.farms.farms_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.farms",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.farms.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "farms"
+      ],
+      "writes": [
+        "s|fk|public.farms.farms_region_id_regions_id_fkey",
+        "n|fk|public.farms.farms_region_id_regions_id_fkey",
+        "e|fk|public.farms.farms_region_id_regions_id_fkey",
+        "n|con|public.farms.farms_region_id_regions_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.farms",
+        "n|sch|public",
+        "n|tbl|public.regions",
+        "n|sch|public",
+        "n|col|public.farms.region_id",
+        "n|col|public.regions.id",
+        "e|uniqueness|public.regions.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "green_coffees"
+      ],
+      "writes": [
+        "s|fk|public.green_coffees.green_coffees_user_id_user_id_fkey",
+        "n|fk|public.green_coffees.green_coffees_user_id_user_id_fkey",
+        "e|fk|public.green_coffees.green_coffees_user_id_user_id_fkey",
+        "n|con|public.green_coffees.green_coffees_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.green_coffees.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "green_coffees"
+      ],
+      "writes": [
+        "s|fk|public.green_coffees.green_coffees_country_id_countries_id_fkey",
+        "n|fk|public.green_coffees.green_coffees_country_id_countries_id_fkey",
+        "e|fk|public.green_coffees.green_coffees_country_id_countries_id_fkey",
+        "n|con|public.green_coffees.green_coffees_country_id_countries_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|tbl|public.countries",
+        "n|sch|public",
+        "n|col|public.green_coffees.country_id",
+        "n|col|public.countries.id",
+        "e|uniqueness|public.countries.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "green_coffees"
+      ],
+      "writes": [
+        "s|fk|public.green_coffees.green_coffees_region_id_regions_id_fkey",
+        "n|fk|public.green_coffees.green_coffees_region_id_regions_id_fkey",
+        "e|fk|public.green_coffees.green_coffees_region_id_regions_id_fkey",
+        "n|con|public.green_coffees.green_coffees_region_id_regions_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|tbl|public.regions",
+        "n|sch|public",
+        "n|col|public.green_coffees.region_id",
+        "n|col|public.regions.id",
+        "e|uniqueness|public.regions.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "green_coffees"
+      ],
+      "writes": [
+        "s|fk|public.green_coffees.green_coffees_farm_id_farms_id_fkey",
+        "n|fk|public.green_coffees.green_coffees_farm_id_farms_id_fkey",
+        "e|fk|public.green_coffees.green_coffees_farm_id_farms_id_fkey",
+        "n|con|public.green_coffees.green_coffees_farm_id_farms_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|tbl|public.farms",
+        "n|sch|public",
+        "n|col|public.green_coffees.farm_id",
+        "n|col|public.farms.id",
+        "e|uniqueness|public.farms.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "green_coffees"
+      ],
+      "writes": [
+        "s|fk|public.green_coffees.green_coffees_process_id_coffee_processes_id_fkey",
+        "n|fk|public.green_coffees.green_coffees_process_id_coffee_processes_id_fkey",
+        "e|fk|public.green_coffees.green_coffees_process_id_coffee_processes_id_fkey",
+        "n|con|public.green_coffees.green_coffees_process_id_coffee_processes_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|tbl|public.coffee_processes",
+        "n|sch|public",
+        "n|col|public.green_coffees.process_id",
+        "n|col|public.coffee_processes.id",
+        "e|uniqueness|public.coffee_processes.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "green_coffees_varieties"
+      ],
+      "writes": [
+        "s|fk|public.green_coffees_varieties.green_coffees_varieties_variety_id_varieties_id_fkey",
+        "n|fk|public.green_coffees_varieties.green_coffees_varieties_variety_id_varieties_id_fkey",
+        "e|fk|public.green_coffees_varieties.green_coffees_varieties_variety_id_varieties_id_fkey",
+        "n|con|public.green_coffees_varieties.green_coffees_varieties_variety_id_varieties_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees_varieties",
+        "n|sch|public",
+        "n|tbl|public.varieties",
+        "n|sch|public",
+        "n|col|public.green_coffees_varieties.variety_id",
+        "n|col|public.varieties.id",
+        "e|uniqueness|public.varieties.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "green_coffees_varieties"
+      ],
+      "writes": [
+        "s|fk|public.green_coffees_varieties.green_coffees_varieties_green_coffee_id_green_coffees_id_fkey",
+        "n|fk|public.green_coffees_varieties.green_coffees_varieties_green_coffee_id_green_coffees_id_fkey",
+        "e|fk|public.green_coffees_varieties.green_coffees_varieties_green_coffee_id_green_coffees_id_fkey",
+        "n|con|public.green_coffees_varieties.green_coffees_varieties_green_coffee_id_green_coffees_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.green_coffees_varieties",
+        "n|sch|public",
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|col|public.green_coffees_varieties.green_coffee_id",
+        "n|col|public.green_coffees.id",
+        "e|uniqueness|public.green_coffees.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "regions"
+      ],
+      "writes": [
+        "s|fk|public.regions.regions_user_id_user_id_fkey",
+        "n|fk|public.regions.regions_user_id_user_id_fkey",
+        "e|fk|public.regions.regions_user_id_user_id_fkey",
+        "n|con|public.regions.regions_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.regions",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.regions.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "regions"
+      ],
+      "writes": [
+        "s|fk|public.regions.regions_country_id_countries_id_fkey",
+        "n|fk|public.regions.regions_country_id_countries_id_fkey",
+        "e|fk|public.regions.regions_country_id_countries_id_fkey",
+        "n|con|public.regions.regions_country_id_countries_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.regions",
+        "n|sch|public",
+        "n|tbl|public.countries",
+        "n|sch|public",
+        "n|col|public.regions.country_id",
+        "n|col|public.countries.id",
+        "e|uniqueness|public.countries.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "roast_levels"
+      ],
+      "writes": [
+        "s|fk|public.roast_levels.roast_levels_user_id_user_id_fkey",
+        "n|fk|public.roast_levels.roast_levels_user_id_user_id_fkey",
+        "e|fk|public.roast_levels.roast_levels_user_id_user_id_fkey",
+        "n|con|public.roast_levels.roast_levels_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.roast_levels",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.roast_levels.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "roasters"
+      ],
+      "writes": [
+        "s|fk|public.roasters.roasters_user_id_user_id_fkey",
+        "n|fk|public.roasters.roasters_user_id_user_id_fkey",
+        "e|fk|public.roasters.roasters_user_id_user_id_fkey",
+        "n|con|public.roasters.roasters_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.roasters",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.roasters.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "varieties"
+      ],
+      "writes": [
+        "s|fk|public.varieties.varieties_user_id_user_id_fkey",
+        "n|fk|public.varieties.varieties_user_id_user_id_fkey",
+        "e|fk|public.varieties.varieties_user_id_user_id_fkey",
+        "n|con|public.varieties.varieties_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.varieties",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.varieties.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "account"
+      ],
+      "writes": [
+        "s|fk|public.account.account_user_id_user_id_fkey",
+        "n|fk|public.account.account_user_id_user_id_fkey",
+        "e|fk|public.account.account_user_id_user_id_fkey",
+        "n|con|public.account.account_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.account",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.account.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "session"
+      ],
+      "writes": [
+        "s|fk|public.session.session_user_id_user_id_fkey",
+        "n|fk|public.session.session_user_id_user_id_fkey",
+        "e|fk|public.session.session_user_id_user_id_fkey",
+        "n|con|public.session.session_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.session",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.session.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    }
+  ],
   "ddl": [
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "coffee_processes",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "coffees",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "coffees_varieties",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "countries",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "espresso_shots",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "farms",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "green_coffees",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "green_coffees_varieties",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "regions",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "roast_levels",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "roasters",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "varieties",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "account",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "session",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "user",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
       "isRlsEnabled": false,
-      "name": "verification",
-      "entityType": "tables",
-      "schema": "public"
+      "entityType": "tables"
     },
     {
+      "schema": "public",
+      "name": "verification",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "table": "coffee_processes",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -110,12 +1475,12 @@
       "default": "gen_random_uuid()",
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffee_processes"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffee_processes",
+      "name": "user_id",
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -123,12 +1488,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffee_processes"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffee_processes",
+      "name": "name",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -136,12 +1501,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffee_processes"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffee_processes",
+      "name": "created_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -149,12 +1514,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffee_processes"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffee_processes",
+      "name": "updated_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": false,
@@ -162,12 +1527,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffee_processes"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -175,25 +1540,12 @@
       "default": "gen_random_uuid()",
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "columns"
     },
     {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "coffees",
       "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -201,25 +1553,25 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "coffees",
       "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "uuid",
+      "type": "text",
       "typeSchema": null,
-      "notNull": false,
+      "notNull": true,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "coffees",
       "name": "roaster_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
       "type": "uuid",
       "typeSchema": null,
       "notNull": false,
@@ -227,12 +1579,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "roast_level_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "roast_level_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "coffees",
+      "name": "roastDate",
       "type": "date",
       "typeSchema": null,
       "notNull": false,
@@ -240,25 +1605,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "roastDate",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "columns"
     },
     {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "coffees",
       "name": "country_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
       "type": "uuid",
       "typeSchema": null,
       "notNull": false,
@@ -266,12 +1618,12 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "coffees",
       "name": "region_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
       "type": "uuid",
       "typeSchema": null,
       "notNull": false,
@@ -279,12 +1631,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "process_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "process_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "coffees",
+      "name": "notes",
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -292,12 +1657,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "notes",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "is_active",
       "type": "boolean",
       "typeSchema": null,
       "notNull": false,
@@ -305,12 +1670,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "is_active",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "created_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -318,12 +1683,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "updated_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": false,
@@ -331,25 +1696,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "columns"
     },
     {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "coffees_varieties",
       "name": "variety_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees_varieties"
-    },
-    {
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -357,12 +1709,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "coffee_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees_varieties"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffees_varieties",
+      "name": "coffee_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "coffees_varieties",
+      "name": "created_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -370,12 +1735,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees_varieties"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "coffees_varieties",
+      "name": "updated_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": false,
@@ -383,12 +1748,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees_varieties"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "countries",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -396,12 +1761,12 @@
       "default": "gen_random_uuid()",
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "countries"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "countries",
+      "name": "user_id",
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -409,64 +1774,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "countries"
+      "entityType": "columns"
     },
     {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "countries",
       "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -474,12 +1787,64 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "countries",
+      "name": "created_at",
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "countries",
+      "name": "updated_at",
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "espresso_shots",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "espresso_shots",
+      "name": "user_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "espresso_shots",
+      "name": "coffee_id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -487,25 +1852,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "coffee_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
+      "entityType": "columns"
     },
     {
-      "type": "numeric",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "espresso_shots",
       "name": "dose",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
       "type": "numeric",
       "typeSchema": null,
       "notNull": false,
@@ -513,246 +1865,25 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "espresso_shots",
       "name": "yield",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "integer",
+      "type": "numeric",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "espresso_shots",
       "name": "time",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "grind_setting",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "notes",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "region_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "country_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "region_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "farm_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "process_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
       "type": "integer",
       "typeSchema": null,
       "notNull": false,
@@ -760,12 +1891,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "altitude",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "espresso_shots",
+      "name": "grind_setting",
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -773,12 +1904,25 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "espresso_shots",
       "name": "notes",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "espresso_shots",
+      "name": "created_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -786,12 +1930,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "espresso_shots",
+      "name": "updated_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": false,
@@ -799,64 +1943,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "columns"
     },
     {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "variety_id",
-      "entityType": "columns",
       "schema": "public",
-      "table": "green_coffees_varieties"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "green_coffee_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees_varieties"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees_varieties"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees_varieties"
-    },
-    {
+      "table": "farms",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -864,12 +1956,12 @@
       "default": "gen_random_uuid()",
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "farms",
+      "name": "user_id",
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -877,12 +1969,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "farms",
+      "name": "name",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -890,12 +1982,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "farms",
+      "name": "region_id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": false,
@@ -903,12 +1995,155 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "farms",
+      "name": "created_at",
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "farms",
+      "name": "updated_at",
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "user_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees",
       "name": "country_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "region_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "farm_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "process_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "altitude",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "notes",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "created_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -916,12 +2151,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "updated_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": false,
@@ -929,12 +2164,64 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "green_coffees_varieties",
+      "name": "variety_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees_varieties",
+      "name": "green_coffee_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees_varieties",
+      "name": "created_at",
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "green_coffees_varieties",
+      "name": "updated_at",
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "regions",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -942,12 +2229,12 @@
       "default": "gen_random_uuid()",
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roast_levels"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "regions",
+      "name": "user_id",
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -955,12 +2242,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roast_levels"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "regions",
+      "name": "name",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -968,12 +2255,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roast_levels"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "regions",
+      "name": "country_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "regions",
+      "name": "created_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -981,12 +2281,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roast_levels"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "regions",
+      "name": "updated_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": false,
@@ -994,12 +2294,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roast_levels"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "roast_levels",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -1007,12 +2307,12 @@
       "default": "gen_random_uuid()",
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roasters"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "roast_levels",
+      "name": "user_id",
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -1020,12 +2320,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roasters"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "roast_levels",
+      "name": "name",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1033,12 +2333,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roasters"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "roast_levels",
+      "name": "created_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -1046,12 +2346,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roasters"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "roast_levels",
+      "name": "updated_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": false,
@@ -1059,12 +2359,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roasters"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "roasters",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -1072,12 +2372,12 @@
       "default": "gen_random_uuid()",
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "varieties"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "roasters",
+      "name": "user_id",
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -1085,12 +2385,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "varieties"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "roasters",
+      "name": "name",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1098,12 +2398,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "varieties"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "roasters",
+      "name": "created_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -1111,12 +2411,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "varieties"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "roasters",
+      "name": "updated_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": false,
@@ -1124,25 +2424,38 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "varieties"
+      "entityType": "columns"
     },
     {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "varieties",
       "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "varieties",
+      "name": "user_id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "varieties",
+      "name": "name",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1150,12 +2463,51 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "varieties",
+      "name": "created_at",
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "varieties",
+      "name": "updated_at",
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "account",
+      "name": "id",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "account_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1163,12 +2515,12 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "provider_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1176,25 +2528,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "account",
+      "name": "user_id",
       "type": "text",
       "typeSchema": null,
-      "notNull": false,
+      "notNull": true,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "access_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -1202,12 +2554,12 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "refresh_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -1215,25 +2567,25 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "id_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "timestamp",
+      "type": "text",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "access_token_expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
       "type": "timestamp",
       "typeSchema": null,
       "notNull": false,
@@ -1241,25 +2593,25 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "refresh_token_expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
+      "type": "timestamp",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "scope",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -1267,12 +2619,25 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "password",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "account",
+      "name": "created_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -1280,12 +2645,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "account",
+      "name": "updated_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -1293,12 +2658,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "session",
+      "name": "id",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1306,25 +2671,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
+      "entityType": "columns"
     },
     {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "session",
       "name": "expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "session",
+      "name": "token",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1332,12 +2697,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "session",
+      "name": "created_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -1345,12 +2710,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "session",
+      "name": "updated_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -1358,25 +2723,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
+      "entityType": "columns"
     },
     {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "session",
       "name": "ip_address",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -1384,25 +2736,25 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "session",
       "name": "user_agent",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
       "type": "text",
       "typeSchema": null,
-      "notNull": true,
+      "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "session",
       "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1410,12 +2762,12 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "user",
       "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1423,12 +2775,12 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "user",
       "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1436,12 +2788,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "email",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "user",
+      "name": "email",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "user",
+      "name": "email_verified",
       "type": "boolean",
       "typeSchema": null,
       "notNull": true,
@@ -1449,12 +2814,12 @@
       "default": "false",
       "generated": null,
       "identity": null,
-      "name": "email_verified",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "user",
+      "name": "image",
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -1462,25 +2827,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "image",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
+      "entityType": "columns"
     },
     {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "user",
       "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -1488,25 +2840,25 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
+      "entityType": "columns"
     },
     {
-      "type": "text",
+      "schema": "public",
+      "table": "user",
+      "name": "updated_at",
+      "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
-      "default": null,
+      "default": "now()",
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "verification",
       "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1514,12 +2866,12 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "verification",
       "name": "identifier",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -1527,12 +2879,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "value",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "verification",
+      "name": "value",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "verification",
+      "name": "expires_at",
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -1540,25 +2905,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
+      "entityType": "columns"
     },
     {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "verification",
       "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
       "type": "timestamp",
       "typeSchema": null,
       "notNull": true,
@@ -1566,12 +2918,25 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "verification",
+      "name": "updated_at",
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "coffee_processes",
+      "name": "coffee_processes_name_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1587,12 +2952,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "coffee_processes_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "coffee_processes"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "coffees_user_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1608,12 +2973,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "coffees_user_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "coffees_user_name_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1636,12 +3001,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "coffees_user_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "coffees_user_process_id_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1664,12 +3029,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "coffees_user_process_id_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "coffees_user_country_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1692,12 +3057,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "coffees_user_country_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "countries",
+      "name": "countries_name_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1713,12 +3078,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "countries_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "countries"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "espresso_shots",
+      "name": "espresso_shots_user_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1734,12 +3099,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "espresso_shots_user_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "espresso_shots"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "espresso_shots",
+      "name": "espresso_shots_user_coffee_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1762,12 +3127,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "espresso_shots_user_coffee_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "espresso_shots"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "farms",
+      "name": "farms_name_region_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1790,12 +3155,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "farms_name_region_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "farms"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "green_coffees_user_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1811,12 +3176,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "green_coffees_user_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "green_coffees_user_name_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1839,12 +3204,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "green_coffees_user_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "green_coffees_user_process_id_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1867,40 +3232,40 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "green_coffees_user_process_id_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "indexes"
     },
     {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "country_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
+      "schema": "public",
+      "table": "green_coffees",
       "name": "green_coffees_user_country_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "green_coffees"
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "country_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "regions",
+      "name": "regions_name_country_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -1923,33 +3288,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "regions_name_country_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "regions"
+      "entityType": "indexes"
     },
     {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
+      "schema": "public",
+      "table": "roast_levels",
       "name": "roast_levels_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "roast_levels"
-    },
-    {
       "nameExplicit": true,
       "columns": [
         {
@@ -1965,12 +3309,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "roasters",
       "name": "roasters_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "roasters"
-    },
-    {
       "nameExplicit": true,
       "columns": [
         {
@@ -1986,33 +3330,33 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "varieties",
       "name": "varieties_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "varieties"
-    },
-    {
       "nameExplicit": true,
       "columns": [
         {
-          "value": "user_id",
+          "value": "name",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
           "opclass": null
         }
       ],
-      "isUnique": false,
+      "isUnique": true,
       "where": null,
       "with": "",
       "method": "btree",
       "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "account_userId_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "account"
-    },
-    {
       "nameExplicit": true,
       "columns": [
         {
@@ -2028,12 +3372,33 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "session_userId_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "session"
+      "entityType": "indexes"
     },
     {
+      "schema": "public",
+      "table": "session",
+      "name": "session_userId_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "public",
+      "table": "verification",
+      "name": "verification_identifier_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -2049,29 +3414,12 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "verification_identifier_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "verification"
+      "entityType": "indexes"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
+      "schema": "public",
+      "table": "coffee_processes",
       "name": "coffee_processes_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffee_processes"
-    },
-    {
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -2083,12 +3431,29 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "coffees_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "coffees_user_id_user_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "coffees",
+      "name": "coffees_roaster_id_roasters_id_fkey",
       "nameExplicit": false,
       "columns": [
         "roaster_id"
@@ -2100,12 +3465,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "coffees_roaster_id_roasters_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "coffees_roast_level_id_roast_levels_id_fkey",
       "nameExplicit": false,
       "columns": [
         "roast_level_id"
@@ -2117,12 +3482,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "coffees_roast_level_id_roast_levels_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "coffees_country_id_countries_id_fkey",
       "nameExplicit": false,
       "columns": [
         "country_id"
@@ -2134,12 +3499,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "coffees_country_id_countries_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "coffees_region_id_regions_id_fkey",
       "nameExplicit": false,
       "columns": [
         "region_id"
@@ -2151,12 +3516,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "coffees_region_id_regions_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "coffees",
+      "name": "coffees_process_id_coffee_processes_id_fkey",
       "nameExplicit": false,
       "columns": [
         "process_id"
@@ -2168,12 +3533,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "coffees_process_id_coffee_processes_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "coffees_varieties",
+      "name": "coffees_varieties_variety_id_varieties_id_fkey",
       "nameExplicit": false,
       "columns": [
         "variety_id"
@@ -2185,63 +3550,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "coffees_varieties_variety_id_varieties_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees_varieties"
+      "entityType": "fks"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "coffee_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "coffees",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
+      "schema": "public",
+      "table": "coffees_varieties",
       "name": "coffees_varieties_coffee_id_coffees_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees_varieties"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "countries_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "espresso_shots_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
       "nameExplicit": false,
       "columns": [
         "coffee_id"
@@ -2253,12 +3567,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "espresso_shots_coffee_id_coffees_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "espresso_shots"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "countries",
+      "name": "countries_user_id_user_id_fkey",
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -2270,12 +3584,63 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "farms_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "farms"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "espresso_shots",
+      "name": "espresso_shots_user_id_user_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "espresso_shots",
+      "name": "espresso_shots_coffee_id_coffees_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "coffee_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "coffees",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "farms",
+      "name": "farms_user_id_user_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "farms",
+      "name": "farms_region_id_regions_id_fkey",
       "nameExplicit": false,
       "columns": [
         "region_id"
@@ -2287,12 +3652,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "farms_region_id_regions_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "farms"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "green_coffees_user_id_user_id_fkey",
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -2304,12 +3669,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "green_coffees_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "green_coffees_country_id_countries_id_fkey",
       "nameExplicit": false,
       "columns": [
         "country_id"
@@ -2321,12 +3686,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "green_coffees_country_id_countries_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "green_coffees_region_id_regions_id_fkey",
       "nameExplicit": false,
       "columns": [
         "region_id"
@@ -2338,12 +3703,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "green_coffees_region_id_regions_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "green_coffees_farm_id_farms_id_fkey",
       "nameExplicit": false,
       "columns": [
         "farm_id"
@@ -2355,12 +3720,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "green_coffees_farm_id_farms_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "green_coffees",
+      "name": "green_coffees_process_id_coffee_processes_id_fkey",
       "nameExplicit": false,
       "columns": [
         "process_id"
@@ -2372,12 +3737,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "green_coffees_process_id_coffee_processes_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "green_coffees_varieties",
+      "name": "green_coffees_varieties_variety_id_varieties_id_fkey",
       "nameExplicit": false,
       "columns": [
         "variety_id"
@@ -2389,12 +3754,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "green_coffees_varieties_variety_id_varieties_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees_varieties"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "green_coffees_varieties",
+      "name": "green_coffees_varieties_green_coffee_id_green_coffees_id_fkey",
       "nameExplicit": false,
       "columns": [
         "green_coffee_id"
@@ -2406,12 +3771,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "green_coffees_varieties_green_coffee_id_green_coffees_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees_varieties"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "regions",
+      "name": "regions_user_id_user_id_fkey",
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -2423,12 +3788,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "regions_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "regions"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "regions",
+      "name": "regions_country_id_countries_id_fkey",
       "nameExplicit": false,
       "columns": [
         "country_id"
@@ -2440,29 +3805,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "regions_country_id_countries_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "regions"
+      "entityType": "fks"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
+      "schema": "public",
+      "table": "roast_levels",
       "name": "roast_levels_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "roast_levels"
-    },
-    {
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -2474,12 +3822,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "roasters",
       "name": "roasters_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "roasters"
-    },
-    {
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -2491,12 +3839,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "varieties",
       "name": "varieties_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "varieties"
-    },
-    {
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -2508,12 +3856,12 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "account",
       "name": "account_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "account"
-    },
-    {
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -2525,195 +3873,208 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "session_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "session"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "session",
+      "name": "session_user_id_user_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "public",
+      "table": "coffees_varieties",
+      "name": "coffees_varieties_pkey",
       "columns": [
         "coffee_id",
         "variety_id"
       ],
       "nameExplicit": false,
-      "name": "coffees_varieties_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "coffees_varieties"
+      "entityType": "pks"
     },
     {
+      "schema": "public",
+      "table": "green_coffees_varieties",
+      "name": "green_coffees_varieties_pkey",
       "columns": [
         "green_coffee_id",
         "variety_id"
       ],
       "nameExplicit": false,
-      "name": "green_coffees_varieties_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "green_coffees_varieties"
+      "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "name": "coffee_processes_pkey",
       "schema": "public",
       "table": "coffee_processes",
-      "entityType": "pks"
-    },
-    {
+      "name": "coffee_processes_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "coffees_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "coffees",
-      "entityType": "pks"
-    },
-    {
+      "name": "coffees_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "countries_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "countries",
-      "entityType": "pks"
-    },
-    {
+      "name": "countries_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "espresso_shots_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "espresso_shots",
-      "entityType": "pks"
-    },
-    {
+      "name": "espresso_shots_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "farms_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "farms",
-      "entityType": "pks"
-    },
-    {
+      "name": "farms_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "green_coffees_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "green_coffees",
-      "entityType": "pks"
-    },
-    {
+      "name": "green_coffees_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "regions_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "regions",
-      "entityType": "pks"
-    },
-    {
+      "name": "regions_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "roast_levels_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "roast_levels",
-      "entityType": "pks"
-    },
-    {
+      "name": "roast_levels_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "roasters_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "roasters",
-      "entityType": "pks"
-    },
-    {
+      "name": "roasters_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "varieties_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "varieties",
-      "entityType": "pks"
-    },
-    {
+      "name": "varieties_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "account_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "account",
-      "entityType": "pks"
-    },
-    {
+      "name": "account_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "session_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "session",
-      "entityType": "pks"
-    },
-    {
+      "name": "session_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "user_pkey",
+      "entityType": "pks"
+    },
+    {
       "schema": "public",
       "table": "user",
-      "entityType": "pks"
-    },
-    {
+      "name": "user_pkey",
       "columns": [
         "id"
       ],
       "nameExplicit": false,
-      "name": "verification_pkey",
-      "schema": "public",
-      "table": "verification",
       "entityType": "pks"
     },
     {
+      "schema": "public",
+      "table": "verification",
+      "name": "verification_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "session",
+      "name": "session_token_key",
       "nameExplicit": false,
       "columns": [
         "token"
       ],
       "nullsNotDistinct": false,
-      "name": "session_token_key",
-      "schema": "public",
-      "table": "session",
       "entityType": "uniques"
     },
     {
+      "schema": "public",
+      "table": "user",
+      "name": "user_email_key",
       "nameExplicit": false,
       "columns": [
         "email"
       ],
       "nullsNotDistinct": false,
-      "name": "user_email_key",
-      "schema": "public",
-      "table": "user",
       "entityType": "uniques"
     }
-  ],
-  "renames": []
+  ]
 }
