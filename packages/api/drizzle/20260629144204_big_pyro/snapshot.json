@@ -1,3278 +1,418 @@
 {
-  "version": "8",
+  "type": "diff",
+  "version": "9",
   "dialect": "postgres",
   "id": "680cc330-2b40-4682-9ec2-35164bb87d0d",
   "prevIds": [
     "cbe099e5-668d-44dc-a4fa-84f422aee27d"
   ],
-  "ddl": [
+  "footprints": [
     {
-      "isRlsEnabled": false,
-      "name": "brewing_device_types",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "brewing_devices",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "coffee_processes",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "coffees",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "coffees_varieties",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "countries",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "espresso_shots",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "farms",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "green_coffees",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "green_coffees_varieties",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "grinders",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "regions",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "roast_levels",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "roasters",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "varieties",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "account",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "session",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "user",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "verification",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_device_types"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_device_types"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_device_types"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_device_types"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_device_types"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "brand",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "type_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffee_processes"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffee_processes"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffee_processes"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffee_processes"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffee_processes"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "roaster_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "roast_level_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "date",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "roastDate",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "country_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "region_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "process_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "notes",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "boolean",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "is_active",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "dialed_in_shot_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "variety_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees_varieties"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "coffee_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees_varieties"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees_varieties"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "coffees_varieties"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "coffee_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "grinder_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "brewing_device_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "numeric",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "dose",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "numeric",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "yield",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "time",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "grind_setting",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "notes",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "region_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "country_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "region_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "farm_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "process_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "altitude",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "notes",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "variety_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees_varieties"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "green_coffee_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees_varieties"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees_varieties"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "green_coffees_varieties"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "grinders"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "grinders"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "grinders"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "brand",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "grinders"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "grinders"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "grinders"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "country_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "regions"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roast_levels"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roast_levels"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roast_levels"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roast_levels"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roast_levels"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roasters"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roasters"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roasters"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roasters"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "roasters"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "varieties"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "varieties"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "varieties"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "varieties"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "varieties"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "account_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "provider_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "access_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "refresh_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "access_token_expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "refresh_token_expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "scope",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "password",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "ip_address",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_agent",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "email",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "boolean",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "false",
-      "generated": null,
-      "identity": null,
-      "name": "email_verified",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "image",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "identifier",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "value",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "brewing_device_types_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "brewing_device_types"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "brewing_devices_user_id_index",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "brewing_devices_name_user_id_index",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "coffee_processes_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "coffee_processes"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "coffees_user_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "coffees_user_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "process_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "coffees_user_process_id_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "country_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "coffees_user_country_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "countries_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "espresso_shots_user_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "coffee_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "espresso_shots_user_coffee_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "region_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "farms_name_region_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "green_coffees_user_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "green_coffees_user_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "process_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "green_coffees_user_process_id_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "country_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "green_coffees_user_country_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "grinders_user_id_index",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "grinders"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "grinders_name_user_id_index",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "grinders"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "country_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "regions_name_country_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "regions"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "roast_levels_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "roast_levels"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "roasters_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "roasters"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "varieties_name_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "varieties"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "account_userId_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "session_userId_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "identifier",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "verification_identifier_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "coffee_processes",
+        "updated_at"
       ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
+      "writes": [
+        "s|colprop|public.coffee_processes.updated_at.notNull",
+        "s|colprop|public.coffee_processes.updated_at.default"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "brewing_device_types_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "brewing_device_types"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "brewing_devices_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "type_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "brewing_device_types",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "brewing_devices_type_id_brewing_device_types_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "brewing_devices"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "coffee_processes_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffee_processes"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "coffees_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "roaster_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "roasters",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "coffees_roaster_id_roasters_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "roast_level_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "roast_levels",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "coffees_roast_level_id_roast_levels_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "country_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "countries",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "coffees_country_id_countries_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "region_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "regions",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "coffees_region_id_regions_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "process_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "coffee_processes",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "coffees_process_id_coffee_processes_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "dialed_in_shot_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "espresso_shots",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "SET NULL",
-      "name": "coffees_dialed_in_shot_id_espresso_shots_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "variety_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "varieties",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "coffees_varieties_variety_id_varieties_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees_varieties"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "coffee_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "coffees",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "coffees_varieties_coffee_id_coffees_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "coffees_varieties"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "countries_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "countries"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "espresso_shots_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "coffee_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "coffees",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "espresso_shots_coffee_id_coffees_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "grinder_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "grinders",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "espresso_shots_grinder_id_grinders_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "brewing_device_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "brewing_devices",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "espresso_shots_brewing_device_id_brewing_devices_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "espresso_shots"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "farms_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "region_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "regions",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "farms_region_id_regions_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "farms"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
+      "reads": [
+        "n|tbl|public.coffee_processes",
+        "n|sch|public",
+        "n|col|public.coffee_processes.updated_at"
       ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "green_coffees_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees"
+      "sqlHash": "d3fe37718e3a7756"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "country_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "countries",
-      "columnsTo": [
-        "id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "coffees",
+        "updated_at"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "green_coffees_country_id_countries_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "region_id"
+      "writes": [
+        "s|colprop|public.coffees.updated_at.notNull",
+        "s|colprop|public.coffees.updated_at.default"
       ],
-      "schemaTo": "public",
-      "tableTo": "regions",
-      "columnsTo": [
-        "id"
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.coffees.updated_at"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "green_coffees_region_id_regions_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees"
+      "sqlHash": "c11cdfd6e492e184"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "farm_id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "coffees_varieties",
+        "updated_at"
       ],
-      "schemaTo": "public",
-      "tableTo": "farms",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "green_coffees_farm_id_farms_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "process_id"
+      "writes": [
+        "s|colprop|public.coffees_varieties.updated_at.notNull",
+        "s|colprop|public.coffees_varieties.updated_at.default"
       ],
-      "schemaTo": "public",
-      "tableTo": "coffee_processes",
-      "columnsTo": [
-        "id"
+      "reads": [
+        "n|tbl|public.coffees_varieties",
+        "n|sch|public",
+        "n|col|public.coffees_varieties.updated_at"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "green_coffees_process_id_coffee_processes_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees"
+      "sqlHash": "22c612e0051ac280"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "variety_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "varieties",
-      "columnsTo": [
-        "id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "countries",
+        "updated_at"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "green_coffees_varieties_variety_id_varieties_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees_varieties"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "green_coffee_id"
+      "writes": [
+        "s|colprop|public.countries.updated_at.notNull",
+        "s|colprop|public.countries.updated_at.default"
       ],
-      "schemaTo": "public",
-      "tableTo": "green_coffees",
-      "columnsTo": [
-        "id"
+      "reads": [
+        "n|tbl|public.countries",
+        "n|sch|public",
+        "n|col|public.countries.updated_at"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "green_coffees_varieties_green_coffee_id_green_coffees_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "green_coffees_varieties"
+      "sqlHash": "5c7975605a7426a5"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "espresso_shots",
+        "updated_at"
       ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
+      "writes": [
+        "s|colprop|public.espresso_shots.updated_at.notNull",
+        "s|colprop|public.espresso_shots.updated_at.default"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "grinders_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "grinders"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|col|public.espresso_shots.updated_at"
       ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "regions_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "regions"
+      "sqlHash": "46f902ad76288aa4"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "country_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "countries",
-      "columnsTo": [
-        "id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "farms",
+        "updated_at"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "name": "regions_country_id_countries_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "regions"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
+      "writes": [
+        "s|colprop|public.farms.updated_at.notNull",
+        "s|colprop|public.farms.updated_at.default"
       ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
+      "reads": [
+        "n|tbl|public.farms",
+        "n|sch|public",
+        "n|col|public.farms.updated_at"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "roast_levels_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "roast_levels"
+      "sqlHash": "cd8e0b435f555497"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "green_coffees",
+        "updated_at"
       ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "roasters_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "roasters"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
+      "writes": [
+        "s|colprop|public.green_coffees.updated_at.notNull",
+        "s|colprop|public.green_coffees.updated_at.default"
       ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
+      "reads": [
+        "n|tbl|public.green_coffees",
+        "n|sch|public",
+        "n|col|public.green_coffees.updated_at"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "varieties_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "varieties"
+      "sqlHash": "efde7faa8f5794e8"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "green_coffees_varieties",
+        "updated_at"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "account_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
+      "writes": [
+        "s|colprop|public.green_coffees_varieties.updated_at.notNull",
+        "s|colprop|public.green_coffees_varieties.updated_at.default"
       ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
+      "reads": [
+        "n|tbl|public.green_coffees_varieties",
+        "n|sch|public",
+        "n|col|public.green_coffees_varieties.updated_at"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "session_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "session"
+      "sqlHash": "952ad2a0de1bc7b5"
     },
     {
-      "columns": [
-        "coffee_id",
-        "variety_id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "regions",
+        "updated_at"
       ],
-      "nameExplicit": false,
-      "name": "coffees_varieties_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "coffees_varieties"
-    },
-    {
-      "columns": [
-        "green_coffee_id",
-        "variety_id"
+      "writes": [
+        "s|colprop|public.regions.updated_at.notNull",
+        "s|colprop|public.regions.updated_at.default"
       ],
-      "nameExplicit": false,
-      "name": "green_coffees_varieties_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "green_coffees_varieties"
-    },
-    {
-      "columns": [
-        "id"
+      "reads": [
+        "n|tbl|public.regions",
+        "n|sch|public",
+        "n|col|public.regions.updated_at"
       ],
-      "nameExplicit": false,
-      "name": "brewing_device_types_pkey",
-      "schema": "public",
-      "table": "brewing_device_types",
-      "entityType": "pks"
+      "sqlHash": "bb8332b39b7a84f9"
     },
     {
-      "columns": [
-        "id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "roast_levels",
+        "updated_at"
       ],
-      "nameExplicit": false,
-      "name": "brewing_devices_pkey",
-      "schema": "public",
-      "table": "brewing_devices",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
+      "writes": [
+        "s|colprop|public.roast_levels.updated_at.notNull",
+        "s|colprop|public.roast_levels.updated_at.default"
       ],
-      "nameExplicit": false,
-      "name": "coffee_processes_pkey",
-      "schema": "public",
-      "table": "coffee_processes",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
+      "reads": [
+        "n|tbl|public.roast_levels",
+        "n|sch|public",
+        "n|col|public.roast_levels.updated_at"
       ],
-      "nameExplicit": false,
-      "name": "coffees_pkey",
-      "schema": "public",
-      "table": "coffees",
-      "entityType": "pks"
+      "sqlHash": "1a82a4d0c9d735a1"
     },
     {
-      "columns": [
-        "id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "roasters",
+        "updated_at"
       ],
-      "nameExplicit": false,
-      "name": "countries_pkey",
-      "schema": "public",
-      "table": "countries",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
+      "writes": [
+        "s|colprop|public.roasters.updated_at.notNull",
+        "s|colprop|public.roasters.updated_at.default"
       ],
-      "nameExplicit": false,
-      "name": "espresso_shots_pkey",
-      "schema": "public",
-      "table": "espresso_shots",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
+      "reads": [
+        "n|tbl|public.roasters",
+        "n|sch|public",
+        "n|col|public.roasters.updated_at"
       ],
-      "nameExplicit": false,
-      "name": "farms_pkey",
-      "schema": "public",
-      "table": "farms",
-      "entityType": "pks"
+      "sqlHash": "0f2ae4853d9d828a"
     },
     {
-      "columns": [
-        "id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "varieties",
+        "updated_at"
       ],
-      "nameExplicit": false,
-      "name": "green_coffees_pkey",
-      "schema": "public",
-      "table": "green_coffees",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
+      "writes": [
+        "s|colprop|public.varieties.updated_at.notNull",
+        "s|colprop|public.varieties.updated_at.default"
       ],
-      "nameExplicit": false,
-      "name": "grinders_pkey",
-      "schema": "public",
-      "table": "grinders",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
+      "reads": [
+        "n|tbl|public.varieties",
+        "n|sch|public",
+        "n|col|public.varieties.updated_at"
       ],
-      "nameExplicit": false,
-      "name": "regions_pkey",
-      "schema": "public",
-      "table": "regions",
-      "entityType": "pks"
+      "sqlHash": "ddfc990b6cc0f51b"
     },
     {
-      "columns": [
-        "id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "grinders",
+        "updated_at"
       ],
-      "nameExplicit": false,
-      "name": "roast_levels_pkey",
-      "schema": "public",
-      "table": "roast_levels",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
+      "writes": [
+        "s|colprop|public.grinders.updated_at.notNull",
+        "s|colprop|public.grinders.updated_at.default"
       ],
-      "nameExplicit": false,
-      "name": "roasters_pkey",
-      "schema": "public",
-      "table": "roasters",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
+      "reads": [
+        "n|tbl|public.grinders",
+        "n|sch|public",
+        "n|col|public.grinders.updated_at"
       ],
-      "nameExplicit": false,
-      "name": "varieties_pkey",
-      "schema": "public",
-      "table": "varieties",
-      "entityType": "pks"
+      "sqlHash": "e25db3316019ebea"
     },
     {
-      "columns": [
-        "id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "brewing_device_types",
+        "updated_at"
       ],
-      "nameExplicit": false,
-      "name": "account_pkey",
-      "schema": "public",
-      "table": "account",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
+      "writes": [
+        "s|colprop|public.brewing_device_types.updated_at.notNull",
+        "s|colprop|public.brewing_device_types.updated_at.default"
       ],
-      "nameExplicit": false,
-      "name": "session_pkey",
-      "schema": "public",
-      "table": "session",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
+      "reads": [
+        "n|tbl|public.brewing_device_types",
+        "n|sch|public",
+        "n|col|public.brewing_device_types.updated_at"
       ],
-      "nameExplicit": false,
-      "name": "user_pkey",
-      "schema": "public",
-      "table": "user",
-      "entityType": "pks"
+      "sqlHash": "4039684e020a3f21"
     },
     {
-      "columns": [
-        "id"
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "brewing_devices",
+        "updated_at"
       ],
-      "nameExplicit": false,
-      "name": "verification_pkey",
-      "schema": "public",
-      "table": "verification",
-      "entityType": "pks"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "token"
+      "writes": [
+        "s|colprop|public.brewing_devices.updated_at.notNull",
+        "s|colprop|public.brewing_devices.updated_at.default"
       ],
-      "nullsNotDistinct": false,
-      "name": "session_token_key",
-      "schema": "public",
-      "table": "session",
-      "entityType": "uniques"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "email"
+      "reads": [
+        "n|tbl|public.brewing_devices",
+        "n|sch|public",
+        "n|col|public.brewing_devices.updated_at"
       ],
-      "nullsNotDistinct": false,
-      "name": "user_email_key",
-      "schema": "public",
-      "table": "user",
-      "entityType": "uniques"
+      "sqlHash": "e1c3328c7f064b1b"
     }
   ],
-  "renames": []
+  "deltas": [
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"coffee_processes\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"coffees\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"coffees_varieties\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"countries\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"espresso_shots\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"farms\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"green_coffees\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"green_coffees_varieties\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"regions\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"roast_levels\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"roasters\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"varieties\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"grinders\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"brewing_device_types\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"brewing_devices\",\"updated_at\"]",
+      "set": {
+        "notNull": true,
+        "default": "now()"
+      }
+    }
+  ]
 }
