@@ -8,14 +8,6 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { Fragment } from 'react'
-import type {
-  Cell,
-  Column,
-  Row,
-  RowData,
-  Table as TanstackTable,
-} from '@tanstack/react-table'
-import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -26,6 +18,14 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import type { ReactNode } from 'react'
+import type {
+  Cell,
+  Column,
+  Row,
+  RowData,
+  Table as TanstackTable,
+} from '@tanstack/react-table'
 
 // Controls how each column renders in the card layout (< lg: phones + tablets).
 // A card is split into an always-visible summary and a detail region revealed

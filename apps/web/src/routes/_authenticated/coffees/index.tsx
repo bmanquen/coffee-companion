@@ -11,7 +11,6 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { CoffeeIcon, Pencil, Plus, Trash2 } from 'lucide-react'
-import type { CellContext } from '@tanstack/react-table'
 import { formatOriginNames } from '@/components/coffees/format-coffee-origins'
 import { CoffeeDetails } from '@/components/coffees/coffee-details'
 import { DataTable, expanderColumn } from '@/components/data-table'
@@ -38,6 +37,7 @@ import {
 } from '@/components/ui/empty'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { useTRPC } from '@/integrations/trpc/react'
+import type { CellContext } from '@tanstack/react-table'
 
 export const Route = createFileRoute('/_authenticated/coffees/')({
   loader: ({ context }) => {

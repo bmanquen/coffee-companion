@@ -14,7 +14,6 @@ import {
 } from '@tanstack/react-table'
 import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import type { CellContext, SortingState } from '@tanstack/react-table'
 import {
   brewLogRowClass,
   renderBrewDetails,
@@ -32,6 +31,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
+import type { CellContext, SortingState } from '@tanstack/react-table'
 
 type Shot = {
   id: string

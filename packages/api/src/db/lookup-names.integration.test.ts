@@ -165,7 +165,7 @@ describe.each(lookupTables())('$sqlName names', (lookup) => {
       () =>
         db
           .update(lookup.table)
-          .set({ name: saved.toLowerCase() } as never)
+          .set({ name: saved.toLowerCase() })
           .where(eq(lookup.id, mine.id)),
       sharedSentence(saved),
     )

@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { BrewingMethod } from '@coffee-companion/api/lib/dialed-in-brew'
-import type { QueryClient } from '@tanstack/react-query'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
+import type { BrewingMethod } from '@coffee-companion/api/lib/dialed-in-brew'
+import type { QueryClient } from '@tanstack/react-query'
 
 export function invalidateDeviceDialedInQueries(
   queryClient: QueryClient,

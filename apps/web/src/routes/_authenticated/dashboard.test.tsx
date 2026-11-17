@@ -1,9 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Dashboard } from './dashboard'
-import type * as ReactRouter from '@tanstack/react-router'
-import type { ReactNode } from 'react'
-import type { DashboardMethod } from '@/components/dashboard/methods'
 import { dashboardMethods } from '@/components/dashboard/methods'
 import { createTestProviders } from '@/test/providers'
 import {
@@ -14,6 +10,10 @@ import {
   makeRecentCoffee,
   makeRecentShot,
 } from '@/test/factories'
+import { Dashboard } from './dashboard'
+import type * as ReactRouter from '@tanstack/react-router'
+import type { ReactNode } from 'react'
+import type { DashboardMethod } from '@/components/dashboard/methods'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 vi.mock('@tanstack/react-router', async (importOriginal) => {

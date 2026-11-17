@@ -1,9 +1,9 @@
-import { FormLabel } from './form-label'
-import { useFieldError } from './use-field-error'
-import { useFieldRequired } from './use-field-required'
 import { Field, FieldContent, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { fromSeconds, toSeconds } from '@/lib/duration'
+import { FormLabel } from './form-label'
+import { useFieldError } from './use-field-error'
+import { useFieldRequired } from './use-field-required'
 
 // Two inputs (minutes + seconds) that together edit a brew time stored as
 // whole seconds. fromSeconds fills the boxes; toSeconds is what the mutation

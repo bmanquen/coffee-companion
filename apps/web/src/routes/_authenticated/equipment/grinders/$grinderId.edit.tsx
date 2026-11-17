@@ -2,7 +2,6 @@ import { insertGrinderSchema } from '@coffee-companion/api/db/zod'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
-import type { InsertGrinder } from '@coffee-companion/api/db/zod'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
@@ -10,6 +9,7 @@ import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useTRPC } from '@/integrations/trpc/react'
 import { submitFormMutation } from '@/lib/form-error'
+import type { InsertGrinder } from '@coffee-companion/api/db/zod'
 
 const grinderMutationFields = { CONFLICT: 'name' } as const
 

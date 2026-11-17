@@ -1,9 +1,9 @@
 import { Link } from '@tanstack/react-router'
+import { useSignOut } from '@/hooks/use-sign-out'
+import { authClient } from '@/lib/auth-client'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
-import { useSignOut } from '@/hooks/use-sign-out'
-import { authClient } from '@/lib/auth-client'
 
 export default function MobileHeader() {
   const { data: session } = authClient.useSession()

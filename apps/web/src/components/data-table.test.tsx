@@ -7,10 +7,10 @@ import {
 } from '@tanstack/react-table'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { DataTable } from './data-table'
 import type { ColumnDef, Row } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
-import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 
 type CoffeeRow = { name: string; roaster: string; notes?: string }
 

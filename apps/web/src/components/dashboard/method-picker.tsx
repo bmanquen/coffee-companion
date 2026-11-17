@@ -1,7 +1,5 @@
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { formatLastBrewed, methodPickerItems } from './methods'
-import type { DashboardMethod, MethodFeed } from './methods'
 import {
   Command,
   CommandEmpty,
@@ -11,6 +9,8 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
+import { formatLastBrewed, methodPickerItems } from './methods'
+import type { DashboardMethod, MethodFeed } from './methods'
 
 // The dashboard's method switcher: a single dropdown listing every Brewing
 // Method alphabetically, each row showing when it was last brewed (or "No brews

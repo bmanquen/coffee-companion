@@ -7,10 +7,10 @@ import {
 } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { planLimits } from '@coffee-companion/api/lib/plan'
-import { PricingPage, PricingScreen } from './pricing'
-import type { BillingPeriod, PlanId, PlanPrice } from '@/lib/plans'
 import { createTestProviders } from '@/test/providers'
 import { trpcSuccess } from '@/test/trpc-response'
+import { PricingPage, PricingScreen } from './pricing'
+import type { BillingPeriod, PlanId, PlanPrice } from '@/lib/plans'
 
 const authState = vi.hoisted(() => ({
   session: null as { user: { id: string } } | null,

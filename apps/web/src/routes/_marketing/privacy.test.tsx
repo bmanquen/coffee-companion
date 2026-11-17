@@ -1,11 +1,11 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { PrivacyPage } from './privacy'
 import {
   APPROVED_APPLE_REGION_TEXT,
   normalizePrivacyText,
   recipients,
 } from '@/lib/privacy'
+import { PrivacyPage } from './privacy'
 
 // jsdom textContent concatenates adjacent blocks without spaces.
 function regionPlainText(element: HTMLElement): string {

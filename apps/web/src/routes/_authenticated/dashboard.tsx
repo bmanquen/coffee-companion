@@ -1,9 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import type {
-  DashboardMethod,
-  MethodFeed,
-} from '@/components/dashboard/methods'
 import { H1 } from '@/components/typography/h1'
 import { EspressoBrewFeed } from '@/components/dashboard/espresso-brew-feed'
 import { PouroverBrewFeed } from '@/components/dashboard/pourover-brew-feed'
@@ -16,6 +12,10 @@ import {
   resolveSelectedMethod,
 } from '@/components/dashboard/methods'
 import { useTRPC } from '@/integrations/trpc/react'
+import type {
+  DashboardMethod,
+  MethodFeed,
+} from '@/components/dashboard/methods'
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   // The selected method lives in the URL so it survives reload/back and can be

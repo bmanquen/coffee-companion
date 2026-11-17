@@ -5,9 +5,6 @@ import {
 import { format } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
 import { useState } from 'react'
-import { FormLabel } from './form-label'
-import { useFieldError } from './use-field-error'
-import { useFieldRequired } from './use-field-required'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Field, FieldContent, FieldError } from '@/components/ui/field'
@@ -17,6 +14,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { useFieldContext } from '@/hooks/form-context'
+import { useFieldRequired } from './use-field-required'
+import { useFieldError } from './use-field-error'
+import { FormLabel } from './form-label'
 
 type DatePickerProps = {
   label: string

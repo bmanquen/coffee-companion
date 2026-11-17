@@ -15,7 +15,6 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { Pencil, Trash2 } from 'lucide-react'
 import { gearLimitSentence } from '@coffee-companion/api/lib/plan'
 import { useState } from 'react'
-import type { CellContext, SortingState } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
 import { EquipmentAddAction } from '@/components/equipment-add-action'
 import { H1 } from '@/components/typography/h1'
@@ -34,6 +33,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
 import { cn } from '@/lib/utils'
+import type { CellContext, SortingState } from '@tanstack/react-table'
 
 export const Route = createFileRoute('/_authenticated/equipment/')({
   loader: ({ context }) => {
@@ -251,7 +251,7 @@ function GrindersSection() {
   const [globalFilter, setGlobalFilter] = useState('')
 
   const table = useReactTable({
-    data: grinders as Array<Grinder>,
+    data: grinders,
     columns,
     state: { sorting, globalFilter },
     initialState: { pagination: { pageSize: 10 } },
@@ -314,7 +314,7 @@ function BrewingDevicesSection() {
   const [globalFilter, setGlobalFilter] = useState('')
 
   const table = useReactTable({
-    data: devices as Array<BrewingDevice>,
+    data: devices,
     columns: deviceColumns,
     state: { sorting, globalFilter },
     initialState: { pagination: { pageSize: 10 } },

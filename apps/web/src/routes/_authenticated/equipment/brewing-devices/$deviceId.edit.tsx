@@ -6,7 +6,6 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
-import type { InsertBrewingDevice } from '@coffee-companion/api/db/zod'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
@@ -15,6 +14,7 @@ import { useAppForm } from '@/hooks/form'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import { submitFormMutation } from '@/lib/form-error'
+import type { InsertBrewingDevice } from '@coffee-companion/api/db/zod'
 
 const deviceMutationFields = { CONFLICT: 'name' } as const
 

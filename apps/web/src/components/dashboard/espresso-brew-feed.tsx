@@ -1,6 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
-import type { EspressoShotWithRelations } from '@/types'
 import {
   dialedInCoffeeColumn,
   renderBrewDetails,
@@ -9,6 +8,7 @@ import { ratioColumn } from '@/components/brews/brew-ratio'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
+import type { EspressoShotWithRelations } from '@/types'
 
 const columnHelper = createColumnHelper<EspressoShotWithRelations>()
 

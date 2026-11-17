@@ -6,7 +6,6 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
-import type { CoffeeFormValues } from '@/components/coffees/coffee-form'
 import { CoffeeOriginEditor } from '@/components/coffees/coffee-origin-editor'
 import {
   coffeeFormSchema,
@@ -22,6 +21,7 @@ import { useAppForm } from '@/hooks/form'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import { submitFormMutation } from '@/lib/form-error'
+import type { CoffeeFormValues } from '@/components/coffees/coffee-form'
 
 export const Route = createFileRoute('/_authenticated/coffees/$coffeeId/edit')({
   loader: async ({ context, params }) => {

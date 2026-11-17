@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { createTestProviders } from '@/test/providers'
+import { makeAeropressBrew, makeRecentShot } from '@/test/factories'
 import { Brews } from './index'
 import type * as ReactRouter from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { createTestProviders } from '@/test/providers'
-import { makeAeropressBrew, makeRecentShot } from '@/test/factories'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 vi.mock('@tanstack/react-router', async (importOriginal) => {

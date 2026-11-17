@@ -1,8 +1,5 @@
 import { CheckIcon, ChevronDownIcon, PlusIcon } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { FormLabel } from './form-label'
-import { useFieldError } from './use-field-error'
-import { useFieldRequired } from './use-field-required'
 import {
   Command,
   CommandEmpty,
@@ -26,6 +23,9 @@ import {
 import { useFieldContext } from '@/hooks/form-context'
 import { mapMutationError, trpcErrorCode } from '@/lib/form-error'
 import { cn } from '@/lib/utils'
+import { useFieldRequired } from './use-field-required'
+import { useFieldError } from './use-field-error'
+import { FormLabel } from './form-label'
 
 const ADD_FAILED = 'Something went wrong. Try again.'
 

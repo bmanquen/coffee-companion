@@ -1,7 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { useAccordionExpansion } from './use-accordion-expansion'
-import type { ExpandedState } from '@tanstack/react-table'
 
 // TanStack drives expansion through an updater that may be either a value or a
 // function of the previous state, so both forms are exercised here.
@@ -57,7 +56,7 @@ describe('useAccordionExpansion', () => {
     act(() => result.current.onExpandedChange({ a: true }))
 
     // `true` means every row; the hook never sets it, but the type allows it.
-    act(() => result.current.onExpandedChange(true as ExpandedState))
+    act(() => result.current.onExpandedChange(true))
 
     expect(result.current.expanded).toEqual({})
   })

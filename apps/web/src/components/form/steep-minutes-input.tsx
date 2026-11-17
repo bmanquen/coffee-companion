@@ -1,9 +1,9 @@
-import { FormLabel } from './form-label'
-import { useFieldError } from './use-field-error'
-import { useFieldRequired } from './use-field-required'
 import { Field, FieldContent, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { fromSeconds, toSeconds } from '@/lib/duration'
+import { FormLabel } from './form-label'
+import { useFieldError } from './use-field-error'
+import { useFieldRequired } from './use-field-required'
 
 // Hours + minutes boxes for Cold Brew. The column is still whole minutes
 // (no migration); this input converts at the edge: minutes × 60 into

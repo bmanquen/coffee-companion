@@ -50,7 +50,7 @@ function renderPicker() {
   const onSelectMethod = vi.fn()
   render(
     <MethodPicker
-      selectedMethod={'espresso' as DashboardMethod}
+      selectedMethod={'espresso'}
       onSelectMethod={onSelectMethod}
       feeds={feeds}
       now={NOW}

@@ -5,9 +5,9 @@ import {
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { useAppForm } from '@/hooks/form'
 import { useFieldRequired } from './use-field-required'
 import type { InsertCoffee } from '@coffee-companion/api/db/zod'
-import { useAppForm } from '@/hooks/form'
 
 function RequiredFlag() {
   return <output>{String(useFieldRequired())}</output>

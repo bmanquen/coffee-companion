@@ -2,8 +2,8 @@ import { insertEspressoShotSchema } from '@coffee-companion/api/db/zod'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import type { ReactNode } from 'react'
 import { useAppForm } from '@/hooks/form'
+import type { ReactNode } from 'react'
 
 // Mock the cmdk command primitives with plain elements so we can unit-test
 // SearchSelect's own logic (open/select/add) without cmdk's browser-only
