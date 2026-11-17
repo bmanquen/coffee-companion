@@ -67,4 +67,15 @@ describe('subscribeNetworkOnline', () => {
     await probe
     expect(setOnline).not.toHaveBeenCalled()
   })
+
+  it('keeps the online state when the startup probe rejects', async () => {
+    mockNetwork(Promise.reject(new Error('probe failed')))
+    const setOnline = jest.fn()
+
+    const stop = subscribeNetworkOnline(setOnline)
+    await new Promise((resolve) => setImmediate(resolve))
+
+    expect(setOnline).not.toHaveBeenCalled()
+    stop()
+  })
 })

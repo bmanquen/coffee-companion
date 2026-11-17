@@ -32,10 +32,14 @@ export function subscribeNetworkOnline(setOnline: (online: boolean) => void) {
     listenerDelivered = true
     setOnline(state.isConnected === true)
   })
-  void Network.getNetworkStateAsync().then((state) => {
-    if (!active || listenerDelivered) return
-    setOnline(state.isConnected === true)
-  })
+  Network.getNetworkStateAsync().then(
+    (state) => {
+      if (!active || listenerDelivered) return
+      setOnline(state.isConnected === true)
+    },
+    // The listener still delivers later changes.
+    () => {},
+  )
   return () => {
     active = false
     sub.remove()
