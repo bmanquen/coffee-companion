@@ -61,11 +61,13 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     ? apiErrorMessage(shots.error, ERROR_LOAD_MORE_FAILED)
     : null
 
+  const retrying = equipment.isFetching || shots.isRefetching
+
   const reload = useCallback(() => {
-    if (loading) return
+    if (loading || retrying) return
     void equipment.refetch()
     void shots.refetch()
-  }, [equipment, loading, shots])
+  }, [equipment, loading, retrying, shots])
 
   const loadMore = useCallback(() => {
     if (
@@ -126,6 +128,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     loadingMore: shots.isFetchingNextPage,
     loadMoreError,
     loadError,
+    retrying,
     busy: createShot.isPending,
     saveError,
     reload,

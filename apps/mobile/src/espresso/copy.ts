@@ -32,6 +32,7 @@ export const ERROR_SAVE_FAILED = 'Something went wrong. Try again.'
 export const ERROR_PREFILL_FAILED =
   "We couldn't load this coffee's last shot. Enter it yourself, or try again."
 export const TRY_AGAIN = 'Try again'
+export const TRYING_AGAIN = 'Trying again'
 
 export const SELECT_COFFEE_ERROR = 'Select a coffee'
 export const SELECT_GRINDER_ERROR = 'Select a grinder'

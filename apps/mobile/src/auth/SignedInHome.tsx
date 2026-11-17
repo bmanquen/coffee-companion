@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { ShotForm } from '../espresso/ShotForm'
 import { ShotList } from '../espresso/ShotList'
-import { TRY_AGAIN } from '../espresso/copy'
+import { TRYING_AGAIN, TRY_AGAIN } from '../espresso/copy'
 import { idleEspressoApi } from '../espresso/types'
 import { useEspressoCatalog } from '../espresso/use-espresso-catalog'
 import { QueryProvider } from '../query'
@@ -64,6 +64,7 @@ function Home({
     catalog,
     loading,
     loadError,
+    retrying,
     busy,
     saveError,
     reload,
@@ -106,10 +107,11 @@ function Home({
           <Text accessibilityRole="alert">{loadError}</Text>
           <Pressable
             accessibilityRole="button"
-            disabled={loading}
+            accessibilityState={{ disabled: loading || retrying, busy: retrying }}
+            disabled={loading || retrying}
             onPress={reload}
           >
-            <Text>{TRY_AGAIN}</Text>
+            <Text>{retrying ? TRYING_AGAIN : TRY_AGAIN}</Text>
           </Pressable>
         </View>
       ) : null}

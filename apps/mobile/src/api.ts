@@ -24,6 +24,20 @@ function sessionHeaders(): Record<string, string> {
   return cookie ? { cookie } : {}
 }
 
+export const REQUEST_TIMEOUT_MS = 30_000
+
+// A lost response would otherwise leave a save busy forever with no retry.
+function fetchWithTimeout(url: RequestInfo | URL, init?: RequestInit) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const caller = init?.signal
+  if (caller?.aborted) controller.abort()
+  caller?.addEventListener('abort', () => controller.abort())
+  return fetch(url, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  )
+}
+
 function toShotRow(shot: ShotRecord): ShotRow {
   return {
     id: shot.id,
@@ -47,6 +61,7 @@ export function createLiveEspressoApi(): EspressoApi {
         url: `${apiBaseUrl()}/api/trpc`,
         transformer: superjson,
         headers: sessionHeaders,
+        fetch: fetchWithTimeout,
       }),
     ],
   })

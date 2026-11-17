@@ -52,6 +52,7 @@ import {
   SHOT_FORM_TEST_ID,
   SHOT_LIST_TEST_ID,
   SHOT_ROW_TEST_ID_PREFIX,
+  TRYING_AGAIN,
   TRY_AGAIN,
   USE_CALENDAR_DATE,
 } from './copy'
@@ -2093,6 +2094,48 @@ describe('log espresso shot', () => {
     expect(screen.getByText('Coffee 0')).toBeTruthy()
     expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
     expect(screen.queryByText('Coffee 20')).toBeNull()
+  })
+
+  it('shows retry progress and ignores repeat taps after a failed refresh', async () => {
+    const all = Array.from({ length: 5 }, (_, index) =>
+      seedShot({ id: `shot-${index}`, coffeeName: `Coffee ${index}` }),
+    )
+    let firstPages = 0
+    let finishRetry: (page: ReturnType<typeof pageFrom>) => void = () => {}
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog({ shots: all })),
+      listShots: (cursor) => {
+        firstPages += 1
+        if (firstPages === 1) return Promise.resolve(pageFrom(all, cursor))
+        if (firstPages === 2) {
+          return Promise.reject(new Error('Network request failed'))
+        }
+        return new Promise((resolve) => {
+          finishRetry = resolve
+        })
+      },
+      loadPrefill: () => Promise.resolve(seedShot()),
+      create: async () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    await waitFor(() => expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy())
+
+    await press(TRY_AGAIN)
+    const retrying = await screen.findByRole('button', { name: TRYING_AGAIN })
+    expect(retrying.props.accessibilityState).toMatchObject({
+      busy: true,
+      disabled: true,
+    })
+    expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
+    await fireEvent.press(retrying)
+    expect(firstPages).toBe(3)
+
+    await act(() => finishRetry(pageFrom(all)))
+    await waitFor(() => expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull())
   })
 
   it('drops an in-flight next page after a refresh', async () => {
