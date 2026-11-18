@@ -86,6 +86,7 @@ export function clearClientSession() {
   })
 }
 
-export function getSessionCookie(): string {
+// expoClient's getCookie reads SecureStore, so it resolves asynchronously.
+export function getSessionCookie(): Promise<string> {
   return authClient.getCookie()
 }

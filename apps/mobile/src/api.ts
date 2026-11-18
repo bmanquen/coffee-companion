@@ -19,8 +19,8 @@ type RouterOutputs = inferRouterOutputs<TRPCRouter>
 type ShotCreateInput = inferRouterInputs<TRPCRouter>['espressoShot']['create']
 type ShotRecord = RouterOutputs['espressoShot']['getRecent']['items'][number]
 
-function sessionHeaders(): Record<string, string> {
-  const cookie = getSessionCookie()
+async function sessionHeaders(): Promise<Record<string, string>> {
+  const cookie = await getSessionCookie()
   return cookie ? { cookie } : {}
 }
 

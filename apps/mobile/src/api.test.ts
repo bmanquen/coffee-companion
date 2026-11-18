@@ -8,7 +8,10 @@ jest.mock('superjson', () => ({
     deserialize: ({ json }: { json: unknown }) => json,
   },
 }))
-jest.mock('./auth/auth-client', () => ({ getSessionCookie: () => null }))
+const mockGetSessionCookie = jest.fn(() => Promise.resolve(''))
+jest.mock('./auth/auth-client', () => ({
+  getSessionCookie: () => mockGetSessionCookie(),
+}))
 
 describe('createLiveEspressoApi', () => {
   const realFetch = global.fetch
@@ -50,5 +53,20 @@ describe('createLiveEspressoApi', () => {
     expect(outcome).not.toHaveBeenCalled()
     await jest.advanceTimersByTimeAsync(1)
     await expect(saved).rejects.toThrow()
+  })
+
+  it('sends the stored session cookie once it resolves', async () => {
+    mockGetSessionCookie.mockReturnValueOnce(
+      Promise.resolve('better-auth.session_token=abc'),
+    )
+    void createLiveEspressoApi()
+      .listShots()
+      .catch(() => {})
+
+    await jest.advanceTimersByTimeAsync(0)
+    const init = jest.mocked(global.fetch).mock.calls[0]?.[1]
+    expect(new Headers(init?.headers).get('cookie')).toBe(
+      'better-auth.session_token=abc',
+    )
   })
 })
