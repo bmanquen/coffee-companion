@@ -73,13 +73,12 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     if (
       shots.isFetchingNextPage ||
       shots.isRefetching ||
-      equipment.isPending ||
       !shots.hasNextPage
     ) {
       return
     }
     void shots.fetchNextPage({ cancelRefetch: false })
-  }, [equipment.isPending, shots])
+  }, [shots])
 
   const createShot = useMutation({
     mutationFn: (input: ShotCreate) => api.create(input),

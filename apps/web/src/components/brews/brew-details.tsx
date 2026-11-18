@@ -29,15 +29,15 @@ export function BrewDetails({
   daysOffRoast,
   notes,
 }: {
-  grinder: { name: string; brand: string }
-  device: { name: string; brand: string }
+  grinder: { name: string; brand: string } | null
+  device: { name: string; brand: string } | null
   extra?: { label: string; value: string }
   daysOffRoast?: number | null
   notes: string | null
 }) {
   const rows: Array<{ label: string; value: ReactNode }> = [
-    { label: 'Grinder', value: `${grinder.name} (${grinder.brand})` },
-    { label: 'Device', value: `${device.name} (${device.brand})` },
+    { label: 'Grinder', value: gearLabel(grinder) },
+    { label: 'Device', value: gearLabel(device) },
     ...(extra ? [{ label: extra.label, value: extra.value }] : []),
     ...(daysOffRoast !== undefined
       ? [
@@ -50,6 +50,12 @@ export function BrewDetails({
   ]
 
   return <DetailList rows={rows} notes={notes} />
+}
+
+// A legacy Brew may point at gear the reader cannot see; the API returns it as
+// null, which is missing data, not Sealing.
+function gearLabel(gear: { name: string; brand: string } | null) {
+  return gear ? `${gear.name} (${gear.brand})` : '-'
 }
 
 // The data a brew detail sub-row reads, kept structural so any surface's row type
@@ -74,7 +80,7 @@ export function renderBrewDetails(
 ) {
   // A Sealed Brew has no settings to reveal, so the detail region carries the
   // way to reopen it instead.
-  if (brew.sealed || !brew.grinder || !brew.brewingDevice) {
+  if (brew.sealed) {
     return <SealedBrewNotice />
   }
 

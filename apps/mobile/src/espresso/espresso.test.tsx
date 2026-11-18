@@ -36,6 +36,7 @@ import {
   LABEL_YIELD,
   LOADING_MORE_SHOTS,
   LOADING_SHOTS,
+  LOAD_MORE_SHOTS,
   LOG,
   LOG_ESPRESSO_HEADING,
   LOG_SHOT,
@@ -1153,6 +1154,29 @@ describe('log espresso shot', () => {
     await render(<App auth={signedIn} espresso={api} />)
     expect(await screen.findByText('Ada House')).toBeTruthy()
     expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
+    expect(screen.getByTestId(LOG_SHOT_TEST_ID)).toBeDisabled()
+  })
+
+  it('pages history from Load more while the equipment load is pending', async () => {
+    const all = Array.from({ length: 25 }, (_, i) =>
+      seedShot({ id: `shot-${i}`, coffeeName: `Coffee ${i}` }),
+    )
+    const cursors: Array<unknown> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => all),
+      listShots: (cursor) => {
+        cursors.push(cursor)
+        return Promise.resolve(pageFrom(all, cursor))
+      },
+      load: () => new Promise(() => {}),
+      create: async () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    expect(await screen.findByText('Coffee 0')).toBeTruthy()
+
+    await press(LOAD_MORE_SHOTS)
+    expect(await screen.findByText('Coffee 24')).toBeTruthy()
+    expect(cursors).toHaveLength(2)
     expect(screen.getByTestId(LOG_SHOT_TEST_ID)).toBeDisabled()
   })
 

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { BrewDetails } from './brew-details'
+import { BrewDetails, renderBrewDetails } from './brew-details'
 
 const grinder = { name: 'Ode', brand: 'Fellow' }
 const device = { name: 'V60', brand: 'Hario' }
@@ -30,5 +30,23 @@ describe('BrewDetails', () => {
     expect(screen.getByText('No notes...')).toBeTruthy()
     const notesValue = screen.getByText('Notes').closest('div')
     expect(notesValue?.textContent).not.toContain('-')
+  })
+})
+
+describe('renderBrewDetails', () => {
+  const brew = {
+    grinder,
+    brewingDevice: device,
+    roastDate: null,
+    createdAt: new Date('2026-05-01T12:00:00Z'),
+    notes: 'bright and clean',
+    sealed: false,
+  }
+
+  it('shows a readable brew whose grinder is hidden, not the Sealed notice', () => {
+    render(renderBrewDetails({ ...brew, grinder: null }))
+    expect(screen.getByText(/V60 \(Hario\)/)).toBeTruthy()
+    expect(screen.getByText('bright and clean')).toBeTruthy()
+    expect(screen.queryByRole('note')).toBeNull()
   })
 })
