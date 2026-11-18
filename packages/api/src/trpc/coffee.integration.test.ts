@@ -146,10 +146,27 @@ describe('coffee.create', () => {
       .set({ roasterId: roaster.id, roastLevelId: level.id })
       .where(eq(coffees.id, coffee.id))
 
-    const listed = (await asA.coffee.getAll()).find((c) => c.id === coffee.id)
+    const shared = await db.query.roastLevels.findFirst({
+      where: { userId: { isNull: true } },
+    })
+    if (!shared) throw new Error('No shared roast level seeded')
+    const own = await createCoffee(uniq('Own lookups'), {
+      roastLevelId: shared.id,
+    })
+
+    const all = await asA.coffee.getAll()
+    const listed = all.find((c) => c.id === coffee.id)
     expect(listed).toBeDefined()
     expect(listed?.roaster).toBeNull()
     expect(listed?.roastLevel).toBeNull()
+    // The user's own roaster and a shared level still come through.
+    const visible = all.find((c) => c.id === own.id)
+    expect(visible?.roaster).toEqual(
+      expect.objectContaining({ id: own.roasterId }),
+    )
+    expect(visible?.roastLevel).toEqual(
+      expect.objectContaining({ id: shared.id }),
+    )
   })
 
   it('stores multiple origin countries on a blend, one region each', async () => {

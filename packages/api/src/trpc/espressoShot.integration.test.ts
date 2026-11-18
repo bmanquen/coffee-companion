@@ -332,7 +332,13 @@ describe('espressoShot.update', () => {
     expect(fetched.roastDate).toBe('2026-04-15')
   })
 
-  it('keeps createdAt server-owned so an edit cannot move the shot', async () => {
+  it('keeps timestamps server-owned so a create or edit cannot move the shot', async () => {
+    const backdated = new Date('2020-01-01T00:00:00Z')
+    const timestamps = {
+      createdAt: backdated,
+      updatedAt: backdated,
+      sealedAt: backdated,
+    } as object
     const created = await asA.espressoShot.create({
       coffeeId: coffeeAId,
       grinderId,
@@ -342,8 +348,12 @@ describe('espressoShot.update', () => {
       time: 30,
       grindSetting: '1.5',
       idempotencyKey: crypto.randomUUID(),
+      ...timestamps,
     })
-    const backdated = new Date('2020-01-01T00:00:00Z')
+    expect(created.createdAt.getTime()).toBeGreaterThan(backdated.getTime())
+    expect(created.updatedAt.getTime()).toBeGreaterThan(backdated.getTime())
+    expect(created.sealed).toBe(false)
+
     await asA.espressoShot.update({
       id: created.id,
       coffeeId: coffeeAId,
@@ -353,13 +363,14 @@ describe('espressoShot.update', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
-      ...({ createdAt: backdated, sealedAt: backdated } as object),
+      ...timestamps,
     })
     const stored = await db.query.espressoShots.findFirst({
       where: { id: created.id },
     })
     expect(stored?.dose).toBe('19')
     expect(stored?.createdAt).toEqual(created.createdAt)
+    expect(stored?.updatedAt.getTime()).toBeGreaterThan(backdated.getTime())
     expect(stored?.sealedAt).toBeNull()
   })
 

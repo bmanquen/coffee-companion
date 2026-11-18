@@ -1531,6 +1531,35 @@ describe('log espresso shot', () => {
     expect(screen.getByLabelText('Grinder, Niche Zero')).toBeTruthy()
   })
 
+  it('clears a prefilled grinder that is not one of the user’s grinders', async () => {
+    const foreignGrinder = '00000000-0000-4000-8000-000000000098'
+    const created: Array<ShotCreate> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog()),
+      loadPrefill: () =>
+        Promise.resolve(
+          seedShot({ grinderId: foreignGrinder, roastDate: '2026-05-01' }),
+        ),
+      create: async (input) => {
+        created.push(input)
+      },
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+
+    // Logging must ask for a grinder, not send one the API will reject.
+    expect(created).toEqual([])
+    expect(
+      screen.getByLabelText(
+        selectTriggerA11yLabel(LABEL_GRINDER, SELECT_GRINDER),
+      ),
+    ).toBeTruthy()
+  })
+
   it('does not apply prefill after a save has started', async () => {
     let resolvePrefill: (shot: ShotRow | null) => void = () => {}
     const pendingPrefill = new Promise<ShotRow | null>((resolve) => {

@@ -388,13 +388,14 @@ describe('the enumeration itself', () => {
   it('covers every read each of those routers exposes', () => {
     // Reads with Sealing tests on every Brew router, and reads tested on one
     // router only, named in full so another router's copy still fails.
-    const assertedEverywhere = new Set([
-      'getAll',
-      'getRecent',
-      'getById',
-      'getDialedIn',
+    const assertedEverywhere = new Set(['getRecent', 'getById', 'getDialedIn'])
+    const assertedOn = new Set([
+      'espressoShot.getLatestUnsealed',
+      'aeropressBrew.getAll',
+      'pouroverBrew.getAll',
+      'frenchpressBrew.getAll',
+      'coldBrewBrew.getAll',
     ])
-    const assertedOn = new Set(['espressoShot.getLatestUnsealed'])
 
     for (const method of methods) {
       const reads = paths

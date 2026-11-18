@@ -137,10 +137,19 @@ export function ShotForm({
         keepPrefill.current,
         '',
       )
-      return keepPrefill.current.brewingDeviceId ||
+      // A legacy shot can name gear the user cannot pick (or no longer has);
+      // prefilling it would show a blank select and fail on Log.
+      const keepGrinder =
+        keepPrefill.current.grinderId ||
+        catalog.grinders.some((grinder) => grinder.id === next.grinderId)
+      const keepDevice =
+        keepPrefill.current.brewingDeviceId ||
         catalog.devices.some((device) => device.id === next.brewingDeviceId)
-        ? next
-        : { ...next, brewingDeviceId: '' }
+      return {
+        ...next,
+        grinderId: keepGrinder ? next.grinderId : '',
+        brewingDeviceId: keepDevice ? next.brewingDeviceId : '',
+      }
     }
     // A queued edit has already cleared its own error, so the committed draft suffices here.
     const filled = fill(draftRef.current)
