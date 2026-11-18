@@ -147,9 +147,12 @@ export function ShotForm({
     // A prefill is not an edit: a lost save must replay under its first key.
     const before = parseShotDraft(draftRef.current)
     const after = parseShotDraft(filled)
-    const priorKey = before.ok
-      ? idempotencyKeys.get(draftFingerprint(before.value))
-      : undefined
+    // Another coffee in the committed draft means the coffee was changed, which
+    // is an edit, so its key must not carry over.
+    const priorKey =
+      before.ok && before.value.coffeeId === coffeeId
+        ? idempotencyKeys.get(draftFingerprint(before.value))
+        : undefined
     const fingerprint = after.ok ? draftFingerprint(after.value) : undefined
     if (priorKey && fingerprint && !idempotencyKeys.has(fingerprint)) {
       idempotencyKeys.set(fingerprint, priorKey)
