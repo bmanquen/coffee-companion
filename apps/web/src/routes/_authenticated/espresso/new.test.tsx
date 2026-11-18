@@ -766,7 +766,7 @@ describe('NewEspressoShot form', () => {
     }
   })
 
-  it('prefills from Try again after a failed save', async () => {
+  it('retries a lost save unchanged when Try again would prefill a newer shot', async () => {
     const providers = seeded()
     const { queryClient, trpc, Wrapper, fetchSpy } = providers
     queryClient.removeQueries({
@@ -832,44 +832,36 @@ describe('NewEspressoShot form', () => {
         ),
       )
 
+      // The save may have committed, so the retry must send what it sent.
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-      await waitFor(() => expect(lookups).toBe(2))
-      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull(),
+      )
+      expect(lookups).toBe(1)
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
       await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
       const bodies = createCalls(fetchSpy).map((call) =>
         String((call[1] as RequestInit | undefined)?.body ?? ''),
       )
-      expect(bodies[1]).toContain('2026-05-01')
-      expect(bodies[0]).not.toContain('2026-05-01')
-      const keys = bodies.map(
-        (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
-      )
-      expect(keys[0]).toBeTruthy()
-      expect(keys[1]).toBe(keys[0])
+      expect(bodies[0]).toContain('idempotencyKey')
+      expect(bodies[1]).toBe(bodies[0])
     } finally {
       fetchSpy.mockRestore()
     }
   })
 
-  it('keeps the first key when a prefill restores an earlier failed draft', async () => {
+  it('restores a lost save, not a lookup started before it, when its coffee is reselected', async () => {
     const { Wrapper, fetchSpy } = seeded()
-    let lookups = 0
+    let resolveFirstLookup: (response: Response) => void = () => {}
+    const firstLookup = new Promise<Response>((resolve) => {
+      resolveFirstLookup = resolve
+    })
     fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
       if (isPrefillCall(call)) {
         if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
-        lookups += 1
-        if (lookups === 2) throw new Error('Network request failed')
-        return trpcSuccess(
-          makeRecentShot({
-            id: 'shot-1',
-            coffeeId: COFFEE,
-            grinderId: GRINDER,
-            brewingDeviceId: ESP_DEVICE,
-            roastDate: '2026-05-01',
-          }),
-        )
+        return firstLookup
       }
       if (isCreateCall(call)) throw new Error('Network request failed')
       return trpcSuccess()
@@ -891,7 +883,7 @@ describe('NewEspressoShot form', () => {
     try {
       render(<NewEspressoShot />, { wrapper: Wrapper })
       pickCoffee(COFFEE)
-      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      await waitFor(() => expect(prefillCalls(fetchSpy)).toHaveLength(1))
       fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
         target: { value: GRINDER },
       })
@@ -914,26 +906,43 @@ describe('NewEspressoShot form', () => {
       await logAndSettle(1)
 
       pickCoffee(COFFEE_B)
-      await waitFor(() => expect(prefillCalls(fetchSpy)).toHaveLength(2))
       pickCoffee(COFFEE)
-      expect(
-        await screen.findByRole('button', { name: 'Try again' }),
-      ).toBeTruthy()
+      // The lookup that began before the save answers with an older shot.
+      await act(async () => {
+        resolveFirstLookup(
+          trpcSuccess(
+            makeRecentShot({
+              id: 'shot-1',
+              coffeeId: COFFEE,
+              grinderId: GRINDER,
+              brewingDeviceId: ESP_DEVICE,
+              roastDate: '2026-05-01',
+            }),
+          ),
+        )
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
       expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      const lookupsForA = prefillCalls(fetchSpy).filter(
+        (call) => coffeeIdFromCall(call) === COFFEE,
+      )
+      expect(lookupsForA).toHaveLength(1)
+
+      // Only the decimal format changes, so the retry keeps its key.
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18.0' },
+      })
       await logAndSettle(2)
 
-      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
-      await logAndSettle(3)
-
-      const keys = createCalls(fetchSpy).map(
-        (call) =>
-          String((call[1] as RequestInit | undefined)?.body ?? '').match(
-            /"idempotencyKey"\s*:\s*"([^"]+)"/,
-          )?.[1],
+      const bodies = createCalls(fetchSpy).map((call) =>
+        String((call[1] as RequestInit | undefined)?.body ?? ''),
       )
-      expect(keys[1]).not.toBe(keys[0])
-      expect(keys[2]).toBe(keys[0])
+      const keys = bodies.map(
+        (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
+      )
+      expect(keys[0]).toBeTruthy()
+      expect(keys[1]).toBe(keys[0])
+      expect(bodies[1]).not.toContain('2026-05-01')
     } finally {
       fetchSpy.mockRestore()
     }
@@ -1124,6 +1133,10 @@ describe('NewEspressoShot form', () => {
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE_B },
       })
+      // Let tRPC dispatch any batched lookup while the create is still pending.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
       expect(prefillCalls(fetchSpy)).toHaveLength(prefillsDuringSave)
       expect(screen.queryByText('May 1st, 2026')).toBeNull()
       expect(screen.queryByText('April 1st, 2026')).toBeNull()
@@ -1136,7 +1149,6 @@ describe('NewEspressoShot form', () => {
         ),
       )
 
-      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
       expect(await screen.findByText('April 1st, 2026')).toBeTruthy()
       expect(screen.queryByText('May 1st, 2026')).toBeNull()
       const coffeeIds = prefillCalls(fetchSpy).map((call) =>

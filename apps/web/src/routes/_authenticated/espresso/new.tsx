@@ -3,6 +3,7 @@ import { applyCoffeePrefill } from '@coffee-companion/brew-display'
 import {
   ESPRESSO_DEVICE_TYPE,
   isEspressoDevice,
+  normalizeDecimal,
 } from '@coffee-companion/api/lib/espresso'
 import {
   useMutation,
@@ -46,8 +47,19 @@ export const Route = createFileRoute('/_authenticated/espresso/new')({
 const PREFILL_FAILED =
   "We couldn't load this coffee's last shot. Enter it yourself, or try again."
 
+// Matches the API's replay check, so 18 and 18.0 reuse the same key.
 function draftFingerprint(value: InsertEspressoShot) {
-  return JSON.stringify(value)
+  return JSON.stringify({
+    ...value,
+    dose: normalizeDecimal(value.dose),
+    yield: normalizeDecimal(value.yield),
+  })
+}
+
+type PrefillSource = {
+  grinderId: string | null
+  brewingDeviceId: string | null
+  roastDate: string | null
 }
 
 export function NewEspressoShot() {
@@ -63,6 +75,8 @@ export function NewEspressoShot() {
   const saveInFlight = useRef(false)
   const saveSucceeded = useRef(false)
   const prefillQueued = useRef(false)
+  // The gear and roast date of each save that may have committed, by coffee.
+  const unresolvedSaves = useRef(new Map<string, PrefillSource>())
   const [prefillError, setPrefillError] = useState(false)
 
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
@@ -125,17 +139,20 @@ export function NewEspressoShot() {
         ...value,
         idempotencyKey,
       })
+      if (!saveSucceeded.current) {
+        unresolvedSaves.current.set(value.coffeeId, {
+          grinderId: value.grinderId,
+          brewingDeviceId: value.brewingDeviceId,
+          roastDate: value.roastDate ?? null,
+        })
+      }
     },
   })
 
   const applyPrefill = (
     coffeeId: string,
     seq: number,
-    latest: {
-      grinderId: string | null
-      brewingDeviceId: string | null
-      roastDate: string | null
-    } | null,
+    latest: PrefillSource | null,
     startedSaveGen: number,
   ) => {
     if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
@@ -195,6 +212,13 @@ export function NewEspressoShot() {
     prefillQueued.current = false
     const seq = prefillSeq.current
     const startedSaveGen = saveGen.current
+    // After a save whose response was lost, its retry must send the same
+    // payload, so restore what was submitted instead of any shot read since.
+    const unresolved = unresolvedSaves.current.get(coffeeId)
+    if (unresolved) {
+      applyPrefill(coffeeId, seq, unresolved, startedSaveGen)
+      return
+    }
     void queryClient
       .fetchQuery({
         ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId }),

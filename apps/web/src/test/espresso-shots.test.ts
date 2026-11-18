@@ -32,7 +32,8 @@ describe('seedEspressoShotPage', () => {
       queryClient,
       trpc,
       items,
-      ESPRESSO_SHOT_PAGE_SIZE,
+      // Includes the matches before the incoming cursor.
+      ESPRESSO_SHOT_PAGE_SIZE * 2,
       cursor,
     )
     expect(
@@ -40,7 +41,9 @@ describe('seedEspressoShotPage', () => {
         trpc.espressoShot.getRecent.infiniteQueryKey(espressoShotPageInput()),
       ),
     ).toEqual({
-      pages: [{ items, total: ESPRESSO_SHOT_PAGE_SIZE, nextCursor: null }],
+      pages: [
+        { items, total: ESPRESSO_SHOT_PAGE_SIZE * 2, nextCursor: null },
+      ],
       pageParams: [cursor],
     })
   })
