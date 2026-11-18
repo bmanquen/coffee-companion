@@ -154,7 +154,9 @@ const decimalString = () =>
 
 // Recipe integers (seconds, minutes, °C). Text fields send numeric strings;
 // duration inputs and tRPC callers send numbers. Null/blank still fail.
-const requiredInt = () =>
+// Durations cannot be negative. Water temperatures stay as permissive as
+// before, so a brew already stored with one can still have its notes edited.
+const requiredInt = ({ allowNegative = false } = {}) =>
   z
     .union([z.number(), z.string(), z.null()])
     .superRefine((value, ctx) => {
@@ -162,11 +164,15 @@ const requiredInt = () =>
         ctx.addIssue({ code: 'custom', message: 'Enter a number' })
         return
       }
-      if (typeof value === 'number' && (!Number.isInteger(value) || value < 0)) {
+      if (
+        typeof value === 'number' &&
+        (!Number.isInteger(value) || (!allowNegative && value < 0))
+      ) {
         ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
         return
       }
-      if (typeof value === 'string' && !/^\d+$/.test(value)) {
+      const pattern = allowNegative ? /^-?\d+$/ : /^\d+$/
+      if (typeof value === 'string' && !pattern.test(value)) {
         ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
       }
     })
@@ -270,7 +276,7 @@ export const insertPouroverBrewSchema = createInsertSchema(pouroverBrews, {
     dose: decimalString(),
     water: decimalString(),
     brewTime: requiredInt(),
-    waterTemp: requiredInt(),
+    waterTemp: requiredInt({ allowNegative: true }),
     grindSetting: requiredGrindSetting(),
     roastDate: roastDate(),
   })
@@ -313,7 +319,7 @@ export const insertFrenchpressBrewSchema = createInsertSchema(
     dose: decimalString(),
     water: decimalString(),
     steepTime: requiredInt(),
-    waterTemp: requiredInt(),
+    waterTemp: requiredInt({ allowNegative: true }),
     grindSetting: requiredGrindSetting(),
     roastDate: roastDate(),
   })

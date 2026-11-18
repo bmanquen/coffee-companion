@@ -1262,6 +1262,12 @@ describe('espressoShot.getRecent', () => {
     ).rejects.toMatchObject({ code: TRPC_BAD_REQUEST })
   })
 
+  it('rejects a search containing NUL as a bad request', async () => {
+    await expect(
+      asA.espressoShot.getRecent({ limit: 2, q: 'huila\0grind' }),
+    ).rejects.toMatchObject({ code: TRPC_BAD_REQUEST })
+  })
+
   it('rejects a cursor with an out-of-range timestamp', async () => {
     const cursor = encodeEspressoShotCursor({
       createdAt: '2026-99-99 12:00:00.123456',

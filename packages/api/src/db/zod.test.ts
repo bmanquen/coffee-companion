@@ -275,6 +275,19 @@ describe('insertPouroverBrewSchema', () => {
       insertPouroverBrewSchema.safeParse({ ...valid, brewTime: null }).success,
     ).toBe(false)
   })
+
+  it('keeps accepting a stored negative water temperature but not a negative brew time', () => {
+    for (const waterTemp of [-4, '-4']) {
+      expect(
+        insertPouroverBrewSchema.parse({ ...valid, waterTemp }).waterTemp,
+      ).toBe(-4)
+    }
+    for (const brewTime of [-1, '-1']) {
+      expect(
+        insertPouroverBrewSchema.safeParse({ ...valid, brewTime }).success,
+      ).toBe(false)
+    }
+  })
 })
 
 describe('insertColdBrewBrewSchema', () => {

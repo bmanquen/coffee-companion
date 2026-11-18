@@ -57,8 +57,12 @@ function roasterVisibleTo(userId: string) {
   )
 }
 
-function loadShotsByIds(userId: string, ids: Array<string>) {
-  return db.query.espressoShots.findMany({
+function loadShotsByIds(
+  userId: string,
+  ids: Array<string>,
+  executor: Pick<typeof db, 'query'> = db,
+) {
+  return executor.query.espressoShots.findMany({
     where: { userId, id: { in: ids } },
     with: withRelations(userId),
   })
@@ -76,7 +80,13 @@ const getRecentInput = z.object({
   limit: z.number().int().min(1).max(50),
   cursor: z.string().min(1).max(256).optional(),
   coffeeId: uuidInput().optional(),
-  q: z.string().trim().max(ESPRESSO_SHOT_Q_MAX).optional(),
+  q: z
+    .string()
+    .trim()
+    .max(ESPRESSO_SHOT_Q_MAX)
+    // Postgres text cannot hold NUL, so the query would fail with a 500.
+    .refine((q) => !q.includes('\0'), 'Search cannot contain NUL')
+    .optional(),
   dialedIn: z.boolean().optional(),
 })
 
@@ -215,51 +225,62 @@ async function loadRecentPage(
     eq(dialedInBrews.userId, userId),
     eq(dialedInBrews.brewingMethod, 'espresso'),
   )
-  const pageQuery = db
-    .select({
-      id: espressoShots.id,
-      createdAt: sql<string>`to_char(${espressoShots.createdAt}, ${ESPRESSO_CURSOR_TIMESTAMP_FORMAT})`.as(
-        'created_at',
-      ),
-    })
-    .from(espressoShots)
-    .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
-    .leftJoin(roasters, roasterVisibleTo(userId))
-  const countQuery = db
-    .select({ total: count() })
-    .from(espressoShots)
-    .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
-    .leftJoin(roasters, roasterVisibleTo(userId))
-  const [idRows, [{ total }]] = await Promise.all([
-    (input.dialedIn ? pageQuery.innerJoin(dialedInBrews, dialedInOn) : pageQuery)
-      .where(where)
-      .orderBy(desc(espressoShots.createdAt), desc(espressoShots.id))
-      .limit(input.limit + 1),
-    (input.dialedIn
-      ? countQuery.innerJoin(dialedInBrews, dialedInOn)
-      : countQuery
-    ).where(countWhere),
-  ])
-  const hasMore = idRows.length > input.limit
-  const pageRows = hasMore ? idRows.slice(0, input.limit) : idRows
-  const ids = pageRows.map((row) => row.id)
-  if (pageRows.length === 0) {
-    return { items: [], total, nextCursor: null }
-  }
-  const last = pageRows[pageRows.length - 1]
-  const nextCursor: EspressoShotCursor | null = hasMore
-    ? encodeEspressoShotCursor({ createdAt: last.createdAt, id: last.id })
-    : null
-  const items = await loadShotsByIds(userId, ids)
-  const byId = new Map(items.map((item) => [item.id, item]))
-  return {
-    items: ids.flatMap((id) => {
-      const item = byId.get(id)
-      return item ? [item] : []
-    }),
-    total,
-    nextCursor,
-  }
+  // One snapshot, so the total, the cursor and the hydrated shots agree even
+  // while another request saves or deletes a shot.
+  return db.transaction(
+    async (tx) => {
+      const pageQuery = tx
+        .select({
+          id: espressoShots.id,
+          createdAt:
+            sql<string>`to_char(${espressoShots.createdAt}, ${ESPRESSO_CURSOR_TIMESTAMP_FORMAT})`.as(
+              'created_at',
+            ),
+        })
+        .from(espressoShots)
+        .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
+        .leftJoin(roasters, roasterVisibleTo(userId))
+      const countQuery = tx
+        .select({ total: count() })
+        .from(espressoShots)
+        .innerJoin(coffees, eq(coffees.id, espressoShots.coffeeId))
+        .leftJoin(roasters, roasterVisibleTo(userId))
+      const idRows = await (
+        input.dialedIn
+          ? pageQuery.innerJoin(dialedInBrews, dialedInOn)
+          : pageQuery
+      )
+        .where(where)
+        .orderBy(desc(espressoShots.createdAt), desc(espressoShots.id))
+        .limit(input.limit + 1)
+      const [{ total }] = await (
+        input.dialedIn
+          ? countQuery.innerJoin(dialedInBrews, dialedInOn)
+          : countQuery
+      ).where(countWhere)
+      const hasMore = idRows.length > input.limit
+      const pageRows = hasMore ? idRows.slice(0, input.limit) : idRows
+      const ids = pageRows.map((row) => row.id)
+      if (pageRows.length === 0) {
+        return { items: [], total, nextCursor: null }
+      }
+      const last = pageRows[pageRows.length - 1]
+      const nextCursor: EspressoShotCursor | null = hasMore
+        ? encodeEspressoShotCursor({ createdAt: last.createdAt, id: last.id })
+        : null
+      const items = await loadShotsByIds(userId, ids, tx)
+      const byId = new Map(items.map((item) => [item.id, item]))
+      return {
+        items: ids.flatMap((id) => {
+          const item = byId.get(id)
+          return item ? [item] : []
+        }),
+        total,
+        nextCursor,
+      }
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' },
+  )
 }
 
 // Every reference must be the user's own, and the device an Espresso one.
