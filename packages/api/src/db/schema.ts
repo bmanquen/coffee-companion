@@ -312,6 +312,9 @@ export const espressoShotIdempotencyKeys = pgTable(
     shotId: uuid('shot_id').references(() => espressoShots.id, {
       onDelete: 'set null',
     }),
+    // Hash of the create request that claimed the key, so a retry still
+    // matches after the shot is edited. Null on keys claimed before it existed.
+    requestFingerprint: text('request_fingerprint'),
   },
   (table) => [
     primaryKey({

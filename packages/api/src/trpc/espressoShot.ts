@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { and, count, desc, eq, ilike, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
@@ -83,21 +84,34 @@ function likeContains(value: string) {
   return `%${value.replace(/[\\%_]/g, '\\$&')}%`
 }
 
-function shotMatchesReplay(
-  stored: typeof espressoShots.$inferSelect,
-  input: z.infer<typeof insertEspressoShotSchema>,
+// Identifies a create request, so 16 and 16.0 replay as the same shot. Hashed
+// so the key row keeps no copy of the notes after the shot is deleted.
+function replayFingerprint(
+  shot: Pick<
+    typeof espressoShots.$inferInsert,
+    | 'coffeeId'
+    | 'grinderId'
+    | 'brewingDeviceId'
+    | 'roastDate'
+    | 'dose'
+    | 'yield'
+    | 'time'
+    | 'grindSetting'
+    | 'notes'
+  >,
 ) {
-  return (
-    stored.coffeeId === input.coffeeId &&
-    stored.grinderId === input.grinderId &&
-    stored.brewingDeviceId === input.brewingDeviceId &&
-    (stored.roastDate ?? null) === (input.roastDate ?? null) &&
-    normalizeDecimal(stored.dose) === normalizeDecimal(input.dose) &&
-    normalizeDecimal(stored.yield) === normalizeDecimal(input.yield) &&
-    stored.time === input.time &&
-    (stored.grindSetting ?? null) === input.grindSetting &&
-    (stored.notes ?? null) === (input.notes ?? null)
-  )
+  const fields = [
+    shot.coffeeId,
+    shot.grinderId,
+    shot.brewingDeviceId,
+    shot.roastDate ?? null,
+    normalizeDecimal(shot.dose),
+    normalizeDecimal(shot.yield),
+    shot.time,
+    shot.grindSetting ?? null,
+    shot.notes ?? null,
+  ]
+  return createHash('sha256').update(JSON.stringify(fields)).digest('hex')
 }
 
 function settingsReadable(shelf: Shelf) {
@@ -326,6 +340,7 @@ async function insertShotWithKey(
         userId,
         idempotencyKey,
         shotId,
+        requestFingerprint: replayFingerprint(shot),
       })
       .onConflictDoNothing()
       .returning({
@@ -344,20 +359,24 @@ async function insertShotWithKey(
       message: 'Could not save this shot',
     })
   }
-  return replayShotId(userId, raced.shotId, input)
+  return replayShotId(userId, raced, input)
 }
 
+// A retry of the request that claimed the key gets the shot as it is now, even
+// after an edit. A different request under the same key is a conflict.
 async function replayShotId(
   userId: string,
-  shotId: string | null,
+  keyRow: typeof espressoShotIdempotencyKeys.$inferSelect,
   input: z.infer<typeof insertEspressoShotSchema>,
 ) {
+  const { shotId } = keyRow
   throwIfKeyDeleted(shotId)
   const existing = await db.query.espressoShots.findFirst({
     where: { id: shotId, userId },
   })
   throwIfKeyDeleted(existing)
-  if (!shotMatchesReplay(existing, input)) {
+  const claimed = keyRow.requestFingerprint ?? replayFingerprint(existing)
+  if (claimed !== replayFingerprint(input)) {
     throw new TRPCError({
       code: TRPC_CONFLICT,
       message: SHOT_REPLAY_CONFLICT,
@@ -453,7 +472,7 @@ export const espressoShotRouter = createTRPCRouter({
       const keyRow = await loadIdempotencyKey(userId, input.idempotencyKey)
       let shotId: string
       if (keyRow) {
-        shotId = await replayShotId(userId, keyRow.shotId, input)
+        shotId = await replayShotId(userId, keyRow, input)
       } else {
         await assertOwnEspressoGear(input, userId)
         await stampFallenBrews(userId, ctx.plan)

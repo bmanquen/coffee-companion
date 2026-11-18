@@ -752,6 +752,33 @@ describe('espressoShot.create idempotency', () => {
     })
   })
 
+  it('returns the edited shot when the original create is retried', async () => {
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    const first = await asA.espressoShot.create(input)
+    const { idempotencyKey: _, ...fields } = input
+    await asA.espressoShot.update({ ...fields, id: first.id, dose: '22' })
+
+    const replayed = await asA.espressoShot.create(input)
+    expect(replayed.id).toBe(first.id)
+    expect(replayed.dose).toBe('22')
+    const page = await asA.espressoShot.getRecent({ limit: 50 })
+    expect(page.items.filter((shot) => shot.id === first.id)).toHaveLength(1)
+
+    await expect(
+      asA.espressoShot.create({ ...input, dose: '22' }),
+    ).rejects.toMatchObject({ code: TRPC_CONFLICT })
+  })
+
   it('withholds settings when a sealed shot is replayed', async () => {
     const idempotencyKey = crypto.randomUUID()
     const input = {
@@ -1219,18 +1246,6 @@ describe('espressoShot.getRecent', () => {
       asA.espressoShot.create({
         ...input,
         dose: '16.1',
-      }),
-    ).rejects.toMatchObject({ code: TRPC_CONFLICT })
-
-    await db
-      .update(espressoShots)
-      .set({ dose: null })
-      .where(eq(espressoShots.id, first.id))
-    await expect(
-      asA.espressoShot.create({
-        ...input,
-        dose: '16',
-        yield: '32',
       }),
     ).rejects.toMatchObject({ code: TRPC_CONFLICT })
   })
