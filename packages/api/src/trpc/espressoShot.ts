@@ -492,12 +492,8 @@ export const espressoShotRouter = createTRPCRouter({
         const shot = await db.query.espressoShots.findFirst({
           where: { id: shotId, userId },
         })
-        if (!shot) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Shot not found',
-          })
-        }
+        // Deleted since the key was claimed, e.g. from another device.
+        throwIfKeyDeleted(shot)
         return shot
       })
     }),

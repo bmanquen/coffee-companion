@@ -693,17 +693,14 @@ describe('espressoShot.create idempotency', () => {
 
     const displaced = stampsBefore.find((row) => row.id === firstWave[1])
     expect(displaced?.sealedAt).toBeNull()
-    expect(
-      stampsAfter.map((row) => ({
-        id: row.id,
-        sealedAt: row.sealedAt?.getTime() ?? null,
-      })),
-    ).toEqual(
-      stampsBefore.map((row) => ({
-        id: row.id,
-        sealedAt: row.sealedAt?.getTime() ?? null,
-      })),
-    )
+    const byId = (rows: typeof stampsBefore) =>
+      rows
+        .map((row) => ({
+          id: row.id,
+          sealedAt: row.sealedAt?.getTime() ?? null,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id))
+    expect(byId(stampsAfter)).toEqual(byId(stampsBefore))
   })
 
   it('does not recreate a shot when the same key is retried after delete', async () => {
