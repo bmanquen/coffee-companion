@@ -386,21 +386,27 @@ describe('the enumeration itself', () => {
   })
 
   it('covers every read each of those routers exposes', () => {
-    const asserted = new Set([
+    // Reads with Sealing tests on every Brew router, and reads tested on one
+    // router only, named in full so another router's copy still fails.
+    const assertedEverywhere = new Set([
       'getAll',
       'getRecent',
       'getById',
       'getDialedIn',
-      'getLatestUnsealed',
     ])
+    const assertedOn = new Set(['espressoShot.getLatestUnsealed'])
 
     for (const method of methods) {
       const reads = paths
         .filter((path) => path.startsWith(`${method}.`))
-        .map((path) => path.split('.')[1])
-        .filter((name) => name.startsWith('get'))
+        .filter((path) => path.split('.')[1].startsWith('get'))
 
-      expect(reads.filter((name) => !asserted.has(name))).toEqual([])
+      expect(
+        reads.filter(
+          (path) =>
+            !assertedEverywhere.has(path.split('.')[1]) && !assertedOn.has(path),
+        ),
+      ).toEqual([])
     }
   })
 })

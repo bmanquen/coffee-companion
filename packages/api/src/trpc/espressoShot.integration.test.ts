@@ -332,6 +332,62 @@ describe('espressoShot.update', () => {
     expect(fetched.roastDate).toBe('2026-04-15')
   })
 
+  it('keeps createdAt server-owned so an edit cannot move the shot', async () => {
+    const created = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const backdated = new Date('2020-01-01T00:00:00Z')
+    await asA.espressoShot.update({
+      id: created.id,
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '19',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      ...({ createdAt: backdated, sealedAt: backdated } as object),
+    })
+    const stored = await db.query.espressoShots.findFirst({
+      where: { id: created.id },
+    })
+    expect(stored?.dose).toBe('19')
+    expect(stored?.createdAt).toEqual(created.createdAt)
+    expect(stored?.sealedAt).toBeNull()
+  })
+
+  it('rejects a roast date in year zero before it reaches Postgres', async () => {
+    await expect(
+      asA.espressoShot.create({
+        coffeeId: coffeeAId,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        roastDate: '0000-01-01',
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: '1.5',
+        idempotencyKey: crypto.randomUUID(),
+      }),
+    ).rejects.toMatchObject({ code: TRPC_BAD_REQUEST })
+  })
+
+  it('rejects a fractional page limit as bad input', async () => {
+    await expect(
+      asA.espressoShot.getRecent({ limit: 1.5 }),
+    ).rejects.toMatchObject({ code: TRPC_BAD_REQUEST })
+    await expect(
+      asA.espressoShot.getDialedIn({ limit: 1.5 }),
+    ).rejects.toMatchObject({ code: TRPC_BAD_REQUEST })
+  })
+
   it('rejects a non-espresso brewing device', async () => {
     const created = await asA.espressoShot.create({
       coffeeId: coffeeAId,
@@ -1047,6 +1103,32 @@ describe('espressoShot.getRecent', () => {
     const search = await asA.espressoShot.getRecent({ limit: 50, q: secret })
     expect(search.items).toEqual([])
     expect(search.total).toBe(0)
+  })
+
+  it('hides another user’s grinder on a legacy shot', async () => {
+    const shot = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    // Only a row written before writes checked gear ownership can do this.
+    await db
+      .update(espressoShots)
+      .set({ grinderId: foreignGrinderId })
+      .where(eq(espressoShots.id, shot.id))
+
+    const recent = await asA.espressoShot.getRecent({
+      limit: 50,
+      coffeeId: coffeeAId,
+    })
+    const legacy = recent.items.find((item) => item.id === shot.id)
+    expect(legacy).toBeDefined()
+    expect(legacy?.grinder).toBeNull()
   })
 
   it('paginates with a cursor and stays stable when a shot is inserted', async () => {

@@ -3,7 +3,10 @@ import { z } from 'zod'
 // A calendar day with no time or timezone. Stored and transported as
 // YYYY-MM-DD. `new Date('YYYY-MM-DD')` is UTC midnight (rolls back behind UTC);
 // `toISOString()` / UTC getters on local midnight roll back ahead of UTC.
-export const calendarDateSchema = z.iso.date()
+// Postgres has no year 0, so it would reject the insert instead of validation.
+export const calendarDateSchema = z.iso
+  .date()
+  .refine((value) => !value.startsWith('0000-'), 'Enter a valid date')
 export type CalendarDate = z.infer<typeof calendarDateSchema>
 
 export function isCalendarDate(value: string): boolean {

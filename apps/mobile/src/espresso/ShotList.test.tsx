@@ -1,9 +1,12 @@
-import { render } from '@testing-library/react-native'
+import { fireEvent, render } from '@testing-library/react-native'
 import { ShotList } from './ShotList'
-import { SHOT_LIST_TEST_ID } from './copy'
+import { LOAD_MORE_SHOTS, SHOT_LIST_TEST_ID } from './copy'
 import type { ShotRow } from './types'
 
 const emptyProps = {
+  canLog: false,
+  hasMore: false,
+  refreshing: false,
   loadingMore: false,
   loadMoreError: null,
   onLogShot: () => {},
@@ -49,5 +52,29 @@ describe('ShotList', () => {
       />,
     )
     expect(view.getByText('Ethiopia Guji')).toBeTruthy()
+  })
+
+  it('offers the next page as a button, held while the list refreshes', async () => {
+    const onEndReached = jest.fn()
+    const list = (refreshing: boolean) => (
+      <ShotList
+        {...emptyProps}
+        shots={[shot]}
+        hasMore={true}
+        refreshing={refreshing}
+        loading={false}
+        failed={false}
+        onEndReached={onEndReached}
+      />
+    )
+    const view = await render(list(true))
+    const button = view.getByRole('button', { name: LOAD_MORE_SHOTS })
+    expect(button.props.accessibilityState).toMatchObject({ disabled: true })
+    await fireEvent.press(button)
+    expect(onEndReached).not.toHaveBeenCalled()
+
+    await view.rerender(list(false))
+    await fireEvent.press(view.getByRole('button', { name: LOAD_MORE_SHOTS }))
+    expect(onEndReached).toHaveBeenCalledTimes(1)
   })
 })

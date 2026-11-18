@@ -45,7 +45,9 @@ function withRelations(userId: string) {
   const visible = { OR: [{ userId: { isNull: true as const } }, { userId }] }
   return {
     coffee: { with: { roaster: { where: visible } } },
-    grinder: true,
+    // Writes require the user's own grinder; a legacy row must not expose
+    // someone else's.
+    grinder: { where: { userId } },
     brewingDevice: { with: { type: true } },
   } as const
 }
@@ -73,7 +75,7 @@ type RecentPage = {
 }
 
 const getRecentInput = z.object({
-  limit: z.number().min(1).max(50),
+  limit: z.number().int().min(1).max(50),
   cursor: z.string().min(1).max(256).optional(),
   coffeeId: uuidInput().optional(),
   q: z.string().trim().max(ESPRESSO_SHOT_Q_MAX).optional(),
@@ -437,7 +439,7 @@ export const espressoShotRouter = createTRPCRouter({
   // rather than dropped: it is still Dialed-in, and the user is owed the sight
   // of what subscribing would reopen.
   getDialedIn: authedProcedure
-    .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
+    .input(z.object({ limit: z.number().int().min(1).max(50).optional() }).optional())
     .query(async ({ ctx, input }) => {
       const ids = await brewIdsForMethod(ctx.session.user.id, 'espresso')
       if (ids.length === 0) return []

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import {
   brewingDeviceTypes,
+  coffees,
   coldBrewBrews,
   countries,
   espressoShots,
@@ -131,6 +132,24 @@ describe('coffee.create', () => {
     await expect(
       createCoffee(uniq('Stolen level'), { roastLevelId: hidden.id }),
     ).rejects.toThrow(/roast level not found/i)
+  })
+
+  it('lists a legacy coffee without another user’s private roaster or level', async () => {
+    const coffee = await createCoffee(uniq('Legacy lookups'))
+    const [roaster, level] = await Promise.all([
+      asB.roaster.create({ name: uniq('Secret roaster') }),
+      asB.roastLevel.create({ name: uniq('Secret level') }),
+    ])
+    // Only a row written before the coffee router checked lookups can do this.
+    await db
+      .update(coffees)
+      .set({ roasterId: roaster.id, roastLevelId: level.id })
+      .where(eq(coffees.id, coffee.id))
+
+    const listed = (await asA.coffee.getAll()).find((c) => c.id === coffee.id)
+    expect(listed).toBeDefined()
+    expect(listed?.roaster).toBeNull()
+    expect(listed?.roastLevel).toBeNull()
   })
 
   it('stores multiple origin countries on a blend, one region each', async () => {

@@ -1144,6 +1144,18 @@ describe('log espresso shot', () => {
     expect(screen.getByTestId(LOG_SHOT_TEST_ID)).toBeDisabled()
   })
 
+  it('keeps loaded history when only the equipment load fails', async () => {
+    const api: EspressoApi = {
+      ...pagingFor(() => [seedShot({ coffeeName: 'Ada House' })]),
+      load: () => Promise.reject(new Error('Network request failed')),
+      create: async () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    expect(await screen.findByText('Ada House')).toBeTruthy()
+    expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
+    expect(screen.getByTestId(LOG_SHOT_TEST_ID)).toBeDisabled()
+  })
+
   it('retries a lost create with the same key and does not duplicate the shot', async () => {
     const stored: Array<ShotRow> = []
     const keys: Array<string> = []

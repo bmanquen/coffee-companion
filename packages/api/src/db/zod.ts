@@ -188,9 +188,14 @@ export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
   grinderId: () => uuidInput('Select a grinder'),
   brewingDeviceId: () => uuidInput('Select a brewing device'),
 })
+  // Timestamps are server-owned: createdAt is the shot list's sort key, and
+  // sealedAt decides whether a shot's settings are readable.
   .omit({
     id: true,
     userId: true,
+    createdAt: true,
+    updatedAt: true,
+    sealedAt: true,
   })
   .extend({
     dose: decimalString(),

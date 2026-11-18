@@ -62,6 +62,9 @@ function Home({
   const idempotencyKeys = useRef(new Map<string, string>())
   const {
     catalog,
+    shots,
+    hasMore,
+    refreshing,
     loading,
     loadError,
     retrying,
@@ -139,7 +142,11 @@ function Home({
         />
       ) : (
         <ShotList
-          shots={catalog?.shots ?? null}
+          shots={shots}
+          // The form needs the equipment catalog, not only the history.
+          canLog={!loading && catalog != null}
+          hasMore={hasMore}
+          refreshing={refreshing}
           loading={loading}
           loadingMore={loadingMore}
           loadMoreError={loadMoreError}

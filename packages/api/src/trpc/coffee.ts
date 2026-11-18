@@ -170,13 +170,17 @@ async function replaceOrigins(
 
 export const coffeeRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id
+    // A legacy Coffee may reference another user's private lookup; show it as
+    // missing rather than leak it.
+    const visible = { OR: [{ userId: { isNull: true as const } }, { userId }] }
     const [rows, dialedInCoffeeIds] = await Promise.all([
       db.query.coffees.findMany({
-        where: { userId: ctx.session.user.id },
+        where: { userId },
         orderBy: { updatedAt: 'desc' },
         with: {
-          roaster: true,
-          roastLevel: true,
+          roaster: { where: visible },
+          roastLevel: { where: visible },
           origins: { with: originWithPlace },
           // Varieties are a many-to-many via the join table; flatten below.
           coffeesVarieties: { with: { variety: true } },

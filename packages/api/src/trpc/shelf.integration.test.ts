@@ -161,6 +161,10 @@ describe('Sealing and the Plan', () => {
     await grantPlan(USER, 'pro')
 
     const all = (await asUser.espressoShot.getRecent({ limit: 50 })).items
+    // An empty page would pass the checks below without reopening anything.
+    expect(all.map((shot) => shot.id)).toEqual(
+      expect.arrayContaining(coffees.map((coffee) => coffee.shotId)),
+    )
     expect(all.every((shot) => shot.sealed === false)).toBe(true)
     expect(all.every((shot) => shot.dose === '18')).toBe(true)
 

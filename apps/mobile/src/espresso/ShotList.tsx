@@ -12,6 +12,7 @@ import {
   ESPRESSO_HEADING,
   LOADING_MORE_SHOTS,
   LOADING_SHOTS,
+  LOAD_MORE_SHOTS,
   LOG_SHOT,
   LOG_SHOT_TEST_ID,
   SHOT_LIST_A11Y_LABEL,
@@ -27,6 +28,9 @@ const NO_SHOT_ROWS: Array<ShotRow> = []
 
 export function ShotList({
   shots,
+  canLog,
+  hasMore,
+  refreshing,
   loading,
   loadingMore,
   loadMoreError,
@@ -35,6 +39,9 @@ export function ShotList({
   onEndReached,
 }: {
   shots: Array<ShotRow> | null
+  canLog: boolean
+  hasMore: boolean
+  refreshing: boolean
   loading: boolean
   loadingMore: boolean
   loadMoreError: string | null
@@ -42,7 +49,6 @@ export function ShotList({
   onLogShot: () => void
   onEndReached: () => void
 }) {
-  const canLog = !loading && shots != null
   const rows = shots ?? NO_SHOT_ROWS
   // A failed next page stays failed until Retry; scroll must not retry it.
   const handleEndReached = () => {
@@ -57,7 +63,7 @@ export function ShotList({
       style={styles.list}
       contentContainerStyle={styles.content}
       data={rows}
-      extraData={`${loading}:${failed}:${loadingMore}:${loadMoreError ?? ''}:${rows.length}`}
+      extraData={`${loading}:${failed}:${loadingMore}:${loadMoreError ?? ''}:${rows.length}:${hasMore}:${refreshing}`}
       initialNumToRender={rows.length > 0 ? rows.length : ESPRESSO_SHOT_PAGE_SIZE}
       keyExtractor={(shot) => shot.id}
       onEndReached={handleEndReached}
@@ -96,6 +102,17 @@ export function ShotList({
               <Text>{TRY_AGAIN}</Text>
             </Pressable>
           </View>
+        ) : hasMore && rows.length > 0 ? (
+          // Reaching the end during a refresh requests nothing, and the list
+          // will not fire onEndReached again at the same height.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: refreshing }}
+            disabled={refreshing}
+            onPress={onEndReached}
+          >
+            <Text>{LOAD_MORE_SHOTS}</Text>
+          </Pressable>
         ) : null
       }
       renderItem={({ item }) => (
