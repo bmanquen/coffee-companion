@@ -178,6 +178,10 @@ export function ShotForm({
         delete updated.brewingDeviceId
         changed = true
       }
+      if (!keepPrefill.current.roastDate && updated.roastDate) {
+        delete updated.roastDate
+        changed = true
+      }
       return changed ? updated : current
     })
   }
@@ -257,10 +261,12 @@ export function ShotForm({
         disabled={busy}
         onChange={(coffeeId) => {
           onClearError()
+          // The roast date is reset below, so its old error no longer applies.
           setFieldErrors((current) => {
-            if (!current.coffeeId) return current
+            if (!current.coffeeId && !current.roastDate) return current
             const next = { ...current }
             delete next.coffeeId
+            delete next.roastDate
             return next
           })
           const keep = keepPrefill.current

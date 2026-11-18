@@ -559,6 +559,31 @@ describe('log espresso shot', () => {
     expect(screen.getByTestId(SHOT_FORM_TEST_ID)).toBeTruthy()
   })
 
+  it('clears the roast date error when another coffee resets the date', async () => {
+    const { api } = fakeApi(
+      catalog({
+        coffees: [
+          { id: COFFEE, name: 'Ethiopia Guji' },
+          { id: COFFEE_B, name: 'Colombia Huila' },
+        ],
+      }),
+    )
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await fireEvent.changeText(
+      screen.getByLabelText(LABEL_ROAST_DATE),
+      '2026-02-30',
+    )
+    await enterRecipe()
+    await press(LOG)
+    expect(screen.getByText(USE_CALENDAR_DATE)).toBeTruthy()
+
+    await pickSelect(LABEL_COFFEE, COFFEE_B)
+    expect(screen.getByLabelText(LABEL_ROAST_DATE).props.value).toBe('')
+    expect(screen.queryByText(USE_CALENDAR_DATE)).toBeNull()
+  })
+
   it('logs one shot when Log is pressed twice', async () => {
     const created: Array<ShotCreate> = []
     let resolveCreate: () => void = () => {}
