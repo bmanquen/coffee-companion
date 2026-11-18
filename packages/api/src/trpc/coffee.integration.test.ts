@@ -7,6 +7,7 @@ import {
   coldBrewBrews,
   countries,
   espressoShots,
+  roastLevels,
 } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import {
@@ -146,27 +147,33 @@ describe('coffee.create', () => {
       .set({ roasterId: roaster.id, roastLevelId: level.id })
       .where(eq(coffees.id, coffee.id))
 
-    const shared = await db.query.roastLevels.findFirst({
-      where: { userId: { isNull: true } },
-    })
-    if (!shared) throw new Error('No shared roast level seeded')
-    const own = await createCoffee(uniq('Own lookups'), {
-      roastLevelId: shared.id,
-    })
+    // A shared (userId null) level does not cascade with the test users.
+    const [shared] = await db
+      .insert(roastLevels)
+      .values({ name: uniq('Shared level') })
+      .returning()
+    try {
+      const own = await createCoffee(uniq('Own lookups'), {
+        roastLevelId: shared.id,
+      })
 
-    const all = await asA.coffee.getAll()
-    const listed = all.find((c) => c.id === coffee.id)
-    expect(listed).toBeDefined()
-    expect(listed?.roaster).toBeNull()
-    expect(listed?.roastLevel).toBeNull()
-    // The user's own roaster and a shared level still come through.
-    const visible = all.find((c) => c.id === own.id)
-    expect(visible?.roaster).toEqual(
-      expect.objectContaining({ id: own.roasterId }),
-    )
-    expect(visible?.roastLevel).toEqual(
-      expect.objectContaining({ id: shared.id }),
-    )
+      const all = await asA.coffee.getAll()
+      const listed = all.find((c) => c.id === coffee.id)
+      expect(listed).toBeDefined()
+      expect(listed?.roaster).toBeNull()
+      expect(listed?.roastLevel).toBeNull()
+      // The user's own roaster and a shared level still come through.
+      const visible = all.find((c) => c.id === own.id)
+      expect(visible?.roaster).toEqual(
+        expect.objectContaining({ id: own.roasterId }),
+      )
+      expect(visible?.roastLevel).toEqual(
+        expect.objectContaining({ id: shared.id }),
+      )
+    } finally {
+      await db.delete(coffees).where(eq(coffees.roastLevelId, shared.id))
+      await db.delete(roastLevels).where(eq(roastLevels.id, shared.id))
+    }
   })
 
   it('stores multiple origin countries on a blend, one region each', async () => {
