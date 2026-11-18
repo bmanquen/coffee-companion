@@ -9,6 +9,7 @@ import {
   frenchpressBrews,
   pouroverBrews,
 } from '../db/schema'
+import { onOwnCoffee } from './brew-ownership'
 import { isPgUniqueViolation } from './pg-error'
 import { isSealed, sealBrew, sealBrewPage, sealBrews } from './shelf'
 import type { Sealable, SealableBrew, Shelf } from './shelf'
@@ -49,10 +50,11 @@ export type DialedInBrewView = DialedInMapping & {
   sealed: boolean
 }
 
-const brewRelations = {
-  coffee: true,
-  brewingDevice: true,
-} as const
+const brewRelations = (userId: string) =>
+  ({
+    coffee: true,
+    brewingDevice: { where: { userId } },
+  }) as const
 
 type LoadedBrew = {
   id: string
@@ -96,12 +98,12 @@ async function loadBrews(
   userId: string,
 ): Promise<Map<string, LoadedBrew>> {
   if (brewIds.length === 0) return new Map()
-  const where = { id: { in: brewIds }, userId }
+  const where = { id: { in: brewIds }, userId, ...onOwnCoffee(userId) }
   switch (brewingMethod) {
     case 'espresso': {
       const brews = await db.query.espressoShots.findMany({
         where,
-        with: brewRelations,
+        with: brewRelations(userId),
       })
       return new Map(
         brews.map((brew) => [
@@ -113,7 +115,7 @@ async function loadBrews(
     case 'aeropress': {
       const brews = await db.query.aeropressBrews.findMany({
         where,
-        with: brewRelations,
+        with: brewRelations(userId),
       })
       return new Map(
         brews.map((brew) => [
@@ -125,7 +127,7 @@ async function loadBrews(
     case 'pourover': {
       const brews = await db.query.pouroverBrews.findMany({
         where,
-        with: brewRelations,
+        with: brewRelations(userId),
       })
       return new Map(
         brews.map((brew) => [
@@ -137,7 +139,7 @@ async function loadBrews(
     case 'frenchpress': {
       const brews = await db.query.frenchpressBrews.findMany({
         where,
-        with: brewRelations,
+        with: brewRelations(userId),
       })
       return new Map(
         brews.map((brew) => [
@@ -149,7 +151,7 @@ async function loadBrews(
     case 'coldBrew': {
       const brews = await db.query.coldBrewBrews.findMany({
         where,
-        with: brewRelations,
+        with: brewRelations(userId),
       })
       return new Map(
         brews.map((brew) => [

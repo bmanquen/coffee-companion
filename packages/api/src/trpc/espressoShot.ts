@@ -29,6 +29,7 @@ import {
   normalizeDecimal,
 } from '../lib/espresso'
 import { isSealed, stampFallenBrews } from '../lib/shelf'
+import { onOwnCoffee, ownGear } from '../lib/brew-ownership'
 import { authedProcedure, createTRPCRouter } from './init'
 import type {
   EspressoShotCursor,
@@ -45,10 +46,7 @@ function withRelations(userId: string) {
   const visible = { OR: [{ userId: { isNull: true as const } }, { userId }] }
   return {
     coffee: { with: { roaster: { where: visible } } },
-    // Writes require the user's own grinder; a legacy row must not expose
-    // someone else's.
-    grinder: { where: { userId } },
-    brewingDevice: { with: { type: true } },
+    ...ownGear(userId),
   } as const
 }
 
@@ -150,7 +148,7 @@ function recentWhere(
   },
   shelf: Shelf,
 ) {
-  const parts = [eq(espressoShots.userId, userId)]
+  const parts = [eq(espressoShots.userId, userId), eq(coffees.userId, userId)]
   if (input.coffeeId) parts.push(eq(espressoShots.coffeeId, input.coffeeId))
   if (input.cursor) {
     const cursorWhere = afterCursor(input.cursor)
@@ -421,6 +419,7 @@ export const espressoShotRouter = createTRPCRouter({
         where: {
           userId: ctx.session.user.id,
           coffeeId: input.coffeeId,
+          ...onOwnCoffee(ctx.session.user.id),
           ...(shelf !== null ? { sealedAt: { isNull: true } } : {}),
         },
         orderBy: { createdAt: 'desc', id: 'desc' },
@@ -445,7 +444,11 @@ export const espressoShotRouter = createTRPCRouter({
       if (ids.length === 0) return []
       return sealBrewsWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
         db.query.espressoShots.findMany({
-          where: { userId: ctx.session.user.id, id: { in: ids } },
+          where: {
+            userId: ctx.session.user.id,
+            id: { in: ids },
+            ...onOwnCoffee(ctx.session.user.id),
+          },
           orderBy: { createdAt: 'desc', id: 'desc' },
           with: withRelations(ctx.session.user.id),
           limit: input?.limit,
@@ -458,7 +461,11 @@ export const espressoShotRouter = createTRPCRouter({
   getById: authedProcedure.input(uuidInput()).query(({ ctx, input }) =>
     sealBrewWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {
       const shot = await db.query.espressoShots.findFirst({
-        where: { id: input, userId: ctx.session.user.id },
+        where: {
+          id: input,
+          userId: ctx.session.user.id,
+          ...onOwnCoffee(ctx.session.user.id),
+        },
       })
       if (!shot) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Shot not found' })

@@ -2,7 +2,7 @@ import { and, count, eq } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
-import { pouroverBrews } from '../db/schema'
+import { coffees, pouroverBrews } from '../db/schema'
 import { insertPouroverBrewSchema } from '../db/zod'
 import { POUR_OVER_DEVICE_TYPE, isPourOverDevice } from '../lib/pourover'
 import {
@@ -12,14 +12,19 @@ import {
   sealBrewsWithDialedIn,
 } from '../lib/dialed-in-brew'
 import { isSealed, stampFallenBrews } from '../lib/shelf'
+import {
+  assertOwnCoffeeAndGrinder,
+  onOwnCoffee,
+  ownGear,
+} from '../lib/brew-ownership'
 import { authedProcedure, createTRPCRouter } from './init'
 
-const withRelations = {
-  coffee: true,
-  grinder: true,
-  brewingDevice: { with: { type: true } },
-  method: true,
-} as const
+const withRelations = (userId: string) =>
+  ({
+    coffee: true,
+    ...ownGear(userId),
+    method: true,
+  }) as const
 
 // Pour over brews must be brewed on a Pour Over-type device. Throws if the
 // device is missing, owned by another user, or not a pour over device.
@@ -59,9 +64,12 @@ export const pouroverBrewRouter = createTRPCRouter({
   getAll: authedProcedure.query(({ ctx }) =>
     sealBrewsWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
       db.query.pouroverBrews.findMany({
-        where: { userId: ctx.session.user.id },
+        where: {
+          userId: ctx.session.user.id,
+          ...onOwnCoffee(ctx.session.user.id),
+        },
         orderBy: { createdAt: 'desc' },
-        with: withRelations,
+        with: withRelations(ctx.session.user.id),
       }),
     ),
   ),
@@ -74,15 +82,25 @@ export const pouroverBrewRouter = createTRPCRouter({
       sealBrewPageWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {
         const [items, [{ total }]] = await Promise.all([
           db.query.pouroverBrews.findMany({
-            where: { userId: ctx.session.user.id },
+            where: {
+              userId: ctx.session.user.id,
+              ...onOwnCoffee(ctx.session.user.id),
+            },
             orderBy: { createdAt: 'desc' },
-            with: withRelations,
+            with: withRelations(ctx.session.user.id),
             limit: input.limit,
             offset: input.offset,
           }),
           db
             .select({ total: count() })
             .from(pouroverBrews)
+            .innerJoin(
+              coffees,
+              and(
+                eq(coffees.id, pouroverBrews.coffeeId),
+                eq(coffees.userId, ctx.session.user.id),
+              ),
+            )
             .where(eq(pouroverBrews.userId, ctx.session.user.id)),
         ])
         return { items, total }
@@ -98,9 +116,13 @@ export const pouroverBrewRouter = createTRPCRouter({
       if (ids.length === 0) return []
       return sealBrewsWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
         db.query.pouroverBrews.findMany({
-          where: { userId: ctx.session.user.id, id: { in: ids } },
+          where: {
+            userId: ctx.session.user.id,
+            id: { in: ids },
+            ...onOwnCoffee(ctx.session.user.id),
+          },
           orderBy: { createdAt: 'desc' },
-          with: withRelations,
+          with: withRelations(ctx.session.user.id),
           limit: input?.limit,
         }),
       )
@@ -109,7 +131,11 @@ export const pouroverBrewRouter = createTRPCRouter({
   getById: authedProcedure.input(z.uuid()).query(({ ctx, input }) =>
     sealBrewWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {
       const brew = await db.query.pouroverBrews.findFirst({
-        where: { id: input, userId: ctx.session.user.id },
+        where: {
+          id: input,
+          userId: ctx.session.user.id,
+          ...onOwnCoffee(ctx.session.user.id),
+        },
       })
       if (!brew) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
@@ -122,6 +148,7 @@ export const pouroverBrewRouter = createTRPCRouter({
     .input(insertPouroverBrewSchema)
     .mutation(async ({ ctx, input }) => {
       await assertPourOverDevice(input.brewingDeviceId, ctx.session.user.id)
+      await assertOwnCoffeeAndGrinder(input, ctx.session.user.id)
       await assertPourOverMethod(input.methodId, ctx.session.user.id)
 
       await stampFallenBrews(ctx.session.user.id, ctx.plan)
@@ -150,6 +177,7 @@ export const pouroverBrewRouter = createTRPCRouter({
         })
       }
       await assertPourOverDevice(data.brewingDeviceId, ctx.session.user.id)
+      await assertOwnCoffeeAndGrinder(data, ctx.session.user.id)
       await assertPourOverMethod(data.methodId, ctx.session.user.id)
 
       const updated = await db
