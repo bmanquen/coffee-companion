@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native'
+import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
 import { TRPC_CONFLICT } from '../api-error'
 import { App } from '../App'
 import { SignedInHome } from '../auth/SignedInHome'
@@ -1223,6 +1224,33 @@ describe('log espresso shot', () => {
     expect(keys[0]).toBe(keys[1])
     expect(await screen.findByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-saved`)).toBeTruthy()
     expect(screen.getAllByText('Ethiopia Guji')).toHaveLength(1)
+  })
+
+  it('saves a new shot on the next Log after its key turns out deleted', async () => {
+    const keys: Array<string> = []
+    const { api, created } = fakeApi(catalog(), {
+      create: (input) => {
+        keys.push(input.idempotencyKey)
+        if (keys.length === 1) {
+          throw Object.assign(new Error(SHOT_IDEMPOTENCY_DELETED), {
+            data: { code: TRPC_CONFLICT },
+          })
+        }
+        created.push(input)
+      },
+    })
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(screen.getByText(SHOT_IDEMPOTENCY_DELETED)).toBeTruthy()
+    expect(keys).toHaveLength(1)
+
+    await press(LOG)
+    expect(keys).toHaveLength(2)
+    expect(keys[1]).not.toBe(keys[0])
+    expect(created).toHaveLength(1)
   })
 
   it('replays a lost create after Back and uses a new key once it saves', async () => {

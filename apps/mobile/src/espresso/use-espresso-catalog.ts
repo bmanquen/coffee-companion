@@ -85,7 +85,11 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   })
 
   const save = useCallback(
-    (input: ShotCreate, onSuccess?: () => void) => {
+    (
+      input: ShotCreate,
+      onSuccess?: () => void,
+      onError?: (error: unknown) => void,
+    ) => {
       if (createShot.isPending) return
       setSaveError(null)
       createShot.mutate(input, {
@@ -101,6 +105,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
         },
         onError: (error) => {
           setSaveError(apiErrorMessage(error, ERROR_SAVE_FAILED))
+          onError?.(error)
         },
       })
     },

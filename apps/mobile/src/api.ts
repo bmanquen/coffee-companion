@@ -32,10 +32,12 @@ function fetchWithTimeout(url: RequestInfo | URL, init?: RequestInit) {
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   const caller = init?.signal
   if (caller?.aborted) controller.abort()
-  caller?.addEventListener('abort', () => controller.abort())
-  return fetch(url, { ...init, signal: controller.signal }).finally(() =>
-    clearTimeout(timer),
-  )
+  const onAbort = () => controller.abort()
+  caller?.addEventListener('abort', onAbort, { once: true })
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => {
+    clearTimeout(timer)
+    caller?.removeEventListener('abort', onAbort)
+  })
 }
 
 function toShotRow(shot: ShotRecord): ShotRow {

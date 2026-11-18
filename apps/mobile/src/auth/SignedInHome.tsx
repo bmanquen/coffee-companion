@@ -1,5 +1,7 @@
+import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
 import { useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { apiErrorMessage } from '../api-error'
 import { ShotForm } from '../espresso/ShotForm'
 import { ShotList } from '../espresso/ShotList'
 import { TRYING_AGAIN, TRY_AGAIN } from '../espresso/copy'
@@ -131,13 +133,25 @@ function Home({
           }}
           onClearError={clearSaveError}
           onSubmit={(input) => {
-            save(input, () => {
+            const forgetKey = () => {
               const keys = idempotencyKeys.current
               for (const [draft, key] of keys) {
                 if (key === input.idempotencyKey) keys.delete(draft)
               }
-              setScreen('list')
-            })
+            }
+            save(
+              input,
+              () => {
+                forgetKey()
+                setScreen('list')
+              },
+              // That shot is gone for good, so the next Log saves a new one.
+              (error) => {
+                if (apiErrorMessage(error, '') === SHOT_IDEMPOTENCY_DELETED) {
+                  forgetKey()
+                }
+              },
+            )
           }}
         />
       ) : (
