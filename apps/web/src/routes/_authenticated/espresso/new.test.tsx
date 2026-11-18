@@ -53,6 +53,9 @@ vi.mock('@/components/form/search-select', () => ({
     return (
       <select
         aria-label={label}
+        // The stored value, which a <select> hides behind its placeholder
+        // when no option matches.
+        data-field-value={field.state.value}
         value={field.state.value}
         onChange={(e) => field.handleChange(e.target.value)}
       >
@@ -233,8 +236,10 @@ describe('NewEspressoShot form', () => {
     expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
     expect(screen.getByDisplayValue('Niche Zero')).toBeTruthy()
     expect(
-      screen.getByRole('combobox', { name: 'Brewing Device' }),
-    ).toHaveProperty('value', '')
+      screen
+        .getByRole('combobox', { name: 'Brewing Device' })
+        .getAttribute('data-field-value'),
+    ).toBe('')
   })
 
   it('does not submit a prefilled grinder that is not in the list', async () => {
@@ -837,6 +842,10 @@ describe('NewEspressoShot form', () => {
       await waitFor(() =>
         expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull(),
       )
+      // Let tRPC dispatch any lookup Try again queued before counting.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
       expect(lookups).toBe(1)
       expect(screen.queryByText('May 1st, 2026')).toBeNull()
 

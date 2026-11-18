@@ -14,6 +14,7 @@ import {
   ESPRESSO_LOAD_FAILED,
   ESPRESSO_SHOT_PAGE_SIZE,
   espressoShotInfiniteOptions,
+  espressoShotPageInput,
 } from '@/hooks/use-espresso-shot-pages'
 import {
   espressoShotCursor,
@@ -418,6 +419,13 @@ describe('Dashboard', () => {
         coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
       }),
     )
+    const filtered = Array.from({ length: 6 }, (_, i) =>
+      makeRecentShot({
+        id: `f${i}`,
+        coffeeId: shots[0].coffeeId,
+        coffee: shots[0].coffee,
+      }),
+    )
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       trpcSuccess({
         items: extra,
@@ -436,9 +444,16 @@ describe('Dashboard', () => {
           {},
           espressoShotCursor(shots[shots.length - 1]),
         )
-        seedEspressoShotPage(queryClient, trpc, [shots[0]], 1, undefined, {
-          coffeeId: shots[0].coffeeId,
-        })
+        // Enough filtered shots that page two stays valid, so only the
+        // filter reset (not the page clamp) can return the table to page one.
+        seedEspressoShotPage(
+          queryClient,
+          trpc,
+          filtered,
+          filtered.length,
+          undefined,
+          { coffeeId: shots[0].coffeeId },
+        )
         seedCoffees(queryClient, trpc, coffeesFrom([...shots, ...extra]))
       })
 
@@ -459,8 +474,10 @@ describe('Dashboard', () => {
       await act(async () => {
         fireEvent.click(screen.getByRole('option', { name: 'Coffee 1' }))
       })
-      expect(screen.getByText('Page 1 of 1')).toBeTruthy()
-      expect(within(screen.getByRole('table')).getByText('Coffee 1')).toBeTruthy()
+      expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getAllByText('Coffee 1'),
+      ).toHaveLength(5)
       expect(within(screen.getByRole('table')).queryByText('Coffee 6')).toBeNull()
     } finally {
       fetchSpy.mockRestore()
@@ -820,6 +837,21 @@ describe('Dashboard', () => {
       ).toBeNull(),
     )
     expect(fetchMock).toHaveBeenCalledTimes(2)
+    // Both the failed request and its retry continue from page one's cursor.
+    const cursors = fetchMock.mock.calls.map(([url]) => {
+      const input = new URL(String(url), 'http://localhost').searchParams.get(
+        'input',
+      )
+      const batch = JSON.parse(input ?? '{}') as Record<
+        string,
+        { json?: { cursor?: string } }
+      >
+      return batch['0'].json?.cursor
+    })
+    expect(cursors).toEqual([
+      espressoShotCursor(shots[shots.length - 1]),
+      espressoShotCursor(shots[shots.length - 1]),
+    ])
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull(),
     )
@@ -938,6 +970,47 @@ describe('Dashboard', () => {
       render(<DashboardContainer />, { wrapper: Wrapper })
       expect(await screen.findAllByText('Kenya AA')).not.toHaveLength(0)
       expect(screen.getByRole('button', { name: 'Pour Over' })).toBeTruthy()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('picks the method from a later espresso page when a delete emptied page one', async () => {
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+          createdAt: new Date('2026-06-01T08:00:00.000Z'),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      const shot = makeRecentShot({
+        coffee: makeRecentCoffee({ name: 'Ethiopia Guji' }),
+        createdAt: new Date('2026-06-03T08:00:00.000Z'),
+      })
+      const cursor = espressoShotCursor(shot)
+      queryClient.setQueryData(
+        trpc.espressoShot.getRecent.infiniteQueryKey(espressoShotPageInput()),
+        {
+          pages: [
+            { items: [], total: 1, nextCursor: cursor },
+            { items: [shot], total: 1, nextCursor: null },
+          ],
+          pageParams: [null, cursor],
+        },
+      )
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findAllByText('Ethiopia Guji')).not.toHaveLength(0)
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
     } finally {
       searchSpy.mockRestore()
       navigateSpy.mockRestore()

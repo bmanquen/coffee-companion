@@ -236,6 +236,72 @@ describe('useEspressoShotPages', () => {
     }
   })
 
+  it('keeps a failed refresh visible through load more until the pages refresh', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const extra = makeRecentShot({
+      id: RETRY_EXTRA_ID,
+      coffeeId: 'c-next',
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    let refreshes = 0
+    const continuations: Array<string> = []
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input, init) => {
+        const text = decodeURIComponent(await requestText(input, init))
+        if (text.includes('"cursor"')) {
+          continuations.push(text)
+          return trpcSuccess({
+            items: [extra],
+            total: first.length + 1,
+            nextCursor: null,
+          })
+        }
+        refreshes += 1
+        if (refreshes <= 2) throw new Error('Network request failed')
+        return trpcSuccess({
+          items: first,
+          total: first.length + 1,
+          nextCursor: espressoShotCursor(first[first.length - 1]),
+        })
+      })
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+      await act(async () => {
+        await result.current.retry()
+      })
+      await waitFor(() =>
+        expect(result.current.loadError).toBe(ESPRESSO_LOAD_FAILED),
+      )
+
+      // The refresh fails again, so nothing is appended and the warning stays.
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      expect(result.current.loadError).toBe(ESPRESSO_LOAD_FAILED)
+      expect(result.current.stale).toBe(true)
+      expect(continuations).toHaveLength(0)
+      await waitFor(() => expect(result.current.loadingMore).toBe(false))
+
+      await act(async () => {
+        await result.current.loadMore()
+      })
+      await waitFor(() => {
+        expect(result.current.loadError).toBeNull()
+        expect(
+          result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
+        ).toBe(true)
+      })
+      expect(continuations).toHaveLength(1)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('keeps extra shots when a refetch fails', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')

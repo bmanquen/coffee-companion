@@ -156,4 +156,28 @@ describe('BrewFeed', () => {
 
     expect(screen.getByText('Page 1 of 2')).toBeTruthy()
   })
+
+  it('keeps an opened brew open only for that brew when a filter moves rows', () => {
+    renderFeed({
+      // Details stay mounted (hidden) for closed rows, so name only open ones.
+      renderDetails: (row) =>
+        row.getIsExpanded() ? <p>Open: {row.original.coffee.name}</p> : null,
+    })
+
+    const table = within(screen.getByRole('table'))
+    fireEvent.click(table.getByText('Ethiopia Guji'))
+    expect(screen.getAllByText('Open: Ethiopia Guji')).not.toHaveLength(0)
+
+    fireEvent.click(screen.getByText('All coffees'))
+    fireEvent.click(screen.getByRole('option', { name: 'Kenya AA' }))
+
+    expect(table.getByText('Kenya AA')).toBeTruthy()
+    expect(screen.queryAllByText(/^Open:/)).toHaveLength(0)
+  })
+
+  it('does not call the history empty while another page is available', () => {
+    renderFeed({ brews: [], hasMore: true })
+    expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
+    expect(screen.getByRole('table')).toBeTruthy()
+  })
 })

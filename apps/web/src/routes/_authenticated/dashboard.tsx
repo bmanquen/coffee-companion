@@ -69,7 +69,10 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
 export function DashboardContainer() {
   const trpc = useTRPC()
   const espressoQuery = useInfiniteQuery(espressoShotInfiniteOptions(trpc))
-  const espresso = espressoQuery.data?.pages[0]?.items ?? []
+  // A delete can empty page one while a later cached page still has shots.
+  const espresso =
+    espressoQuery.data?.pages.find((page) => page.items.length > 0)?.items ??
+    []
   const { data: pourover } = useSuspenseQuery(
     trpc.pouroverBrew.getAll.queryOptions(),
   )

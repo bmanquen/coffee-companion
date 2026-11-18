@@ -51,6 +51,7 @@ export function BrewFeed<T extends BrewRow>({
   banner,
   stale,
   status,
+  hasMore = false,
 }: {
   title: string
   brews: Array<T>
@@ -68,6 +69,8 @@ export function BrewFeed<T extends BrewRow>({
   banner?: ReactNode
   stale?: boolean
   status?: ReactNode
+  // Another server page exists, so an empty list is not an empty history.
+  hasMore?: boolean
 }) {
   // TanStack Table's instance is a stable, mutable object the React Compiler
   // would otherwise over-memoize; opt this component out (mirrors DataTable).
@@ -84,21 +87,23 @@ export function BrewFeed<T extends BrewRow>({
     pageSize,
   })
 
-  // Unique coffees that actually appear in this method's history, sorted by name.
-  const derivedCoffeeOptions = useMemo(
+  // Unique coffees that actually appear in this method's history, sorted by
+  // name, unless the parent supplies the options.
+  const coffeeOptions = useMemo(
     () =>
+      coffeeOptionsProp ??
       Array.from(
         new Map(brews.map((b) => [b.coffeeId, b.coffee.name])).entries(),
       )
         .map(([value, label]) => ({ value, label }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [brews],
+    [brews, coffeeOptionsProp],
   )
-  const coffeeOptions = coffeeOptionsProp ?? derivedCoffeeOptions
   const filterCoffeeOnClient = coffeeFilter == null
   const filterDialedInOnClient = dialedInFilter == null
   const filtering = Boolean(coffeeId || dialedInOnly)
-  const showEmpty = status == null && brews.length === 0 && !filtering
+  const showEmpty =
+    status == null && brews.length === 0 && !filtering && !hasMore
 
   // Memoized so the filtered array keeps a stable reference between renders —
   // a fresh array each render trips the table's autoReset* state and loops.
@@ -145,6 +150,8 @@ export function BrewFeed<T extends BrewRow>({
     onExpandedChange: expansion.onExpandedChange,
     onPaginationChange: setPagination,
     autoResetPageIndex: false,
+    // By id, so a filter or refresh cannot move the open row to another brew.
+    getRowId: (brew) => brew.id,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),

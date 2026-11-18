@@ -136,6 +136,7 @@ export function EspressoBrewFeed() {
         }
         dialedInFilter={{ value: dialedInOnly, onChange: setDialedInOnly }}
         stale={stale}
+        hasMore={hasMore}
         status={
           loading ? (
             <p role="status">{ESPRESSO_LOADING_SHOTS}</p>

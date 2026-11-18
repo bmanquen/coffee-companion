@@ -109,11 +109,18 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
     query.isError && !query.isFetchNextPageError ? ESPRESSO_LOAD_FAILED : null
   const stale = loadError != null && items.length > 0
 
-  const loadMore = useCallback(() => {
+  const loadMore = useCallback(async () => {
     if (!query.hasNextPage || query.isFetchingNextPage || query.isRefetching) {
-      return Promise.resolve()
+      return
     }
-    return query.fetchNextPage({ cancelRefetch: false }).then(() => undefined)
+    // A successful append would clear the failed refresh and hide that the
+    // cached pages are stale, so refresh them first.
+    if (query.isError && !query.isFetchNextPageError) {
+      const refreshed = await query.refetch()
+      const lastPage = refreshed.data?.pages.at(-1)
+      if (refreshed.isError || !lastPage?.nextCursor) return
+    }
+    await query.fetchNextPage({ cancelRefetch: false })
   }, [query])
 
   const retry = useCallback(
