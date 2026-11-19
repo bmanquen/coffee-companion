@@ -47,4 +47,40 @@ describe('seedEspressoShotPage', () => {
       pageParams: [cursor],
     })
   })
+
+  it('drops cached pages a replaced page no longer leads to', () => {
+    const { queryClient, trpc } = createTestProviders()
+    const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+      makeRecentShot({ id: espressoShotFixtureId(index) }),
+    )
+    const extra = makeRecentShot({ id: espressoShotFixtureId(99) })
+    const cursor = espressoShotCursor(first[first.length - 1])
+    const key = trpc.espressoShot.getRecent.infiniteQueryKey(
+      espressoShotPageInput(),
+    )
+    const seedBoth = () => {
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      seedEspressoShotPage(queryClient, trpc, [extra], first.length + 1, cursor)
+    }
+
+    seedBoth()
+    seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+    expect(queryClient.getQueryData(key)).toMatchObject({
+      pageParams: [undefined, cursor],
+    })
+
+    seedEspressoShotPage(
+      queryClient,
+      trpc,
+      first,
+      first.length,
+      undefined,
+      {},
+      null,
+    )
+    expect(queryClient.getQueryData(key)).toEqual({
+      pages: [{ items: first, total: first.length, nextCursor: null }],
+      pageParams: [undefined],
+    })
+  })
 })

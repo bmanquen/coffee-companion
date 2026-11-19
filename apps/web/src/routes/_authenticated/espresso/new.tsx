@@ -233,6 +233,8 @@ export function NewEspressoShot() {
           ) {
             return
           }
+          // A lookup from before a save is dropped, its failure included.
+          if (startedSaveGen !== saveGen.current) return
           setPrefillError(true)
           applyPrefill(coffeeId, seq, null, startedSaveGen)
         },

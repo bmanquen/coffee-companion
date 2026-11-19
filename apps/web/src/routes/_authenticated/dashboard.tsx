@@ -109,6 +109,13 @@ export function DashboardContainer() {
     <Dashboard
       selectedMethod={selectedMethod}
       onSelectMethod={(next) => navigate({ search: { method: next } })}
+      // Filtering Espresso chooses it, so a late recency result cannot switch
+      // the feed away and drop the filter.
+      onFilterEspresso={
+        isDashboardMethod(method)
+          ? undefined
+          : () => navigate({ search: { method: 'espresso' }, replace: true })
+      }
       feeds={feeds}
       now={new Date()}
     />
@@ -124,11 +131,13 @@ export function DashboardContainer() {
 export function Dashboard({
   selectedMethod,
   onSelectMethod,
+  onFilterEspresso,
   feeds,
   now,
 }: {
   selectedMethod: DashboardMethod
   onSelectMethod: (method: DashboardMethod) => void
+  onFilterEspresso?: () => void
   feeds: Array<MethodFeed>
   now: Date
 }) {
@@ -142,7 +151,9 @@ export function Dashboard({
           feeds={feeds}
           now={now}
         />
-        {selectedMethod === 'espresso' && <EspressoBrewFeed />}
+        {selectedMethod === 'espresso' && (
+          <EspressoBrewFeed onFilter={onFilterEspresso} />
+        )}
         {selectedMethod === 'pourover' && <PouroverBrewFeed />}
         {selectedMethod === 'frenchpress' && <FrenchpressBrewFeed />}
         {selectedMethod === 'aeropress' && <AeropressBrewFeed />}

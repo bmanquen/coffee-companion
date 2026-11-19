@@ -86,22 +86,27 @@ export function seedEspressoShotPage(
   queryClient.setQueryData(
     key,
     (current: InfiniteData<ShotPage, string | undefined> | undefined) => {
+      // Replacing a page keeps the pages after it only while its cursor still
+      // leads to them, as a real refetch would.
+      const replaceAt = (
+        data: InfiniteData<ShotPage, string | undefined>,
+        index: number,
+      ) => {
+        const keepRest = data.pageParams[index + 1] === page.nextCursor
+        const end = keepRest ? data.pages.length : index + 1
+        const pages = data.pages.slice(0, end)
+        pages[index] = page
+        return { pages, pageParams: data.pageParams.slice(0, end) }
+      }
       if (!cursor) {
         if (!current?.pages.length) {
           return { pages: [page], pageParams: [undefined] }
         }
-        return {
-          pages: [page, ...current.pages.slice(1)],
-          pageParams: current.pageParams,
-        }
+        return replaceAt(current, 0)
       }
       const data = current ?? { pages: [], pageParams: [] }
       const index = data.pageParams.findIndex((param) => param === cursor)
-      if (index >= 0) {
-        const pages = data.pages.slice()
-        pages[index] = page
-        return { pages, pageParams: data.pageParams }
-      }
+      if (index >= 0) return replaceAt(data, index)
       return {
         pages: [...data.pages, page],
         pageParams: [...data.pageParams, cursor],

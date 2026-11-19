@@ -60,7 +60,12 @@ function EditEspressoShot() {
 
   const updateShot = useMutation(
     trpc.espressoShot.update.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
+        // An in-flight page (e.g. a Brews preload) would write its pre-edit
+        // snapshot back after the invalidation.
+        await queryClient.cancelQueries(
+          trpc.espressoShot.getRecent.infiniteQueryFilter(),
+        )
         queryClient.invalidateQueries(
           trpc.espressoShot.getRecent.infiniteQueryFilter(),
         )

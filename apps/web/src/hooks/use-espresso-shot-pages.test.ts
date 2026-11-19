@@ -302,6 +302,75 @@ describe('useEspressoShotPages', () => {
     }
   })
 
+  it('does not load the next page of a coffee picked while load more refreshes', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const filtered = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 'f', FILTERED_COFFEE_ID)
+    let failRefresh = true
+    let resolveRefresh: (value: Response) => void = () => {}
+    const heldRefresh = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve
+    })
+    const requests: Array<string> = []
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input, init) => {
+        const text = decodeURIComponent(await requestText(input, init))
+        requests.push(text)
+        if (failRefresh) throw new Error('Network request failed')
+        return heldRefresh
+      })
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      seedEspressoShotPage(
+        queryClient,
+        trpc,
+        filtered,
+        filtered.length + 1,
+        undefined,
+        { coffeeId: FILTERED_COFFEE_ID },
+      )
+      const { result, rerender } = renderHook(
+        ({ coffeeId }: { coffeeId?: string }) =>
+          useEspressoShotPages({ coffeeId }),
+        { wrapper: Wrapper, initialProps: {} },
+      )
+      await act(async () => {
+        await result.current.retry()
+      })
+      await waitFor(() =>
+        expect(result.current.loadError).toBe(ESPRESSO_LOAD_FAILED),
+      )
+
+      failRefresh = false
+      requests.length = 0
+      let loading: Promise<void> = Promise.resolve()
+      await act(async () => {
+        loading = result.current.loadMore()
+      })
+      await waitFor(() => expect(requests).toHaveLength(1))
+      rerender({ coffeeId: FILTERED_COFFEE_ID })
+      await act(async () => {
+        resolveRefresh(
+          trpcSuccess({
+            items: first,
+            total: first.length + 1,
+            nextCursor: espressoShotCursor(first[first.length - 1]),
+          }),
+        )
+        await loading
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      expect(requests.filter((text) => text.includes('"cursor"'))).toEqual([])
+      expect(result.current.items.map((shot) => shot.id)).toEqual(
+        filtered.map((shot) => shot.id),
+      )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('keeps extra shots when a refetch fails', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')

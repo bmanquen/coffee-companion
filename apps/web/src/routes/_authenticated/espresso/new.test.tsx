@@ -581,6 +581,7 @@ describe('NewEspressoShot form', () => {
             /"idempotencyKey"\s*:\s*"([^"]+)"/,
           )?.[1],
       )
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[0]).not.toBe(keys[1])
       expect(keys[2]).toBe(keys[0])
     } finally {
@@ -764,6 +765,7 @@ describe('NewEspressoShot form', () => {
       const keys = bodies.map(
         (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
       )
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[0]).toBe(keys[1])
       expect(bodies[1]).not.toContain('2026-05-01')
     } finally {
@@ -949,7 +951,7 @@ describe('NewEspressoShot form', () => {
       const keys = bodies.map(
         (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
       )
-      expect(keys[0]).toBeTruthy()
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[1]).toBe(keys[0])
       expect(bodies[1]).not.toContain('2026-05-01')
     } finally {
@@ -1216,8 +1218,16 @@ describe('NewEspressoShot form', () => {
         target: { value: '1.5' },
       })
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
-      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      // Retry only once the save is visibly pending and its request is held.
+      expect(
+        await screen.findByRole('button', { name: 'Logging…' }),
+      ).toBeTruthy()
       await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      // Let tRPC dispatch any lookup Try again queued before counting.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
       expect(prefillCalls(fetchSpy)).toHaveLength(1)
     } finally {
       resolveCreate(trpcSuccess())

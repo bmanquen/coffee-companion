@@ -3,7 +3,7 @@ import {
   ESPRESSO_SHOT_Q_MAX,
 } from '@coffee-companion/api/lib/espresso'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTRPC } from '@/integrations/trpc/react'
 import type { InfiniteData } from '@tanstack/react-query'
 import type { EspressoShotWithRelations } from '@/types'
@@ -92,6 +92,12 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
   const queryClient = useQueryClient()
   const options = espressoShotInfiniteOptions(trpc, filters)
   const query = useInfiniteQuery(options)
+  // The filters on screen now, so a Load more can tell they changed under it.
+  const filterKey = JSON.stringify(espressoShotPageInput(filters))
+  const shownFilterKey = useRef(filterKey)
+  useEffect(() => {
+    shownFilterKey.current = filterKey
+  }, [filterKey])
 
   const items = useMemo(
     () => query.data?.pages.flatMap((page) => page.items) ?? NO_SHOTS,
@@ -117,11 +123,14 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
     // cached pages are stale, so refresh them first.
     if (query.isError && !query.isFetchNextPageError) {
       const refreshed = await query.refetch()
+      // fetchNextPage follows the filters on screen, so a coffee picked during
+      // the refresh would get the page instead of the one clicked under.
+      if (shownFilterKey.current !== filterKey) return
       const lastPage = refreshed.data?.pages.at(-1)
       if (refreshed.isError || !lastPage?.nextCursor) return
     }
     await query.fetchNextPage({ cancelRefetch: false })
-  }, [query])
+  }, [query, filterKey])
 
   const retry = useCallback(
     () => query.refetch().then(() => undefined),

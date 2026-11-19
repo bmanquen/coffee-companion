@@ -945,6 +945,48 @@ describe('Dashboard', () => {
     }
   })
 
+  it('keeps Espresso chosen once its feed is filtered before recency settles', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => new Promise<never>(() => {}))
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigate = vi.fn()
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(navigate as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({ coffee: makeRecentCoffee({ name: 'Kenya AA' }) }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      void queryClient.prefetchInfiniteQuery({
+        ...espressoShotInfiniteOptions(trpc),
+        queryFn: () => new Promise<never>(() => {}),
+      })
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findByText(ESPRESSO_LOADING_SHOTS)).toBeTruthy()
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('All coffees'))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('option', { name: /Kenya AA/ }))
+      })
+      expect(navigate).toHaveBeenCalledWith({
+        search: { method: 'espresso' },
+        replace: true,
+      })
+    } finally {
+      fetchSpy.mockRestore()
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
   it('uses an explicit URL method before espresso settles', async () => {
     const searchSpy = vi
       .spyOn(Route, 'useSearch')

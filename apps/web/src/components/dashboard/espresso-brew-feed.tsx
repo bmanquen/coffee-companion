@@ -59,7 +59,9 @@ const columns = [
   expanderColumn<EspressoShotWithRelations>(),
 ]
 
-export function EspressoBrewFeed() {
+// onFilter runs whenever the user changes a filter, which the dashboard takes
+// as choosing Espresso.
+export function EspressoBrewFeed({ onFilter }: { onFilter?: () => void } = {}) {
   const trpc = useTRPC()
   const coffeesQuery = useQuery({
     ...trpc.coffee.getAll.queryOptions(),
@@ -107,7 +109,13 @@ export function EspressoBrewFeed() {
         coffeeOptions={
           coffeesQuery.isError && coffees.length === 0 ? [] : coffeeOptions
         }
-        coffeeFilter={{ value: coffeeId, onChange: setCoffeeId }}
+        coffeeFilter={{
+          value: coffeeId,
+          onChange: (next) => {
+            setCoffeeId(next)
+            onFilter?.()
+          },
+        }}
         banner={
           <>
             {loadError && items.length > 0 ? (
@@ -134,7 +142,13 @@ export function EspressoBrewFeed() {
             ) : null}
           </>
         }
-        dialedInFilter={{ value: dialedInOnly, onChange: setDialedInOnly }}
+        dialedInFilter={{
+          value: dialedInOnly,
+          onChange: (next) => {
+            setDialedInOnly(next)
+            onFilter?.()
+          },
+        }}
         stale={stale}
         hasMore={hasMore}
         status={
