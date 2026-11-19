@@ -20,6 +20,22 @@ const brewTables = [
   coldBrewBrews,
 ]
 
+// How many of the user's Brews, of every method, use one Coffee, Grinder or
+// Brewing Device: the Brews deleting it cascades to. Sealed Brews count too,
+// since they go with it.
+export async function countBrewsUsing(
+  userId: string,
+  column: 'coffeeId' | 'grinderId' | 'brewingDeviceId',
+  id: string,
+): Promise<number> {
+  const counts = await Promise.all(
+    brewTables.map((table) =>
+      db.$count(table, and(eq(table.userId, userId), eq(table[column], id))),
+    ),
+  )
+  return counts.reduce((sum, n) => sum + n, 0)
+}
+
 // The Coffees a user may read the Brews of, or null when their Plan holds the
 // whole library. A Set because every Brew of every feed is tested against it.
 export type Shelf = ReadonlySet<string> | null

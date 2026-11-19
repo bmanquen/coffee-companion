@@ -12,24 +12,15 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { gearLimitSentence } from '@coffee-companion/api/lib/plan'
 import { useState } from 'react'
 import { DataTable } from '@/components/data-table'
+import { DeleteWithBrewsDialog } from '@/components/delete-with-brews-dialog'
 import { EquipmentAddAction } from '@/components/equipment-add-action'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
 import { cn } from '@/lib/utils'
@@ -87,38 +78,13 @@ function GrinderActionsCell({ row }: CellContext<Grinder, unknown>) {
           <Pencil className="h-4 w-4" />
         </Button>
       </Link>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            aria-label="Delete grinder"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete grinder</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete &quot;{grinder.name}&quot;? This
-              cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter showCloseButton>
-            <DialogClose asChild>
-              <Button
-                variant="destructive"
-                disabled={deleteGrinder.isPending}
-                onClick={() => deleteGrinder.mutate(grinder.id)}
-              >
-                Delete
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteWithBrewsDialog
+        noun="grinder"
+        name={grinder.name}
+        brewCountOptions={trpc.grinder.brewCount.queryOptions(grinder.id)}
+        onDelete={() => deleteGrinder.mutate(grinder.id)}
+        isPending={deleteGrinder.isPending}
+      />
     </div>
   )
 }
@@ -179,38 +145,13 @@ function DeviceActionsCell({ row }: CellContext<BrewingDevice, unknown>) {
           <Pencil className="h-4 w-4" />
         </Button>
       </Link>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            aria-label="Delete brewing device"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete brewing device</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete &quot;{device.name}&quot;? This
-              also removes its espresso shots and cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter showCloseButton>
-            <DialogClose asChild>
-              <Button
-                variant="destructive"
-                disabled={deleteDevice.isPending}
-                onClick={() => deleteDevice.mutate(device.id)}
-              >
-                Delete
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteWithBrewsDialog
+        noun="brewing device"
+        name={device.name}
+        brewCountOptions={trpc.brewingDevice.brewCount.queryOptions(device.id)}
+        onDelete={() => deleteDevice.mutate(device.id)}
+        isPending={deleteDevice.isPending}
+      />
     </div>
   )
 }

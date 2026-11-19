@@ -12,7 +12,7 @@ import {
 import { insertCoffeeSchema } from '../db/zod'
 import { coffeeIdsWithDialedIn } from '../lib/dialed-in-brew'
 import { isPgUniqueViolation } from '../lib/pg-error'
-import { stampFallenBrews } from '../lib/shelf'
+import { countBrewsUsing, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 import type { CoffeeOriginInput, InsertCoffee } from '../db/zod'
 
@@ -261,6 +261,13 @@ export const coffeeRouter = createTRPCRouter({
         rethrowUniqueCoffeeConflict(err)
       }
     }),
+
+  // What deleting it would cascade to, so the confirmation can say so.
+  brewCount: authedProcedure
+    .input(z.uuid())
+    .query(({ ctx, input }) =>
+      countBrewsUsing(ctx.session.user.id, 'coffeeId', input),
+    ),
 
   delete: authedProcedure
     .input(z.uuid())

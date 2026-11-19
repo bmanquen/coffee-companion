@@ -10,23 +10,14 @@ import {
   getExpandedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { CoffeeIcon, Pencil, Plus, Trash2 } from 'lucide-react'
+import { CoffeeIcon, Pencil, Plus } from 'lucide-react'
 import { formatOriginNames } from '@/components/coffees/format-coffee-origins'
 import { CoffeeDetails } from '@/components/coffees/coffee-details'
 import { DataTable, expanderColumn } from '@/components/data-table'
+import { DeleteWithBrewsDialog } from '@/components/delete-with-brews-dialog'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import {
   Empty,
   EmptyContent,
@@ -93,38 +84,13 @@ function CoffeeActionsCell({ row }: CellContext<CoffeeRow, unknown>) {
           <Pencil className="h-4 w-4" />
         </Button>
       </Link>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            aria-label="Delete coffee"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete coffee</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete &quot;{coffee.name}&quot;? This
-              action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter showCloseButton>
-            <DialogClose asChild>
-              <Button
-                variant="destructive"
-                disabled={deleteCoffee.isPending}
-                onClick={() => deleteCoffee.mutate(coffee.id)}
-              >
-                Delete
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteWithBrewsDialog
+        noun="coffee"
+        name={coffee.name}
+        brewCountOptions={trpc.coffee.brewCount.queryOptions(coffee.id)}
+        onDelete={() => deleteCoffee.mutate(coffee.id)}
+        isPending={deleteCoffee.isPending}
+      />
     </div>
   )
 }
