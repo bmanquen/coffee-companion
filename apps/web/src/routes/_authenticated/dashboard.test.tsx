@@ -562,6 +562,155 @@ describe('Dashboard', () => {
     }
   })
 
+  it('lands Next on the first loaded shot after a refresh shrinks the list', async () => {
+    const shots = Array.from({ length: 10 }, (_, i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(i),
+        coffeeId: `c${i}`,
+        coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
+      }),
+    )
+    const extra = Array.from({ length: 5 }, (_, i) =>
+      makeRecentShot({
+        id: `n${i}`,
+        coffeeId: `n${i}`,
+        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
+      }),
+    )
+    const kept = shots.slice(0, 8)
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      // A background refresh fails, leaving the cached pages stale.
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      // Next refreshes first: two shots were deleted elsewhere.
+      .mockResolvedValueOnce(
+        trpcSuccess({
+          items: kept,
+          total: kept.length + extra.length,
+          nextCursor: espressoShotCursor(kept[kept.length - 1]),
+        }),
+      )
+      .mockResolvedValueOnce(
+        trpcSuccess({
+          items: extra,
+          total: kept.length + extra.length,
+          nextCursor: null,
+        }),
+      )
+    try {
+      const { queryClient, trpc } = renderDashboard(
+        'espresso',
+        shots,
+        {},
+        (providers) => {
+          seedEspressoShotPage(
+            providers.queryClient,
+            providers.trpc,
+            shots,
+            shots.length + extra.length,
+            undefined,
+            {},
+            espressoShotCursor(shots[shots.length - 1]),
+          )
+          seedCoffees(
+            providers.queryClient,
+            providers.trpc,
+            coffeesFrom([...shots, ...extra]),
+          )
+        },
+      )
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      })
+      expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+      await act(async () => {
+        await queryClient.refetchQueries(
+          trpc.espressoShot.getRecent.infiniteQueryFilter(),
+        )
+      })
+      expect(
+        await screen.findByText("We couldn't load your shots. Try again."),
+      ).toBeTruthy()
+
+      fireEvent.click(screen.getByLabelText('Next page'))
+      // 8 rows remain, so the first new shot is row 9, on page 2, not page 3.
+      expect(await screen.findByText('Page 2 of 3')).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getByText('Extra 1'),
+      ).toBeTruthy()
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('stays where Previous left it when a pending Next load settles', async () => {
+    const shots = Array.from({ length: 10 }, (_, i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(i),
+        coffeeId: `c${i}`,
+        coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
+      }),
+    )
+    const extra = Array.from({ length: 5 }, (_, i) =>
+      makeRecentShot({
+        id: `n${i}`,
+        coffeeId: `n${i}`,
+        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
+      }),
+    )
+    let release: (response: Response) => void = () => {}
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = resolve
+        }),
+    )
+    try {
+      renderDashboard('espresso', shots, {}, (providers) => {
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          shots,
+          shots.length + extra.length,
+          undefined,
+          {},
+          espressoShotCursor(shots[shots.length - 1]),
+        )
+        seedCoffees(
+          providers.queryClient,
+          providers.trpc,
+          coffeesFrom([...shots, ...extra]),
+        )
+      })
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      })
+      fireEvent.click(screen.getByLabelText('Next page'))
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Previous page'))
+      })
+      expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+
+      await act(async () => {
+        release(
+          trpcSuccess({
+            items: extra,
+            total: shots.length + extra.length,
+            nextCursor: null,
+          }),
+        )
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      // The loaded shots are kept, but the table stays on page 1.
+      expect(await screen.findByText('Page 1 of 3')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('ignores a Next load that settles after the filter changed', async () => {
     const shots = Array.from({ length: 10 }, (_, i) =>
       makeRecentShot({

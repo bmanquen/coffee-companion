@@ -92,6 +92,7 @@ export function EspressoBrewFeed({ onFilter }: { onFilter?: () => void } = {}) {
   const {
     items,
     hasMore,
+    loadingMore,
     loadMore,
     loadMoreError,
     loading,
@@ -159,6 +160,7 @@ export function EspressoBrewFeed({ onFilter }: { onFilter?: () => void } = {}) {
       stale={stale}
       hasMore={hasMore}
       loadMore={loadMore}
+      loadingMore={loadingMore}
       loadMoreError={loadMoreError}
       status={
         loading ? (

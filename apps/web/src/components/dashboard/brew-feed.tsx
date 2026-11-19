@@ -53,6 +53,7 @@ export function BrewFeed<T extends BrewRow>({
   status,
   hasMore = false,
   loadMore,
+  loadingMore = false,
   loadMoreError,
 }: {
   title: string
@@ -73,9 +74,11 @@ export function BrewFeed<T extends BrewRow>({
   status?: ReactNode
   // Another server page exists, so an empty list is not an empty history.
   hasMore?: boolean
-  // Fetches the next server page, resolving true once rows were appended.
-  // Next on the last loaded page uses it, then moves to the appended rows.
-  loadMore?: () => Promise<boolean>
+  // Fetches the next server page, resolving with the first appended row's id
+  // (null if none). Next on the last loaded page uses it, then moves there.
+  loadMore?: () => Promise<string | null>
+  // The shot query is busy, so a load started now would be dropped.
+  loadingMore?: boolean
   // Why the last loadMore failed; shown under the table with a retry.
   loadMoreError?: string | null
 }) {
@@ -93,11 +96,11 @@ export function BrewFeed<T extends BrewRow>({
     pageIndex: 0,
     pageSize,
   })
-  // The page Next asked for before its rows were loaded.
-  const [pendingPage, setPendingPage] = useState<number | null>(null)
-  // Bumped on each filter change, so a load started under other filters
-  // cannot move this table.
-  const filterGeneration = useRef(0)
+  // The first row a Next load appended, to move to once it renders.
+  const [pendingRowId, setPendingRowId] = useState<string | null>(null)
+  // Bumped on each filter change and manual page change, so a load that
+  // settles after either cannot move this table.
+  const navGeneration = useRef(0)
 
   // Unique coffees that actually appear in this method's history, sorted by
   // name, unless the parent supplies the options.
@@ -136,33 +139,34 @@ export function BrewFeed<T extends BrewRow>({
   )
 
   useEffect(() => {
-    filterGeneration.current += 1
-    setPendingPage(null)
+    navGeneration.current += 1
+    setPendingRowId(null)
     setPagination((current) =>
       current.pageIndex === 0 ? current : { ...current, pageIndex: 0 },
     )
   }, [coffeeId, dialedInOnly])
 
-  // Move to the requested page once its rows render, not when the request
-  // resolves, so the table never shows a page past its rows.
+  // Move to the page holding the first appended row once it renders. Found
+  // by id, since a refresh before the append can change the rows above it.
   useEffect(() => {
-    if (pendingPage == null) return
-    if (visibleBrews.length <= pendingPage * pagination.pageSize) return
-    setPendingPage(null)
-    setPagination((current) => ({ ...current, pageIndex: pendingPage }))
-  }, [pendingPage, visibleBrews.length, pagination.pageSize])
+    if (pendingRowId == null) return
+    const index = visibleBrews.findIndex((brew) => brew.id === pendingRowId)
+    if (index < 0) return
+    setPendingRowId(null)
+    setPagination((current) => ({
+      ...current,
+      pageIndex: Math.floor(index / current.pageSize),
+    }))
+  }, [pendingRowId, visibleBrews])
 
   const loadNextPage =
     loadMore && hasMore
       ? () => {
-          // The page holding the first appended row: the next page when this
-          // one is full, or this one when the new rows finish filling it.
-          const target = Math.floor(visibleBrews.length / pagination.pageSize)
-          const generation = filterGeneration.current
-          void loadMore().then((appended) => {
+          const generation = navGeneration.current
+          void loadMore().then((firstId) => {
             // A failed or empty request leaves the current page in place.
-            if (appended && generation === filterGeneration.current) {
-              setPendingPage(target)
+            if (firstId && generation === navGeneration.current) {
+              setPendingRowId(firstId)
             }
           })
         }
@@ -187,7 +191,12 @@ export function BrewFeed<T extends BrewRow>({
     // Accordion: opening one brew collapses the others (see grilling decision).
     state: { expanded: expansion.expanded, pagination },
     onExpandedChange: expansion.onExpandedChange,
-    onPaginationChange: setPagination,
+    // Paging by hand cancels a pending move to newly loaded rows.
+    onPaginationChange: (updater) => {
+      navGeneration.current += 1
+      setPendingRowId(null)
+      setPagination(updater)
+    },
     autoResetPageIndex: false,
     // By id, so a filter or refresh cannot move the open row to another brew.
     getRowId: (brew) => brew.id,
@@ -249,7 +258,7 @@ export function BrewFeed<T extends BrewRow>({
                   row.original.sealed ? <SealedRowNotice /> : null
                 }
                 paginated
-                loadNextPage={loadNextPage}
+                loadNextPage={loadingMore ? undefined : loadNextPage}
                 rowClassName={(row) =>
                   row.original.sealed
                     ? sealedRowClass
@@ -263,7 +272,12 @@ export function BrewFeed<T extends BrewRow>({
           {status == null && loadMoreError && loadNextPage ? (
             <div className="flex flex-col gap-2">
               <p role="alert">{loadMoreError}</p>
-              <Button type="button" variant="outline" onClick={loadNextPage}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={loadingMore}
+                onClick={loadNextPage}
+              >
                 Try again
               </Button>
             </div>

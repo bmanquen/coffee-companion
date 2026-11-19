@@ -115,10 +115,11 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
     query.isError && !query.isFetchNextPageError ? ESPRESSO_LOAD_FAILED : null
   const stale = loadError != null && items.length > 0
 
-  // Resolves true once older shots were appended, so a pager can move to them.
-  const loadMore = useCallback(async () => {
+  // Resolves with the first appended shot's id, so a pager can move to it;
+  // null when nothing was appended.
+  const loadMore = useCallback(async (): Promise<string | null> => {
     if (!query.hasNextPage || query.isFetchingNextPage || query.isRefetching) {
-      return false
+      return null
     }
     // A successful append would clear the failed refresh and hide that the
     // cached pages are stale, so refresh them first.
@@ -126,12 +127,13 @@ export function useEspressoShotPages(filters: EspressoShotPageFilters = {}) {
       const refreshed = await query.refetch()
       // fetchNextPage follows the filters on screen, so a coffee picked during
       // the refresh would get the page instead of the one clicked under.
-      if (shownFilterKey.current !== filterKey) return false
+      if (shownFilterKey.current !== filterKey) return null
       const lastPage = refreshed.data?.pages.at(-1)
-      if (refreshed.isError || !lastPage?.nextCursor) return false
+      if (refreshed.isError || !lastPage?.nextCursor) return null
     }
     const next = await query.fetchNextPage({ cancelRefetch: false })
-    return !next.isError && (next.data?.pages.at(-1)?.items.length ?? 0) > 0
+    if (next.isError) return null
+    return next.data?.pages.at(-1)?.items[0]?.id ?? null
   }, [query, filterKey])
 
   const retry = useCallback(

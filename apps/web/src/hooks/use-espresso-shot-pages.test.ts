@@ -344,7 +344,7 @@ describe('useEspressoShotPages', () => {
 
       failRefresh = false
       requests.length = 0
-      let loading: Promise<boolean> = Promise.resolve(false)
+      let loading: Promise<string | null> = Promise.resolve(null)
       await act(async () => {
         loading = result.current.loadMore()
       })
