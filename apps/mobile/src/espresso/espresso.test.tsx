@@ -1624,8 +1624,9 @@ describe('log espresso shot', () => {
         Promise.resolve(
           seedShot({ grinderId: foreignGrinder, roastDate: '2026-05-01' }),
         ),
-      create: async (input) => {
+      create: (input) => {
         created.push(input)
+        return Promise.resolve()
       },
     }
     await render(<App auth={signedIn} espresso={api} />)
