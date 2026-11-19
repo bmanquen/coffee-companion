@@ -14,6 +14,7 @@ A signed-in user logs an Espresso Shot from the home list: pick a Coffee, enter 
 - Choose `Log Shot`.
 - After save, the new Shot is the first row on that list.
 - The list loads the first 20 Shots. Scrolling to the end fetches the next page.
+- If a next-page request fails, the footer shows the error and `Try again`. Scrolling does not retry while that error shows; press `Try again`.
 
 ## Driving it with control
 

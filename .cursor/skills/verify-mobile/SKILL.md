@@ -150,11 +150,11 @@ Stable handles (use these, not coordinates or visible text):
 The same queries as a raw Jest file. This renders in-process and does not check Metro — only `helpers/control drive <feature>` does:
 
 ```bash
-VERIFY_MOBILE_ARTIFACTS="$PWD"/.cursor/skills/verify-mobile/artifacts/<run>/welcome \
+VERIFY_MOBILE_ARTIFACTS="$PWD/.cursor/skills/verify-mobile/artifacts/manual-1/welcome" \
   pnpm --filter @coffee-companion/mobile exec jest --ci src/welcome.test.tsx
-VERIFY_MOBILE_ARTIFACTS="$PWD"/.cursor/skills/verify-mobile/artifacts/<run>/sign-in \
+VERIFY_MOBILE_ARTIFACTS="$PWD/.cursor/skills/verify-mobile/artifacts/manual-1/sign-in" \
   pnpm --filter @coffee-companion/mobile exec jest --ci src/auth/sign-in.test.tsx
-VERIFY_MOBILE_ARTIFACTS="$PWD"/.cursor/skills/verify-mobile/artifacts/<run>/espresso \
+VERIFY_MOBILE_ARTIFACTS="$PWD/.cursor/skills/verify-mobile/artifacts/manual-1/espresso" \
   pnpm --filter @coffee-companion/mobile exec jest --ci src/espresso/espresso.test.tsx
 ```
 
@@ -222,16 +222,22 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | `helpers/device.test.mjs` | Node tests for adb / dumpsys / AVD list / boot-wait / pid / screenshot helpers and `maestro check-syntax` on `flows/` |
 
 ```bash
-.cursor/skills/verify-mobile/helpers/control launch
-.cursor/skills/verify-mobile/helpers/control doctor
-.cursor/skills/verify-mobile/helpers/control drive welcome
-.cursor/skills/verify-mobile/helpers/control drive sign-in
-.cursor/skills/verify-mobile/helpers/control drive espresso
-ls .cursor/skills/verify-mobile/artifacts/*/welcome/proof.json
-ls .cursor/skills/verify-mobile/artifacts/*/sign-in/proof.json
-ls .cursor/skills/verify-mobile/artifacts/*/espresso/proof.json
-.cursor/skills/verify-mobile/helpers/control cleanup
-ls .cursor/skills/verify-mobile/artifacts/*/welcome/proof.json
-ls .cursor/skills/verify-mobile/artifacts/*/sign-in/proof.json
-ls .cursor/skills/verify-mobile/artifacts/*/espresso/proof.json
+set -euo pipefail
+control=.cursor/skills/verify-mobile/helpers/control
+artifacts=.cursor/skills/verify-mobile/artifacts
+$control launch
+$control doctor
+# Drive writes under this launch's run ID and exits non-zero on failure, so
+# these checks never pass on an older run's proof.
+run=$(node -p 'require("./.cursor/skills/verify-mobile/.run/state.json").runId')
+$control drive welcome
+$control drive sign-in
+$control drive espresso
+test -f "$artifacts/$run/welcome/proof.json"
+test -f "$artifacts/$run/sign-in/proof.json"
+test -f "$artifacts/$run/espresso/proof.json"
+$control cleanup
+test -f "$artifacts/$run/welcome/proof.json"
+test -f "$artifacts/$run/sign-in/proof.json"
+test -f "$artifacts/$run/espresso/proof.json"
 ```
