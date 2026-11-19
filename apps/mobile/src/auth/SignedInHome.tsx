@@ -112,8 +112,8 @@ function Home({
           <Text accessibilityRole="alert">{loadError}</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ disabled: loading || retrying, busy: retrying }}
-            disabled={loading || retrying}
+            accessibilityState={{ disabled: retrying, busy: retrying }}
+            disabled={retrying}
             onPress={reload}
           >
             <Text>{retrying ? TRYING_AGAIN : TRY_AGAIN}</Text>

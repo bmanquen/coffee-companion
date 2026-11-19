@@ -1,6 +1,7 @@
-import { onlineManager } from '@tanstack/react-query'
+import { focusManager, onlineManager } from '@tanstack/react-query'
 import * as Network from 'expo-network'
-import { subscribeNetworkOnline } from './query'
+import { AppState } from 'react-native'
+import { subscribeAppFocus, subscribeNetworkOnline } from './query'
 import type { NetworkState } from 'expo-network'
 
 function mockNetwork(probe: Promise<NetworkState>) {
@@ -77,5 +78,41 @@ describe('subscribeNetworkOnline', () => {
 
     expect(setOnline).not.toHaveBeenCalled()
     stop()
+  })
+})
+
+describe('subscribeAppFocus', () => {
+  const setAppState = (state: string) => {
+    Object.defineProperty(AppState, 'currentState', {
+      configurable: true,
+      get: () => state,
+    })
+  }
+
+  afterEach(() => {
+    focusManager.setFocused(undefined)
+  })
+
+  it('starts focused when the app returned to the foreground unobserved', () => {
+    // Queries last saw the app go to the background, then stopped listening.
+    focusManager.setFocused(false)
+    setAppState('active')
+    const stop = subscribeAppFocus((focused) => {
+      focusManager.setFocused(focused)
+    })
+    expect(focusManager.isFocused()).toBe(true)
+    stop()
+  })
+
+  it('starts unfocused in the background and leaves an unknown state alone', () => {
+    const handleFocus = jest.fn()
+    setAppState('background')
+    subscribeAppFocus(handleFocus)()
+    expect(handleFocus).toHaveBeenLastCalledWith(false)
+
+    handleFocus.mockClear()
+    setAppState('unknown')
+    subscribeAppFocus(handleFocus)()
+    expect(handleFocus).not.toHaveBeenCalled()
   })
 })

@@ -20,6 +20,8 @@ import type {
 
 export const ESPRESSO_EQUIPMENT_QUERY_KEY = 'espresso-equipment'
 export const ESPRESSO_SHOTS_QUERY_KEY = 'espresso-shots'
+// Keyed by user, then Coffee, so a save can drop every prefill of its user.
+const ESPRESSO_PREFILL_QUERY_KEY = 'espresso-prefill'
 
 export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const queryClient = useQueryClient()
@@ -50,24 +52,29 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     (shots.isPending && items.length === 0) ||
     (shots.isFetching && items.length === 0 && !shots.isFetchingNextPage)
 
-  const loadError =
-    equipment.isError && !equipment.data
-      ? apiErrorMessage(equipment.error, ERROR_LOAD_FAILED)
-      : shots.isError && !shots.isFetchNextPageError
-        ? apiErrorMessage(shots.error, ERROR_LOAD_FAILED)
-        : null
+  const equipmentFailed = equipment.isError && !equipment.data
+  const historyFailed = shots.isError && !shots.isFetchNextPageError
+  const loadError = equipmentFailed
+    ? apiErrorMessage(equipment.error, ERROR_LOAD_FAILED)
+    : historyFailed
+      ? apiErrorMessage(shots.error, ERROR_LOAD_FAILED)
+      : null
 
   const loadMoreError = shots.isFetchNextPageError
     ? apiErrorMessage(shots.error, ERROR_LOAD_MORE_FAILED)
     : null
 
-  const retrying = equipment.isFetching || shots.isRefetching
+  // Each failed request retries on its own, so a failed history read can be
+  // retried while equipment is still loading, and the reverse.
+  const retrying =
+    (equipmentFailed && equipment.isFetching) ||
+    (historyFailed && shots.isRefetching)
 
   const reload = useCallback(() => {
-    if (loading || retrying) return
-    void equipment.refetch()
-    void shots.refetch()
-  }, [equipment, loading, retrying, shots])
+    if (retrying) return
+    if (equipmentFailed) void equipment.refetch()
+    if (historyFailed) void shots.refetch()
+  }, [equipment, equipmentFailed, historyFailed, retrying, shots])
 
   const loadMore = useCallback(() => {
     if (
@@ -95,7 +102,9 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
       createShot.mutate(input, {
         onSuccess: () => {
           // fetchQuery would otherwise hand the next form a prefill read before this shot
-          queryClient.removeQueries({ queryKey: ['espresso-prefill', userId] })
+          queryClient.removeQueries({
+            queryKey: [ESPRESSO_PREFILL_QUERY_KEY, userId],
+          })
           onSuccess?.()
           const shotsFilter = { queryKey: [ESPRESSO_SHOTS_QUERY_KEY, userId] }
           // With no cached page, invalidate would reuse a read started before this save.
@@ -105,7 +114,9 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
         },
         onError: (error) => {
           // The save may have committed, so a lookup begun before it is stale.
-          queryClient.removeQueries({ queryKey: ['espresso-prefill', userId] })
+          queryClient.removeQueries({
+            queryKey: [ESPRESSO_PREFILL_QUERY_KEY, userId],
+          })
           setSaveError(apiErrorMessage(error, ERROR_SAVE_FAILED))
           onError?.(error)
         },
@@ -117,7 +128,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const loadPrefill = useCallback(
     (coffeeId: string) =>
       queryClient.fetchQuery({
-        queryKey: ['espresso-prefill', userId, coffeeId],
+        queryKey: [ESPRESSO_PREFILL_QUERY_KEY, userId, coffeeId],
         queryFn: () => api.loadPrefill(coffeeId),
         staleTime: 0,
       }),

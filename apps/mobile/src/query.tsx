@@ -2,7 +2,6 @@ import {
   QueryClient,
   QueryClientProvider,
   focusManager,
-  notifyManager,
   onlineManager,
 } from '@tanstack/react-query'
 import * as Network from 'expo-network'
@@ -15,13 +14,19 @@ let lifecycleWired = false
 export function wireReactNativeQueryLifecycle() {
   if (lifecycleWired) return
   lifecycleWired = true
-  focusManager.setEventListener((handleFocus) => {
-    const sub = AppState.addEventListener('change', (state) => {
-      handleFocus(state === 'active')
-    })
-    return () => sub.remove()
-  })
+  focusManager.setEventListener(subscribeAppFocus)
   onlineManager.setEventListener(subscribeNetworkOnline)
+}
+
+export function subscribeAppFocus(handleFocus: (focused: boolean) => void) {
+  // The app may have come back to the foreground while no query listened,
+  // such as after a sign-out in the background, so start from where it is.
+  const current = AppState.currentState
+  if (current !== 'unknown') handleFocus(current === 'active')
+  const sub = AppState.addEventListener('change', (state) => {
+    handleFocus(state === 'active')
+  })
+  return () => sub.remove()
 }
 
 export function subscribeNetworkOnline(setOnline: (online: boolean) => void) {
@@ -47,12 +52,6 @@ export function subscribeNetworkOnline(setOnline: (online: boolean) => void) {
 }
 
 const isTest = process.env.NODE_ENV === 'test'
-
-if (isTest) {
-  notifyManager.setScheduler((job) => {
-    job()
-  })
-}
 
 export function createMobileQueryClient() {
   return new QueryClient({

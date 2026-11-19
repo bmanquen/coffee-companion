@@ -44,6 +44,7 @@ import {
   LOG_SHOT,
   LOG_SHOT_TEST_ID,
   LOG_TEST_ID,
+  MUST_BE_A_NUMBER,
   SEALED_SHOT,
   SELECT_COFFEE_ERROR,
   SELECT_DEVICE,
@@ -462,19 +463,19 @@ describe('log espresso shot', () => {
       await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '1.2.3')
       await press(LOG)
 
-      const coffeeError = screen.getByTestId(
-        selectTriggerTestId(LABEL_COFFEE),
-      ).props.accessibilityHint as string
-      const doseError = screen.getByLabelText(LABEL_DOSE).props
-        .accessibilityHint as string
-      expect(coffeeError).toBeTruthy()
-      expect(doseError).toBeTruthy()
-      expect(screen.getByText(coffeeError)).toBeTruthy()
-      expect(screen.getByText(doseError)).toBeTruthy()
+      expect(
+        screen.getByTestId(selectTriggerTestId(LABEL_COFFEE)).props
+          .accessibilityHint,
+      ).toBe(SELECT_COFFEE_ERROR)
+      expect(screen.getByLabelText(LABEL_DOSE).props.accessibilityHint).toBe(
+        MUST_BE_A_NUMBER,
+      )
+      expect(screen.getByText(SELECT_COFFEE_ERROR)).toBeTruthy()
+      expect(screen.getByText(MUST_BE_A_NUMBER)).toBeTruthy()
       expect(announce).toHaveBeenCalled()
       const announced = announce.mock.calls.at(-1)?.[0]
-      expect(announced).toContain(coffeeError)
-      expect(announced).toContain(doseError)
+      expect(announced).toContain(SELECT_COFFEE_ERROR)
+      expect(announced).toContain(MUST_BE_A_NUMBER)
     } finally {
       announce.mockRestore()
     }
@@ -2368,6 +2369,38 @@ describe('log espresso shot', () => {
 
     await act(() => finishRetry(pageFrom(all)))
     await waitFor(() => expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull())
+  })
+
+  it('retries a failed history read while equipment is still loading', async () => {
+    const all = Array.from({ length: 3 }, (_, index) =>
+      seedShot({ id: `shot-${index}`, coffeeName: `Coffee ${index}` }),
+    )
+    let loads = 0
+    let historyReads = 0
+    const api: EspressoApi = {
+      load: () => {
+        loads += 1
+        return new Promise(() => {})
+      },
+      listShots: (cursor) => {
+        historyReads += 1
+        return historyReads === 1
+          ? Promise.reject(new Error('Network request failed'))
+          : Promise.resolve(pageFrom(all, cursor))
+      },
+      loadPrefill: () => Promise.resolve(seedShot()),
+      create: async () => {},
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await waitFor(() => expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy())
+
+    const retry = screen.getByRole('button', { name: TRY_AGAIN })
+    expect(retry.props.accessibilityState).toMatchObject({ disabled: false })
+    await fireEvent.press(retry)
+    await waitFor(() => expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull())
+    expect(historyReads).toBe(2)
+    // The pending equipment request is left to finish, not started again.
+    expect(loads).toBe(1)
   })
 
   it('drops an in-flight next page after a refresh', async () => {
