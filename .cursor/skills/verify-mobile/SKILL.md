@@ -225,6 +225,8 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 set -euo pipefail
 control=.cursor/skills/verify-mobile/helpers/control
 artifacts=.cursor/skills/verify-mobile/artifacts
+# Clean up even when a step below fails; disarmed after the explicit cleanup.
+trap '$control cleanup' EXIT
 $control launch
 $control doctor
 # Drive writes under this launch's run ID and exits non-zero on failure, so
@@ -237,6 +239,7 @@ test -f "$artifacts/$run/welcome/proof.json"
 test -f "$artifacts/$run/sign-in/proof.json"
 test -f "$artifacts/$run/espresso/proof.json"
 $control cleanup
+trap - EXIT
 test -f "$artifacts/$run/welcome/proof.json"
 test -f "$artifacts/$run/sign-in/proof.json"
 test -f "$artifacts/$run/espresso/proof.json"

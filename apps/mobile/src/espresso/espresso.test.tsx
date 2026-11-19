@@ -1039,7 +1039,10 @@ describe('log espresso shot', () => {
       resolveAda = resolve
     })
     let owner = ADA_ID
+    // Distinct grinders, so a late equipment load shows in the form.
+    const adaGrinder = '00000000-0000-4000-8000-0000000000a1'
     const adaCatalog = catalog({
+      grinders: [{ id: adaGrinder, name: 'Ada Grinder' }],
       shots: [seedShot({ coffeeName: 'Ada House' })],
     })
     const alanCatalog = catalog({
@@ -1079,6 +1082,12 @@ describe('log espresso shot', () => {
 
     expect(screen.getByText('Alan House')).toBeTruthy()
     expect(screen.queryByText('Ada House')).toBeNull()
+    await openForm()
+    await fireEvent.press(
+      screen.getByTestId(selectTriggerTestId(LABEL_GRINDER)),
+    )
+    expect(screen.getByTestId(selectOptionTestId(GRINDER))).toBeTruthy()
+    expect(screen.queryByTestId(selectOptionTestId(adaGrinder))).toBeNull()
   })
 
   it('loads more after the signed-in user changes during a pending refresh', async () => {

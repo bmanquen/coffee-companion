@@ -965,11 +965,23 @@ describe('espressoShot.getRecent', () => {
   })
 
   it('returns the user shots with relations', async () => {
+    // Its own shot, so the test passes when run by itself.
+    const coffee = await createCoffee(uniq('Relations Coffee'))
+    const seeded = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
     const shots = (await asA.espressoShot.getRecent({ limit: 50 })).items
-    expect(shots.length).toBeGreaterThanOrEqual(1)
     expect(shots.every((s) => s.userId === USER_A)).toBe(true)
-    expect(shots[0].coffee).toBeTruthy()
-    expect(shots[0].brewingDevice?.type).toBeTruthy()
+    const shot = shots.find((s) => s.id === seeded.id)
+    expect(shot?.coffee.id).toBe(coffee.id)
+    expect(shot?.brewingDevice?.type).toBeTruthy()
   })
 
   it('filters getRecent by coffee and text without loading every page', async () => {
@@ -1097,8 +1109,20 @@ describe('espressoShot.getRecent', () => {
   })
 
   it('includes the roaster on getRecent coffee relations', async () => {
-    const shots = (await asA.espressoShot.getRecent({ limit: 50 }))
-      .items
+    const coffee = await createCoffee(uniq('Roaster Relation Coffee'))
+    await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const shots = (
+      await asA.espressoShot.getRecent({ limit: 1, coffeeId: coffee.id })
+    ).items
     expect(shots[0]?.coffee.roaster).toEqual(
       expect.objectContaining({ name: expect.any(String) }),
     )

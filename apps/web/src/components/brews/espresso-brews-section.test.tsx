@@ -849,23 +849,43 @@ describe('EspressoBrewsSection', () => {
       coffeeId: 'c2',
       coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
     })
-    seedLog(queryClient, trpc, [guji, huila])
-    seedEspressoShotPage(queryClient, trpc, [huila], 1, undefined, {
+    // Only the server has this shot, so a client-side filter cannot show it.
+    const serverOnly = makeRecentShot({
+      id: 's3',
       coffeeId: 'c2',
+      grindSetting: 'server-only',
+      coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
     })
+    seedLog(queryClient, trpc, [guji, huila])
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        trpcSuccess({ items: [serverOnly], total: 1, nextCursor: null }),
+      )
+    try {
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+      fireEvent.click(screen.getByRole('button', { name: 'All coffees' }))
+      fireEvent.click(screen.getByRole('option', { name: 'Colombia Huila' }))
 
-    render(<EspressoBrewsSection />, { wrapper: Wrapper })
-    fireEvent.click(screen.getByRole('button', { name: 'All coffees' }))
-    fireEvent.click(screen.getByRole('option', { name: 'Colombia Huila' }))
-
-    await waitFor(() =>
+      await waitFor(() =>
+        expect(
+          within(screen.getByRole('table')).getByText('server-only'),
+        ).toBeTruthy(),
+      )
       expect(
         within(screen.getByRole('table')).queryByText('Ethiopia Guji'),
-      ).toBeNull(),
-    )
-    expect(
-      within(screen.getByRole('table')).getByText('Colombia Huila'),
-    ).toBeTruthy()
+      ).toBeNull()
+      const input = new URL(
+        String(fetchSpy.mock.calls[0][0]),
+        'http://localhost',
+      ).searchParams.get('input')
+      expect(
+        (JSON.parse(input ?? '{}') as Record<string, { json?: unknown }>)['0']
+          .json,
+      ).toMatchObject({ coffeeId: 'c2' })
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 
   it('names same-name coffees with their roaster', () => {
