@@ -6,7 +6,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { SealedRowNotice, sealedRowClass } from '@/components/brews/sealed-row'
 import { CoffeeFilter } from '@/components/coffee-filter'
@@ -52,6 +52,7 @@ export function BrewFeed<T extends BrewRow>({
   stale,
   status,
   hasMore = false,
+  loadMore,
 }: {
   title: string
   brews: Array<T>
@@ -71,6 +72,9 @@ export function BrewFeed<T extends BrewRow>({
   status?: ReactNode
   // Another server page exists, so an empty list is not an empty history.
   hasMore?: boolean
+  // Fetches the next server page, resolving true once rows were appended.
+  // Next on the last loaded page uses it, then moves to the appended rows.
+  loadMore?: () => Promise<boolean>
 }) {
   // TanStack Table's instance is a stable, mutable object the React Compiler
   // would otherwise over-memoize; opt this component out (mirrors DataTable).
@@ -86,6 +90,11 @@ export function BrewFeed<T extends BrewRow>({
     pageIndex: 0,
     pageSize,
   })
+  // The page Next asked for before its rows were loaded.
+  const [pendingPage, setPendingPage] = useState<number | null>(null)
+  // Bumped on each filter change, so a load started under other filters
+  // cannot move this table.
+  const filterGeneration = useRef(0)
 
   // Unique coffees that actually appear in this method's history, sorted by
   // name, unless the parent supplies the options.
@@ -124,10 +133,37 @@ export function BrewFeed<T extends BrewRow>({
   )
 
   useEffect(() => {
+    filterGeneration.current += 1
+    setPendingPage(null)
     setPagination((current) =>
       current.pageIndex === 0 ? current : { ...current, pageIndex: 0 },
     )
   }, [coffeeId, dialedInOnly])
+
+  // Move to the requested page once its rows render, not when the request
+  // resolves, so the table never shows a page past its rows.
+  useEffect(() => {
+    if (pendingPage == null) return
+    if (visibleBrews.length <= pendingPage * pagination.pageSize) return
+    setPendingPage(null)
+    setPagination((current) => ({ ...current, pageIndex: pendingPage }))
+  }, [pendingPage, visibleBrews.length, pagination.pageSize])
+
+  const loadNextPage =
+    loadMore && hasMore
+      ? () => {
+          // The page holding the first appended row: the next page when this
+          // one is full, or this one when the new rows finish filling it.
+          const target = Math.floor(visibleBrews.length / pagination.pageSize)
+          const generation = filterGeneration.current
+          void loadMore().then((appended) => {
+            // A failed or empty request leaves the current page in place.
+            if (appended && generation === filterGeneration.current) {
+              setPendingPage(target)
+            }
+          })
+        }
+      : undefined
 
   useEffect(() => {
     setPagination((current) => {
@@ -210,6 +246,7 @@ export function BrewFeed<T extends BrewRow>({
                   row.original.sealed ? <SealedRowNotice /> : null
                 }
                 paginated
+                loadNextPage={loadNextPage}
                 rowClassName={(row) =>
                   row.original.sealed
                     ? sealedRowClass

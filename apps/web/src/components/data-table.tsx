@@ -315,6 +315,9 @@ interface DataTableProps<T> {
   // Extra classes applied per row (desktop <tr>) and per card (mobile), derived
   // from the row's data — e.g. to highlight rows that match some condition.
   rowClassName?: (row: Row<T>) => string | undefined
+  // When provided, Next stays enabled on the last page and calls this instead,
+  // for a table whose rows continue past what is loaded.
+  loadNextPage?: () => void
 }
 
 export function DataTable<T>({
@@ -323,6 +326,7 @@ export function DataTable<T>({
   replaceRow,
   paginated,
   rowClassName,
+  loadNextPage,
 }: DataTableProps<T>) {
   // TanStack Table's instance is a stable, mutable object; React Compiler would
   // otherwise memoize getHeaderGroups()/getRowModel() and never re-derive rows
@@ -516,8 +520,10 @@ export function DataTable<T>({
               variant="outline"
               size="icon"
               className="h-8 w-8"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
+              onClick={() =>
+                table.getCanNextPage() ? table.nextPage() : loadNextPage?.()
+              }
+              disabled={!table.getCanNextPage() && !loadNextPage}
               aria-label="Next page"
             >
               <ChevronRight className="h-4 w-4" />

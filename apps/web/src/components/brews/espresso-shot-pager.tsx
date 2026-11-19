@@ -9,7 +9,7 @@ export function EspressoShotPager({
   hasMore: boolean
   loadingMore: boolean
   loadMoreError: string | null
-  loadMore: () => void | Promise<void>
+  loadMore: () => unknown
 }) {
   if (loadMoreError) {
     return (

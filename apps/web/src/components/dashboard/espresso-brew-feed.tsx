@@ -161,6 +161,7 @@ export function EspressoBrewFeed({ onFilter }: { onFilter?: () => void } = {}) {
         }}
         stale={stale}
         hasMore={hasMore}
+        loadMore={loadMore}
         status={
           loading ? (
             <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
