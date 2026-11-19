@@ -45,6 +45,34 @@ let foreignGrinderId: string
 // Device types are globally unique; reuse existing rows or create-and-track new
 // ones so cleanup never deletes seeded data on a shared database.
 const createdTypeIds: Array<string> = []
+// Follows getRecent's cursors from `cursor`, failing as soon as one repeats or
+// the pages outnumber what the fixture allows, so a cursor that never
+// advances fails the test instead of spinning past its timeout.
+async function walkCursors(
+  maxPages: number,
+  cursor: string | null | undefined,
+  load: (
+    cursor: string | undefined,
+  ) => Promise<{ items: Array<{ id: string }>; nextCursor: string | null }>,
+) {
+  const ids: Array<string> = []
+  const seen = new Set<string>()
+  if (cursor) seen.add(cursor)
+  for (let pages = 0; ; pages += 1) {
+    if (pages === maxPages) {
+      throw new Error(`getRecent did not finish within ${maxPages} pages`)
+    }
+    const page = await load(cursor ?? undefined)
+    ids.push(...page.items.map((shot) => shot.id))
+    if (!page.nextCursor) return ids
+    if (seen.has(page.nextCursor)) {
+      throw new Error(`getRecent repeated cursor ${page.nextCursor}`)
+    }
+    seen.add(page.nextCursor)
+    cursor = page.nextCursor
+  }
+}
+
 async function findOrCreateDeviceType(name: string): Promise<string> {
   const existing = await db
     .select()
@@ -1174,35 +1202,22 @@ describe('espressoShot.getRecent', () => {
       idempotencyKey: crypto.randomUUID(),
     })
 
-    const collected = [...page1.items]
-    let cursor = page1.nextCursor
-    while (cursor) {
-      const page = await asA.espressoShot.getRecent({
-        limit: 2,
-        coffeeId: coffee.id,
-        cursor,
-      })
-      collected.push(...page.items)
-      cursor = page.nextCursor
-    }
-    const collectedIds = collected.map((shot) => shot.id)
+    // Three older shots remain after page one: two pages, plus one spare.
+    const collectedIds = [
+      ...page1.items.map((shot) => shot.id),
+      ...(await walkCursors(3, page1.nextCursor, (cursor) =>
+        asA.espressoShot.getRecent({ limit: 2, coffeeId: coffee.id, cursor }),
+      )),
+    ]
     expect(new Set(collectedIds).size).toBe(collectedIds.length)
     expect(collectedIds).toEqual(expect.arrayContaining(created))
     expect(collectedIds).not.toContain(inserted.id)
     expect(collectedIds).toHaveLength(created.length)
 
-    const refreshed: Array<string> = []
-    let next = undefined as typeof page1.nextCursor | undefined
-    for (;;) {
-      const page = await asA.espressoShot.getRecent({
-        limit: 2,
-        coffeeId: coffee.id,
-        cursor: next ?? undefined,
-      })
-      refreshed.push(...page.items.map((shot) => shot.id))
-      if (!page.nextCursor) break
-      next = page.nextCursor
-    }
+    // Six shots at two a page, plus one spare in case the last page is empty.
+    const refreshed = await walkCursors(4, undefined, (cursor) =>
+      asA.espressoShot.getRecent({ limit: 2, coffeeId: coffee.id, cursor }),
+    )
     expect(refreshed).toHaveLength(page1.total + 1)
     expect(new Set(refreshed).size).toBe(refreshed.length)
     expect(refreshed[0]).toBe(inserted.id)
@@ -1238,18 +1253,10 @@ describe('espressoShot.getRecent', () => {
       })),
     )
 
-    const collected: Array<string> = []
-    let cursor: string | undefined
-    for (;;) {
-      const page = await asA.espressoShot.getRecent({
-        limit: 2,
-        coffeeId: coffee.id,
-        cursor,
-      })
-      collected.push(...page.items.map((shot) => shot.id))
-      if (!page.nextCursor) break
-      cursor = page.nextCursor
-    }
+    // Six rows at two a page, plus one spare in case the last page is empty.
+    const collected = await walkCursors(4, undefined, (cursor) =>
+      asA.espressoShot.getRecent({ limit: 2, coffeeId: coffee.id, cursor }),
+    )
 
     expect(collected).toHaveLength(rows.length)
     expect(new Set(collected).size).toBe(rows.length)
@@ -1670,6 +1677,8 @@ describe('espresso_shot_idempotency_keys shot_id lookup', () => {
     })
     const lookupText = lookupPlan.rows.map((row) => row['QUERY PLAN']).join('\n')
     expect(lookupText).toMatch(/Index Scan|Index Only Scan|Bitmap Index Scan/)
-    expect(lookupText).toMatch(/shot_id/)
+    // The table name contains "shot_id" too, so match the scan's index
+    // condition rather than any mention of the column.
+    expect(lookupText).toMatch(/Index Cond: \(shot_id = /)
   })
 })

@@ -483,16 +483,23 @@ describe('espressoShot.getLatestUnsealed', () => {
           return run(tx)
         }, config),
       )
+    let reading: Promise<unknown> | undefined
     try {
-      const reading = asSnapshot.espressoShot.getLatestUnsealed({
+      const read = asSnapshot.espressoShot.getLatestUnsealed({
         coffeeId: target,
       })
-      // Fail fast rather than hang if the read stops using one transaction.
+      reading = read
+      // Fail fast rather than hang if the read stops pausing in one
+      // transaction, and with the read's own error if it fails first.
+      const notPaused = new Error('Shelf and shot not read in one transaction')
       await Promise.race([
         atShelf,
+        read.then(() => {
+          throw notPaused
+        }),
         new Promise((_resolve, reject) =>
           setTimeout(
-            () => reject(new Error('Shelf and shot not read in one transaction')),
+            () => reject(new Error('Read did not reach the Shelf within 5s')),
             5_000,
           ),
         ),
@@ -505,11 +512,13 @@ describe('espressoShot.getLatestUnsealed', () => {
       await log((await createSnapshotCoffee(uniqSnapshot('Newcomer'))).id)
       release()
 
-      const found = await reading
+      const found = await read
       expect(found?.dose).toBe('18')
       expect(found?.sealed).toBe(false)
     } finally {
       release()
+      // Whatever failed above, let the read finish before cleanup runs.
+      await reading?.catch(() => {})
       spy.mockRestore()
     }
 
