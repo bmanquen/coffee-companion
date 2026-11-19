@@ -2,9 +2,12 @@ import { and, eq, isNull, notInArray, sql } from 'drizzle-orm'
 import { db } from '../db'
 import {
   aeropressBrews,
+  brewingDevices,
+  coffees,
   coldBrewBrews,
   espressoShots,
   frenchpressBrews,
+  grinders,
   pouroverBrews,
 } from '../db/schema'
 import { shelfSizes } from './plan'
@@ -28,6 +31,19 @@ export async function countBrewsUsing(
   column: 'coffeeId' | 'grinderId' | 'brewingDeviceId',
   id: string,
 ): Promise<number> {
+  // A Coffee or gear the user doesn't own isn't theirs to delete, so nothing
+  // goes, even when one of their own Brews points at it.
+  const parent = {
+    coffeeId: coffees,
+    grinderId: grinders,
+    brewingDeviceId: brewingDevices,
+  }[column]
+  const owned = await db.$count(
+    parent,
+    and(eq(parent.id, id), eq(parent.userId, userId)),
+  )
+  if (owned === 0) return 0
+
   const counts = await Promise.all(
     brewTables.map((table) =>
       db.$count(table, and(eq(table.userId, userId), eq(table[column], id))),

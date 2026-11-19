@@ -455,6 +455,15 @@ describe('brewCount for coffee, grinder and brewing device', () => {
     await db.insert(coldBrewBrews).values({ ...gear, userId: USER_A })
 
     expect(await counts()).toEqual([3, grinderBefore + 3, deviceBefore + 3])
+    // B can't delete A's coffee or gear, so nothing of B's would go with them,
+    // even though B's own brew points at them.
+    expect(
+      await Promise.all([
+        asB.coffee.brewCount(coffee.id),
+        asB.grinder.brewCount(grinderId),
+        asB.brewingDevice.brewCount(espressoDeviceId),
+      ]),
+    ).toEqual([0, 0, 0])
   })
 
   it('is zero for an id the caller does not own', async () => {
