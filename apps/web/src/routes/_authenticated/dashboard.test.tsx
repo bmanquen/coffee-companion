@@ -404,7 +404,7 @@ describe('Dashboard', () => {
     expect(screen.getByRole('option', { name: 'Kenya Nyeri' })).toBeTruthy()
   })
 
-  it('keeps the table page when more shots append, and resets it when the filter changes', async () => {
+  it('fills a part-full last page from Next, and resets the page when the filter changes', async () => {
     const shots = Array.from({ length: 6 }, (_, i) =>
       makeRecentShot({
         id: espressoShotFixtureId(i),
@@ -464,8 +464,13 @@ describe('Dashboard', () => {
       expect(screen.getByText('Page 2 of 2')).toBeTruthy()
       expect(within(screen.getByRole('table')).getByText('Coffee 6')).toBeTruthy()
 
-      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+      expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull()
+      // Page 2 holds one shot, so the loaded shots fill it before page 3.
+      fireEvent.click(screen.getByLabelText('Next page'))
       expect(await screen.findByText('Page 2 of 3')).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getByText('Extra 1'),
+      ).toBeTruthy()
       expect(within(screen.getByRole('table')).getByText('Coffee 6')).toBeTruthy()
 
       await act(async () => {
@@ -1059,11 +1064,16 @@ describe('Dashboard', () => {
       { wrapper: Wrapper },
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    for (let step = 0; step < 3; step += 1) {
+      fireEvent.click(screen.getByLabelText('Next page'))
+    }
+    expect(screen.getByText('Page 4 of 4')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Next page'))
     expect(
       await screen.findByText("We couldn't load more shots. Try again."),
     ).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Page 4 of 4')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() =>
@@ -1087,12 +1097,8 @@ describe('Dashboard', () => {
       espressoShotCursor(shots[shots.length - 1]),
       espressoShotCursor(shots[shots.length - 1]),
     ])
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull(),
-    )
-    for (let step = 0; step < 4; step += 1) {
-      fireEvent.click(screen.getByLabelText('Next page'))
-    }
+    // The retry moves on to the shot it loaded, as Next would have.
+    expect(await screen.findByText('Page 5 of 5')).toBeTruthy()
     expect(
       within(screen.getByRole('table')).getByText('Coffee extra'),
     ).toBeTruthy()

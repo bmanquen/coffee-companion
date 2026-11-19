@@ -53,6 +53,7 @@ export function BrewFeed<T extends BrewRow>({
   status,
   hasMore = false,
   loadMore,
+  loadMoreError,
 }: {
   title: string
   brews: Array<T>
@@ -75,6 +76,8 @@ export function BrewFeed<T extends BrewRow>({
   // Fetches the next server page, resolving true once rows were appended.
   // Next on the last loaded page uses it, then moves to the appended rows.
   loadMore?: () => Promise<boolean>
+  // Why the last loadMore failed; shown under the table with a retry.
+  loadMoreError?: string | null
 }) {
   // TanStack Table's instance is a stable, mutable object the React Compiler
   // would otherwise over-memoize; opt this component out (mirrors DataTable).
@@ -257,6 +260,14 @@ export function BrewFeed<T extends BrewRow>({
               />
             </div>
           )}
+          {status == null && loadMoreError && loadNextPage ? (
+            <div className="flex flex-col gap-2">
+              <p role="alert">{loadMoreError}</p>
+              <Button type="button" variant="outline" onClick={loadNextPage}>
+                Try again
+              </Button>
+            </div>
+          ) : null}
         </>
       )}
     </Card>

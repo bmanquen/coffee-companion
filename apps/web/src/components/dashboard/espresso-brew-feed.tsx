@@ -9,7 +9,6 @@ import {
 import { ratioColumn } from '@/components/brews/brew-ratio'
 import { BrewFeed } from '@/components/dashboard/brew-feed'
 import { expanderColumn } from '@/components/data-table'
-import { EspressoShotPager } from '@/components/brews/espresso-shot-pager'
 import { Button } from '@/components/ui/button'
 import {
   ESPRESSO_COFFEES_LOAD_FAILED,
@@ -93,7 +92,6 @@ export function EspressoBrewFeed({ onFilter }: { onFilter?: () => void } = {}) {
   const {
     items,
     hasMore,
-    loadingMore,
     loadMore,
     loadMoreError,
     loading,
@@ -106,83 +104,74 @@ export function EspressoBrewFeed({ onFilter }: { onFilter?: () => void } = {}) {
   })
 
   return (
-    <>
-      <BrewFeed
-        title="Espresso"
-        brews={items}
-        columns={columns}
-        renderDetails={(row) => renderBrewDetails(row.original)}
-        newTo="/espresso/new"
-        logLabel="Log Shot"
-        emptyMessage="No espresso shots yet."
-        emptyLinkLabel="Log your first shot"
-        coffeeOptions={
-          coffeesQuery.isError && coffees.length === 0 ? [] : coffeeOptions
-        }
-        coffeeFilter={{
-          value: coffeeId,
-          onChange: (next) => {
-            setCoffeeId(next)
-            onFilter?.()
-          },
-        }}
-        banner={
-          <>
-            {loadError && items.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                <p role="alert">{loadError}</p>
-                <Button type="button" variant="outline" onClick={retry}>
-                  Try again
-                </Button>
-              </div>
-            ) : null}
-            {coffeesQuery.isError && coffees.length === 0 ? (
-              <div className="flex flex-col gap-2">
-                <p role="alert">{ESPRESSO_COFFEES_LOAD_FAILED}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    void coffeesQuery.refetch()
-                  }}
-                >
-                  Try again
-                </Button>
-              </div>
-            ) : null}
-          </>
-        }
-        dialedInFilter={{
-          value: dialedInOnly,
-          onChange: (next) => {
-            setDialedInOnly(next)
-            onFilter?.()
-          },
-        }}
-        stale={stale}
-        hasMore={hasMore}
-        loadMore={loadMore}
-        status={
-          loading ? (
-            <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
-          ) : loadError && items.length === 0 ? (
+    <BrewFeed
+      title="Espresso"
+      brews={items}
+      columns={columns}
+      renderDetails={(row) => renderBrewDetails(row.original)}
+      newTo="/espresso/new"
+      logLabel="Log Shot"
+      emptyMessage="No espresso shots yet."
+      emptyLinkLabel="Log your first shot"
+      coffeeOptions={
+        coffeesQuery.isError && coffees.length === 0 ? [] : coffeeOptions
+      }
+      coffeeFilter={{
+        value: coffeeId,
+        onChange: (next) => {
+          setCoffeeId(next)
+          onFilter?.()
+        },
+      }}
+      banner={
+        <>
+          {loadError && items.length > 0 ? (
             <div className="flex flex-col gap-2">
               <p role="alert">{loadError}</p>
               <Button type="button" variant="outline" onClick={retry}>
                 Try again
               </Button>
             </div>
-          ) : undefined
-        }
-      />
-      {loading || (loadError && items.length === 0) ? null : (
-        <EspressoShotPager
-          hasMore={hasMore}
-          loadingMore={loadingMore}
-          loadMoreError={loadMoreError}
-          loadMore={loadMore}
-        />
-      )}
-    </>
+          ) : null}
+          {coffeesQuery.isError && coffees.length === 0 ? (
+            <div className="flex flex-col gap-2">
+              <p role="alert">{ESPRESSO_COFFEES_LOAD_FAILED}</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  void coffeesQuery.refetch()
+                }}
+              >
+                Try again
+              </Button>
+            </div>
+          ) : null}
+        </>
+      }
+      dialedInFilter={{
+        value: dialedInOnly,
+        onChange: (next) => {
+          setDialedInOnly(next)
+          onFilter?.()
+        },
+      }}
+      stale={stale}
+      hasMore={hasMore}
+      loadMore={loadMore}
+      loadMoreError={loadMoreError}
+      status={
+        loading ? (
+          <p role="status">{ESPRESSO_LOADING_SHOTS}</p>
+        ) : loadError && items.length === 0 ? (
+          <div className="flex flex-col gap-2">
+            <p role="alert">{loadError}</p>
+            <Button type="button" variant="outline" onClick={retry}>
+              Try again
+            </Button>
+          </div>
+        ) : undefined
+      }
+    />
   )
 }
