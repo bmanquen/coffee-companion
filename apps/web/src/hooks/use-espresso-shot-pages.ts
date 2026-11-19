@@ -5,7 +5,7 @@ import {
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTRPC } from '@/integrations/trpc/react'
-import type { InfiniteData } from '@tanstack/react-query'
+import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { EspressoShotWithRelations } from '@/types'
 
 export { ESPRESSO_SHOT_PAGE_SIZE, ESPRESSO_SHOT_Q_MAX }
@@ -61,6 +61,25 @@ export function espressoShotInfiniteOptions(
       staleTime: ESPRESSO_SHOT_STALE_TIME_MS,
     },
   )
+}
+
+// After a shot write: invalidate leaves an in-flight read running, and its
+// pre-write response would then land as fresh (and a new observer would join
+// it), so cancel the shot reads first. Resolves once both are invalidated.
+export async function refreshEspressoShotReads(
+  queryClient: QueryClient,
+  trpc: ReturnType<typeof useTRPC>,
+) {
+  const pages = trpc.espressoShot.getRecent.infiniteQueryFilter()
+  const latest = trpc.espressoShot.getLatestUnsealed.queryFilter()
+  await Promise.all([
+    queryClient.cancelQueries(pages),
+    queryClient.cancelQueries(latest),
+  ])
+  await Promise.all([
+    queryClient.invalidateQueries(pages),
+    queryClient.invalidateQueries(latest),
+  ])
 }
 
 export function withoutShotFromInfinitePages<

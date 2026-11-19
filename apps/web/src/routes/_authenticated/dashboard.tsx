@@ -97,11 +97,13 @@ export function DashboardContainer() {
     { method: 'coldbrew', brews: coldbrew },
   ]
 
-  // Recency needs the espresso page. Until it settles — and while a failed
-  // empty load still owes a retry — hold Espresso so Pour Over cannot hide it.
+  // Recency needs the espresso page. Until it settles — and while a load that
+  // never succeeded still owes a retry — hold Espresso so Pour Over cannot
+  // hide it. A failed refresh of a page already shown keeps the feed chosen
+  // from that page.
   const selectedMethod = isDashboardMethod(method)
     ? method
-    : espressoQuery.isPending || (espressoQuery.isError && espresso.length === 0)
+    : espressoQuery.isPending || (espressoQuery.isError && !espressoQuery.data)
       ? 'espresso'
       : resolveSelectedMethod(undefined, feeds)
 

@@ -26,7 +26,8 @@ describe('seedEspressoShotPage', () => {
     )
     const cursor = espressoShotCursor({
       createdAt: items[0].createdAt,
-      id: 'incoming',
+      // A real API cursor carries a shot's UUID.
+      id: espressoShotFixtureId(ESPRESSO_SHOT_PAGE_SIZE),
     })
     seedEspressoShotPage(
       queryClient,

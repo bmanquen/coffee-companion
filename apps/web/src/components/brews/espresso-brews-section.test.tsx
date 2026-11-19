@@ -210,6 +210,48 @@ describe('EspressoBrewsSection', () => {
     }
   })
 
+  it('offers a coffee-library retry while cached coffees stay pickable', async () => {
+    const coffees = [makeCoffee({ id: 'c1', name: 'Ethiopia Guji' })]
+    let coffeeLoads = 0
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input) => {
+        if (String(input).includes('coffee.getAll')) {
+          coffeeLoads += 1
+          if (coffeeLoads === 1) {
+            return Promise.reject(new Error('Network request failed'))
+          }
+          return Promise.resolve(trpcSuccess(coffees))
+        }
+        return Promise.reject(new Error('Network request failed'))
+      })
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedLog(queryClient, trpc, [makeRecentShot({ id: 's1' })])
+      seedCoffees(queryClient, trpc, coffees)
+
+      render(<EspressoBrewsSection />, { wrapper: Wrapper })
+      await act(() =>
+        queryClient.invalidateQueries(trpc.coffee.getAll.queryFilter()),
+      )
+      const coffeeError = await screen.findByText(ESPRESSO_COFFEES_LOAD_FAILED)
+      expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
+
+      fireEvent.click(
+        within(coffeeError.parentElement as HTMLElement).getByRole('button', {
+          name: 'Try again',
+        }),
+      )
+      await waitFor(() =>
+        expect(screen.queryByText(ESPRESSO_COFFEES_LOAD_FAILED)).toBeNull(),
+      )
+      expect(coffeeLoads).toBe(2)
+      expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('shows a retry instead of the empty state when the first page fails', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
@@ -749,6 +791,8 @@ describe('EspressoBrewsSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
     expect(await table.findByText('Coffee extra')).toBeTruthy()
+    // Load more appends; it does not replace the page already shown.
+    expect(table.getByText('Coffee 0')).toBeTruthy()
   })
 
   it('lists coffees from the library, not only loaded shots', async () => {
@@ -1222,8 +1266,12 @@ describe('EspressoBrewsSection', () => {
         }),
       )
 
-      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
-      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+      const shotError = await screen.findByText(ESPRESSO_LOAD_FAILED)
+      expect(
+        within(shotError.parentElement as HTMLElement).getByRole('button', {
+          name: 'Try again',
+        }),
+      ).toBeTruthy()
       expect(table.queryByText('Ethiopia Guji')).toBeNull()
       expect(table.getByText('Kenya AA')).toBeTruthy()
       expect(table.getByRole('button', { name: 'Edit shot' })).toBeTruthy()

@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { refreshEspressoShotReads } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 import type { BrewingMethod } from '@coffee-companion/api/lib/dialed-in-brew'
@@ -19,19 +20,10 @@ function invalidateMethodFeed(
   brewingMethod: BrewingMethod,
 ) {
   switch (brewingMethod) {
-    case 'espresso': {
-      // Invalidate leaves an inactive page's fetch running, and its pre-toggle
-      // response would land as fresh, so cancel in-flight pages first.
-      const pages = trpc.espressoShot.getRecent.infiniteQueryFilter()
-      void queryClient
-        .cancelQueries(pages)
-        .then(() => queryClient.invalidateQueries(pages))
-      queryClient.invalidateQueries(
-        trpc.espressoShot.getLatestUnsealed.queryFilter(),
-      )
+    case 'espresso':
+      void refreshEspressoShotReads(queryClient, trpc)
       queryClient.invalidateQueries(trpc.espressoShot.getDialedIn.queryFilter())
       return
-    }
     case 'aeropress':
       queryClient.invalidateQueries(trpc.aeropressBrew.getAll.queryFilter())
       queryClient.invalidateQueries(trpc.aeropressBrew.getRecent.queryFilter())

@@ -34,6 +34,7 @@ import {
   ESPRESSO_LOADING_SHOTS,
   ESPRESSO_SHOT_FILTER_DEBOUNCE_MS,
   ESPRESSO_SHOT_Q_MAX,
+  refreshEspressoShotReads,
   useEspressoShotPages,
 } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
@@ -77,12 +78,7 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
           trpc.espressoShot.getRecent.infiniteQueryFilter(),
         )
         removeShot(shotId)
-        queryClient.invalidateQueries(
-          trpc.espressoShot.getRecent.infiniteQueryFilter(),
-        )
-        queryClient.invalidateQueries(
-          trpc.espressoShot.getLatestUnsealed.queryFilter(),
-        )
+        void refreshEspressoShotReads(queryClient, trpc)
         queryClient.invalidateQueries(trpc.coffee.getAll.queryOptions())
         invalidateDeviceDialedInQueries(queryClient, trpc)
       },
@@ -250,7 +246,15 @@ export function EspressoBrewsSection() {
           </Link>
         </div>
         <div className="flex w-full flex-col gap-2 sm:flex-row">
-          {coffeesQuery.isError && coffees.length === 0 ? (
+          {/* Cached coffees stay pickable while a failed refresh is retried. */}
+          {coffeesQuery.isError && coffees.length === 0 ? null : (
+            <CoffeeFilter
+              options={coffeeOptions}
+              value={coffeeId}
+              onChange={setCoffeeId}
+            />
+          )}
+          {coffeesQuery.isError ? (
             <div className="flex flex-col gap-2">
               <p role="alert">{ESPRESSO_COFFEES_LOAD_FAILED}</p>
               <Button
@@ -263,13 +267,7 @@ export function EspressoBrewsSection() {
                 Try again
               </Button>
             </div>
-          ) : (
-            <CoffeeFilter
-              options={coffeeOptions}
-              value={coffeeId}
-              onChange={setCoffeeId}
-            />
-          )}
+          ) : null}
           <Input
             placeholder="Filter shots..."
             value={q}

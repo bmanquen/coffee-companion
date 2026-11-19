@@ -23,10 +23,11 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
+import { refreshEspressoShotReads } from '@/hooks/use-espresso-shot-pages'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
-import { submitFormMutation } from '@/lib/form-error'
+import { submitFormMutation, trpcErrorCode } from '@/lib/form-error'
 import type { PrefillKeep } from '@coffee-companion/brew-display'
 import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
 
@@ -48,13 +49,24 @@ export const Route = createFileRoute('/_authenticated/espresso/new')({
 const PREFILL_FAILED =
   "We couldn't load this coffee's last shot. Enter it yourself, or try again."
 
-// Matches the API's replay check, so 18 and 18.0 reuse the same key.
+// Matches the API's replay check, so 18 and 18.0, or 30 and 030, reuse the
+// same key.
 function draftFingerprint(value: InsertEspressoShot) {
+  const time = value.time as number | string | null
   return JSON.stringify({
     ...value,
     dose: normalizeDecimal(value.dose),
     yield: normalizeDecimal(value.yield),
+    time: typeof time === 'string' && /^\d+$/.test(time) ? Number(time) : time,
   })
+}
+
+// A 4xx means the API answered before inserting anything; a network failure
+// or 5xx may have come after the shot was saved.
+function rejectedBeforeSave(error: unknown) {
+  const status = (error as { data?: { httpStatus?: unknown } } | null)?.data
+    ?.httpStatus
+  return typeof status === 'number' && status >= 400 && status < 500
 }
 
 type PrefillSource = {
@@ -96,16 +108,13 @@ export function NewEspressoShot() {
 
   const createShot = useMutation(
     trpc.espressoShot.create.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
         saveSucceeded.current = true
-        queryClient.invalidateQueries(
-          trpc.espressoShot.getRecent.infiniteQueryFilter(),
-        )
-        queryClient.invalidateQueries(
-          trpc.espressoShot.getLatestUnsealed.queryFilter(),
-        )
         idempotencyKeys.current.clear()
         track('brew_logged', { method: 'espresso' })
+        // A Brews preload begun before the save would otherwise land without
+        // this shot and look fresh when the log opens.
+        await refreshEspressoShotReads(queryClient, trpc)
         navigate(brewsLogLocation('espresso'))
       },
     }),
@@ -136,14 +145,16 @@ export function NewEspressoShot() {
         idempotencyKeys.current.set(fingerprint, idempotencyKey)
       }
       saveGen.current += 1
-      const outcome = { keyDeleted: false }
+      const outcome = { keyDeleted: false, rejected: false }
       await submitFormMutation(
         form,
         (input: Parameters<typeof createShot.mutateAsync>[0]) =>
           createShot.mutateAsync(input).catch((error: unknown) => {
             outcome.keyDeleted =
+              trpcErrorCode(error) === 'CONFLICT' &&
               error instanceof Error &&
               error.message === SHOT_IDEMPOTENCY_DELETED
+            outcome.rejected = rejectedBeforeSave(error)
             throw error
           }),
         { ...value, idempotencyKey },
@@ -154,7 +165,8 @@ export function NewEspressoShot() {
           if (key === idempotencyKey) idempotencyKeys.current.delete(draft)
         }
         unresolvedSaves.current.delete(value.coffeeId)
-      } else if (!saveSucceeded.current) {
+      } else if (!saveSucceeded.current && !outcome.rejected) {
+        // Only a save that may have committed must replay as submitted.
         unresolvedSaves.current.set(value.coffeeId, {
           grinderId: value.grinderId,
           brewingDeviceId: value.brewingDeviceId,

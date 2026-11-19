@@ -16,6 +16,7 @@ import { useAppForm } from '@/hooks/form'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
+import { refreshEspressoShotReads } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 import { submitFormMutation } from '@/lib/form-error'
 import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
@@ -61,17 +62,9 @@ function EditEspressoShot() {
   const updateShot = useMutation(
     trpc.espressoShot.update.mutationOptions({
       onSuccess: async () => {
-        // An in-flight page (e.g. a Brews preload) would write its pre-edit
+        // An in-flight page or prefill lookup would write its pre-edit
         // snapshot back after the invalidation.
-        await queryClient.cancelQueries(
-          trpc.espressoShot.getRecent.infiniteQueryFilter(),
-        )
-        queryClient.invalidateQueries(
-          trpc.espressoShot.getRecent.infiniteQueryFilter(),
-        )
-        queryClient.invalidateQueries(
-          trpc.espressoShot.getLatestUnsealed.queryFilter(),
-        )
+        await refreshEspressoShotReads(queryClient, trpc)
         queryClient.invalidateQueries(
           trpc.espressoShot.getById.queryOptions(shotId),
         )

@@ -1509,6 +1509,92 @@ describe('Dashboard', () => {
     }
   })
 
+  it('keeps the newest method when a refresh of an empty espresso page fails', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      const shotKey = trpc.espressoShot.getRecent.infiniteQueryKey(
+        espressoShotPageInput(),
+      )
+      queryClient.setQueryData(shotKey, {
+        pages: [{ items: [], total: 0, nextCursor: null }],
+        pageParams: [null],
+      })
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(
+        await screen.findByRole('button', { name: 'Pour Over' }),
+      ).toBeTruthy()
+      await act(() => queryClient.invalidateQueries({ queryKey: shotKey }))
+      await waitFor(() =>
+        expect(queryClient.getQueryState(shotKey)?.status).toBe('error'),
+      )
+      // The page already shown has no shots, so Pour Over stays chosen; a
+      // failed refresh of it does not owe Espresso a retry.
+      expect(screen.getByRole('button', { name: 'Pour Over' })).toBeTruthy()
+      expect(screen.queryByText(ESPRESSO_LOAD_FAILED)).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('offers a coffee-library retry while cached coffees stay pickable', async () => {
+    let coffeeLoads = 0
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input) => {
+        if (String(input).includes('coffee.getAll')) {
+          coffeeLoads += 1
+          if (coffeeLoads === 1) {
+            return Promise.reject(new Error('Network request failed'))
+          }
+          return Promise.resolve(
+            trpcSuccess([makeCoffee({ name: 'Ethiopia Guji' })]),
+          )
+        }
+        return Promise.reject(new Error('Network request failed'))
+      })
+    try {
+      const { queryClient, trpc } = renderDashboard('espresso', [
+        makeRecentShot(),
+      ])
+      await act(() =>
+        queryClient.invalidateQueries(trpc.coffee.getAll.queryFilter()),
+      )
+      const coffeeError = await screen.findByText(ESPRESSO_COFFEES_LOAD_FAILED)
+      expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
+
+      fireEvent.click(
+        within(coffeeError.parentElement as HTMLElement).getByRole('button', {
+          name: 'Try again',
+        }),
+      )
+      await waitFor(() =>
+        expect(screen.queryByText(ESPRESSO_COFFEES_LOAD_FAILED)).toBeNull(),
+      )
+      expect(coffeeLoads).toBe(2)
+      expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('shows shot and coffee retries independently when both loads fail', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
@@ -1534,11 +1620,29 @@ describe('Dashboard', () => {
         />,
         { wrapper: Wrapper },
       )
-      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
-      expect(await screen.findByText(ESPRESSO_COFFEES_LOAD_FAILED)).toBeTruthy()
+      const shotError = await screen.findByText(ESPRESSO_LOAD_FAILED)
+      const coffeeError = await screen.findByText(ESPRESSO_COFFEES_LOAD_FAILED)
       expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(
         2,
       )
+      const callsTo = (procedure: string) =>
+        fetchSpy.mock.calls.filter((call) =>
+          String(call[0]).includes(procedure),
+        ).length
+      const retry = async (error: HTMLElement, own: string, other: string) => {
+        const ownBefore = callsTo(own)
+        const otherBefore = callsTo(other)
+        fireEvent.click(
+          within(error.parentElement as HTMLElement).getByRole('button', {
+            name: 'Try again',
+          }),
+        )
+        await waitFor(() => expect(callsTo(own)).toBe(ownBefore + 1))
+        expect(callsTo(other)).toBe(otherBefore)
+      }
+      // Each Try again sits with its own message and retries only its load.
+      await retry(shotError, 'espressoShot.getRecent', 'coffee.getAll')
+      await retry(coffeeError, 'coffee.getAll', 'espressoShot.getRecent')
     } finally {
       fetchSpy.mockRestore()
     }

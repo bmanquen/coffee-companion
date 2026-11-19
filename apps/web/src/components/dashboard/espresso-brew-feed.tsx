@@ -134,7 +134,8 @@ export function EspressoBrewFeed({ onFilter }: { onFilter?: () => void } = {}) {
               </Button>
             </div>
           ) : null}
-          {coffeesQuery.isError && coffees.length === 0 ? (
+          {/* Shown even with cached coffees, which stay pickable. */}
+          {coffeesQuery.isError ? (
             <div className="flex flex-col gap-2">
               <p role="alert">{ESPRESSO_COFFEES_LOAD_FAILED}</p>
               <Button
