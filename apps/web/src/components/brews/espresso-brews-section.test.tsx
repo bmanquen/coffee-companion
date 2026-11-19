@@ -976,11 +976,11 @@ describe('EspressoBrewsSection', () => {
       )
 
       render(<EspressoBrewsSection />, { wrapper: Wrapper })
-      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+      // Text queries, not role queries: role queries walk every row on each
+      // waitFor poll, which nears the timeout under CI coverage.
+      fireEvent.click(screen.getByText('Load more'))
       await waitFor(() =>
-        expect(
-          screen.getByRole('button', { name: 'Load more' }),
-        ).toHaveProperty('disabled', true),
+        expect(screen.getByText('Load more')).toHaveProperty('disabled', true),
       )
 
       fireEvent.change(screen.getByPlaceholderText('Filter shots...'), {
@@ -990,9 +990,7 @@ describe('EspressoBrewsSection', () => {
         'value',
         'Huila',
       )
-      expect(
-        screen.getByRole('button', { name: 'Load more' }),
-      ).toHaveProperty('disabled', true)
+      expect(screen.getByText('Load more')).toHaveProperty('disabled', true)
 
       await waitFor(
         () => {
@@ -1000,7 +998,7 @@ describe('EspressoBrewsSection', () => {
             within(screen.getByRole('table')).getByText('Colombia Huila'),
           ).toBeTruthy()
           expect(
-            screen.getByRole('button', { name: 'Load more' }),
+            screen.getByText('Load more'),
           ).toHaveProperty('disabled', false)
         },
         { timeout: FILTER_SETTLE_TIMEOUT_MS },
@@ -1013,9 +1011,7 @@ describe('EspressoBrewsSection', () => {
         expect(
           within(screen.getByRole('table')).getByText('Colombia Huila'),
         ).toBeTruthy()
-        expect(
-          screen.getByRole('button', { name: 'Load more' }),
-        ).toHaveProperty('disabled', false)
+        expect(screen.getByText('Load more')).toHaveProperty('disabled', false)
       })
       expect(
         within(screen.getByRole('table')).queryByText('Stale extra'),
@@ -1396,18 +1392,16 @@ describe('EspressoBrewsSection', () => {
     )
     try {
       render(<EspressoBrewsSection />, { wrapper: Wrapper })
-      expect(screen.getByRole('button', { name: 'Load more' })).toBeTruthy()
-
-      fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
-      await waitFor(() =>
-        expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull(),
-      )
+      // Text queries, not role queries: role queries walk all 20 rows on every
+      // waitFor poll, which nears the timeout under CI coverage.
+      fireEvent.click(screen.getByText('Load more'))
+      await waitFor(() => expect(screen.queryByText('Load more')).toBeNull())
       expect(within(screen.getByRole('table')).getByText('Coffee 0')).toBeTruthy()
       // A failed request also hides Load more, behind its retry.
       expect(
         screen.queryByText("We couldn't load more shots. Try again."),
       ).toBeNull()
-      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+      expect(screen.queryByText('Try again')).toBeNull()
     } finally {
       fetchSpy.mockRestore()
     }
