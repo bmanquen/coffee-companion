@@ -68,5 +68,18 @@ describe('espresso shot cursor', () => {
     expect(decodeEspressoShotCursor(encode('2026-05-01 24:00:00.123456'))).toBeNull()
     expect(decodeEspressoShotCursor(encode('2026-05-01 12:60:00.123456'))).toBeNull()
     expect(decodeEspressoShotCursor(encode('2026-05-01 12:00:60.123456'))).toBeNull()
+    expect(decodeEspressoShotCursor(encode('0000-01-01 12:00:00.123456'))).toBeNull()
+    expect(decodeEspressoShotCursor(encode('0001-01-01 12:00:00.123456'))).toEqual({
+      createdAt: '0001-01-01 12:00:00.123456',
+      id: key.id,
+    })
+  })
+
+  it('rejects an issued cursor with characters inserted', () => {
+    const cursor = encodeEspressoShotCursor(key)
+    expect(
+      decodeEspressoShotCursor(`${cursor.slice(0, 8)} ${cursor.slice(8)}`),
+    ).toBeNull()
+    expect(decodeEspressoShotCursor(`${cursor}=`)).toBeNull()
   })
 })

@@ -67,6 +67,7 @@ export interface SealableBrew {
 async function shelfCoffeeIds(
   userId: string,
   size: number,
+  executor: Pick<typeof db, 'execute'>,
 ): Promise<Array<string>> {
   const everyBrew = sql.join(
     brewTables.map(
@@ -79,7 +80,7 @@ async function shelfCoffeeIds(
     sql` union all `,
   )
 
-  const rows = await db.execute<{ id: string }>(sql`
+  const rows = await executor.execute<{ id: string }>(sql`
     select c.id
     from coffees c
     left join (${everyBrew}) b on b.coffee_id = c.id
@@ -91,10 +92,15 @@ async function shelfCoffeeIds(
   return rows.rows.map((row) => row.id)
 }
 
-export async function loadShelf(userId: string, plan: PlanId): Promise<Shelf> {
+// Pass a transaction to read the Shelf in the same snapshot as the Brews.
+export async function loadShelf(
+  userId: string,
+  plan: PlanId,
+  executor: Pick<typeof db, 'execute'> = db,
+): Promise<Shelf> {
   const size = shelfSizes[plan]
   if (size === null) return null
-  return new Set(await shelfCoffeeIds(userId, size))
+  return new Set(await shelfCoffeeIds(userId, size, executor))
 }
 
 // Resolves the Shelf on first use and shares it thereafter. A request that

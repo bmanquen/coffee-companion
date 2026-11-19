@@ -28,13 +28,14 @@ import {
   isEspressoDevice,
   normalizeDecimal,
 } from '../lib/espresso'
-import { isSealed, stampFallenBrews } from '../lib/shelf'
+import { isSealed, loadShelf, stampFallenBrews } from '../lib/shelf'
 import { onOwnCoffee, ownGear } from '../lib/brew-ownership'
 import { authedProcedure, createTRPCRouter } from './init'
 import type {
   EspressoShotCursor,
   EspressoShotCursorKey,
 } from '../lib/espresso'
+import type { PlanId } from '../lib/plan'
 import type { Shelf } from '../lib/shelf'
 
 export const TRPC_BAD_REQUEST = 'BAD_REQUEST' as const
@@ -209,26 +210,24 @@ async function loadRecentPage(
     cursor?: EspressoShotCursorKey
     dialedIn?: boolean
   },
-  shelf: Shelf,
-): Promise<RecentPage> {
-  const where = recentWhere(userId, input, shelf)
-  const countWhere = recentWhere(
-    userId,
-    {
-      coffeeId: input.coffeeId,
-      q: input.q,
-    },
-    shelf,
-  )
+  plan: PlanId,
+): Promise<{ page: RecentPage; shelf: Shelf }> {
   const dialedInOn = and(
     eq(dialedInBrews.brewId, espressoShots.id),
     eq(dialedInBrews.userId, userId),
     eq(dialedInBrews.brewingMethod, 'espresso'),
   )
-  // One snapshot, so the total, the cursor and the hydrated shots agree even
-  // while another request saves or deletes a shot.
+  // One snapshot, so the Shelf, the total, the cursor and the hydrated shots
+  // agree even while another request saves or deletes a shot.
   return db.transaction(
     async (tx) => {
+      const shelf = await loadShelf(userId, plan, tx)
+      const where = recentWhere(userId, input, shelf)
+      const countWhere = recentWhere(
+        userId,
+        { coffeeId: input.coffeeId, q: input.q },
+        shelf,
+      )
       const pageQuery = tx
         .select({
           id: espressoShots.id,
@@ -262,7 +261,7 @@ async function loadRecentPage(
       const pageRows = hasMore ? idRows.slice(0, input.limit) : idRows
       const ids = pageRows.map((row) => row.id)
       if (pageRows.length === 0) {
-        return { items: [], total, nextCursor: null }
+        return { page: { items: [], total, nextCursor: null }, shelf }
       }
       const last = pageRows[pageRows.length - 1]
       const nextCursor: EspressoShotCursor | null = hasMore
@@ -271,12 +270,15 @@ async function loadRecentPage(
       const items = await loadShotsByIds(userId, ids, tx)
       const byId = new Map(items.map((item) => [item.id, item]))
       return {
-        items: ids.flatMap((id) => {
-          const item = byId.get(id)
-          return item ? [item] : []
-        }),
-        total,
-        nextCursor,
+        page: {
+          items: ids.flatMap((id) => {
+            const item = byId.get(id)
+            return item ? [item] : []
+          }),
+          total,
+          nextCursor,
+        },
+        shelf,
       }
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
@@ -413,21 +415,22 @@ export const espressoShotRouter = createTRPCRouter({
       const cursor = input.cursor
         ? decodeCursorOrThrow(input.cursor)
         : undefined
+      const { page, shelf } = await loadRecentPage(
+        ctx.session.user.id,
+        {
+          limit: input.limit,
+          coffeeId: input.coffeeId,
+          q: input.q,
+          cursor,
+          dialedIn: input.dialedIn,
+        },
+        ctx.plan,
+      )
+      // Seal with the Shelf the page was read against, not a fresh one.
       return sealBrewPageWithDialedIn(
         ctx.session.user.id,
-        ctx.shelf,
-        async () =>
-          loadRecentPage(
-            ctx.session.user.id,
-            {
-              limit: input.limit,
-              coffeeId: input.coffeeId,
-              q: input.q,
-              cursor,
-              dialedIn: input.dialedIn,
-            },
-            await ctx.shelf(),
-          ),
+        () => Promise.resolve(shelf),
+        () => Promise.resolve(page),
       )
     }),
 

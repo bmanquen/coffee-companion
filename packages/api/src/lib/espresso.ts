@@ -37,7 +37,8 @@ function isEspressoCursorTimestamp(value: string): boolean {
   const hour = Number(value.slice(11, 13))
   const minute = Number(value.slice(14, 16))
   const second = Number(value.slice(17, 19))
-  if (month < 1 || month > 12) return false
+  // Postgres has no year 0000, so it would fail the query instead.
+  if (year < 1 || month < 1 || month > 12) return false
   if (hour > 23 || minute > 59 || second > 59) return false
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
   return day >= 1 && day <= daysInMonth
@@ -59,7 +60,10 @@ export function decodeEspressoShotCursor(
   if (!isEspressoCursorTimestamp(createdAt) || !UUID_PATTERN.test(id)) {
     return null
   }
-  return { createdAt, id }
+  const key = { createdAt, id }
+  // base64url decoding skips stray characters, so only accept the exact
+  // token the server issued.
+  return encodeEspressoShotCursor(key) === cursor ? key : null
 }
 
 // Postgres numeric comes back as a string. Normalize so 16 and 16.0 compare
