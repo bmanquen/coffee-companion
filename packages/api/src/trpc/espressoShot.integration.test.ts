@@ -1262,6 +1262,12 @@ describe('espressoShot.getRecent', () => {
     ).rejects.toMatchObject({ code: TRPC_BAD_REQUEST })
   })
 
+  it('rejects an offset from a client that predates cursors', async () => {
+    await expect(
+      asA.espressoShot.getRecent({ limit: 2, offset: 20 } as never),
+    ).rejects.toMatchObject({ code: TRPC_BAD_REQUEST })
+  })
+
   it('rejects a search containing NUL as a bad request', async () => {
     await expect(
       asA.espressoShot.getRecent({ limit: 2, q: 'huila\0grind' }),

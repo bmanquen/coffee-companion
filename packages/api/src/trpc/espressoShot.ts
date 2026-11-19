@@ -89,6 +89,9 @@ const getRecentInput = z.object({
     .refine((q) => !q.includes('\0'), 'Search cannot contain NUL')
     .optional(),
   dialedIn: z.boolean().optional(),
+  // Clients from before cursors sent offset. Dropping it would answer them
+  // with page one again, which they would append as duplicates.
+  offset: z.never({ error: 'Reload to continue paging' }).optional(),
 })
 
 function likeContains(value: string) {
@@ -437,23 +440,32 @@ export const espressoShotRouter = createTRPCRouter({
   getLatestUnsealed: authedProcedure
     .input(z.object({ coffeeId: uuidInput() }))
     .query(async ({ ctx, input }) => {
-      const shelf = await ctx.shelf()
-      if (shelf !== null && !shelf.has(input.coffeeId)) return null
-      const shot = await db.query.espressoShots.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          coffeeId: input.coffeeId,
-          ...onOwnCoffee(ctx.session.user.id),
-          ...(shelf !== null ? { sealedAt: { isNull: true } } : {}),
+      const userId = ctx.session.user.id
+      // The Shelf and the shot from one snapshot, as in getRecent, so a save
+      // or edit in between cannot pair a shot with a Shelf it never had.
+      const found = await db.transaction(
+        async (tx) => {
+          const shelf = await loadShelf(userId, ctx.plan, tx)
+          if (shelf !== null && !shelf.has(input.coffeeId)) return null
+          const shot = await tx.query.espressoShots.findFirst({
+            where: {
+              userId,
+              coffeeId: input.coffeeId,
+              ...onOwnCoffee(userId),
+              ...(shelf !== null ? { sealedAt: { isNull: true } } : {}),
+            },
+            orderBy: { createdAt: 'desc', id: 'desc' },
+            with: withRelations(userId),
+          })
+          return shot ? { shot, shelf } : null
         },
-        orderBy: { createdAt: 'desc', id: 'desc' },
-        with: withRelations(ctx.session.user.id),
-      })
-      if (!shot) return null
+        { isolationLevel: 'repeatable read', accessMode: 'read only' },
+      )
+      if (!found) return null
       return sealBrewWithDialedIn(
-        ctx.session.user.id,
-        ctx.shelf,
-        () => Promise.resolve(shot),
+        userId,
+        () => Promise.resolve(found.shelf),
+        () => Promise.resolve(found.shot),
       )
     }),
 

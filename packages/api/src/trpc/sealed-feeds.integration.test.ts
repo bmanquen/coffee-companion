@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
-import { brewingDeviceTypes } from '../db/schema'
+import { brewingDeviceTypes, espressoShots } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
 import { COLD_BREW_DEVICE_TYPE } from '../lib/cold-brew'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
@@ -333,7 +333,7 @@ describe.each(methods)('%s feeds', (method) => {
     const { items } =
       method === 'espressoShot'
         ? await asUser.espressoShot.getRecent({ limit: 50 })
-        : await feedFor().getRecent({ limit: 50, offset: 0 })
+        : await asUser[method].getRecent({ limit: 50, offset: 0 })
     const brew = items.find((row) => row.id === sealedId(method))
 
     expect(brew?.sealed).toBe(true)
@@ -369,6 +369,38 @@ describe('espressoShot.getLatestUnsealed', () => {
       coffeeId: sealed.coffeeId,
     })
     expect(found).toBeNull()
+  })
+
+  it('skips a newer stamped shot on a Coffee still on the Shelf', async () => {
+    // Off the Shelf, the Shelf guard alone returns null, so this needs a
+    // Coffee on it to show the sealedAt filter at work.
+    const readable = await asUser.espressoShot.getById(
+      readableId('espressoShot'),
+    )
+    const [stamped] = await db
+      .insert(espressoShots)
+      .values({
+        userId: USER,
+        coffeeId: readable.coffeeId,
+        grinderId: readable.grinderId!,
+        brewingDeviceId: readable.brewingDeviceId!,
+        grindSetting: 'stamped',
+        dose: '19',
+        yield: '38',
+        time: 31,
+        sealedAt: new Date(),
+        createdAt: new Date(Date.now() + 60_000),
+      })
+      .returning({ id: espressoShots.id })
+    try {
+      const found = await asUser.espressoShot.getLatestUnsealed({
+        coffeeId: readable.coffeeId,
+      })
+      expect(found?.id).toBe(readable.id)
+      expect(found?.sealed).toBe(false)
+    } finally {
+      await db.delete(espressoShots).where(eq(espressoShots.id, stamped.id))
+    }
   })
 })
 
