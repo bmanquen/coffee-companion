@@ -8,6 +8,10 @@ describe('formatBrewRatio', () => {
     expect(formatBrewRatio('15', '220')).toBe('1:14.67')
     expect(formatBrewRatio('18', '300')).toBe('1:16.67')
     expect(formatBrewRatio('50', '500')).toBe('1:10')
+    // Exact half-hundredths round up, as the API's ratio search does, even
+    // where the double sits just below (53.5 / 20 is 2.67499… in binary).
+    expect(formatBrewRatio('20', '53.5')).toBe('1:2.68')
+    expect(formatBrewRatio('20', '45.7')).toBe('1:2.29')
   })
 
   it('reads decimal strings the way the database stores grams', () => {

@@ -5,6 +5,15 @@ function parseWeight(value: string | number | null | undefined): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+// Rounds half away from zero on the decimal value, as Postgres rounds
+// numerics (the API's ratio search), not on its nearest binary double:
+// 53.5 / 20 is 2.67499… as a double, so toFixed(2) would give 2.67.
+function roundDecimal(value: number, decimals: number): number {
+  const scale = 10 ** decimals
+  const scaled = Number((Math.abs(value) * scale).toPrecision(15))
+  return (Math.sign(value) * Math.round(scaled)) / scale
+}
+
 export function formatBrewRatio(
   dose: string | number | null | undefined,
   output: string | number | null | undefined,
@@ -18,10 +27,10 @@ export function formatBrewRatio(
   // hundredth of the dose would otherwise round to "1:0".
   if (ratio > 0) {
     for (let decimals = 2; decimals <= 6; decimals++) {
-      const rounded = Number(ratio.toFixed(decimals))
+      const rounded = roundDecimal(ratio, decimals)
       if (rounded !== 0) return `1:${rounded}`
     }
     return `1:${ratio}`
   }
-  return `1:${Number(ratio.toFixed(2))}`
+  return `1:${roundDecimal(ratio, 2)}`
 }

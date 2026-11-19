@@ -820,6 +820,67 @@ describe('espressoShot.create idempotency', () => {
     })
   })
 
+  it('returns the deleted-key conflict when an overlapping save claims the key and its coffee is deleted mid-insert', async () => {
+    const coffee = await createCoffee(uniq('Deleted Mid Insert'))
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    let release: () => void = () => {}
+    const released = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let locked: () => void = () => {}
+    const coffeeLocked = new Promise<void>((resolve) => {
+      locked = resolve
+    })
+    // Another request: holds the coffee so this create's insert waits on its
+    // foreign key, then claims the key, loses its shot to the coffee's
+    // deletion, and commits.
+    const overlapping = db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT id FROM coffees WHERE id = ${coffee.id} FOR UPDATE`,
+      )
+      locked()
+      await released
+      await tx.insert(espressoShotIdempotencyKeys).values({
+        userId: USER_A,
+        idempotencyKey,
+        shotId: null,
+      })
+      await tx.delete(coffees).where(eq(coffees.id, coffee.id))
+    })
+    await coffeeLocked
+    const create = asA.espressoShot.create(input)
+    const outcome = create.then(
+      () => null,
+      (error: unknown) => error,
+    )
+    // Wait until the insert is blocked on the coffee row.
+    for (let i = 0; i < 200; i++) {
+      const waiting = await db.execute<{ n: number }>(
+        sql`SELECT count(*)::int AS n FROM pg_stat_activity
+            WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      )
+      if (waiting.rows[0].n > 0) break
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+    release()
+    await overlapping
+
+    expect(await outcome).toMatchObject({
+      code: TRPC_CONFLICT,
+      message: SHOT_IDEMPOTENCY_DELETED,
+    })
+  })
+
   it('rejects a reused key when the shot fields differ', async () => {
     const idempotencyKey = crypto.randomUUID()
     const input = {
@@ -1024,6 +1085,36 @@ describe('espressoShot.getRecent', () => {
     expect(byText.items.every((shot) => shot.grindSetting !== 'guji-grind')).toBe(
       true,
     )
+  })
+
+  it('finds getRecent shots by the ratio the log shows', async () => {
+    const coffee = await createCoffee(uniq('Ratio Search'))
+    const log = (dose: string, yieldGrams: string) =>
+      asA.espressoShot.create({
+        coffeeId: coffee.id,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose,
+        yield: yieldGrams,
+        time: 30,
+        grindSetting: '12',
+        idempotencyKey: crypto.randomUUID(),
+      })
+    const even = await log('18', '45')
+    const rounded = await log('18', '41')
+    const half = await log('20', '53.5')
+    const search = async (q: string) =>
+      (
+        await asA.espressoShot.getRecent({ limit: 50, coffeeId: coffee.id, q })
+      ).items.map((shot) => shot.id)
+
+    // 45/18 shows as 1:2.5, 41/18 (2.2777…) as 1:2.28, and 53.5/20 as 1:2.68.
+    expect(await search('1:2.5')).toEqual([even.id])
+    expect(await search('1:2.28')).toEqual([rounded.id])
+    expect(await search('1:2.50')).toEqual([])
+    expect(await search('1:2.277')).toEqual([])
+    // An exact half-hundredth rounds up, as formatBrewRatio shows it.
+    expect(await search('1:2.68')).toEqual([half.id])
   })
 
   it('filters getRecent to dialed-in shots', async () => {

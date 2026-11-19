@@ -28,6 +28,7 @@ import {
   isEspressoDevice,
   normalizeDecimal,
 } from '../lib/espresso'
+import { PG_FOREIGN_KEY_VIOLATION, pgErrorIn } from '../lib/pg-error'
 import { isSealed, loadShelf, stampFallenBrews } from '../lib/shelf'
 import { onOwnCoffee, ownGear } from '../lib/brew-ownership'
 import { authedProcedure, createTRPCRouter } from './init'
@@ -177,6 +178,9 @@ function recentWhere(
       sql`CAST(${espressoShots.dose} AS TEXT) ILIKE ${pattern}`,
       sql`CAST(${espressoShots.yield} AS TEXT) ILIKE ${pattern}`,
       sql`CAST(${espressoShots.time} AS TEXT) ILIKE ${pattern}`,
+      // The ratio as the log shows it (formatBrewRatio): "1:" and yield/dose
+      // to two decimals without trailing zeros, so "1:2" finds 18g → 36g.
+      sql`'1:' || CAST(trim_scale(round(${espressoShots.yield} / NULLIF(${espressoShots.dose}, 0), 2)) AS TEXT) ILIKE ${pattern}`,
     )
     const identityMatch = or(
       ilike(coffees.name, pattern),
@@ -354,7 +358,38 @@ async function insertShotWithKey(
   input: z.infer<typeof insertEspressoShotSchema> & { idempotencyKey: string },
 ) {
   const { idempotencyKey, ...shot } = input
-  const claimedId = await db.transaction(async (tx) => {
+  let claimedId: string | null
+  try {
+    claimedId = await claimShot(userId, idempotencyKey, shot)
+  } catch (error) {
+    // An overlapping request with this key may have saved the shot and its
+    // gear been deleted since: replay that key (deleted, here) rather than
+    // fail the save. Without a claimed key, the failure stands.
+    if (!pgErrorIn(error, PG_FOREIGN_KEY_VIOLATION)) throw error
+    const claimed = await loadIdempotencyKey(userId, idempotencyKey)
+    if (!claimed) throw error
+    return replayShotId(userId, claimed, input)
+  }
+  if (claimedId) return claimedId
+
+  const raced = await loadIdempotencyKey(userId, idempotencyKey)
+  if (!raced) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Could not save this shot',
+    })
+  }
+  return replayShotId(userId, raced, input)
+}
+
+// Inserts the shot and claims its key together; null when another request
+// already holds the key.
+function claimShot(
+  userId: string,
+  idempotencyKey: string,
+  shot: z.infer<typeof insertEspressoShotSchema>,
+) {
+  return db.transaction(async (tx) => {
     const inserted = await tx
       .insert(espressoShots)
       .values({ ...shot, userId })
@@ -376,16 +411,6 @@ async function insertShotWithKey(
     await tx.delete(espressoShots).where(eq(espressoShots.id, shotId))
     return null
   })
-  if (claimedId) return claimedId
-
-  const raced = await loadIdempotencyKey(userId, idempotencyKey)
-  if (!raced) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Could not save this shot',
-    })
-  }
-  return replayShotId(userId, raced, input)
 }
 
 // A retry of the request that claimed the key gets the shot as it is now, even
