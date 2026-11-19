@@ -6,6 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react-native'
 import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
+import { AccessibilityInfo } from 'react-native'
 import { TRPC_CONFLICT } from '../api-error'
 import { App } from '../App'
 import { SignedInHome } from '../auth/SignedInHome'
@@ -448,6 +449,35 @@ describe('log espresso shot', () => {
     await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '18')
     expect(screen.getAllByText('Enter a number')).toHaveLength(2)
     expect(screen.getByText(SELECT_COFFEE_ERROR)).toBeTruthy()
+  })
+
+  it('puts each field error on its control and announces them on Log', async () => {
+    const announce = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibility')
+      .mockImplementation(() => {})
+    try {
+      const { api } = fakeApi(catalog())
+      await render(<App auth={signedIn} espresso={api} />)
+      await openForm()
+      await fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), '1.2.3')
+      await press(LOG)
+
+      const coffeeError = screen.getByTestId(
+        selectTriggerTestId(LABEL_COFFEE),
+      ).props.accessibilityHint as string
+      const doseError = screen.getByLabelText(LABEL_DOSE).props
+        .accessibilityHint as string
+      expect(coffeeError).toBeTruthy()
+      expect(doseError).toBeTruthy()
+      expect(screen.getByText(coffeeError)).toBeTruthy()
+      expect(screen.getByText(doseError)).toBeTruthy()
+      expect(announce).toHaveBeenCalled()
+      const announced = announce.mock.calls.at(-1)?.[0]
+      expect(announced).toContain(coffeeError)
+      expect(announced).toContain(doseError)
+    } finally {
+      announce.mockRestore()
+    }
   })
 
   it('clears only the coffee error when a coffee is selected', async () => {
@@ -1682,6 +1712,62 @@ describe('log espresso shot', () => {
     await pickSelect(LABEL_COFFEE, COFFEE)
     expect(prefills).toBe(2)
     expect(screen.getByDisplayValue('2026-05-01')).toBeTruthy()
+  })
+
+  it('does not show a prefill failure from a lookup begun before the save', async () => {
+    let rejectPrefill: (error: Error) => void = () => {}
+    const pendingPrefill = new Promise<ShotRow | null>((_resolve, reject) => {
+      rejectPrefill = reject
+    })
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      loadPrefill: () => pendingPrefill,
+      create: () => Promise.reject(new Error('Network request failed')),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    await press(LOG)
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
+
+    await act(async () => {
+      rejectPrefill(new Error('Network request failed'))
+      await pendingPrefill.catch(() => {})
+    })
+    expect(screen.queryByText(ERROR_PREFILL_FAILED)).toBeNull()
+    expect(screen.queryByTestId(SHOT_FORM_PREFILL_ERROR_TEST_ID)).toBeNull()
+  })
+
+  it('requests a fresh prefill after a failed save instead of joining a pending one', async () => {
+    const stale = new Promise<ShotRow | null>(() => {})
+    let prefills = 0
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      loadPrefill: () => {
+        prefills += 1
+        return prefills === 1 ? stale : Promise.resolve(seedShot())
+      },
+      create: () => Promise.reject(new Error('Network request failed')),
+    }
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    await press(LOG)
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
+
+    await press(BACK)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    expect(prefills).toBe(2)
+    expect(await screen.findByDisplayValue('2026-05-01')).toBeTruthy()
   })
 
   it('shows a retry when the last shot cannot be loaded and still lets you log one', async () => {

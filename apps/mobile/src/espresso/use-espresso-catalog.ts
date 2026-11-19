@@ -104,6 +104,8 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
             .then(() => queryClient.invalidateQueries(shotsFilter))
         },
         onError: (error) => {
+          // The save may have committed, so a lookup begun before it is stale.
+          queryClient.removeQueries({ queryKey: ['espresso-prefill', userId] })
           setSaveError(apiErrorMessage(error, ERROR_SAVE_FAILED))
           onError?.(error)
         },

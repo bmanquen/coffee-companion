@@ -85,6 +85,8 @@ export function Field({
       <Text>{label}</Text>
       <TextInput
         accessibilityLabel={label}
+        // Read after the label, so the error is heard on the control itself.
+        accessibilityHint={error}
         accessibilityState={disabled ? { disabled: true } : undefined}
         testID={fieldTestId(label)}
         value={value}
@@ -139,6 +141,7 @@ export function SelectField({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={selectTriggerA11yLabel(label, selectedText)}
+        accessibilityHint={error}
         accessibilityState={disabled ? { disabled: true } : undefined}
         testID={selectTriggerTestId(label)}
         disabled={disabled}

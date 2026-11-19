@@ -265,7 +265,11 @@ describe('useEspressoCatalog', () => {
         nextCursor: cursorRefreshedFirst,
       })
       await Promise.resolve()
-      result.current.save(shotInput)
+      // A second shot, so the API would store it rather than replay the first.
+      result.current.save({
+        ...shotInput,
+        idempotencyKey: '00000000-0000-4000-8000-0000000000b2',
+      })
       await Promise.resolve()
     })
 

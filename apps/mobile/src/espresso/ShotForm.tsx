@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { applyCoffeePrefill } from '@coffee-companion/brew-display'
 import { normalizeDecimal } from '@coffee-companion/api/lib/espresso'
 import {
+  AccessibilityInfo,
   BackHandler,
   KeyboardAvoidingView,
   Pressable,
@@ -201,6 +202,8 @@ export function ShotForm({
         if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
           return
         }
+        // A lookup from before a save is dropped, its failure included.
+        if (startedSaveGen !== saveGen.current) return
         setPrefillError(true)
         applyPrefill(coffeeId, seq, null, startedSaveGen)
       },
@@ -378,6 +381,10 @@ export function ShotForm({
           const parsed = parseShotDraft(draft)
           if (!parsed.ok) {
             setFieldErrors(parsed.errors)
+            // Otherwise a screen reader hears nothing when Log is refused.
+            AccessibilityInfo.announceForAccessibility(
+              Object.values(parsed.errors).join('. '),
+            )
             return
           }
           const fingerprint = draftFingerprint(parsed.value)
