@@ -693,8 +693,9 @@ describe('useEspressoShotPages', () => {
       async (input, init) => {
         const body = await requestText(input, init)
         if (body.includes(boundary)) {
+          // Changed, so the test sees the refetch rather than the cache.
           return trpcSuccess({
-            items: [extraShot],
+            items: [{ ...extraShot, notes: 'refetched' }],
             total: first.length + 1,
             nextCursor: null,
           })
@@ -732,8 +733,9 @@ describe('useEspressoShotPages', () => {
       })
       await waitFor(() => {
         expect(
-          result.current.items.some((shot) => shot.id === RETRY_EXTRA_ID),
-        ).toBe(true)
+          result.current.items.find((shot) => shot.id === RETRY_EXTRA_ID)
+            ?.notes,
+        ).toBe('refetched')
         expect(result.current.hasMore).toBe(false)
       })
     } finally {

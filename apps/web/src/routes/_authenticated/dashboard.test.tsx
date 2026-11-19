@@ -484,6 +484,82 @@ describe('Dashboard', () => {
     }
   })
 
+  it('drops a deleted coffee filter for good, even after a later failed refresh', async () => {
+    const guji = makeRecentShot({
+      id: 's1',
+      coffeeId: 'c1',
+      coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    })
+    const huila = makeRecentShot({
+      id: 's2',
+      coffeeId: 'c2',
+      coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+    })
+    const { queryClient, trpc } = renderDashboard(
+      'espresso',
+      [guji, huila],
+      {},
+      (providers) => {
+        seedEspressoShotPage(providers.queryClient, providers.trpc, [
+          guji,
+          huila,
+        ])
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          [huila],
+          1,
+          undefined,
+          { coffeeId: 'c2' },
+        )
+        seedCoffees(
+          providers.queryClient,
+          providers.trpc,
+          coffeesFrom([guji, huila]),
+        )
+      },
+    )
+    const table = () => within(screen.getByRole('table'))
+    const failCatalogRefresh = async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockRejectedValue(new Error('Network request failed'))
+      try {
+        await act(async () => {
+          await queryClient.refetchQueries({
+            queryKey: trpc.coffee.getAll.queryKey(),
+          })
+          // Query notifies observers on a later tick; let the feed re-render.
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    }
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('All coffees'))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('option', { name: 'Colombia Huila' }))
+    })
+    expect(table().queryByText('Ethiopia Guji')).toBeNull()
+
+    // A failed refresh says nothing about Huila, so the pick stands.
+    await failCatalogRefresh()
+    expect(table().queryByText('Ethiopia Guji')).toBeNull()
+
+    // Huila was deleted in another tab.
+    act(() => {
+      seedCoffees(queryClient, trpc, coffeesFrom([guji]))
+    })
+    expect(await table().findByText('Ethiopia Guji')).toBeTruthy()
+
+    // A later failed refresh must not bring the deleted pick back.
+    await failCatalogRefresh()
+    expect(table().getByText('Ethiopia Guji')).toBeTruthy()
+  })
+
   it('clamps the table page when loaded shots shrink', async () => {
     const shots = Array.from({ length: 6 }, (_, i) =>
       makeRecentShot({

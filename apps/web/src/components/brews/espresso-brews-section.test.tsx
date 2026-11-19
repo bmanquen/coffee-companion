@@ -778,6 +778,65 @@ describe('EspressoBrewsSection', () => {
     expect(screen.getByPlaceholderText('Filter shots...')).toBeTruthy()
   })
 
+  it('drops a coffee filter once the catalog loads without that coffee', async () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    const guji = makeRecentShot({
+      id: 's1',
+      coffeeId: 'c1',
+      coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    })
+    const huila = makeRecentShot({
+      id: 's2',
+      coffeeId: 'c2',
+      coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+    })
+    seedLog(queryClient, trpc, [guji, huila])
+    seedEspressoShotPage(queryClient, trpc, [huila], 1, undefined, {
+      coffeeId: 'c2',
+    })
+
+    const failCatalogRefresh = async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockRejectedValue(new Error('Network request failed'))
+      try {
+        await act(async () => {
+          await queryClient.refetchQueries({
+            queryKey: trpc.coffee.getAll.queryKey(),
+          })
+          // Query notifies observers on a later tick; let the feed re-render.
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    }
+
+    render(<EspressoBrewsSection />, { wrapper: Wrapper })
+    fireEvent.click(screen.getByRole('button', { name: 'All coffees' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Colombia Huila' }))
+    await waitFor(() =>
+      expect(screen.queryByText('Ethiopia Guji')).toBeNull(),
+    )
+
+    // A failed refresh says nothing about Huila, so the pick stands.
+    await failCatalogRefresh()
+    expect(screen.queryByText('Ethiopia Guji')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Colombia Huila' })).toBeTruthy()
+
+    // Huila was deleted in another tab.
+    act(() => {
+      seedCoffees(queryClient, trpc, coffeesFrom([guji]))
+    })
+    expect(await screen.findAllByText('Ethiopia Guji')).not.toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
+
+    // A later failed refresh must not bring the deleted pick back.
+    await failCatalogRefresh()
+    expect(screen.getAllByText('Ethiopia Guji')).not.toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
+  })
+
   it('filters shots by coffee on the server', async () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     const guji = makeRecentShot({
@@ -1093,6 +1152,19 @@ describe('EspressoBrewsSection', () => {
       await within(screen.getByRole('table')).findByText('Coffee extra'),
     ).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledTimes(2)
+    // The failed request and its retry both continue from page one's cursor.
+    const cursors = fetchMock.mock.calls.map(([url]) => {
+      const input = new URL(String(url), 'http://localhost').searchParams.get(
+        'input',
+      )
+      const batch = JSON.parse(input ?? '{}') as Record<
+        string,
+        { json?: { cursor?: string } }
+      >
+      return batch['0'].json?.cursor
+    })
+    const cursor = espressoShotCursor(first[first.length - 1])
+    expect(cursors).toEqual([cursor, cursor])
   })
 
   it('keeps remaining shots visible when a refetch after delete fails', async () => {
@@ -1331,6 +1403,11 @@ describe('EspressoBrewsSection', () => {
         expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull(),
       )
       expect(within(screen.getByRole('table')).getByText('Coffee 0')).toBeTruthy()
+      // A failed request also hides Load more, behind its retry.
+      expect(
+        screen.queryByText("We couldn't load more shots. Try again."),
+      ).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
     } finally {
       fetchSpy.mockRestore()
     }

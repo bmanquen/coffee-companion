@@ -178,7 +178,17 @@ export function EspressoBrewsSection() {
   const coffees = coffeesQuery.data ?? []
   const [sorting, setSorting] = useState<SortingState>([])
   const [q, setQ] = useState('')
-  const [coffeeId, setCoffeeId] = useState('')
+  const [pickedCoffeeId, setCoffeeId] = useState('')
+  // A coffee deleted elsewhere drops out of the filter once the catalog loads
+  // without it; until then (or if that refresh fails) the pick stands. The
+  // pick is cleared, not just hidden, so a later failed refresh (which keeps
+  // the old data but is no longer a success) cannot bring it back.
+  const pickRemoved =
+    coffeesQuery.isSuccess &&
+    pickedCoffeeId !== '' &&
+    !coffees.some((coffee) => coffee.id === pickedCoffeeId)
+  if (pickRemoved) setCoffeeId('')
+  const coffeeId = pickRemoved ? '' : pickedCoffeeId
   const expansion = useAccordionExpansion()
   const debouncedQ = useDebouncedValue(q, ESPRESSO_SHOT_FILTER_DEBOUNCE_MS)
   const filtering = Boolean(coffeeId || debouncedQ.trim())
