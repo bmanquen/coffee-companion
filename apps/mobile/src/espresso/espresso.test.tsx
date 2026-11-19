@@ -2336,6 +2336,16 @@ describe('log espresso shot', () => {
     expect(screen.getByText('Coffee 0')).toBeTruthy()
     expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
     expect(screen.queryByText('Coffee 20')).toBeNull()
+
+    // Paging on from the pre-save page would hide the failed refresh and
+    // extend a list that no longer matches the server.
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(cursors).toEqual([undefined, undefined])
+    expect(screen.queryByText('Coffee 20')).toBeNull()
+    expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
   })
 
   it('shows retry progress and ignores repeat taps after a failed refresh', async () => {

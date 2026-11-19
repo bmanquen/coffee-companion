@@ -77,9 +77,12 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   }, [equipment, equipmentFailed, historyFailed, retrying, shots])
 
   const loadMore = useCallback(() => {
+    // After a failed refresh the cached pages are stale; paging on from them
+    // would hide its Retry. A failed next page keeps its own footer retry.
     if (
       shots.isFetchingNextPage ||
       shots.isRefetching ||
+      shots.isRefetchError ||
       !shots.hasNextPage
     ) {
       return

@@ -126,6 +126,13 @@ describe('useEspressoCatalog', () => {
             nextCursor: cursorAfter(afterRefresh),
           })
         }
+        if (cursor === cursorAfter(afterRefresh)) {
+          return Promise.resolve({
+            items: afterSave.slice(PAGE * 2, PAGE * 3),
+            total: totalAfterSave,
+            nextCursor: cursorAfter(afterSave.slice(PAGE * 2, PAGE * 3)),
+          })
+        }
         return Promise.reject(new Error(`unexpected cursor ${cursor}`))
       },
       loadPrefill: () => Promise.resolve(null),
@@ -175,6 +182,20 @@ describe('useEspressoCatalog', () => {
     )
     expect(result.current.catalog?.shots.map((row) => row.id)).toEqual(
       afterSave.slice(0, PAGE * 2).map((row) => row.id),
+    )
+
+    // A refetch of the two cached pages cannot reach a third, so this proves
+    // load more pages on from the refreshed rows.
+    await act(async () => {
+      result.current.loadMore()
+      await Promise.resolve()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE * 3),
+    )
+    expect(listCursors[listCursors.length - 1]).toBe(cursorAfter(afterRefresh))
+    expect(result.current.catalog?.shots.map((row) => row.id)).toEqual(
+      afterSave.slice(0, PAGE * 3).map((row) => row.id),
     )
   })
 
@@ -273,11 +294,14 @@ describe('useEspressoCatalog', () => {
       await Promise.resolve()
     })
 
+    // No page is read while the second refresh is pending, not even with the
+    // cursor from before either save.
+    const cursorsBeforeBlockedLoad = [...listCursors]
     await act(async () => {
       result.current.loadMore()
       await Promise.resolve()
     })
-    expect(listCursors).not.toContain(cursorRefreshedFirst)
+    expect(listCursors).toEqual(cursorsBeforeBlockedLoad)
 
     await act(async () => {
       resolveSecondRefresh({
@@ -327,16 +351,21 @@ describe('useEspressoCatalog', () => {
       result.current.save(shotInput)
       await Promise.resolve()
     })
-    await act(async () => {
-      resolveStale({ items: [], total: 0, nextCursor: null })
-      await Promise.resolve()
-    })
-
+    // The fresh read does not wait for the one started before the save.
     await waitFor(() =>
       expect(result.current.catalog?.shots.map((row) => row.id)).toEqual([
         saved.id,
       ]),
     )
+    expect(listCalls).toBe(2)
+
+    await act(async () => {
+      resolveStale({ items: [], total: 0, nextCursor: null })
+      await Promise.resolve()
+    })
+    expect(result.current.catalog?.shots.map((row) => row.id)).toEqual([
+      saved.id,
+    ])
     expect(listCalls).toBe(2)
   })
 
