@@ -19,15 +19,19 @@ function invalidateMethodFeed(
   brewingMethod: BrewingMethod,
 ) {
   switch (brewingMethod) {
-    case 'espresso':
-      queryClient.invalidateQueries(
-        trpc.espressoShot.getRecent.infiniteQueryFilter(),
-      )
+    case 'espresso': {
+      // Invalidate leaves an inactive page's fetch running, and its pre-toggle
+      // response would land as fresh, so cancel in-flight pages first.
+      const pages = trpc.espressoShot.getRecent.infiniteQueryFilter()
+      void queryClient
+        .cancelQueries(pages)
+        .then(() => queryClient.invalidateQueries(pages))
       queryClient.invalidateQueries(
         trpc.espressoShot.getLatestUnsealed.queryFilter(),
       )
       queryClient.invalidateQueries(trpc.espressoShot.getDialedIn.queryFilter())
       return
+    }
     case 'aeropress':
       queryClient.invalidateQueries(trpc.aeropressBrew.getAll.queryFilter())
       queryClient.invalidateQueries(trpc.aeropressBrew.getRecent.queryFilter())

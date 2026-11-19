@@ -1,3 +1,4 @@
+import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
 import {
   act,
   fireEvent,
@@ -463,6 +464,67 @@ describe('NewEspressoShot form', () => {
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
       )
       expect(keys[0]).toBe(keys[1])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('mints a new key once the API says the replayed shot was deleted', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates === 1) throw new Error('Network request failed')
+        if (creates === 2) throw new Error(SHOT_IDEMPOTENCY_DELETED)
+        return trpcSuccess()
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      const log = async (calls: number) => {
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(calls))
+      }
+      await log(1)
+      await log(2)
+      await log(3)
+
+      const keys = createCalls(fetchSpy).map((call) => {
+        const init = call[1] as RequestInit | undefined
+        return String(init?.body ?? '').match(
+          /"idempotencyKey"\s*:\s*"([^"]+)"/,
+        )?.[1]
+      })
+      // The lost save replays under its key until the API says it is gone.
+      expect(keys[1]).toBe(keys[0])
+      expect(keys[2]).toBeTruthy()
+      expect(keys[2]).not.toBe(keys[0])
     } finally {
       fetchSpy.mockRestore()
     }

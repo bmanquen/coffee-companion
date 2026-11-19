@@ -2,6 +2,7 @@ import { insertEspressoShotSchema } from '@coffee-companion/api/db/zod'
 import { applyCoffeePrefill } from '@coffee-companion/brew-display'
 import {
   ESPRESSO_DEVICE_TYPE,
+  SHOT_IDEMPOTENCY_DELETED,
   isEspressoDevice,
   normalizeDecimal,
 } from '@coffee-companion/api/lib/espresso'
@@ -135,11 +136,25 @@ export function NewEspressoShot() {
         idempotencyKeys.current.set(fingerprint, idempotencyKey)
       }
       saveGen.current += 1
-      await submitFormMutation(form, createShot.mutateAsync, {
-        ...value,
-        idempotencyKey,
-      })
-      if (!saveSucceeded.current) {
+      const outcome = { keyDeleted: false }
+      await submitFormMutation(
+        form,
+        (input: Parameters<typeof createShot.mutateAsync>[0]) =>
+          createShot.mutateAsync(input).catch((error: unknown) => {
+            outcome.keyDeleted =
+              error instanceof Error &&
+              error.message === SHOT_IDEMPOTENCY_DELETED
+            throw error
+          }),
+        { ...value, idempotencyKey },
+      )
+      if (outcome.keyDeleted) {
+        // That shot is gone for good, so the next Log saves a new one.
+        for (const [draft, key] of idempotencyKeys.current) {
+          if (key === idempotencyKey) idempotencyKeys.current.delete(draft)
+        }
+        unresolvedSaves.current.delete(value.coffeeId)
+      } else if (!saveSucceeded.current) {
         unresolvedSaves.current.set(value.coffeeId, {
           grinderId: value.grinderId,
           brewingDeviceId: value.brewingDeviceId,
