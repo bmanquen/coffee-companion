@@ -225,7 +225,13 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 set -euo pipefail
 control=.cursor/skills/verify-mobile/helpers/control
 artifacts=.cursor/skills/verify-mobile/artifacts
-# Clean up even when a step below fails; disarmed after the explicit cleanup.
+# Another run's instance: stop without cleaning it up (launch would refuse it).
+if [ -e .cursor/skills/verify-mobile/.run/state.json ]; then
+  echo 'A verification instance is already running; drive it or clean it up first.' >&2
+  exit 1
+fi
+# From here any instance is this run's, so clean up even when a step below
+# fails (launch included); disarmed after the explicit cleanup.
 trap '$control cleanup' EXIT
 $control launch
 $control doctor
