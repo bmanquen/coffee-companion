@@ -146,7 +146,8 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     catalog,
     // History stays readable when only the equipment request fails.
     shots: shots.data ? items : null,
-    hasMore: shots.hasNextPage,
+    // Not after a failed refresh: loadMore waits for the history Retry then.
+    hasMore: shots.hasNextPage && !shots.isRefetchError,
     refreshing: shots.isRefetching && !shots.isFetchingNextPage,
     loading,
     loadingMore: shots.isFetchingNextPage,

@@ -2324,6 +2324,7 @@ describe('log espresso shot', () => {
     }
     await render(<App auth={signedIn} espresso={api} />)
     expect(screen.getByText('Coffee 0')).toBeTruthy()
+    expect(screen.getByText(LOAD_MORE_SHOTS)).toBeTruthy()
 
     await openForm()
     await pickCoffee()
@@ -2346,6 +2347,8 @@ describe('log espresso shot', () => {
     expect(cursors).toEqual([undefined, undefined])
     expect(screen.queryByText('Coffee 20')).toBeNull()
     expect(screen.getByText(ERROR_LOAD_FAILED)).toBeTruthy()
+    // Nor does the footer offer a Load more that would do nothing.
+    expect(screen.queryByText(LOAD_MORE_SHOTS)).toBeNull()
   })
 
   it('shows retry progress and ignores repeat taps after a failed refresh', async () => {
