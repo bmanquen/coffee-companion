@@ -36,7 +36,10 @@ export function SignedInHome({
 }) {
   return (
     <QueryProvider>
+      {/* Keyed by user, so another account never inherits a pending save,
+          its draft, or its retry keys. */}
       <Home
+        key={userId}
         name={name}
         userId={userId}
         onSignOut={onSignOut}

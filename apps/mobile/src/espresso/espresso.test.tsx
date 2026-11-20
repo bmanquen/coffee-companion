@@ -40,6 +40,7 @@ import {
   LOADING_SHOTS,
   LOAD_MORE_SHOTS,
   LOG,
+  LOGGING,
   LOG_ESPRESSO_HEADING,
   LOG_SHOT,
   LOG_SHOT_TEST_ID,
@@ -1088,6 +1089,43 @@ describe('log espresso shot', () => {
     )
     expect(screen.getByTestId(selectOptionTestId(GRINDER))).toBeTruthy()
     expect(screen.queryByTestId(selectOptionTestId(adaGrinder))).toBeNull()
+  })
+
+  it('does not hand a pending save to the next signed-in user', async () => {
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog()),
+      loadPrefill: () => Promise.resolve(seedShot()),
+      // Ada's save never answers.
+      create: () => new Promise(() => {}),
+    }
+    const view = await render(
+      <SignedInHome
+        userId={ADA_ID}
+        name="Ada Lovelace"
+        espresso={api}
+        onSignOut={() => {}}
+      />,
+    )
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(await screen.findByText(LOGGING)).toBeTruthy()
+
+    await view.rerender(
+      <SignedInHome
+        userId={ALAN_ID}
+        name="Alan Turing"
+        espresso={api}
+        onSignOut={() => {}}
+      />,
+    )
+    // Alan starts on his own list, not on Ada's busy form.
+    expect(screen.queryByTestId(SHOT_FORM_TEST_ID)).toBeNull()
+    await openForm()
+    expect(screen.queryByText(LOGGING)).toBeNull()
+    expect(screen.getByText(LOG)).toBeTruthy()
   })
 
   it('loads more after the signed-in user changes during a pending refresh', async () => {
