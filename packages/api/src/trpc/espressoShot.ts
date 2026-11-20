@@ -575,7 +575,10 @@ export const espressoShotRouter = createTRPCRouter({
         shotId = await insertShotWithKey(userId, input)
       }
 
-      return sealBrewWithDialedIn(userId, ctx.shelf, async () => {
+      // A fresh Shelf, not the request's: another read in the same batch may
+      // have computed it before this insert lifted the Coffee onto it.
+      const shelf = () => loadShelf(userId, ctx.plan)
+      return sealBrewWithDialedIn(userId, shelf, async () => {
         const shot = await db.query.espressoShots.findFirst({
           where: { id: shotId, userId },
         })

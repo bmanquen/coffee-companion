@@ -37,7 +37,13 @@ const asSnapshot = callerFor(SNAPSHOT)
 const uniqSnapshot = uniqFor(SNAPSHOT)
 const createSnapshotCoffee = createCoffeeFor(asSnapshot, uniqSnapshot)
 
-seedUsers([USER, PROMOTED, SNAPSHOT], types.cleanup)
+// A fourth for the batched create test.
+const BATCH = 'shelf-batch-user'
+const asBatch = callerFor(BATCH)
+const uniqBatch = uniqFor(BATCH)
+const createBatchCoffee = createCoffeeFor(asBatch, uniqBatch)
+
+seedUsers([USER, PROMOTED, SNAPSHOT, BATCH], types.cleanup)
 
 let grinderId: string
 let deviceId: string
@@ -526,5 +532,47 @@ describe('espressoShot.getLatestUnsealed', () => {
     expect(
       await asSnapshot.espressoShot.getLatestUnsealed({ coffeeId: target }),
     ).toBeNull()
+  })
+})
+
+describe('espressoShot.create', () => {
+  it('returns the new shot unsealed when its request already read the Shelf', async () => {
+    const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
+    const device = await asBatch.brewingDevice.create({
+      name: uniqBatch('Linea Mini'),
+      brand: 'La Marzocco',
+      typeId,
+    })
+    const grinder = await asBatch.grinder.create({
+      name: uniqBatch('Niche Zero'),
+      brand: 'Niche',
+    })
+    const shot = (coffeeId: string) => ({
+      coffeeId,
+      grinderId: grinder.id,
+      brewingDeviceId: device.id,
+      dose: '18',
+      yield: '36',
+      time: 28,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    // Added first and then outranked by five brewed Coffees, so it starts off
+    // the Free Shelf, and logging a shot on it puts it back on.
+    const returning = (await createBatchCoffee(uniqBatch('Returning'))).id
+    let onShelf = ''
+    for (let i = 0; i < 5; i++) {
+      const coffee = await createBatchCoffee(uniqBatch(`Coffee ${i}`))
+      onShelf = (await asBatch.espressoShot.create(shot(coffee.id))).id
+    }
+
+    // One request, as a tRPC batch is: a read computes its Shelf before the
+    // create's insert moves the Coffee onto it.
+    const inOneRequest = batchedCallerFor(BATCH)
+    await inOneRequest.espressoShot.getById(onShelf)
+    const created = await inOneRequest.espressoShot.create(shot(returning))
+
+    expect(created.sealed).toBe(false)
+    expect(created.dose).toBe('18')
   })
 })
