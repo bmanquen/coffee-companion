@@ -24,7 +24,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const skillDir = resolve(here, '..')
 const repoRoot = process.env.VERIFY_REPO_ROOT ?? resolve(skillDir, '../../..')
 const mobileDir = join(repoRoot, 'apps/mobile')
-const runDir = join(skillDir, '.run')
+const runDir = process.env.VERIFY_RUN_DIR ?? join(skillDir, '.run')
 const statePath = join(runDir, 'state.json')
 const artifactsDir = join(skillDir, 'artifacts')
 
@@ -186,6 +186,51 @@ function requireState() {
 function writeState(state) {
   ensureDir(runDir)
   writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`)
+}
+
+// Which run owns the instance in a run dir. Launch creates owner.json
+// exclusively before it starts anything, so of two racing launches only one
+// gets it, and `cleanup` with VERIFY_OWNER set touches only its own instance,
+// including one a failed launch left half started.
+function ownerPath(dir) {
+  return join(dir, 'owner.json')
+}
+
+export function readRunClaim(dir) {
+  try {
+    return JSON.parse(readFileSync(ownerPath(dir), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+// Null when this call claimed the dir, else the claim already there.
+export function claimRun(dir, owner) {
+  ensureDir(dir)
+  try {
+    writeFileSync(
+      ownerPath(dir),
+      `${JSON.stringify({ owner, pid: process.pid })}\n`,
+      { flag: 'wx' },
+    )
+    return null
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error
+    return readRunClaim(dir) ?? {}
+  }
+}
+
+function claimRunOrDie() {
+  const owner = process.env.VERIFY_OWNER || `${process.pid}-${Date.now()}`
+  const held = claimRun(runDir, owner)
+  if (!held) return
+  die(
+    pidAlive(held.pid) || hasLiveRecordedPids(readState())
+      ? `Another verification run (owner ${held.owner ?? 'unknown'}) holds ${runDir}. ` +
+          'Drive that one, or run `helpers/control cleanup` first. Do not double-drive.'
+      : `A previous run left ${runDir} behind and nothing it started is running. ` +
+          'Run `helpers/control cleanup` first.',
+  )
 }
 
 function pidAlive(pid) {
@@ -2606,6 +2651,7 @@ async function cmdLaunch() {
     die(portBusyMessage(port, portFree.pids, 'metro'))
   }
 
+  claimRunOrDie()
   ensureDir(runDir)
   ensureDir(artifactsDir)
 
@@ -3083,6 +3129,7 @@ async function cmdLaunchDevice(opts = {}) {
   if (webFree.status !== 'ok') {
     die(portBusyMessage(webPort, webFree.pids, 'web'))
   }
+  claimRunOrDie()
 
   const sdk = resolveSdkRoot()
   if (!sdk) {
@@ -4226,6 +4273,20 @@ function stopListenersOnOwnedVerifyPorts(
 }
 
 async function cmdCleanup() {
+  const owner = process.env.VERIFY_OWNER
+  if (owner && readRunClaim(runDir)?.owner !== owner) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          skipped: `${runDir} is not claimed by VERIFY_OWNER ${owner}; left as is.`,
+        },
+        null,
+        2,
+      ),
+    )
+    return
+  }
   const state = readState()
   const stopped = []
   let killedSerial = null
