@@ -1378,6 +1378,80 @@ function stylusHandwritingProblem(stdout) {
   )
 }
 
+// An attached emulator is the user's, so its setting goes back to what launch
+// found: "null" (never set) is deleted, "0" needs nothing, and an unread
+// value (undefined) is left alone. A failure is reported, not thrown, so the
+// rest of cleanup still runs.
+function restoreStylusHandwriting(
+  serial,
+  before,
+  {
+    run = (args) =>
+      runCapture(adbBin(), ['-s', serial, 'shell', 'settings', ...args], {
+        allowFail: true,
+      }),
+  } = {},
+) {
+  if (!serial || before == null || before === '0') return
+  const result = run(
+    before === 'null'
+      ? ['delete', 'secure', STYLUS_HANDWRITING_SETTING]
+      : ['put', 'secure', STYLUS_HANDWRITING_SETTING, before],
+  )
+  if (result.status !== 0) {
+    console.error(
+      `Could not restore ${STYLUS_HANDWRITING_SETTING}=${before} on ${serial}: ` +
+        `${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
+    )
+  }
+}
+
+// Null when the emulator at serial is the recorded AVD (or its name cannot be
+// read), else the mismatch.
+function connectedAvdProblem(
+  serial,
+  expected,
+  readAvd = () =>
+    parseAvdName(
+      runCapture(adbBin(), ['-s', serial, 'emu', 'avd', 'name'], {
+        allowFail: true,
+      }).stdout,
+    ),
+) {
+  const avd = readAvd()
+  return avd && avd !== expected
+    ? `${serial} is AVD ${avd}, not ${expected}`
+    : null
+}
+
+// The device writes cleanup and failed-launch teardown make, only on the
+// emulator that was recorded: another AVD now on the serial (booted after
+// this run's emulator went away) keeps its package, reverses, and settings.
+// Returns the mismatch, or null when the writes ran.
+function releaseRecordedDevice(
+  state,
+  {
+    uninstallOwned = shouldUninstallRecordedPackage(state),
+    avdProblem = () =>
+      connectedAvdProblem(state.serial, state.avdName ?? chosenAvdName()),
+    uninstall = () => uninstallPackage(state.serial, state.androidPackage),
+    clearReverses = () => adbClearReverses(state.serial),
+    restoreStylus = () =>
+      restoreStylusHandwriting(state.serial, state.stylusHandwritingBefore),
+  } = {},
+) {
+  if (!state.serial) return null
+  const problem = avdProblem()
+  if (problem) {
+    console.error(`Left ${state.serial} alone: ${problem}.`)
+    return problem
+  }
+  if (uninstallOwned) uninstall()
+  clearReverses()
+  restoreStylus()
+  return null
+}
+
 function ensureStylusHandwritingOff(
   serial,
   { put = adbPutStylusHandwritingOff, get = adbStylusHandwriting } = {},
@@ -3096,7 +3170,9 @@ async function stopLaunchDevice(partial, stopped = []) {
   if (partial.metroPid) stopRecordedPid(partial.metroPid, 'metro', stopped)
   // A failed wait still leaves an APK this run installed. Cleanup uninstalls
   // only when ownedPackage is not false.
-  if (plan.clearReverses) adbClearReverses(partial.serial)
+  if (plan.clearReverses) {
+    releaseRecordedDevice(partial, { uninstallOwned: false })
+  }
   if (partial.emulatorPid) {
     await killEmulatorSerial({
       serial: partial.serial,
@@ -3366,6 +3442,11 @@ async function cmdLaunchDevice(opts = {}) {
     )
     adbReverse(DEVICE_SERIAL, metroPort)
     adbReverse(DEVICE_SERIAL, webPort)
+    if (attachedEmulator) {
+      const before = `${adbStylusHandwriting(DEVICE_SERIAL) ?? ''}`.trim()
+      partial.stylusHandwritingBefore = before || undefined
+      persistLaunchPartial(partial)
+    }
     ensureStylusHandwritingOff(DEVICE_SERIAL)
     const devClientUrl = expoDevClientUrl({ scheme, metroPort })
     openDevClient(DEVICE_SERIAL, devClientUrl, ANDROID_PACKAGE)
@@ -3378,6 +3459,7 @@ async function cmdLaunchDevice(opts = {}) {
       avdName,
       attachedEmulator,
       ownedPackage: partial.ownedPackage,
+      stylusHandwritingBefore: partial.stylusHandwritingBefore,
       androidPackage: ANDROID_PACKAGE,
       emulatorPid,
       metroPid: metro.metroPid,
@@ -3489,6 +3571,17 @@ async function cmdDriveDevice(flow) {
     })
   ) {
     die(preexistingInstallClearStateMessage(), EXIT_NOT_DRIVABLE)
+  }
+  // Before any write, so a different AVD now on the serial is left untouched.
+  const avdProblem = connectedAvdProblem(
+    state.serial,
+    state.avdName ?? AVD_NAME,
+  )
+  if (avdProblem) {
+    die(
+      `Device ${state.serial} is not the recorded emulator: ${avdProblem}.`,
+      EXIT_NOT_DRIVABLE,
+    )
   }
   ensureAdbReverses(state.serial, driveDeviceReversePorts(state))
   ensureStylusHandwritingOff(state.serial)
@@ -3896,14 +3989,8 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   }
 
   if (serial && attached?.state === 'device') {
-    const avd = parseAvdName(
-      runCapture(adbBin(), ['-s', serial, 'emu', 'avd', 'name'], {
-        allowFail: true,
-      }).stdout,
-    )
-    if (avd && avd !== (state.avdName ?? AVD_NAME)) {
-      problems.push(`${serial} is AVD ${avd}, not ${state.avdName ?? AVD_NAME}`)
-    }
+    const avdProblem = connectedAvdProblem(serial, state.avdName ?? AVD_NAME)
+    if (avdProblem) problems.push(avdProblem)
   }
 
   const expectedSha = gitHeadShortSha()
@@ -4297,11 +4384,12 @@ async function cmdCleanup() {
       if (pid === state.emulatorPid || pid === state.webPid) continue
       stopRecordedPid(pid, pidKind(pid, state), stopped)
     }
-    if (shouldUninstallRecordedPackage(state)) {
-      uninstallPackage(state.serial, state.androidPackage)
-    }
-    if (state.serial) adbClearReverses(state.serial)
-    if (state.emulatorPid) {
+    const foreignAvd = releaseRecordedDevice(state)
+    if (state.emulatorPid && foreignAvd) {
+      // Not `emu kill` on the serial: that is the other AVD now. Signal only
+      // the pid this run started.
+      stopRecordedPid(state.emulatorPid, 'emulator', stopped)
+    } else if (state.emulatorPid) {
       await killEmulatorSerial({
         serial: state.serial,
         pid: state.emulatorPid,
@@ -4401,6 +4489,9 @@ export {
   STYLUS_HANDWRITING_SETTING,
   stylusHandwritingProblem,
   ensureStylusHandwritingOff,
+  restoreStylusHandwriting,
+  connectedAvdProblem,
+  releaseRecordedDevice,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   adbShellCookieGetCommands,

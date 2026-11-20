@@ -64,6 +64,9 @@ import {
   STYLUS_HANDWRITING_SETTING,
   stylusHandwritingProblem,
   ensureStylusHandwritingOff,
+  restoreStylusHandwriting,
+  connectedAvdProblem,
+  releaseRecordedDevice,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   adbShellCookieGetCommands,
@@ -1386,6 +1389,101 @@ describe('stylus handwriting setting', () => {
           get: () => '1',
         }),
       new RegExp(`${STYLUS_HANDWRITING_SETTING}=1`),
+    )
+  })
+
+  it('puts back what an attached emulator had before launch', () => {
+    const restored = (before) => {
+      const calls = []
+      restoreStylusHandwriting(DEVICE_SERIAL, before, {
+        run: (args) => {
+          calls.push(args)
+          return { status: 0 }
+        },
+      })
+      return calls
+    }
+    assert.deepEqual(restored('1'), [
+      ['put', 'secure', STYLUS_HANDWRITING_SETTING, '1'],
+    ])
+    assert.deepEqual(restored('null'), [
+      ['delete', 'secure', STYLUS_HANDWRITING_SETTING],
+    ])
+    // Already off, or never read (an emulator this run booted): no write.
+    assert.deepEqual(restored('0'), [])
+    assert.deepEqual(restored(undefined), [])
+  })
+})
+
+describe('releaseRecordedDevice', () => {
+  const release = (avd, opts = {}) => {
+    const calls = []
+    const problem = releaseRecordedDevice(
+      { serial: DEVICE_SERIAL, avdName: 'verify-pixel', ...opts.state },
+      {
+        uninstallOwned: opts.uninstallOwned ?? true,
+        avdProblem: () =>
+          connectedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => avd),
+        uninstall: () => calls.push('uninstall'),
+        clearReverses: () => calls.push('reverses'),
+        restoreStylus: () => calls.push('stylus'),
+      },
+    )
+    return { calls, problem }
+  }
+
+  it('releases the recorded emulator', () => {
+    assert.deepEqual(release('verify-pixel'), {
+      calls: ['uninstall', 'reverses', 'stylus'],
+      problem: null,
+    })
+    // Failed-launch teardown never uninstalls.
+    assert.deepEqual(release('verify-pixel', { uninstallOwned: false }).calls, [
+      'reverses',
+      'stylus',
+    ])
+    // An unreadable name is not a mismatch.
+    assert.deepEqual(release(null).calls, ['uninstall', 'reverses', 'stylus'])
+  })
+
+  it('writes nothing to another AVD now on the serial', () => {
+    assert.deepEqual(release('Pixel_7'), {
+      calls: [],
+      problem: `${DEVICE_SERIAL} is AVD Pixel_7, not verify-pixel`,
+    })
+    assert.deepEqual(release('verify-pixel', { state: { serial: null } }), {
+      calls: [],
+      problem: null,
+    })
+  })
+})
+
+describe('connectedAvdProblem', () => {
+  it('names a different AVD on the recorded serial', () => {
+    assert.equal(
+      connectedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => 'verify-pixel'),
+      null,
+    )
+    assert.equal(
+      connectedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => 'Pixel_7'),
+      `${DEVICE_SERIAL} is AVD Pixel_7, not verify-pixel`,
+    )
+    // An unreadable name is left to the readiness check.
+    assert.equal(
+      connectedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => null),
+      null,
+    )
+  })
+
+  it('is checked before drive-device writes to the device', () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'),
+      'utf8',
+    )
+    const drive = src.slice(src.indexOf('async function cmdDriveDevice'))
+    assert.ok(
+      drive.indexOf('connectedAvdProblem(') <
+        drive.indexOf('ensureAdbReverses(state.serial'),
     )
   })
 })
