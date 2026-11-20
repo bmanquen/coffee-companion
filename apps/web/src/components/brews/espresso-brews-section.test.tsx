@@ -29,7 +29,7 @@ import {
   makeRecentShot,
 } from '@/test/factories'
 import { createTestProviders } from '@/test/providers'
-import { trpcSuccess } from '@/test/trpc-response'
+import { trpcBatchSuccess, trpcSuccess } from '@/test/trpc-response'
 import { EspressoBrewsSection } from './espresso-brews-section'
 import type * as ReactRouter from '@tanstack/react-router'
 
@@ -1107,25 +1107,29 @@ describe('EspressoBrewsSection', () => {
       .spyOn(globalThis, 'fetch')
       .mockImplementation((input, init) => {
         if (isEspressoCursorRequest(input, init)) return pendingLoadMore
-        if (String(input).includes('espressoShot.getRecent')) {
-          return Promise.resolve(
-            trpcSuccess({ items: [], total: 0, nextCursor: null }),
-          )
-        }
-        return Promise.resolve(trpcSuccess())
+        // The delete's refresh can batch these, so each keeps its own slot.
+        return Promise.resolve(
+          trpcBatchSuccess(input, (procedure) =>
+            procedure === 'espressoShot.getRecent'
+              ? { items: [], total: 0, nextCursor: null }
+              : procedure === 'coffee.getAll'
+                ? coffeesFromShots(first)
+                : {},
+          ),
+        )
       })
+    const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(index),
+        coffeeId: `c${index}`,
+        coffee: makeRecentCoffee({
+          id: `c${index}`,
+          name: index === 0 ? 'Colombia Huila' : `Coffee ${index}`,
+        }),
+      }),
+    )
     try {
       const { queryClient, trpc, Wrapper } = createTestProviders()
-      const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
-        makeRecentShot({
-          id: espressoShotFixtureId(index),
-          coffeeId: `c${index}`,
-          coffee: makeRecentCoffee({
-            id: `c${index}`,
-            name: index === 0 ? 'Colombia Huila' : `Coffee ${index}`,
-          }),
-        }),
-      )
       seedLog(queryClient, trpc, first, first.length + 1)
       seedEspressoShotPage(queryClient, trpc, [first[0]], 1, undefined, {
         q: 'Huila',

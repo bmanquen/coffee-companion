@@ -51,4 +51,31 @@ describe('CoffeeFilter with cmdk', () => {
     })
     expect(screen.queryAllByRole('option')).toHaveLength(0)
   })
+
+  it('finds a coffee renamed while the filter is open by its new label', async () => {
+    const view = render(
+      <CoffeeFilter options={options} value="" onChange={vi.fn()} />,
+    )
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'All coffees' }))
+    })
+    view.rerender(
+      <CoffeeFilter
+        options={[
+          ...options.slice(0, 2),
+          { value: 'huila', label: 'Kenya Nyeri' },
+        ]}
+        value=""
+        onChange={vi.fn()}
+      />,
+    )
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Search coffees...'), {
+        target: { value: 'nyeri' },
+      })
+    })
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Kenya Nyeri',
+    ])
+  })
 })

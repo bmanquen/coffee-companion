@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { refreshEspressoShotReads } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
 import type { BrewingMethod } from '@coffee-companion/api/lib/dialed-in-brew'
@@ -20,10 +19,19 @@ function invalidateMethodFeed(
   brewingMethod: BrewingMethod,
 ) {
   switch (brewingMethod) {
-    case 'espresso':
-      void refreshEspressoShotReads(queryClient, trpc)
+    case 'espresso': {
+      // A toggle changes membership, not the gear and roast date a form
+      // prefills from, so only the history pages cancel a read in flight.
+      const pages = trpc.espressoShot.getRecent.infiniteQueryFilter()
+      void queryClient
+        .cancelQueries(pages)
+        .then(() => queryClient.invalidateQueries(pages))
+      queryClient.invalidateQueries(
+        trpc.espressoShot.getLatestUnsealed.queryFilter(),
+      )
       queryClient.invalidateQueries(trpc.espressoShot.getDialedIn.queryFilter())
       return
+    }
     case 'aeropress':
       queryClient.invalidateQueries(trpc.aeropressBrew.getAll.queryFilter())
       queryClient.invalidateQueries(trpc.aeropressBrew.getRecent.queryFilter())

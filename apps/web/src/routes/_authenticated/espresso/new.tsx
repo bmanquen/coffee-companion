@@ -124,6 +124,8 @@ export function NewEspressoShot() {
   const pendingLookup = useRef<object | null>(null)
   const saveInterruptedLookup = useRef(false)
   const saveRejected = useRef(false)
+  // The coffee of a save the API just reported deleted, if any.
+  const savedKeyDeletedFor = useRef('')
   // The gear and roast date of each save that may have committed, by coffee
   // and then by idempotency key, newest last, so a retry of any of them can
   // send what it first sent.
@@ -210,6 +212,7 @@ export function NewEspressoShot() {
         { ...value, idempotencyKey },
       )
       saveRejected.current = outcome.rejected
+      savedKeyDeletedFor.current = outcome.keyDeleted ? value.coffeeId : ''
       if (outcome.keyDeleted) {
         // That shot is gone for good, so the next Log saves a new one.
         for (const [draft, key] of idempotencyKeys.current) {
@@ -378,6 +381,9 @@ export function NewEspressoShot() {
     const resume = saveInterruptedLookup.current && saveRejected.current
     saveInterruptedLookup.current = false
     if (saveSucceeded.current || !prefillCoffeeId.current) return
+    // The draft just sent is the one to save anew: an older lost save of
+    // its recipe waits for a reselection or an edit back to it.
+    if (savedKeyDeletedFor.current === prefillCoffeeId.current) return
     if (prefillQueued.current || resume) {
       loadPrefillFor(prefillCoffeeId.current)
     } else {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
 import { BrewFeed } from './brew-feed'
@@ -155,6 +155,50 @@ describe('BrewFeed', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Ethiopia Guji' }))
 
     expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+  })
+
+  it('stays on page 1 when a Next load started before a filter change lands', async () => {
+    const ethiopia = Array.from({ length: SHOTS_PER_COFFEE }, (_, index) =>
+      makeRecentShot({
+        id: `e${index}`,
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      }),
+    )
+    const kenya = Array.from({ length: SHOTS_PER_COFFEE }, (_, index) =>
+      makeRecentShot({
+        id: `k${index}`,
+        coffeeId: 'c2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Kenya AA' }),
+      }),
+    )
+    let settleLoad: (firstId: string | null) => void = () => {}
+    const loadMore = vi.fn(
+      () =>
+        new Promise<string | null>((resolve) => {
+          settleLoad = resolve
+        }),
+    )
+    renderFeed({
+      brews: [...ethiopia, ...kenya],
+      pageSize: BREW_FEED_PAGE_SIZE,
+      hasMore: true,
+      loadMore,
+    })
+    fireEvent.click(screen.getByLabelText('Next page'))
+    fireEvent.click(screen.getByLabelText('Next page'))
+    expect(screen.getByText(/^Page 3 of 3/)).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Next page'))
+    expect(loadMore).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByText('All coffees'))
+    fireEvent.click(screen.getByRole('option', { name: 'Ethiopia Guji' }))
+    // e5 is on page 2 of the filtered rows, so only the generation check
+    // keeps the old load from moving there.
+    await act(async () => {
+      settleLoad('e5')
+    })
+    expect(screen.getByText(/^Page 1 of 2/)).toBeTruthy()
   })
 
   it('keeps an opened brew open only for that brew when a filter moves rows', () => {

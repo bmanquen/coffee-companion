@@ -1,3 +1,4 @@
+import { onlineManager } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { espressoShotCursor, seedEspressoShotPage } from '@/test/espresso-shots'
@@ -232,6 +233,72 @@ describe('useEspressoShotPages', () => {
       })
       await waitFor(() => expect(result.current.loadingMore).toBe(false))
     } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('appends nothing when load more joins a refetch started since the last render', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    let continuations = 0
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input, init) => {
+        const text = decodeURIComponent(await requestText(input, init))
+        if (text.includes('"cursor"')) continuations += 1
+        return trpcSuccess({
+          items: first,
+          total: first.length + 1,
+          nextCursor: espressoShotCursor(first[first.length - 1]),
+        })
+      })
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+      let firstId: string | null = 'unset'
+      await act(async () => {
+        // No render between them, so loadMore still sees the query idle.
+        void queryClient.refetchQueries(
+          trpc.espressoShot.getRecent.infiniteQueryFilter(),
+        )
+        firstId = await result.current.loadMore()
+      })
+      // Its id would send a pager back to a page already shown.
+      expect(firstId).toBeNull()
+      expect(continuations).toBe(0)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('holds load more while a refresh is paused offline', async () => {
+    const first = pageOf(ESPRESSO_SHOT_PAGE_SIZE, 's')
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => new Promise<never>(() => {}))
+    onlineManager.setOnline(false)
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    try {
+      seedEspressoShotPage(queryClient, trpc, first, first.length + 1)
+      const { result } = renderHook(() => useEspressoShotPages(), {
+        wrapper: Wrapper,
+      })
+      act(() => {
+        void result.current.retry()
+      })
+      await waitFor(() => expect(result.current.loadingMore).toBe(true))
+      let firstId: string | null = 'unset'
+      await act(async () => {
+        firstId = await result.current.loadMore()
+      })
+      expect(firstId).toBeNull()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      // Otherwise reconnecting resumes the paused refresh into the next test.
+      queryClient.clear()
+      onlineManager.setOnline(true)
       fetchSpy.mockRestore()
     }
   })

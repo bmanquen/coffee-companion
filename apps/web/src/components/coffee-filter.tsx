@@ -89,7 +89,9 @@ export function CoffeeFilter({
                 </CommandItem>
                 {options.map((option) => (
                   <CommandItem
-                    key={option.value}
+                    // cmdk reads keywords only when an item mounts, so a
+                    // renamed coffee remounts to be found by its new label.
+                    key={`${option.value}:${option.label}`}
                     // Ids, so two coffees with the same label stay separately
                     // selectable; the label is what search matches.
                     value={`coffee:${option.value}`}

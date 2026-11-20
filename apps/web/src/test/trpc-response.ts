@@ -28,3 +28,28 @@ export function trpcErrorResponse(
     headers: { 'content-type': 'application/jsonl' },
   })
 }
+
+// A reply to a request the batch stream link may have batched: one result
+// per procedure in the URL, in its slot, from dataFor(procedure name).
+export function trpcBatchSuccess(
+  input: RequestInfo | URL,
+  dataFor: (procedure: string) => unknown,
+) {
+  const url = new URL(
+    input instanceof Request ? input.url : String(input),
+    'http://localhost',
+  )
+  const procedures = decodeURIComponent(
+    url.pathname.split('/').pop() ?? '',
+  ).split(',')
+  const head = Object.fromEntries(
+    procedures.map((procedure, index) => [
+      String(index),
+      [[{ result: { data: dataFor(procedure) } }]],
+    ]),
+  )
+  return new Response(JSON.stringify({ json: head }) + '\n', {
+    status: 200,
+    headers: { 'content-type': 'application/jsonl' },
+  })
+}

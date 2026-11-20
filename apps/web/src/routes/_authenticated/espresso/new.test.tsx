@@ -208,6 +208,20 @@ function createCalls(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
   return fetchSpy.mock.calls.filter((call) => isCreateCall(call))
 }
 
+// Each create request's input, in order, as the API receives it.
+function createInputs(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
+  return createCalls(fetchSpy).map((call) => {
+    const body = JSON.parse(
+      String((call[1] as RequestInit | undefined)?.body ?? '{}'),
+    ) as Record<string, { json: Record<string, unknown> }>
+    return body['0'].json
+  })
+}
+
+function createKeys(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
+  return createInputs(fetchSpy).map((input) => input.idempotencyKey)
+}
+
 function prefillCalls(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
   return fetchSpy.mock.calls.filter((call) => isPrefillCall(call))
 }
@@ -310,10 +324,7 @@ describe('NewEspressoShot form', () => {
 
       await waitFor(() => expect(createCalls(fetchSpy).length).toBeGreaterThan(0))
       expect(createCalls(fetchSpy)).toHaveLength(1)
-      const body = String(
-        (createCalls(fetchSpy)[0][1] as RequestInit | undefined)?.body ?? '',
-      )
-      expect(body).toContain(GRINDER)
+      expect(createInputs(fetchSpy)[0].grinderId).toBe(GRINDER)
     } finally {
       fetchSpy.mockRestore()
     }
@@ -412,15 +423,13 @@ describe('NewEspressoShot form', () => {
       await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
       const createCall = createCalls(fetchSpy)[0]
       expect(String(createCall[0])).toContain('espressoShot.create')
-      const body = String(
-        (createCall[1] as RequestInit | undefined)?.body ?? '',
-      )
-      expect(body).toContain('18')
-      expect(body).toContain('36')
-      expect(body).toContain(COFFEE)
-      expect(body).toContain('2026-05-01')
-      expect(body).not.toContain('2026-04-30')
-      expect(body).not.toMatch(/2026-05-01T/)
+      expect(createInputs(fetchSpy)[0]).toMatchObject({
+        dose: '18',
+        yield: '36',
+        coffeeId: COFFEE,
+        // The calendar day, not a timestamp a time zone could shift.
+        roastDate: '2026-05-01',
+      })
       // Navigation waits for the shot reads to refresh after tracking.
       await waitFor(() =>
         expect(mocks.navigate).toHaveBeenCalledWith({
@@ -480,12 +489,7 @@ describe('NewEspressoShot form', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
       await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
 
-      const keys = createCalls(fetchSpy).map((call) => {
-        const init = call[1] as RequestInit | undefined
-        return String(init?.body ?? '').match(
-          /"idempotencyKey"\s*:\s*"([^"]+)"/,
-        )?.[1]
-      })
+      const keys = createKeys(fetchSpy)
       expect(keys[0]).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
       )
@@ -543,12 +547,7 @@ describe('NewEspressoShot form', () => {
       await log(2)
       await log(3)
 
-      const keys = createCalls(fetchSpy).map((call) => {
-        const init = call[1] as RequestInit | undefined
-        return String(init?.body ?? '').match(
-          /"idempotencyKey"\s*:\s*"([^"]+)"/,
-        )?.[1]
-      })
+      const keys = createKeys(fetchSpy)
       for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
       // The lost save replays under its key until the API says it is gone.
       expect(keys[1]).toBe(keys[0])
@@ -616,12 +615,7 @@ describe('NewEspressoShot form', () => {
       await log(2)
       await log(3)
 
-      const keys = createCalls(fetchSpy).map((call) => {
-        const init = call[1] as RequestInit | undefined
-        return String(init?.body ?? '').match(
-          /"idempotencyKey"\s*:\s*"([^"]+)"/,
-        )?.[1]
-      })
+      const keys = createKeys(fetchSpy)
       // Only a CONFLICT that says the shot was deleted frees the key; a new
       // key here could store the lost save a second time.
       for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
@@ -678,17 +672,11 @@ describe('NewEspressoShot form', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
       await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
 
-      const bodies = createCalls(fetchSpy).map((call) =>
-        String((call[1] as RequestInit | undefined)?.body ?? ''),
-      )
-      const keys = bodies.map(
-        (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
-      )
+      const keys = createKeys(fetchSpy)
       expect(keys[0]).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[1]).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[0]).not.toBe(keys[1])
-      expect(bodies[1]).toMatch(/"dose"\s*:\s*"22"/)
-      expect(bodies[1]).not.toMatch(/"dose"\s*:\s*"18"/)
+      expect(createInputs(fetchSpy)[1].dose).toBe('22')
     } finally {
       fetchSpy.mockRestore()
     }
@@ -739,12 +727,7 @@ describe('NewEspressoShot form', () => {
       await logWithDose('22', 2)
       await logWithDose('18', 3)
 
-      const keys = createCalls(fetchSpy).map(
-        (call) =>
-          String((call[1] as RequestInit | undefined)?.body ?? '').match(
-            /"idempotencyKey"\s*:\s*"([^"]+)"/,
-          )?.[1],
-      )
+      const keys = createKeys(fetchSpy)
       for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[0]).not.toBe(keys[1])
       expect(keys[2]).toBe(keys[0])
@@ -981,15 +964,10 @@ describe('NewEspressoShot form', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
       await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
-      const bodies = createCalls(fetchSpy).map((call) =>
-        String((call[1] as RequestInit | undefined)?.body ?? ''),
-      )
-      const keys = bodies.map(
-        (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
-      )
+      const keys = createKeys(fetchSpy)
       for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[0]).toBe(keys[1])
-      expect(bodies[1]).not.toContain('2026-05-01')
+      expect(createInputs(fetchSpy)[1].roastDate).not.toBe('2026-05-01')
     } finally {
       fetchSpy.mockRestore()
     }
@@ -1170,15 +1148,10 @@ describe('NewEspressoShot form', () => {
       })
       await logAndSettle(2)
 
-      const bodies = createCalls(fetchSpy).map((call) =>
-        String((call[1] as RequestInit | undefined)?.body ?? ''),
-      )
-      const keys = bodies.map(
-        (body) => body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
-      )
+      const keys = createKeys(fetchSpy)
       for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[1]).toBe(keys[0])
-      expect(bodies[1]).not.toContain('2026-05-01')
+      expect(createInputs(fetchSpy)[1].roastDate).not.toBe('2026-05-01')
     } finally {
       fetchSpy.mockRestore()
     }
@@ -1447,13 +1420,12 @@ describe('NewEspressoShot form', () => {
         )
         // The 18 g retry sends exactly what the 18 g save sent, so the API
         // replays it instead of storing a second shot.
-        const keyOf = (body: string) =>
-          body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1]
-        expect(keyOf(bodies[0])).toMatch(IDEMPOTENCY_KEY_PATTERN)
-        expect(keyOf(bodies[1])).toMatch(IDEMPOTENCY_KEY_PATTERN)
+        const keys = createKeys(fetchSpy)
+        expect(keys[0]).toMatch(IDEMPOTENCY_KEY_PATTERN)
+        expect(keys[1]).toMatch(IDEMPOTENCY_KEY_PATTERN)
         // Two shots, two keys: the API would refuse the 22 g save as a replay
         // conflict under the 18 g save's key.
-        expect(keyOf(bodies[1])).not.toBe(keyOf(bodies[0]))
+        expect(keys[1]).not.toBe(keys[0])
         expect(bodies[1]).not.toBe(bodies[0])
         if (pending) expect(bodies[2]).toBe(bodies[1])
         expect(bodies.at(-1)).toBe(bodies[0])
@@ -1622,8 +1594,14 @@ describe('NewEspressoShot form', () => {
       expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
       await logAndSettle(2)
 
-      // Retrying the May 2 save finds its shot deleted.
+      // Reselecting restores the newest lost save, May 2, as an untouched
+      // prefill; retrying it finds its shot deleted.
+      pickCoffee(COFFEE_B)
+      pickCoffee(COFFEE)
+      expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
       await logAndSettle(3)
+      // The draft stays as sent, so the next Log saves May 2 anew.
+      expect(screen.getByText('May 2nd, 2026')).toBeTruthy()
 
       // The May 1 save may still have committed, so reselecting the coffee
       // restores it rather than reading the latest shot, and Log replays it.
@@ -1632,12 +1610,7 @@ describe('NewEspressoShot form', () => {
       expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
       expect(prefills).toBe(1)
       await logAndSettle(4)
-      const keys = createCalls(fetchSpy).map(
-        (call) =>
-          String((call[1] as RequestInit | undefined)?.body ?? '').match(
-            /"idempotencyKey"\s*:\s*"([^"]+)"/,
-          )?.[1],
-      )
+      const keys = createKeys(fetchSpy)
       expect(keys[3]).toBe(keys[0])
       expect(keys[1]).not.toBe(keys[0])
     } finally {
@@ -1691,9 +1664,7 @@ describe('NewEspressoShot form', () => {
         String((call[1] as RequestInit | undefined)?.body ?? ''),
       )
       // The form looks as it did, so the retry sends the same shot.
-      expect(bodies[0].match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1]).toMatch(
-        IDEMPOTENCY_KEY_PATTERN,
-      )
+      expect(createKeys(fetchSpy)[0]).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(bodies[1]).toBe(bodies[0])
     } finally {
       fetchSpy.mockRestore()

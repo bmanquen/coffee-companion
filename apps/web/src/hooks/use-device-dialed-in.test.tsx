@@ -44,4 +44,47 @@ describe('useDeviceDialedIn', () => {
     })
     expect(queryClient.getQueryState(page.queryKey)?.isInvalidated).toBe(true)
   })
+
+  it('leaves a shot form’s prefill lookup running through a toggle', async () => {
+    let finishLatest: (response: Response) => void = () => {}
+    const fetch = vi.fn<typeof globalThis.fetch>((input) =>
+      String(input).includes('espressoShot.getLatestUnsealed')
+        ? new Promise<Response>((resolve) => {
+            finishLatest = resolve
+          })
+        : Promise.resolve(trpcSuccess({})),
+    )
+    const { queryClient, trpc, Wrapper } = createTestProviders({ fetch })
+    // The form reads it with fetchQuery, so nothing would restart it.
+    const lookup = queryClient.fetchQuery(
+      trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId: 'c1' }),
+    )
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+
+    const { result } = renderHook(() => useDeviceDialedIn('espresso'), {
+      wrapper: Wrapper,
+    })
+    act(() => {
+      result.current.toggle({
+        id: 's1',
+        brewingDeviceId: 'd1',
+        isDialedIn: true,
+      })
+    })
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.some(([input]) =>
+          String(input).includes('dialedInBrew'),
+        ),
+      ).toBe(true),
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    await act(async () => {
+      finishLatest(trpcSuccess(null))
+    })
+    await expect(lookup).resolves.toBeNull()
+  })
 })
