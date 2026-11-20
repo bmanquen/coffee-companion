@@ -49,15 +49,41 @@ export const Route = createFileRoute('/_authenticated/espresso/new')({
 const PREFILL_FAILED =
   "We couldn't load this coffee's last shot. Enter it yourself, or try again."
 
+// An emptied Notes field holds '' where an untouched one holds null; both
+// mean no notes, and are sent and fingerprinted as null.
+function withBlankNotesAsNull(value: InsertEspressoShot): InsertEspressoShot {
+  return { ...value, notes: value.notes || null }
+}
+
 // Matches the API's replay check, so 18 and 18.0, or 30 and 030, reuse the
 // same key.
 function draftFingerprint(value: InsertEspressoShot) {
   const time = value.time as number | string | null
   return JSON.stringify({
-    ...value,
+    ...withBlankNotesAsNull(value),
     dose: normalizeDecimal(value.dose),
     yield: normalizeDecimal(value.yield),
     time: typeof time === 'string' && /^\d+$/.test(time) ? Number(time) : time,
+  })
+}
+
+// The fields a user types for each shot, apart from the coffee and the gear
+// and roast date its prefill carries forward.
+const RECIPE_FIELDS = new Set([
+  'dose',
+  'yield',
+  'time',
+  'grindSetting',
+  'notes',
+])
+
+function recipeFingerprint(value: InsertEspressoShot) {
+  return draftFingerprint({
+    ...value,
+    coffeeId: '',
+    grinderId: '',
+    brewingDeviceId: '',
+    roastDate: null,
   })
 }
 
@@ -88,8 +114,10 @@ export function NewEspressoShot() {
   const saveInFlight = useRef(false)
   const saveSucceeded = useRef(false)
   const prefillQueued = useRef(false)
-  // The gear and roast date of each save that may have committed, by coffee.
-  const unresolvedSaves = useRef(new Map<string, PrefillSource>())
+  // The gear and roast date of each save that may have committed, by coffee
+  // and then by recipe, newest last, so a retry of any of them can send what
+  // it first sent.
+  const unresolvedSaves = useRef(new Map<string, Map<string, PrefillSource>>())
   const [prefillError, setPrefillError] = useState(false)
 
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
@@ -137,7 +165,17 @@ export function NewEspressoShot() {
     validators: {
       onChange: insertEspressoShotSchema as never,
     },
-    onSubmit: async ({ value }) => {
+    listeners: {
+      // Editing the recipe back to a lost save's restores that save's gear
+      // and roast date, so its retry replays rather than saving a new shot.
+      // An edit made while a save is pending is checked once it settles.
+      onChange: ({ fieldApi }) => {
+        if (!RECIPE_FIELDS.has(fieldApi.name) || saveInFlight.current) return
+        restoreMatchingSave()
+      },
+    },
+    onSubmit: async ({ value: submitted }) => {
+      const value = withBlankNotesAsNull(submitted)
       const fingerprint = draftFingerprint(value)
       let idempotencyKey = idempotencyKeys.current.get(fingerprint)
       if (!idempotencyKey) {
@@ -164,14 +202,22 @@ export function NewEspressoShot() {
         for (const [draft, key] of idempotencyKeys.current) {
           if (key === idempotencyKey) idempotencyKeys.current.delete(draft)
         }
-        unresolvedSaves.current.delete(value.coffeeId)
+        unresolvedSaves.current
+          .get(value.coffeeId)
+          ?.delete(recipeFingerprint(value))
       } else if (!saveSucceeded.current && !outcome.rejected) {
         // Only a save that may have committed must replay as submitted.
-        unresolvedSaves.current.set(value.coffeeId, {
+        const saves =
+          unresolvedSaves.current.get(value.coffeeId) ??
+          new Map<string, PrefillSource>()
+        const recipe = recipeFingerprint(value)
+        saves.delete(recipe)
+        saves.set(recipe, {
           grinderId: value.grinderId,
           brewingDeviceId: value.brewingDeviceId,
           roastDate: value.roastDate ?? null,
         })
+        unresolvedSaves.current.set(value.coffeeId, saves)
       }
     },
   })
@@ -241,7 +287,12 @@ export function NewEspressoShot() {
     const startedSaveGen = saveGen.current
     // After a save whose response was lost, its retry must send the same
     // payload, so restore what was submitted instead of any shot read since.
-    const unresolved = unresolvedSaves.current.get(coffeeId)
+    // The one with the form's recipe if there is one, else the newest.
+    const saves = unresolvedSaves.current.get(coffeeId)
+    const unresolved = saves
+      ? (saves.get(recipeFingerprint({ ...form.state.values, coffeeId })) ??
+        [...saves.values()].at(-1))
+      : undefined
     if (unresolved) {
       applyPrefill(coffeeId, seq, unresolved, startedSaveGen)
       return
@@ -275,14 +326,26 @@ export function NewEspressoShot() {
     loadPrefillFor(coffeeId)
   }
 
+  // Restores the gear and roast date of the lost save whose recipe the form
+  // now holds, if any, in fields not set by hand.
+  const restoreMatchingSave = () => {
+    const values = form.state.values
+    if (!values.coffeeId || values.coffeeId !== prefillCoffeeId.current) return
+    const match = unresolvedSaves.current
+      .get(values.coffeeId)
+      ?.get(recipeFingerprint(values))
+    if (match) {
+      applyPrefill(values.coffeeId, prefillSeq.current, match, saveGen.current)
+    }
+  }
+
   const flushQueuedPrefill = () => {
     saveInFlight.current = false
-    if (
-      !saveSucceeded.current &&
-      prefillQueued.current &&
-      prefillCoffeeId.current
-    ) {
+    if (saveSucceeded.current || !prefillCoffeeId.current) return
+    if (prefillQueued.current) {
       loadPrefillFor(prefillCoffeeId.current)
+    } else {
+      restoreMatchingSave()
     }
   }
 

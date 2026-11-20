@@ -1571,14 +1571,40 @@ describe('Dashboard', () => {
         return Promise.reject(new Error('Network request failed'))
       })
     try {
-      const { queryClient, trpc } = renderDashboard('espresso', [
-        makeRecentShot(),
-      ])
+      const guji = makeRecentShot({
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      })
+      const { queryClient, trpc } = renderDashboard(
+        'espresso',
+        [guji],
+        {},
+        (providers) => {
+          // So picking the coffee reads no shots.
+          seedEspressoShotPage(
+            providers.queryClient,
+            providers.trpc,
+            [guji],
+            1,
+            undefined,
+            {
+              coffeeId: 'c1',
+            },
+          )
+        },
+      )
       await act(() =>
         queryClient.invalidateQueries(trpc.coffee.getAll.queryFilter()),
       )
       const coffeeError = await screen.findByText(ESPRESSO_COFFEES_LOAD_FAILED)
-      expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
+      // The cached coffee is still offered and can be picked.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'All coffees' }))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('option', { name: 'Ethiopia Guji' }))
+      })
+      expect(screen.getByRole('button', { name: 'Ethiopia Guji' })).toBeTruthy()
+      expect(screen.getByText(ESPRESSO_COFFEES_LOAD_FAILED)).toBeTruthy()
 
       fireEvent.click(
         within(coffeeError.parentElement as HTMLElement).getByRole('button', {
@@ -1589,7 +1615,7 @@ describe('Dashboard', () => {
         expect(screen.queryByText(ESPRESSO_COFFEES_LOAD_FAILED)).toBeNull(),
       )
       expect(coffeeLoads).toBe(2)
-      expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Ethiopia Guji' })).toBeTruthy()
     } finally {
       fetchSpy.mockRestore()
     }

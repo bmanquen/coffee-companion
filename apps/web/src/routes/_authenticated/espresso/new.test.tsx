@@ -523,9 +523,9 @@ describe('NewEspressoShot form', () => {
           /"idempotencyKey"\s*:\s*"([^"]+)"/,
         )?.[1]
       })
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
       // The lost save replays under its key until the API says it is gone.
       expect(keys[1]).toBe(keys[0])
-      expect(keys[2]).toBeTruthy()
       expect(keys[2]).not.toBe(keys[0])
     } finally {
       fetchSpy.mockRestore()
@@ -598,7 +598,7 @@ describe('NewEspressoShot form', () => {
       })
       // Only a CONFLICT that says the shot was deleted frees the key; a new
       // key here could store the lost save a second time.
-      expect(keys[0]).toBeTruthy()
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
       expect(keys[1]).toBe(keys[0])
       expect(keys[2]).toBe(keys[0])
     } finally {
@@ -1157,6 +1157,188 @@ describe('NewEspressoShot form', () => {
           ),
         ).toHaveLength(2),
       )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it.each([
+    { order: 'the coffee is reselected after the recipe returns' },
+    { order: 'the recipe returns after the coffee is reselected' },
+    { order: 'the recipe returns while a retry of the other is pending' },
+  ])(
+    'retries the first of two lost saves for one coffee when $order',
+    async ({ order }) => {
+      const { Wrapper, fetchSpy } = seeded()
+      const pending = order.includes('pending')
+      let creates = 0
+      let failPendingRetry: () => void = () => {}
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isPrefillCall(call)) {
+          if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
+          return trpcSuccess(
+            makeRecentShot({
+              id: 'shot-1',
+              coffeeId: COFFEE,
+              grinderId: GRINDER,
+              brewingDeviceId: ESP_DEVICE,
+              roastDate: '2026-05-01',
+            }),
+          )
+        }
+        if (isCreateCall(call)) {
+          creates += 1
+          if (pending && creates === 3) {
+            await new Promise<void>((resolve) => {
+              failPendingRetry = resolve
+            })
+          }
+          throw new Error('Network request failed')
+        }
+        return trpcSuccess()
+      })
+      const pickCoffee = (id: string) =>
+        fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+          target: { value: id },
+        })
+      const setDose = (value: string) =>
+        fireEvent.change(screen.getByLabelText(/^Dose/), { target: { value } })
+      const logAndSettle = async (count: number) => {
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        )
+      }
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        setDose('18')
+        fireEvent.change(screen.getByLabelText(/^Yield/), {
+          target: { value: '36' },
+        })
+        fireEvent.change(screen.getByLabelText(/^Time/), {
+          target: { value: '30' },
+        })
+        fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+          target: { value: '1.5' },
+        })
+        await logAndSettle(1)
+
+        // A second shot of the same coffee, also lost.
+        setDose('22')
+        await act(async () => {
+          fireEvent.click(screen.getByLabelText(/^Roast Date/))
+        })
+        fireEvent.click(
+          await screen.findByRole('button', { name: /May 2nd, 2026/ }),
+        )
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+        await logAndSettle(2)
+
+        const reselect = async () => {
+          pickCoffee(COFFEE_B)
+          pickCoffee(COFFEE)
+        }
+        if (order === 'the coffee is reselected after the recipe returns') {
+          setDose('18')
+          await reselect()
+        } else if (pending) {
+          await reselect()
+          expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+          // Retry the 22 g save, and go back to 18 g before it settles.
+          fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+          await waitFor(() => expect(createCalls(fetchSpy).length).toBe(3))
+          setDose('18')
+          await act(async () => {
+            failPendingRetry()
+            await new Promise((resolve) => setTimeout(resolve, 0))
+          })
+          await waitFor(() =>
+            expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+              'disabled',
+              false,
+            ),
+          )
+        } else {
+          await reselect()
+          expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+          setDose('18')
+        }
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        await logAndSettle(pending ? 4 : 3)
+
+        const bodies = createCalls(fetchSpy).map((call) =>
+          String((call[1] as RequestInit | undefined)?.body ?? ''),
+        )
+        // The 18 g retry sends exactly what the 18 g save sent, so the API
+        // replays it instead of storing a second shot.
+        expect(
+          bodies[0].match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
+        ).toMatch(IDEMPOTENCY_KEY_PATTERN)
+        expect(bodies[1]).not.toBe(bodies[0])
+        if (pending) expect(bodies[2]).toBe(bodies[1])
+        expect(bodies.at(-1)).toBe(bodies[0])
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    },
+  )
+
+  it("reuses a lost save's key after a note is typed and erased", async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        throw new Error('Network request failed')
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      const log = async (calls: number) => {
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(calls))
+      }
+      await log(1)
+      const notes = screen.getByLabelText(/^Notes/)
+      fireEvent.change(notes, { target: { value: 'sour' } })
+      fireEvent.change(notes, { target: { value: '' } })
+      await log(2)
+
+      const bodies = createCalls(fetchSpy).map((call) =>
+        String((call[1] as RequestInit | undefined)?.body ?? ''),
+      )
+      // The form looks as it did, so the retry sends the same shot.
+      expect(bodies[0].match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1]).toMatch(
+        IDEMPOTENCY_KEY_PATTERN,
+      )
+      expect(bodies[1]).toBe(bodies[0])
     } finally {
       fetchSpy.mockRestore()
     }
