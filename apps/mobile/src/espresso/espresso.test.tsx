@@ -6,7 +6,12 @@ import {
   waitFor,
 } from '@testing-library/react-native'
 import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
-import { AccessibilityInfo, BackHandler, StyleSheet } from 'react-native'
+import {
+  AccessibilityInfo,
+  BackHandler,
+  Keyboard,
+  StyleSheet,
+} from 'react-native'
 import { TRPC_CONFLICT } from '../api-error'
 import { App } from '../App'
 import { SignedInHome } from '../auth/SignedInHome'
@@ -236,6 +241,30 @@ function fakeApi(
       }),
   }
   return { api, created }
+}
+
+// Lays out the keyboard-avoiding view and raises a 300pt keyboard over its
+// bottom, so padding behavior that is enabled pads by the overlap.
+async function raiseKeyboardOver(
+  testId: string,
+  keyboardListeners: jest.SpyInstance,
+) {
+  await fireEvent(screen.getByTestId(testId), 'layout', {
+    persist: () => {},
+    nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 800 } },
+  })
+  await act(async () => {
+    for (const [event, handler] of keyboardListeners.mock.calls) {
+      if (event !== 'keyboardWillShow') continue
+      ;(handler as (e: unknown) => void)({
+        duration: 0,
+        endCoordinates: { screenX: 0, screenY: 500, width: 390, height: 300 },
+      })
+    }
+    await Promise.resolve()
+  })
+  return StyleSheet.flatten(screen.getByTestId(testId).props.style)
+    .paddingBottom
 }
 
 async function press(name: string) {
@@ -829,23 +858,24 @@ describe('log espresso shot', () => {
   })
 
   it('wraps the recipe fields in padding keyboard avoidance', async () => {
+    const keyboardListeners = jest.spyOn(Keyboard, 'addListener')
     const { api } = fakeApi(catalog())
     await render(<App auth={signedIn} espresso={api} />)
     await openForm()
     await fireEvent(screen.getByTestId(fieldTestId(LABEL_DOSE)), 'focus')
 
-    // The configuration only (padding behavior is what adds paddingBottom);
-    // whether fields clear the keyboard is a device check.
+    // Enabled padding avoidance pads by the keyboard's overlap; whether the
+    // fields clear a real keyboard is a device check.
     expect(
-      StyleSheet.flatten(
-        screen.getByTestId(SHOT_FORM_KEYBOARD_TEST_ID).props.style,
-      ).paddingBottom,
-    ).toBe(0)
+      await raiseKeyboardOver(SHOT_FORM_KEYBOARD_TEST_ID, keyboardListeners),
+    ).toBe(300)
+    keyboardListeners.mockRestore()
     expect(screen.getByTestId(fieldTestId(LABEL_TIME))).toBeTruthy()
     expect(screen.getByTestId(fieldTestId(LABEL_GRIND))).toBeTruthy()
   })
 
   it('wraps the picker sheet in padding keyboard avoidance on iOS', async () => {
+    const keyboardListeners = jest.spyOn(Keyboard, 'addListener')
     const { api } = fakeApi(catalog())
     const view = await render(<App auth={signedIn} espresso={api} />)
     await openForm()
@@ -856,10 +886,12 @@ describe('log espresso shot', () => {
 
     // Jest runs as iOS; Android leaves the Modal's behavior unset.
     expect(
-      StyleSheet.flatten(
-        screen.getByTestId(selectKeyboardTestId(LABEL_COFFEE)).props.style,
-      ).paddingBottom,
-    ).toBe(0)
+      await raiseKeyboardOver(
+        selectKeyboardTestId(LABEL_COFFEE),
+        keyboardListeners,
+      ),
+    ).toBe(300)
+    keyboardListeners.mockRestore()
     expect(screen.getByTestId(selectSheetTestId(LABEL_COFFEE))).toBeTruthy()
 
     const pickerDest = process.env.VERIFY_MOBILE_PICKER_KEYBOARD_ARTIFACTS
@@ -1684,6 +1716,7 @@ describe('log espresso shot', () => {
 
   it('clears a prefilled device that is not an espresso option', async () => {
     const otherDevice = '00000000-0000-4000-8000-000000000099'
+    const created: Array<ShotCreate> = []
     const api: EspressoApi = {
       ...pagingFor(() => []),
       load: () => Promise.resolve(catalog()),
@@ -1694,7 +1727,10 @@ describe('log espresso shot', () => {
             roastDate: '2026-05-01',
           }),
         ),
-      create: async () => {},
+      create: (input) => {
+        created.push(input)
+        return Promise.resolve()
+      },
     }
     await render(<App auth={signedIn} espresso={api} />)
     await openForm()
@@ -1707,6 +1743,13 @@ describe('log espresso shot', () => {
     ).toBeTruthy()
     expect(screen.queryByLabelText('Brewing Device, Linea Mini')).toBeNull()
     expect(screen.getByLabelText('Grinder, Niche Zero')).toBeTruthy()
+
+    // The placeholder shows for any id it has no option for, so Log is what
+    // shows the draft dropped it rather than sending it.
+    await enterRecipe()
+    await press(LOG)
+    expect(created).toEqual([])
+    expect(screen.getByText(SELECT_DEVICE_ERROR)).toBeTruthy()
   })
 
   it('clears a prefilled grinder that is not one of the user’s grinders', async () => {
@@ -2505,6 +2548,7 @@ describe('log espresso shot', () => {
     expect(retry.props.accessibilityState).toMatchObject({ disabled: false })
     await fireEvent.press(retry)
     await waitFor(() => expect(screen.queryByText(ERROR_LOAD_FAILED)).toBeNull())
+    expect(await screen.findByText('Coffee 0')).toBeTruthy()
     expect(historyReads).toBe(2)
     // The pending equipment request is left to finish, not started again.
     expect(loads).toBe(1)
@@ -2526,6 +2570,7 @@ describe('log espresso shot', () => {
           nextCursor: EspressoShotCursor | null
         }) => void)
       | null = null
+    const cursors: Array<EspressoShotCursor> = []
     const api: EspressoApi = {
       load: () => Promise.resolve(catalog({ shots })),
       listShots: (cursor) => {
@@ -2539,6 +2584,7 @@ describe('log espresso shot', () => {
                 : null,
           })
         }
+        cursors.push(cursor)
         return new Promise((resolve) => {
           resolveMore = resolve
         })
@@ -2574,6 +2620,11 @@ describe('log espresso shot', () => {
     })
     expect(screen.queryByText('Coffee 20')).toBeNull()
     expect(screen.getByText('Logged new')).toBeTruthy()
+
+    // The stale reply's null cursor must not replace the refreshed one.
+    await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
+    await waitFor(() => expect(cursors).toHaveLength(2))
+    expect(cursors[1]).toBe(pageCursor('shot-18'))
   })
 
   it('clears the load-more spinner when a refresh fails', async () => {

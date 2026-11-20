@@ -26,7 +26,6 @@ import { e2eSignInUser } from './e2e'
 import {
   clearSessionStore,
   readSessionCookie,
-  readSessionData,
   restoreSessionCookie,
   writeE2EAuthCookie,
 } from './session-store'
@@ -54,18 +53,6 @@ export type Auth = {
   signInApple: () => Promise<void>
   signInE2E: () => Promise<void>
   signOut: () => Promise<void>
-}
-
-// expoClient blanks the stored cookie to "{}" on sign-out; anything else could sign back in.
-// Both the cookie and the session cached for offline startup are gone or
-// blanked, so a restart cannot sign the user back in.
-function storedSessionErased() {
-  const blank = (value: string | null) => !value || value === '{}'
-  try {
-    return blank(readSessionCookie()) && blank(readSessionData())
-  } catch {
-    return false
-  }
 }
 
 export function useAuth(): Auth {
@@ -179,10 +166,10 @@ export function useAuth(): Auth {
             ...serverFailureDetail(caught),
             message: failureMessage(caught),
           })
-          if (!storedSessionErased()) {
-            setError({ title: ERROR_SIGN_OUT_FAILED })
-            return
-          }
+          // A blank read-back proves nothing: a failed Android commit can
+          // read back empty and still restore the session on restart.
+          setError({ title: ERROR_SIGN_OUT_FAILED })
+          return
         }
         clearClientSession()
       } finally {
