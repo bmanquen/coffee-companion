@@ -12,10 +12,17 @@ describe('formatBrewRatio', () => {
     // where the double sits just below (53.5 / 20 is 2.67499… in binary).
     expect(formatBrewRatio('20', '53.5')).toBe('1:2.68')
     expect(formatBrewRatio('20', '45.7')).toBe('1:2.29')
+    // Just below a half-hundredth rounds down: 2.674999999999999 is 1:2.67.
+    expect(formatBrewRatio('20', '53.49999999999998')).toBe('1:2.67')
+    // The database divides to a fixed precision before rounding, so
+    // 2.67499999999999999999996… (2.6750000000000000000000) shows as 1:2.68.
+    expect(formatBrewRatio('3', '8.0249999999999999999999')).toBe('1:2.68')
   })
 
   it('reads decimal strings the way the database stores grams', () => {
     expect(formatBrewRatio('18.0', '36.0')).toBe('1:2')
+    // Past the 1000 decimals a quotient keeps, as the database accepts it.
+    expect(formatBrewRatio(`18.${'0'.repeat(1001)}`, '36')).toBe('1:2')
   })
 
   it('is null when dose is missing', () => {

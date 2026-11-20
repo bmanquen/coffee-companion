@@ -1167,6 +1167,7 @@ describe('espressoShot.getRecent', () => {
     const even = await log('18', '45')
     const rounded = await log('18', '41')
     const half = await log('20', '53.5')
+    const belowHalf = await log('20', '53.49999999999998')
     const tiny = await log('20', '0.05')
     const tinier = await log('20', '0.000001')
     const search = async (q: string) =>
@@ -1181,6 +1182,8 @@ describe('espressoShot.getRecent', () => {
     expect(await search('1:2.277')).toEqual([])
     // An exact half-hundredth rounds up, as formatBrewRatio shows it.
     expect(await search('1:2.68')).toEqual([half.id])
+    // Just below the half (2.674999999999999) rounds down, as it shows.
+    expect(await search('1:2.67')).toEqual([belowHalf.id])
     // 0.05/20 would round to 1:0, so it shows (and is found) as 1:0.003.
     expect(await search('1:0.003')).toEqual([tiny.id])
     expect(await search('1:0.0025')).toEqual([])
