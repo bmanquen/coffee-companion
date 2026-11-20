@@ -2769,6 +2769,15 @@ async function cmdLaunch() {
         'Drive that one, or run `helpers/control cleanup` first. Do not double-drive.',
     )
   }
+  // Writing Metro's state would drop the only record of that value.
+  if (stylusRestoreOwed(existing)) {
+    die(
+      `${existing.serial} still owes AVD ${existing.avdName} its ` +
+        `${STYLUS_HANDWRITING_SETTING}=${existing.stylusHandwritingBefore}. ` +
+        `Run cleanup once that emulator is back, or delete ${runDir} to drop ` +
+        'the restore, before launching.',
+    )
+  }
 
   const port = DEFAULT_METRO_PORT
   const portFree = await waitForPortFree(port, PORT_FREE_TIMEOUT_MS)
@@ -3270,7 +3279,11 @@ async function stopRecordedEmulator(
   return state.serial ?? DEVICE_SERIAL
 }
 
-async function stopLaunchDevice(partial, stopped = []) {
+async function stopLaunchDevice(
+  partial,
+  stopped = [],
+  { avdProblem, clearReverses, restoreStylus, killSerial, signalPid } = {},
+) {
   const plan = launchDeviceTeardownPlan(partial)
   if (partial.expoPid) stopRecordedPid(partial.expoPid, 'expo', stopped)
   if (partial.metroPid) stopRecordedPid(partial.metroPid, 'metro', stopped)
@@ -3279,13 +3292,21 @@ async function stopLaunchDevice(partial, stopped = []) {
   let foreignAvd = null
   if (plan.clearReverses) {
     try {
-      foreignAvd = releaseRecordedDevice(partial, { uninstallOwned: false })
+      foreignAvd = releaseRecordedDevice(partial, {
+        uninstallOwned: false,
+        avdProblem,
+        clearReverses,
+        restoreStylus,
+      })
     } catch (error) {
       // .run/ keeps the stylus record, so cleanup tries the restore again.
       console.error(error.message)
     }
   }
-  await stopRecordedEmulator(partial, foreignAvd, stopped)
+  await stopRecordedEmulator(partial, foreignAvd, stopped, {
+    killSerial,
+    signalPid,
+  })
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
   restoreMobileExpoPublicEnv()
 }
@@ -3434,6 +3455,8 @@ async function cmdLaunchDevice(opts = {}) {
     webPid: null,
     expoPid: null,
     ownedPackage: !attachedEmulator,
+    // A kept value also holds when this run boots that AVD again.
+    stylusHandwritingBefore: keptStylus ?? undefined,
   }
 
   try {
@@ -4528,13 +4551,18 @@ async function cmdCleanup() {
   }
 
   restoreMobileExpoPublicEnv()
+  const claim = readRunClaim(runDir)
   if (existsSync(runDir)) {
     rmSync(runDir, { recursive: true, force: true })
   }
   if (restoreError) {
     // Only what another cleanup needs to put the setting back, and nothing it
-    // could uninstall or stop.
+    // could uninstall or stop. An owner-scoped run keeps its claim, so the
+    // same VERIFY_OWNER can retry and no other owner can take it.
     writeState(stylusRestoreRecord(state))
+    if (owner && claim) {
+      writeFileSync(ownerPath(runDir), `${JSON.stringify(claim)}\n`)
+    }
     die(
       `${restoreError.message}. Kept it in ${statePath}; run cleanup again ` +
         `once that emulator is back, or delete ${runDir} to drop it.`,
@@ -4621,6 +4649,7 @@ export {
   stylusRestoreRecord,
   stylusRestoreOwed,
   keptStylusBaseline,
+  stopLaunchDevice,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   adbShellCookieGetCommands,

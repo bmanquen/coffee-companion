@@ -72,6 +72,7 @@ import {
   stopRecordedEmulator,
   stylusRestoreRecord,
   keptStylusBaseline,
+  stopLaunchDevice,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   adbShellCookieGetCommands,
@@ -1604,24 +1605,84 @@ describe('cleanup with a kept stylus record', () => {
     }
     writeFileSync(join(run, 'state.json'), JSON.stringify(record))
     const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+    // Unscoped: an inherited owner would make cleanup skip.
+    delete env.VERIFY_OWNER
     delete env.ANDROID_HOME
     delete env.ANDROID_SDK_ROOT
     env.PATH = `${bin}:${process.env.PATH}`
+    const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+    const cli = (command, owner) =>
+      spawnSync(process.execPath, [control, command], {
+        env: owner ? { ...env, VERIFY_OWNER: owner } : env,
+        encoding: 'utf8',
+        timeout: 60_000,
+      })
+    const kept = () => JSON.parse(readFileSync(join(run, 'state.json'), 'utf8'))
     try {
-      const result = spawnSync(
-        process.execPath,
-        [join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'), 'cleanup'],
-        { env, encoding: 'utf8', timeout: 60_000 },
-      )
+      const result = cli('cleanup')
       assert.notEqual(result.status, 0, result.stdout)
       assert.match(result.stderr, /Could not restore stylus_handwriting_enabled=1/)
-      assert.deepEqual(
-        JSON.parse(readFileSync(join(run, 'state.json'), 'utf8')),
-        record,
+      assert.deepEqual(kept(), record)
+
+      // A plain launch would overwrite the record with Metro's state.
+      const launch = cli('launch')
+      assert.notEqual(launch.status, 0, launch.stdout)
+      assert.match(launch.stderr, /still owes AVD verify-pixel/)
+      assert.deepEqual(kept(), record)
+
+      // An owner-scoped cleanup keeps its claim, so that owner can retry and
+      // another owner still cannot take the instance.
+      writeFileSync(
+        join(run, 'owner.json'),
+        JSON.stringify({ owner: 'run-a', pid: 1 }),
       )
+      const scoped = cli('cleanup', 'run-a')
+      assert.notEqual(scoped.status, 0, scoped.stdout)
+      assert.equal(
+        JSON.parse(readFileSync(join(run, 'owner.json'), 'utf8')).owner,
+        'run-a',
+      )
+      const other = cli('cleanup', 'run-b')
+      assert.equal(other.status, 0, other.stderr)
+      assert.match(other.stdout, /not claimed by VERIFY_OWNER run-b/)
+      assert.deepEqual(kept(), record)
+      const retry = cli('cleanup', 'run-a')
+      assert.match(retry.stderr, /Could not restore stylus_handwriting_enabled=1/)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('stopLaunchDevice', () => {
+  const teardown = async (avd) => {
+    const calls = []
+    await stopLaunchDevice(
+      { serial: DEVICE_SERIAL, avdName: 'verify-pixel', emulatorPid: 4242 },
+      [],
+      {
+        avdProblem: () =>
+          recordedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => avd),
+        clearReverses: () => calls.push(['reverses']),
+        restoreStylus: () => calls.push(['stylus']),
+        killSerial: ({ serial }) => calls.push(['emu kill', serial]),
+        signalPid: (pid) => calls.push(['signal', pid]),
+      },
+    )
+    return calls
+  }
+
+  it('kills its own emulator through the serial', async () => {
+    assert.deepEqual(await teardown('verify-pixel'), [
+      ['reverses'],
+      ['stylus'],
+      ['emu kill', DEVICE_SERIAL],
+    ])
+  })
+
+  it('only signals its pid when another or an unknown AVD holds the serial', async () => {
+    assert.deepEqual(await teardown('Pixel_7'), [['signal', 4242]])
+    assert.deepEqual(await teardown(null), [['signal', 4242]])
   })
 })
 
