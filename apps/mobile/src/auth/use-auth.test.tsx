@@ -28,6 +28,7 @@ const mocks = {
   clearSessionStore: jest.fn(),
   writeE2EAuthCookie: jest.fn(),
   readSessionCookie: jest.fn(),
+  readSessionData: jest.fn(),
   restoreSessionCookie: jest.fn(),
   appleAvailable: true,
   session: null as null | { user: { name: string } },
@@ -49,6 +50,7 @@ jest.mock('./session-store', () => ({
   clearSessionStore: () => mocks.clearSessionStore(),
   writeE2EAuthCookie: (userId: string) => mocks.writeE2EAuthCookie(userId),
   readSessionCookie: () => mocks.readSessionCookie(),
+  readSessionData: () => mocks.readSessionData(),
   restoreSessionCookie: (raw: string | null) => mocks.restoreSessionCookie(raw),
 }))
 
@@ -79,6 +81,8 @@ describe('useAuth', () => {
     mocks.clearSessionStore.mockReset()
     mocks.writeE2EAuthCookie.mockReset()
     mocks.readSessionCookie.mockReset()
+    mocks.readSessionData.mockReset()
+    mocks.readSessionData.mockReturnValue(null)
     mocks.restoreSessionCookie.mockReset()
     mocks.readSessionCookie.mockReturnValue(null)
     mocks.restoreSessionCookie.mockResolvedValue(undefined)
@@ -221,6 +225,23 @@ describe('useAuth', () => {
 
     expect(mocks.clearClientSession).toHaveBeenCalled()
     expect(result.current.error).toBeNull()
+  })
+
+  it('stays signed in when the cached session survives a failed store deletion', async () => {
+    mocks.clearSessionStore.mockRejectedValueOnce(new Error('secure store'))
+    mocks.readSessionCookie.mockReturnValue('{}')
+    mocks.readSessionData.mockReturnValue(
+      JSON.stringify({ session: { id: 'session-1' }, user: { id: 'user-1' } }),
+    )
+    const { result } = await renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.signOut()
+    })
+
+    // An offline restart would restore that cached session.
+    expect(mocks.clearClientSession).not.toHaveBeenCalled()
+    expect(result.current.error).toEqual({ title: ERROR_SIGN_OUT_FAILED })
   })
 
   it('stays signed in when the stored cookie cannot be read after store deletion fails', async () => {

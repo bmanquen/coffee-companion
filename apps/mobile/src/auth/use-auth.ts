@@ -26,6 +26,7 @@ import { e2eSignInUser } from './e2e'
 import {
   clearSessionStore,
   readSessionCookie,
+  readSessionData,
   restoreSessionCookie,
   writeE2EAuthCookie,
 } from './session-store'
@@ -56,10 +57,12 @@ export type Auth = {
 }
 
 // expoClient blanks the stored cookie to "{}" on sign-out; anything else could sign back in.
-function storedCookieErased() {
+// Both the cookie and the session cached for offline startup are gone or
+// blanked, so a restart cannot sign the user back in.
+function storedSessionErased() {
+  const blank = (value: string | null) => !value || value === '{}'
   try {
-    const cookie = readSessionCookie()
-    return !cookie || cookie === '{}'
+    return blank(readSessionCookie()) && blank(readSessionData())
   } catch {
     return false
   }
@@ -176,7 +179,7 @@ export function useAuth(): Auth {
             ...serverFailureDetail(caught),
             message: failureMessage(caught),
           })
-          if (!storedCookieErased()) {
+          if (!storedSessionErased()) {
             setError({ title: ERROR_SIGN_OUT_FAILED })
             return
           }

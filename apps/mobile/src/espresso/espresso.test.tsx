@@ -6,7 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react-native'
 import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
-import { AccessibilityInfo } from 'react-native'
+import { AccessibilityInfo, StyleSheet } from 'react-native'
 import { TRPC_CONFLICT } from '../api-error'
 import { App } from '../App'
 import { SignedInHome } from '../auth/SignedInHome'
@@ -828,18 +828,24 @@ describe('log espresso shot', () => {
     expect(screen.getByTestId(selectOptionTestId(heart))).toBeTruthy()
   })
 
-  it('raises recipe fields above the keyboard', async () => {
+  it('wraps the recipe fields in padding keyboard avoidance', async () => {
     const { api } = fakeApi(catalog())
     await render(<App auth={signedIn} espresso={api} />)
     await openForm()
     await fireEvent(screen.getByTestId(fieldTestId(LABEL_DOSE)), 'focus')
 
-    expect(screen.getByTestId(SHOT_FORM_KEYBOARD_TEST_ID)).toBeTruthy()
+    // The configuration only (padding behavior is what adds paddingBottom);
+    // whether fields clear the keyboard is a device check.
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId(SHOT_FORM_KEYBOARD_TEST_ID).props.style,
+      ).paddingBottom,
+    ).toBe(0)
     expect(screen.getByTestId(fieldTestId(LABEL_TIME))).toBeTruthy()
     expect(screen.getByTestId(fieldTestId(LABEL_GRIND))).toBeTruthy()
   })
 
-  it('raises the picker sheet above the keyboard', async () => {
+  it('wraps the picker sheet in padding keyboard avoidance on iOS', async () => {
     const { api } = fakeApi(catalog())
     const view = await render(<App auth={signedIn} espresso={api} />)
     await openForm()
@@ -848,7 +854,12 @@ describe('log espresso shot', () => {
     const search = screen.getByTestId(selectSearchTestId(LABEL_COFFEE))
     await fireEvent(search, 'focus')
 
-    expect(screen.getByTestId(selectKeyboardTestId(LABEL_COFFEE))).toBeTruthy()
+    // Jest runs as iOS; Android leaves the Modal's behavior unset.
+    expect(
+      StyleSheet.flatten(
+        screen.getByTestId(selectKeyboardTestId(LABEL_COFFEE)).props.style,
+      ).paddingBottom,
+    ).toBe(0)
     expect(screen.getByTestId(selectSheetTestId(LABEL_COFFEE))).toBeTruthy()
 
     const pickerDest = process.env.VERIFY_MOBILE_PICKER_KEYBOARD_ARTIFACTS

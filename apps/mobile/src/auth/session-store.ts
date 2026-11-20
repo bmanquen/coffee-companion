@@ -58,6 +58,11 @@ export function readSessionCookie(): string | null {
   return sessionStore.getItem(SESSION_COOKIE_KEY)
 }
 
+// The session the Expo client caches for offline startup.
+export function readSessionData(): string | null {
+  return sessionStore.getItem(SESSION_DATA_KEY)
+}
+
 export async function restoreSessionCookie(raw: string | null) {
   if (raw == null) {
     await SecureStore.deleteItemAsync(SESSION_COOKIE_KEY)

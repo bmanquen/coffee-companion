@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   useInfiniteQuery,
   useMutation,
@@ -11,7 +11,6 @@ import {
   ERROR_LOAD_MORE_FAILED,
   ERROR_SAVE_FAILED,
 } from './copy'
-import type { InfiniteData } from '@tanstack/react-query'
 import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
 import type {
   EspressoApi,
@@ -28,28 +27,30 @@ const ESPRESSO_PREFILL_QUERY_KEY = 'espresso-prefill'
 export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const queryClient = useQueryClient()
   const [saveError, setSaveError] = useState<string | null>(null)
-  // The first-page read after a save. Its result replaces the cached pages
-  // only when it succeeds, so a failure keeps every loaded row.
-  const [saveRefresh, setSaveRefresh] = useState<{
-    pending: boolean
-    error: unknown
-    // The history's dataUpdatedAt when the read failed.
-    failedOver: number
-  }>({ pending: false, error: null, failedOver: 0 })
-  const saveRefreshRun = useRef<AbortController | null>(null)
 
   const equipment = useQuery({
     queryKey: [ESPRESSO_EQUIPMENT_QUERY_KEY, userId],
     queryFn: () => api.load(),
   })
-  const shots = useInfiniteQuery({
-    queryKey: [ESPRESSO_SHOTS_QUERY_KEY, userId],
-    // Reading signal is also what tells TanStack a cancelled refresh must not
-    // go on to its older pages.
-    queryFn: ({ pageParam, signal }) => api.listShots(pageParam, signal),
-    initialPageParam: undefined as EspressoShotCursor | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-  })
+  const shotsOptions = useMemo(
+    () => ({
+      queryKey: [ESPRESSO_SHOTS_QUERY_KEY, userId],
+      // Reading signal is also what tells TanStack a cancelled refresh must
+      // not go on to its older pages.
+      queryFn: ({
+        pageParam,
+        signal,
+      }: {
+        pageParam: EspressoShotCursor | undefined
+        signal: AbortSignal
+      }) => api.listShots(pageParam, signal),
+      initialPageParam: undefined as EspressoShotCursor | undefined,
+      getNextPageParam: (lastPage: ShotPage) =>
+        lastPage.nextCursor ?? undefined,
+    }),
+    [api, userId],
+  )
+  const shots = useInfiniteQuery(shotsOptions)
 
   const items = useMemo(
     () => shots.data?.pages.flatMap((page) => page.items) ?? [],
@@ -60,88 +61,60 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     ? { ...equipment.data, shots: items }
     : null
 
-  // A read that is paused (offline) or still owed after a save is not an
-  // empty history yet. A failed post-save read is not loading either: it may
-  // have cancelled the first read, which leaves the query pending.
-  // Until a read succeeds: Retry's own, or any later refetch of the history
-  // (focus, reconnect), which brings the saved shot too.
-  const saveRefreshFailed =
-    saveRefresh.error != null && shots.dataUpdatedAt === saveRefresh.failedOver
+  // A history read that is out, or paused offline, is not an empty history.
+  const historyReading = shots.isFetching && !shots.isFetchingNextPage
   const loading =
     equipment.isPending ||
     (items.length === 0 &&
-      !saveRefreshFailed &&
-      (shots.isPending ||
-        saveRefresh.pending ||
-        shots.fetchStatus === 'paused' ||
-        (shots.isFetching && !shots.isFetchingNextPage)))
+      (shots.isPending || shots.fetchStatus === 'paused' || historyReading))
 
   const equipmentFailed = equipment.isError && !equipment.data
-  const historyFailed =
-    (shots.isError && !shots.isFetchNextPageError) || saveRefreshFailed
+  const historyFailed = shots.isError && !shots.isFetchNextPageError
   const loadError = equipmentFailed
     ? apiErrorMessage(equipment.error, ERROR_LOAD_FAILED)
     : historyFailed
-      ? apiErrorMessage(
-          saveRefreshFailed ? saveRefresh.error : shots.error,
-          ERROR_LOAD_FAILED,
-        )
+      ? apiErrorMessage(shots.error, ERROR_LOAD_FAILED)
       : null
 
   const loadMoreError = shots.isFetchNextPageError
     ? apiErrorMessage(shots.error, ERROR_LOAD_MORE_FAILED)
     : null
 
-  // Each failed request retries on its own, so a failed history read can be
-  // retried while equipment is still loading, and the reverse.
+  // Retry stays available while any failed request is not already running
+  // again; each one retries on its own.
+  const equipmentRetryable = equipmentFailed && !equipment.isFetching
+  const historyRetryable = historyFailed && !historyReading
   const retrying =
-    (equipmentFailed && equipment.isFetching) ||
-    (historyFailed && (shots.isRefetching || saveRefresh.pending))
+    (equipmentFailed || historyFailed) &&
+    !equipmentRetryable &&
+    !historyRetryable
 
-  const shotsKey = useMemo(() => [ESPRESSO_SHOTS_QUERY_KEY, userId], [userId])
-
-  // Reads the first page again and, only when that succeeds, makes it the
-  // whole history: the saved shot shows without waiting on older pages, and
-  // a failure leaves the loaded rows and holds paging for the Retry.
+  // Reads the first page again through the history query itself, so a focus
+  // or reconnect refetch joins it instead of racing it. Success makes that
+  // page the whole history (the saved shot shows without waiting on older
+  // pages); failure keeps the loaded rows, holds paging for Retry, and marks
+  // the history stale so a reconnect recovers it too.
   const refreshFirstPage = useCallback(async () => {
-    saveRefreshRun.current?.abort()
-    const run = new AbortController()
-    saveRefreshRun.current = run
-    // A failure stays shown (with its Retry busy) until a read succeeds.
-    setSaveRefresh((prev) => ({ ...prev, pending: true }))
-    // A read begun before the save must not land after this one.
-    await queryClient.cancelQueries({ queryKey: shotsKey })
+    // A read begun before the save must not stand in for this one.
+    await queryClient.cancelQueries({ queryKey: shotsOptions.queryKey })
     try {
-      const page = await api.listShots(undefined, run.signal)
-      if (saveRefreshRun.current !== run) return
-      queryClient.setQueryData<
-        InfiniteData<ShotPage, EspressoShotCursor | undefined>
-      >(shotsKey, { pages: [page], pageParams: [undefined] })
-      setSaveRefresh({ pending: false, error: null, failedOver: 0 })
-    } catch (error) {
-      if (saveRefreshRun.current !== run) return
-      setSaveRefresh({
-        pending: false,
-        error,
-        failedOver: queryClient.getQueryState(shotsKey)?.dataUpdatedAt ?? 0,
+      await queryClient.infiniteQuery({
+        ...shotsOptions,
+        pages: 1,
+        staleTime: 0,
+      })
+    } catch {
+      await queryClient.invalidateQueries({
+        queryKey: shotsOptions.queryKey,
+        refetchType: 'none',
       })
     }
-  }, [api, queryClient, shotsKey])
+  }, [queryClient, shotsOptions])
 
   const reload = useCallback(() => {
-    if (retrying) return
-    if (equipmentFailed) void equipment.refetch()
-    if (saveRefreshFailed) void refreshFirstPage()
-    else if (historyFailed) void shots.refetch()
-  }, [
-    equipment,
-    equipmentFailed,
-    historyFailed,
-    refreshFirstPage,
-    retrying,
-    saveRefreshFailed,
-    shots,
-  ])
+    if (equipmentRetryable) void equipment.refetch()
+    if (historyRetryable) void refreshFirstPage()
+  }, [equipment, equipmentRetryable, historyRetryable, refreshFirstPage])
 
   const loadMore = useCallback(() => {
     // After a failed refresh the cached pages are stale; paging on from them
@@ -150,14 +123,12 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
       shots.isFetchingNextPage ||
       shots.isRefetching ||
       shots.isRefetchError ||
-      saveRefresh.pending ||
-      saveRefreshFailed ||
       !shots.hasNextPage
     ) {
       return
     }
     void shots.fetchNextPage({ cancelRefetch: false })
-  }, [saveRefresh.pending, saveRefreshFailed, shots])
+  }, [shots])
 
   const createShot = useMutation({
     mutationFn: (input: ShotCreate) => api.create(input),
@@ -212,14 +183,8 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     // History stays readable when only the equipment request fails.
     shots: shots.data ? items : null,
     // Not after a failed refresh: loadMore waits for the history Retry then.
-    hasMore:
-      shots.hasNextPage &&
-      !shots.isRefetchError &&
-      !saveRefresh.pending &&
-      !saveRefreshFailed,
-    refreshing:
-      (shots.isRefetching && !shots.isFetchingNextPage) ||
-      (saveRefresh.pending && items.length > 0),
+    hasMore: shots.hasNextPage && !shots.isRefetchError,
+    refreshing: shots.isRefetching && !shots.isFetchingNextPage,
     loading,
     loadingMore: shots.isFetchingNextPage,
     loadMoreError,

@@ -474,7 +474,7 @@ describe('useEspressoCatalog', () => {
     expect(listCursors).toEqual([null])
   })
 
-  it('drops the post-save error once a later history refetch succeeds', async () => {
+  it('recovers a failed post-save read on reconnect while the cached page is still fresh', async () => {
     const saved = shot({ id: 'shot-saved', coffeeName: 'Saved' })
     let rows = [shot({ id: 'shot-1', coffeeName: 'Shot 1' })]
     let failNext = false
@@ -497,6 +497,105 @@ describe('useEspressoCatalog', () => {
         failNext = true
       },
     }
+    const { result } = await renderCatalog(api)
+    await waitFor(() => expect(result.current.catalog?.shots).toHaveLength(1))
+    // Seconds after the first read, well inside its staleTime.
+    await act(async () => {
+      result.current.save(shotInput)
+    })
+    await waitFor(() => expect(result.current.loadError).not.toBeNull())
+
+    // The connection drops and comes back; nobody presses Retry.
+    try {
+      onlineManager.setOnline(false)
+    } finally {
+      onlineManager.setOnline(true)
+    }
+    await waitFor(() =>
+      expect(result.current.catalog?.shots[0]?.id).toBe(saved.id),
+    )
+    expect(result.current.loadError).toBeNull()
+  })
+
+  it('retries equipment while a failed history read is still being retried', async () => {
+    let loads = 0
+    let reads = 0
+    const api: EspressoApi = {
+      load: () => {
+        loads += 1
+        return loads < 3
+          ? Promise.reject(new Error('Network request failed'))
+          : Promise.resolve(catalog({ shots: [] }))
+      },
+      listShots: () => {
+        reads += 1
+        if (reads === 1) {
+          return Promise.resolve({
+            items: [shot()],
+            total: 1,
+            nextCursor: null,
+          })
+        }
+        // A refresh fails, then its retry hangs.
+        return reads === 2
+          ? Promise.reject(new Error('Network request failed'))
+          : new Promise<ShotPage>(() => {})
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {},
+    }
+    const { result } = await renderHook(
+      () => ({
+        catalog: useEspressoCatalog(api, USER),
+        client: useQueryClient(),
+      }),
+      { wrapper },
+    )
+    await waitFor(() => expect(result.current.catalog.shots).toHaveLength(1))
+    await act(async () => {
+      await result.current.client.refetchQueries({
+        queryKey: [ESPRESSO_SHOTS_QUERY_KEY, USER],
+      })
+    })
+    await waitFor(() => expect(loads).toBe(1))
+
+    // Both retry; equipment fails again while history is still out.
+    await act(async () => {
+      result.current.catalog.reload()
+    })
+    await waitFor(() => expect(loads).toBe(2))
+    await waitFor(() => expect(result.current.catalog.retrying).toBe(false))
+
+    await act(async () => {
+      result.current.catalog.reload()
+    })
+    await waitFor(() => expect(result.current.catalog.catalog).not.toBeNull())
+    expect(reads).toBe(3)
+  })
+
+  it('lets a focus refetch during the post-save read join it, not overwrite it', async () => {
+    const saved = shot({ id: 'shot-saved', coffeeName: 'Saved' })
+    const fromWeb = shot({ id: 'shot-web', coffeeName: 'From web' })
+    let release: () => void = () => {}
+    let rows = [shot({ id: 'shot-1', coffeeName: 'Shot 1' })]
+    let reads = 0
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      listShots: () => {
+        reads += 1
+        const page = { items: rows, total: rows.length, nextCursor: null }
+        if (reads !== 2) return Promise.resolve(page)
+        // The post-save read is held; meanwhile a shot is logged on the web.
+        return new Promise<ShotPage>((resolve) => {
+          release = () => resolve(page)
+          rows = [fromWeb, ...rows]
+        })
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {
+        rows = [saved, ...rows]
+      },
+    }
     const { result } = await renderHook(
       () => ({
         catalog: useEspressoCatalog(api, USER),
@@ -510,17 +609,29 @@ describe('useEspressoCatalog', () => {
     await act(async () => {
       result.current.catalog.save(shotInput)
     })
-    await waitFor(() => expect(result.current.catalog.loadError).not.toBeNull())
+    await waitFor(() => expect(reads).toBe(2))
 
-    // A focus or reconnect refetch, not Retry, brings the saved shot.
+    // Coming back to the app refetches stale history; it shares the held read.
     await act(async () => {
-      await result.current.client.invalidateQueries({
-        queryKey: [ESPRESSO_SHOTS_QUERY_KEY, USER],
-      })
+      const refetch = result.current.client.refetchQueries(
+        { queryKey: [ESPRESSO_SHOTS_QUERY_KEY, USER] },
+        { cancelRefetch: false },
+      )
+      release()
+      await refetch
     })
     await waitFor(() =>
       expect(result.current.catalog.catalog?.shots[0]?.id).toBe(saved.id),
     )
+    expect(reads).toBe(2)
+
+    // The next read is the newest and is not replaced by an older one.
+    await act(async () => {
+      await result.current.client.refetchQueries({
+        queryKey: [ESPRESSO_SHOTS_QUERY_KEY, USER],
+      })
+    })
+    expect(result.current.catalog.catalog?.shots[0]?.id).toBe(fromWeb.id)
     expect(result.current.catalog.loadError).toBeNull()
   })
 
