@@ -42,19 +42,24 @@ describe('seedEspressoShotPage', () => {
         trpc.espressoShot.getRecent.infiniteQueryKey(espressoShotPageInput()),
       ),
     ).toEqual({
-      pages: [
-        { items, total: ESPRESSO_SHOT_PAGE_SIZE * 2, nextCursor: null },
-      ],
+      pages: [{ items, total: ESPRESSO_SHOT_PAGE_SIZE * 2, nextCursor: null }],
       pageParams: [cursor],
     })
   })
 
   it('drops cached pages a replaced page no longer leads to', () => {
     const { queryClient, trpc } = createTestProviders()
+    // In the API's order: newest first, and ids descending within one
+    // timestamp, so the continuation is a shot after the cursor.
     const first = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
-      makeRecentShot({ id: espressoShotFixtureId(index) }),
+      makeRecentShot({
+        id: espressoShotFixtureId(ESPRESSO_SHOT_PAGE_SIZE - index),
+      }),
     )
-    const extra = makeRecentShot({ id: espressoShotFixtureId(99) })
+    const extra = makeRecentShot({
+      id: espressoShotFixtureId(0),
+      createdAt: new Date(first[0].createdAt.getTime() - 60_000),
+    })
     const cursor = espressoShotCursor(first[first.length - 1])
     const key = trpc.espressoShot.getRecent.infiniteQueryKey(
       espressoShotPageInput(),

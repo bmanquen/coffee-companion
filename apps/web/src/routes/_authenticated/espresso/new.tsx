@@ -114,6 +114,11 @@ export function NewEspressoShot() {
   const saveInFlight = useRef(false)
   const saveSucceeded = useRef(false)
   const prefillQueued = useRef(false)
+  // The prefill lookup in flight, if any. A save drops its result, so when
+  // that save is then refused outright the lookup is started again.
+  const pendingLookup = useRef<object | null>(null)
+  const saveInterruptedLookup = useRef(false)
+  const saveRejected = useRef(false)
   // The gear and roast date of each save that may have committed, by coffee
   // and then by recipe, newest last, so a retry of any of them can send what
   // it first sent.
@@ -197,6 +202,7 @@ export function NewEspressoShot() {
           }),
         { ...value, idempotencyKey },
       )
+      saveRejected.current = outcome.rejected
       if (outcome.keyDeleted) {
         // That shot is gone for good, so the next Log saves a new one.
         for (const [draft, key] of idempotencyKeys.current) {
@@ -304,10 +310,15 @@ export function NewEspressoShot() {
       applyPrefill(coffeeId, seq, unresolved, startedSaveGen)
       return
     }
+    const lookup = {}
+    pendingLookup.current = lookup
     void queryClient
       .fetchQuery({
         ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId }),
         staleTime: 0,
+      })
+      .finally(() => {
+        if (pendingLookup.current === lookup) pendingLookup.current = null
       })
       .then(
         (latest) => applyPrefill(coffeeId, seq, latest, startedSaveGen),
@@ -348,8 +359,12 @@ export function NewEspressoShot() {
 
   const flushQueuedPrefill = () => {
     saveInFlight.current = false
+    // Only a save the API refused outright: after one that may have
+    // committed, a lookup from before it is stale.
+    const resume = saveInterruptedLookup.current && saveRejected.current
+    saveInterruptedLookup.current = false
     if (saveSucceeded.current || !prefillCoffeeId.current) return
-    if (prefillQueued.current) {
+    if (prefillQueued.current || resume) {
       loadPrefillFor(prefillCoffeeId.current)
     } else {
       restoreMatchingSave()
@@ -372,6 +387,8 @@ export function NewEspressoShot() {
           // while the first save is still pending.
           if (saveInFlight.current) return
           saveSucceeded.current = false
+          saveRejected.current = false
+          saveInterruptedLookup.current = pendingLookup.current != null
           saveInFlight.current = true
           void form.handleSubmit().finally(() => {
             flushQueuedPrefill()

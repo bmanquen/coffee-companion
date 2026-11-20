@@ -157,18 +157,41 @@ function coffeeIdFromCall(call: Array<unknown>) {
   )?.[1]
 }
 
-function prefillResponse(
+// Answers every operation of a batched tRPC request in order: a Coffee's
+// latest-shot lookup from the query cache, anything else with an empty
+// result. httpBatchStreamLink can put the prefill and Dialed-in lookups in one
+// request, so each needs its own slot in the reply.
+function batchResponse(
   queryClient: ReturnType<typeof createTestProviders>['queryClient'],
   trpc: ReturnType<typeof createTestProviders>['trpc'],
   call: Array<unknown>,
 ) {
-  const coffeeId = coffeeIdFromCall(call)
-  if (!coffeeId) return trpcSuccess(null)
-  return trpcSuccess(
-    queryClient.getQueryData(
-      trpc.espressoShot.getLatestUnsealed.queryKey({ coffeeId }),
-    ) ?? null,
+  const url = new URL(String(call[0]), 'http://localhost')
+  const procedures = decodeURIComponent(
+    url.pathname.split('/').pop() ?? '',
+  ).split(',')
+  const inputs = JSON.parse(url.searchParams.get('input') ?? '{}') as Record<
+    string,
+    { json?: { coffeeId?: string } } | undefined
+  >
+  const head = Object.fromEntries(
+    procedures.map((procedure, index) => {
+      const coffeeId = inputs[index]?.json?.coffeeId
+      const data =
+        procedure.endsWith('getLatestUnsealed') && coffeeId
+          ? (queryClient.getQueryData(
+              trpc.espressoShot.getLatestUnsealed.queryKey({ coffeeId }),
+            ) ?? null)
+          : procedure.endsWith('getLatestUnsealed')
+            ? null
+            : {}
+      return [String(index), [[{ result: { data } }]]]
+    }),
   )
+  return new Response(JSON.stringify({ json: head }) + '\n', {
+    status: 200,
+    headers: { 'content-type': 'application/jsonl' },
+  })
 }
 
 function serveFromCache(
@@ -176,12 +199,8 @@ function serveFromCache(
   create?: (call: Array<unknown>) => Promise<Response> | Response,
 ) {
   return async (...call: Array<unknown>) => {
-    if (isCreateCall(call) && create) return create(call)
-    if (isPrefillCall(call)) {
-      return prefillResponse(providers.queryClient, providers.trpc, call)
-    }
-    if (isCreateCall(call)) return trpcSuccess()
-    return trpcSuccess()
+    if (isCreateCall(call)) return create ? create(call) : trpcSuccess()
+    return batchResponse(providers.queryClient, providers.trpc, call)
   }
 }
 
@@ -1158,6 +1177,90 @@ describe('NewEspressoShot form', () => {
     }
   })
 
+  it('resumes a prefill lookup the save interrupted once the API rejects that save', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () =>
+        trpcErrorResponse('BAD_REQUEST', 'Brewing device is not espresso'),
+      ),
+    )
+    try {
+      queryClient.removeQueries({
+        queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+          coffeeId: COFFEE,
+        }),
+      })
+      let resolvePrefill: (
+        shot: ReturnType<typeof makeRecentShot>,
+      ) => void = () => {}
+      const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+        (resolve) => {
+          resolvePrefill = resolve
+        },
+      )
+      void queryClient.prefetchQuery({
+        ...trpc.espressoShot.getLatestUnsealed.queryOptions({
+          coffeeId: COFFEE,
+        }),
+        queryFn: () => pending,
+      })
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        { target: { value: ESP_DEVICE } },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy)).toHaveLength(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      // Nothing was saved, so the lookup the save interrupted still applies.
+      resolvePrefill(
+        makeRecentShot({
+          id: 'shot-1',
+          coffeeId: COFFEE,
+          grinderId: GRINDER_B,
+          brewingDeviceId: ESP_DEVICE,
+          roastDate: '2026-05-01',
+        }),
+      )
+      await waitFor(() => expect(screen.getByText('May 1st, 2026')))
+      // The gear entered by hand stays.
+      expect(screen.getByRole('combobox', { name: 'Grinder' })).toHaveProperty(
+        'value',
+        GRINDER,
+      )
+      expect(screen.getByLabelText(/^Dose/)).toHaveProperty('value', '18')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('looks up a reselected coffee again after the API rejects its save', async () => {
     const { Wrapper, fetchSpy } = seeded()
     fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
@@ -1335,9 +1438,13 @@ describe('NewEspressoShot form', () => {
         )
         // The 18 g retry sends exactly what the 18 g save sent, so the API
         // replays it instead of storing a second shot.
-        expect(
-          bodies[0].match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1],
-        ).toMatch(IDEMPOTENCY_KEY_PATTERN)
+        const keyOf = (body: string) =>
+          body.match(/"idempotencyKey"\s*:\s*"([^"]+)"/)?.[1]
+        expect(keyOf(bodies[0])).toMatch(IDEMPOTENCY_KEY_PATTERN)
+        expect(keyOf(bodies[1])).toMatch(IDEMPOTENCY_KEY_PATTERN)
+        // Two shots, two keys: the API would refuse the 22 g save as a replay
+        // conflict under the 18 g save's key.
+        expect(keyOf(bodies[1])).not.toBe(keyOf(bodies[0]))
         expect(bodies[1]).not.toBe(bodies[0])
         if (pending) expect(bodies[2]).toBe(bodies[1])
         expect(bodies.at(-1)).toBe(bodies[0])

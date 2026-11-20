@@ -93,7 +93,7 @@ export function MethodPicker({
                             : 'text-muted-foreground',
                         )}
                       >
-                        {formatLastBrewed(item.lastBrewedAt, now)}
+                        {formatLastBrewed(item.lastBrewedAt, now, item.status)}
                       </span>
                     </CommandItem>
                   )

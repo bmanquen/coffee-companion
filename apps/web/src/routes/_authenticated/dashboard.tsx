@@ -90,7 +90,15 @@ export function DashboardContainer() {
   const navigate = Route.useNavigate()
 
   const feeds: Array<MethodFeed> = [
-    { method: 'espresso', brews: espresso },
+    {
+      method: 'espresso',
+      brews: espresso,
+      // Until a page has loaded, an empty list is not "No brews yet". A failed
+      // refresh keeps the recency of the page already loaded.
+      ...(espressoQuery.data
+        ? {}
+        : { status: espressoQuery.isError ? 'failed' : 'loading' }),
+    },
     { method: 'pourover', brews: pourover },
     { method: 'frenchpress', brews: frenchpress },
     { method: 'aeropress', brews: aeropress },

@@ -1058,7 +1058,9 @@ describe('EspressoBrewsSection', () => {
       // waitFor poll, which nears the timeout under CI coverage.
       fireEvent.click(screen.getByText('Load more'))
       await waitFor(() =>
-        expect(screen.getByText('Load more')).toHaveProperty('disabled', true),
+        expect(
+          screen.getByText('Load more').getAttribute('aria-disabled'),
+        ).toBe('true'),
       )
 
       fireEvent.change(screen.getByPlaceholderText('Filter shots...'), {
@@ -1068,7 +1070,9 @@ describe('EspressoBrewsSection', () => {
         'value',
         'Huila',
       )
-      expect(screen.getByText('Load more')).toHaveProperty('disabled', true)
+      expect(
+        screen.getByText('Load more').getAttribute('aria-disabled'),
+      ).toBe('true')
 
       await waitFor(
         () => {
@@ -1076,8 +1080,8 @@ describe('EspressoBrewsSection', () => {
             within(screen.getByRole('table')).getByText('Colombia Huila'),
           ).toBeTruthy()
           expect(
-            screen.getByText('Load more'),
-          ).toHaveProperty('disabled', false)
+            screen.getByText('Load more').getAttribute('aria-disabled'),
+          ).toBe('false')
         },
         { timeout: FILTER_SETTLE_TIMEOUT_MS },
       )
@@ -1089,7 +1093,9 @@ describe('EspressoBrewsSection', () => {
         expect(
           within(screen.getByRole('table')).getByText('Colombia Huila'),
         ).toBeTruthy()
-        expect(screen.getByText('Load more')).toHaveProperty('disabled', false)
+        expect(
+          screen.getByText('Load more').getAttribute('aria-disabled'),
+        ).toBe('false')
       })
       expect(
         within(screen.getByRole('table')).queryByText('Stale extra'),
@@ -1141,8 +1147,10 @@ describe('EspressoBrewsSection', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
       await waitFor(() =>
         expect(
-          screen.getByRole('button', { name: 'Load more' }),
-        ).toHaveProperty('disabled', true),
+          screen
+            .getByRole('button', { name: 'Load more' })
+            .getAttribute('aria-disabled'),
+        ).toBe('true'),
       )
       fireEvent.change(screen.getByPlaceholderText('Filter shots...'), {
         target: { value: 'Huila' },
@@ -1174,6 +1182,14 @@ describe('EspressoBrewsSection', () => {
       await act(async () => {
         await pendingLoadMore
       })
+      // The held page's reply is processed after the fetch resolves; read the
+      // cache only once nothing can still write it.
+      await waitFor(() =>
+        expect(
+          queryClient.getQueryState(espressoShotInfiniteOptions(trpc).queryKey)
+            ?.fetchStatus,
+        ).toBe('idle'),
+      )
 
       const history = queryClient.getQueryData(
         espressoShotInfiniteOptions(trpc).queryKey,

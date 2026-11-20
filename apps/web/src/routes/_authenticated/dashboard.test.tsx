@@ -1449,6 +1449,49 @@ describe('Dashboard', () => {
     }
   })
 
+  it('does not call Espresso unbrewed while its first page is loading or failed', async () => {
+    let failPage: (error: Error) => void = () => {}
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockReturnValue({ method: 'pourover' })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [])
+      void queryClient
+        .prefetchInfiniteQuery({
+          ...espressoShotInfiniteOptions(trpc),
+          queryFn: () =>
+            new Promise<never>((_resolve, reject) => {
+              failPage = reject
+            }),
+        })
+        .catch(() => {})
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      const espressoRow = () =>
+        screen
+          .getAllByRole('option')
+          .find((option) => option.textContent.startsWith('Espresso'))
+          ?.textContent
+      fireEvent.click(screen.getByRole('button', { name: 'Pour Over' }))
+      expect(espressoRow()).toBe('EspressoLoading…')
+
+      await act(async () => {
+        failPage(new Error('Network request failed'))
+      })
+      await waitFor(() => expect(espressoRow()).toBe("EspressoCouldn't load"))
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
   it('shows the espresso feed retry when getRecent fails with no cached page', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')

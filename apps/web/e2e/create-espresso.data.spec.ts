@@ -48,7 +48,7 @@ test('roast-date picker selects a date and closes', async ({ page }) => {
 
   await expect(page.getByText('Pick a date')).toHaveCount(0)
   await expect(page.getByRole('grid')).toHaveCount(0)
-  await expect(page.getByLabel('Roast Date')).toBeFocused()
+  await expect(page.getByLabel('Roast Date', { exact: true })).toBeFocused()
 })
 
 test('roast-date picker closes on keyboard select', async ({ page }) => {
@@ -60,7 +60,7 @@ test('roast-date picker closes on keyboard select', async ({ page }) => {
 
   await expect(page.getByText('Pick a date')).toHaveCount(0)
   await expect(page.getByRole('grid')).toHaveCount(0)
-  await expect(page.getByLabel('Roast Date')).toBeFocused()
+  await expect(page.getByLabel('Roast Date', { exact: true })).toBeFocused()
 })
 
 test('roast-date picker stays open when changing months', async ({ page }) => {
@@ -83,7 +83,7 @@ test('roast-date picker keeps a date from another month when that day is tapped 
 
   await page.goto('/espresso/new')
 
-  const trigger = page.getByLabel('Roast Date')
+  const trigger = page.getByLabel('Roast Date', { exact: true })
   const day = page.getByRole('button', { name: SELECTED_DAY_NAME })
   await clickUntil(page.getByText('Pick a date'), day)
   await page.getByRole('button', { name: NEXT_MONTH_NAME }).click()
