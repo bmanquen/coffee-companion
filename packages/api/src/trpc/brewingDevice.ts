@@ -5,6 +5,10 @@ import { db } from '../db'
 import { brewingDevices } from '../db/schema'
 import { insertBrewingDeviceSchema } from '../db/zod'
 import { assertRoomForAnother } from '../lib/allowance'
+import {
+  assertVisibleDeviceType,
+  visibleDeviceType,
+} from '../lib/brew-ownership'
 import { isPgUniqueViolation } from '../lib/pg-error'
 import { countBrewsUsing } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
@@ -22,7 +26,12 @@ function rethrowUniqueDeviceConflict(err: unknown): never {
 export const brewingDeviceRouter = createTRPCRouter({
   list: authedProcedure.query(async ({ ctx }) => {
     return db.query.brewingDevices.findMany({
-      where: { userId: ctx.session.user.id },
+      // A device written with another user's private type, before create
+      // checked it, is left out rather than listed without its type.
+      where: {
+        userId: ctx.session.user.id,
+        type: visibleDeviceType(ctx.session.user.id),
+      },
       orderBy: { name: 'asc' },
       with: { type: true },
     })
@@ -49,6 +58,7 @@ export const brewingDeviceRouter = createTRPCRouter({
         'brewingDevices',
         ctx.session.user.id,
       )
+      await assertVisibleDeviceType(input.typeId, ctx.session.user.id)
 
       try {
         const [device] = await db
@@ -65,6 +75,7 @@ export const brewingDeviceRouter = createTRPCRouter({
     .input(insertBrewingDeviceSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
+      await assertVisibleDeviceType(data.typeId, ctx.session.user.id)
       try {
         const updated = await db
           .update(brewingDevices)

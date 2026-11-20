@@ -16,6 +16,7 @@ import {
   UNKNOWN_UUID,
   callerFor,
   createCoffeeFor,
+  grantPlan,
   seedUsers,
   uniqFor,
 } from '../../test/trpc'
@@ -1359,6 +1360,34 @@ describe('espressoShot.getRecent', () => {
     )
   })
 
+  it('searches the Coffee column’s combined coffee and roaster label', async () => {
+    // coffeeOptionLabel trims the tab, so the label shows `Coffee · Sey`.
+    const roaster = await asA.roaster.create({ name: `\t${uniq('Sey')}` })
+    const coffee = await createCoffee(uniq('Ethiopia Guji'), {
+      roasterId: roaster.id,
+    })
+    const shot = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const search = async (q: string) =>
+      (await asA.espressoShot.getRecent({ limit: 50, q })).items.map(
+        (item) => item.id,
+      )
+
+    // As coffeeOptionLabel shows it, and in another case.
+    const label = `${coffee.name} · ${roaster.name.trim()}`
+    expect(await search(label)).toEqual([shot.id])
+    expect(await search(label.toUpperCase())).toEqual([shot.id])
+    expect(await search(`${coffee.name} · ${uniq('Other')}`)).toEqual([])
+  })
+
   it('hides and does not search another user’s private roaster', async () => {
     const coffee = await createCoffee(uniq('Leaky roaster coffee'))
     const secret = uniq('Secret roaster')
@@ -1394,6 +1423,12 @@ describe('espressoShot.getRecent', () => {
     const search = await asA.espressoShot.getRecent({ limit: 50, q: secret })
     expect(search.items).toEqual([])
     expect(search.total).toBe(0)
+    const label = await asA.espressoShot.getRecent({
+      limit: 50,
+      // Only a combined label holds the separator.
+      q: `· ${secret}`,
+    })
+    expect(label.items).toEqual([])
   })
 
   it('hides another user’s grinder on a legacy shot', async () => {
@@ -1924,8 +1959,57 @@ describe('espressoShot.getDialedIn', () => {
   })
 
   it('does not return another user’s dialed-in shots', async () => {
+    // Each user has a Dialed-in shot of their own, so an unscoped query and
+    // one that drops B's shot both fail.
+    const uniqB = uniqFor(USER_B)
+    // Room for a second set of gear when other tests already gave B one.
+    await grantPlan(USER_B, 'pro')
+    const coffeeB = await createCoffeeFor(asB, uniqB)(uniqB('Dialed Guji'))
+    const grinderB = await asB.grinder.create({
+      name: uniqB('Dialed Niche'),
+      brand: 'Niche',
+    })
+    const deviceB = await asB.brewingDevice.create({
+      name: uniqB('Dialed Linea'),
+      brand: 'La Marzocco',
+      typeId: await findOrCreateDeviceType(ESPRESSO_DEVICE_TYPE),
+    })
+    const shotB = await asB.espressoShot.create({
+      coffeeId: coffeeB.id,
+      grinderId: grinderB.id,
+      brewingDeviceId: deviceB.id,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    await asB.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: deviceB.id,
+      brewId: shotB.id,
+    })
+    const shotA = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceId,
+      brewId: shotA.id,
+    })
+    expect((await asA.espressoShot.getDialedIn()).map((s) => s.id)).toContain(
+      shotA.id,
+    )
+
     const dialedIn = await asB.espressoShot.getDialedIn()
-    expect(dialedIn.every((s) => s.userId === USER_B)).toBe(true)
+    expect(dialedIn.map((s) => s.id)).toEqual([shotB.id])
   })
 })
 

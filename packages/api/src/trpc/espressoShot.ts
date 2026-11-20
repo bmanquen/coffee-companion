@@ -198,9 +198,13 @@ function recentWhere(
       sql`CAST(${espressoShots.time} AS TEXT) ILIKE ${pattern}`,
       sql`'1:' || CAST(${shownRatio()} AS TEXT) ILIKE ${pattern}`,
     )
+    // Also the Coffee column's label, coffeeOptionLabel's `Coffee · Roaster`,
+    // with the same visible roaster.
     const identityMatch = or(
       ilike(coffees.name, pattern),
       ilike(roasters.name, pattern),
+      // JS trim() also strips tabs and line breaks, so the label does too.
+      sql`${coffees.name} || ' · ' || btrim(${roasters.name}, ${' \t\n\r\f\v'}) ILIKE ${pattern}`,
     )
     const readable = settingsReadable(shelf)
     parts.push(

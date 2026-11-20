@@ -4,6 +4,7 @@ import { db } from '../db'
 import {
   aeropressBrews,
   brewingDeviceTypes,
+  brewingDevices,
   coldBrewBrews,
   espressoShots,
   frenchpressBrews,
@@ -230,5 +231,47 @@ describe('espressoShot', () => {
         coffeeId: foreign.coffeeId,
       }),
     ).toBeNull()
+  })
+
+  it('hides a legacy device that carries another user’s private type', async () => {
+    const espressoType = await deviceType(ESPRESSO_DEVICE_TYPE)
+    const theirType = await asOther.brewingDeviceType.create({
+      name: uniqOther('Their private type'),
+    })
+    const [legacy, control] = await Promise.all(
+      ['Legacy espresso', 'Control espresso'].map((name) =>
+        asOwner.brewingDevice.create({
+          name: uniq(name),
+          brand: 'Brand',
+          typeId: espressoType,
+        }),
+      ),
+    )
+    const logShot = (brewingDeviceId: string) =>
+      asOwner.espressoShot.create({
+        ...own,
+        brewingDeviceId,
+        grindSetting: '1.5',
+        dose: '18',
+        yield: '36',
+        time: 30,
+        idempotencyKey: crypto.randomUUID(),
+      })
+    const shot = await logShot(legacy.id)
+    const controlShot = await logShot(control.id)
+    // Only a device written before writes checked the type can do this.
+    await db
+      .update(brewingDevices)
+      .set({ typeId: theirType.id })
+      .where(eq(brewingDevices.id, legacy.id))
+
+    const { items } = await asOwner.espressoShot.getRecent({ limit: 50 })
+    const deviceOf = (id: string) =>
+      items.find((row) => row.id === id)?.brewingDevice
+    expect(deviceOf(shot.id)).toBeNull()
+    expect(deviceOf(controlShot.id)?.type.name).toBe(ESPRESSO_DEVICE_TYPE)
+    const listed = (await asOwner.brewingDevice.list()).map((d) => d.id)
+    expect(listed).not.toContain(legacy.id)
+    expect(listed).toContain(control.id)
   })
 })

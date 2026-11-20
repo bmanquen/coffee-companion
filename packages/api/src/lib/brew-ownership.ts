@@ -35,10 +35,34 @@ export function onOwnCoffee(userId: string) {
   return { coffee: { userId } } as const
 }
 
-// Another user's grinder or device on a legacy Brew comes back as null.
+// A Brewing Device Type the user may see: a shared one or their own.
+export function visibleDeviceType(userId: string) {
+  return { OR: [{ userId: { isNull: true as const } }, { userId }] }
+}
+
+// Device writes: the type must be one the user may see, so a device cannot
+// carry another user's private type into the user's reads.
+export async function assertVisibleDeviceType(typeId: string, userId: string) {
+  const type = await db.query.brewingDeviceTypes.findFirst({
+    where: { id: typeId, ...visibleDeviceType(userId) },
+    columns: { id: true },
+  })
+  if (!type) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Brewing device type not found',
+    })
+  }
+}
+
+// Another user's grinder or device on a legacy Brew comes back as null, and
+// so does a device written with another user's private type before the check.
 export function ownGear(userId: string) {
   return {
     grinder: { where: { userId } },
-    brewingDevice: { where: { userId }, with: { type: true } },
+    brewingDevice: {
+      where: { userId, type: visibleDeviceType(userId) },
+      with: { type: true },
+    },
   } as const
 }

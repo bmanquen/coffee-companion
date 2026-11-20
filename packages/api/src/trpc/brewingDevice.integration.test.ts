@@ -70,6 +70,33 @@ describe('brewingDevice', () => {
   })
 })
 
+describe('brewingDevice type visibility', () => {
+  it('refuses another user’s private type on create and update', async () => {
+    const theirType = await asB.brewingDeviceType.create({
+      name: uniqFor(USER_B)('Private type'),
+    })
+    await expect(
+      asA.brewingDevice.create({
+        name: uniq('With their type'),
+        brand: 'Brand',
+        typeId: theirType.id,
+      }),
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Brewing device type not found',
+    })
+    await expect(
+      asA.brewingDevice.update({
+        id: deviceAId,
+        name: uniq('Owned by A'),
+        brand: 'Brand',
+        typeId: theirType.id,
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    expect((await asA.brewingDevice.getById(deviceAId)).typeId).toBe(typeId)
+  })
+})
+
 describe('brewingDevice.getById', () => {
   it('returns the user’s device', async () => {
     const found = await asA.brewingDevice.getById(deviceAId)
@@ -171,6 +198,10 @@ describe('brewingDevice.delete', () => {
 
 describe('brewingDevice plan limits', () => {
   it('allows three brewing devices on Free and refuses the fourth', async () => {
+    // A type of their own: another user's private type is refused.
+    const typeId = (
+      await asFree.brewingDeviceType.create({ name: uniqFree('Type') })
+    ).id
     const first = await asFree.brewingDevice.create({
       name: uniqFree('One'),
       brand: 'Brand',
@@ -209,6 +240,9 @@ describe('brewingDevice plan limits', () => {
   it('lets a granted paid Plan add devices past the Free limit', async () => {
     const uniqPaid = uniqFor(USER_PAID)
     await grantPlan(USER_PAID, 'pro')
+    const typeId = (
+      await asPaid.brewingDeviceType.create({ name: uniqPaid('Type') })
+    ).id
 
     for (const label of ['One', 'Two', 'Three', 'Four']) {
       await asPaid.brewingDevice.create({
@@ -223,6 +257,9 @@ describe('brewingDevice plan limits', () => {
 
   it('lets a Subscription add devices after Free had already hit the cap', async () => {
     const uniqUpgraded = uniqFor(USER_UPGRADED)
+    const typeId = (
+      await asUpgraded.brewingDeviceType.create({ name: uniqUpgraded('Type') })
+    ).id
     for (const label of ['One', 'Two', 'Three']) {
       await asUpgraded.brewingDevice.create({
         name: uniqUpgraded(label),
