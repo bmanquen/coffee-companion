@@ -177,15 +177,21 @@ describe('useEspressoCatalog', () => {
     await waitFor(() =>
       expect(result.current.catalog?.shots[0]?.id).toBe(saved.id),
     )
+    // The save re-reads only the first page.
+    expect(result.current.catalog?.shots).toHaveLength(PAGE)
+
+    // Load more pages on from the refreshed rows, so no row is skipped.
+    await act(async () => {
+      result.current.loadMore()
+      await Promise.resolve()
+    })
     await waitFor(() =>
       expect(result.current.catalog?.shots).toHaveLength(PAGE * 2),
     )
+    expect(listCursors).not.toContain(cursorAfter(page2))
     expect(result.current.catalog?.shots.map((row) => row.id)).toEqual(
       afterSave.slice(0, PAGE * 2).map((row) => row.id),
     )
-
-    // A refetch of the two cached pages cannot reach a third, so this proves
-    // load more pages on from the refreshed rows.
     await act(async () => {
       result.current.loadMore()
       await Promise.resolve()
@@ -325,6 +331,115 @@ describe('useEspressoCatalog', () => {
     expect(result.current.catalog?.shots.map((row) => row.id)).toEqual(
       afterSecondSave.slice(0, PAGE * 2).map((row) => row.id),
     )
+  })
+
+  it('reads only the first page again after a save, then pages on from it', async () => {
+    const PAGE = ESPRESSO_SHOT_PAGE_SIZE
+    const listing = Array.from({ length: PAGE * 2 }, (_, index) =>
+      shot({ id: `shot-${index + 1}`, coffeeName: `Shot ${index + 1}` }),
+    )
+    const saved = shot({ id: 'shot-saved', coffeeName: 'Saved' })
+    let rows = listing
+    const listCursors: Array<EspressoShotCursor | null> = []
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      // Pages by the id of the row before, so a cursor from before the save
+      // still lands right after it.
+      listShots: (cursor) => {
+        listCursors.push(cursor ?? null)
+        const start = cursor
+          ? rows.findIndex((row) => `after:${row.id}` === cursor) + 1
+          : 0
+        const items = rows.slice(start, start + PAGE)
+        const more = start + PAGE < rows.length
+        return Promise.resolve({
+          items,
+          total: rows.length,
+          nextCursor: more ? `after:${items[items.length - 1].id}` : null,
+        })
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {
+        rows = [saved, ...listing]
+      },
+    }
+    const { result } = await renderCatalog(api)
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE),
+    )
+    await act(async () => {
+      result.current.loadMore()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE * 2),
+    )
+    listCursors.length = 0
+
+    await act(async () => {
+      result.current.save(shotInput)
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots[0]?.id).toBe(saved.id),
+    )
+    // One read, not one per cached page.
+    expect(listCursors).toEqual([null])
+    expect(result.current.catalog?.shots).toHaveLength(PAGE)
+
+    await act(async () => {
+      result.current.loadMore()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE * 2),
+    )
+    await act(async () => {
+      result.current.loadMore()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE * 2 + 1),
+    )
+    expect(result.current.catalog?.shots.map((row) => row.id)).toEqual(
+      [saved, ...listing].map((row) => row.id),
+    )
+  })
+
+  it('aborts a history read when a save cancels it', async () => {
+    const signals: Array<AbortSignal | undefined> = []
+    let reads = 0
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      listShots: (_cursor, signal) => {
+        reads += 1
+        signals.push(signal)
+        // The first read loads; the second, the first save's refresh, hangs.
+        if (reads === 1) {
+          return Promise.resolve({
+            items: [shot()],
+            total: 1,
+            nextCursor: null,
+          })
+        }
+        if (reads === 2) return new Promise(() => {})
+        return Promise.resolve({ items: [shot()], total: 1, nextCursor: null })
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {},
+    }
+    const { result } = await renderCatalog(api)
+    await waitFor(() => expect(result.current.catalog?.shots).toHaveLength(1))
+    await act(async () => {
+      result.current.save(shotInput)
+    })
+    await waitFor(() => expect(reads).toBe(2))
+    expect(signals[1]?.aborted).toBe(false)
+    // A second shot cancels that refresh for its own.
+    await act(async () => {
+      result.current.save({
+        ...shotInput,
+        idempotencyKey: '00000000-0000-4000-8000-0000000000c3',
+      })
+    })
+    await waitFor(() => expect(reads).toBe(3))
+    expect(signals[1]?.aborted).toBe(true)
   })
 
   it('reads the shots again after a save when the only read in flight started before it', async () => {

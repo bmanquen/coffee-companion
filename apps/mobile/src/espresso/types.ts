@@ -48,7 +48,11 @@ export type EspressoCatalog = {
 
 export type EspressoApi = {
   load: () => Promise<EspressoCatalog>
-  listShots: (cursor?: EspressoShotCursor | null) => Promise<ShotPage>
+  // signal aborts the request when its query is cancelled.
+  listShots: (
+    cursor?: EspressoShotCursor | null,
+    signal?: AbortSignal,
+  ) => Promise<ShotPage>
   loadPrefill: (coffeeId: string) => Promise<ShotRow | null>
   create: (input: ShotCreate) => Promise<void>
 }

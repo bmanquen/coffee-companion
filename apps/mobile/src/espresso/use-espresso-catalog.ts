@@ -11,11 +11,13 @@ import {
   ERROR_LOAD_MORE_FAILED,
   ERROR_SAVE_FAILED,
 } from './copy'
+import type { InfiniteData } from '@tanstack/react-query'
 import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
 import type {
   EspressoApi,
   EspressoCatalog,
   ShotCreate,
+  ShotPage,
 } from './types'
 
 export const ESPRESSO_EQUIPMENT_QUERY_KEY = 'espresso-equipment'
@@ -33,7 +35,9 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   })
   const shots = useInfiniteQuery({
     queryKey: [ESPRESSO_SHOTS_QUERY_KEY, userId],
-    queryFn: ({ pageParam }) => api.listShots(pageParam),
+    // Reading signal is also what tells TanStack a cancelled refresh must not
+    // go on to its older pages.
+    queryFn: ({ pageParam, signal }) => api.listShots(pageParam, signal),
     initialPageParam: undefined as EspressoShotCursor | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   })
@@ -111,9 +115,22 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
           onSuccess?.()
           const shotsFilter = { queryKey: [ESPRESSO_SHOTS_QUERY_KEY, userId] }
           // With no cached page, invalidate would reuse a read started before this save.
-          void queryClient
-            .cancelQueries(shotsFilter)
-            .then(() => queryClient.invalidateQueries(shotsFilter))
+          void queryClient.cancelQueries(shotsFilter).then(() => {
+            // Only the first page is read again, so the saved shot shows
+            // without waiting on every older page, or failing with one; its
+            // fresh cursor pages on from there.
+            queryClient.setQueryData<
+              InfiniteData<ShotPage, EspressoShotCursor | undefined>
+            >(shotsFilter.queryKey, (data) =>
+              data && data.pages.length > 1
+                ? {
+                    pages: data.pages.slice(0, 1),
+                    pageParams: data.pageParams.slice(0, 1),
+                  }
+                : data,
+            )
+            return queryClient.invalidateQueries(shotsFilter)
+          })
         },
         onError: (error) => {
           // The save may have committed, so a lookup begun before it is stale.

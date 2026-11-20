@@ -1249,6 +1249,7 @@ describe('log espresso shot', () => {
   it('retries a lost create with the same key and does not duplicate the shot', async () => {
     const stored: Array<ShotRow> = []
     const keys: Array<string> = []
+    const sent: Array<ShotCreate> = []
     let creates = 0
     const api: EspressoApi = {
       ...pagingFor(() => stored),
@@ -1262,6 +1263,7 @@ describe('log espresso shot', () => {
       create: (input) =>
         Promise.resolve().then(() => {
           keys.push(input.idempotencyKey)
+          sent.push(input)
           creates += 1
           if (stored.length === 0) {
             stored.push(
@@ -1287,6 +1289,9 @@ describe('log espresso shot', () => {
 
     expect(keys).toHaveLength(2)
     expect(keys[0]).toBe(keys[1])
+    // The API refuses a replay whose fields differ (roast date included), so
+    // the retry must send exactly what the lost create sent.
+    expect(sent[1]).toEqual(sent[0])
     expect(await screen.findByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-saved`)).toBeTruthy()
     expect(screen.getAllByText('Ethiopia Guji')).toHaveLength(1)
   })

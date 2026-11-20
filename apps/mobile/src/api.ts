@@ -86,11 +86,17 @@ export function createLiveEspressoApi(): EspressoApi {
         shots: [],
       }
     },
-    async listShots(cursor?: ShotPage['nextCursor']): Promise<ShotPage> {
-      const page = await client.espressoShot.getRecent.query({
-        limit: ESPRESSO_SHOT_PAGE_SIZE,
-        ...(cursor ? { cursor } : {}),
-      })
+    async listShots(
+      cursor?: ShotPage['nextCursor'],
+      signal?: AbortSignal,
+    ): Promise<ShotPage> {
+      const page = await client.espressoShot.getRecent.query(
+        {
+          limit: ESPRESSO_SHOT_PAGE_SIZE,
+          ...(cursor ? { cursor } : {}),
+        },
+        { signal },
+      )
       return {
         items: page.items.map(toShotRow),
         total: page.total,
