@@ -1407,16 +1407,12 @@ function restoreStylusHandwriting(
 }
 
 // Null when the emulator at serial is the recorded AVD (or its name cannot be
-// read), else the mismatch.
+// read, which doctor's readiness check reports in other ways), else the
+// mismatch.
 function connectedAvdProblem(
   serial,
   expected,
-  readAvd = () =>
-    parseAvdName(
-      runCapture(adbBin(), ['-s', serial, 'emu', 'avd', 'name'], {
-        allowFail: true,
-      }).stdout,
-    ),
+  readAvd = () => readConnectedAvdName(serial),
 ) {
   const avd = readAvd()
   return avd && avd !== expected
@@ -1424,16 +1420,70 @@ function connectedAvdProblem(
     : null
 }
 
+// For a write to the device: null only when its AVD name reads back as the
+// recorded one. An unreadable name could be any emulator, so it is a problem.
+function recordedAvdProblem(serial, expected, readAvd) {
+  let avd = null
+  const problem = connectedAvdProblem(serial, expected, () => {
+    avd = readAvd ? readAvd() : readConnectedAvdName(serial)
+    return avd
+  })
+  if (problem) return problem
+  return avd ? null : `could not read the AVD name on ${serial}`
+}
+
+function readConnectedAvdName(serial) {
+  return parseAvdName(
+    runCapture(adbBin(), ['-s', serial, 'emu', 'avd', 'name'], {
+      allowFail: true,
+    }).stdout,
+  )
+}
+
+// What an attached emulator's stylus setting was before launch changed it, so
+// cleanup can put it back. A read that fails stops launch before the write.
+function readStylusBaseline(
+  serial,
+  {
+    read = () =>
+      runCapture(
+        adbBin(),
+        [
+          '-s',
+          serial,
+          'shell',
+          'settings',
+          'get',
+          'secure',
+          STYLUS_HANDWRITING_SETTING,
+        ],
+        { allowFail: true },
+      ),
+  } = {},
+) {
+  const result = read()
+  const value = `${result.stdout ?? ''}`.trim()
+  if (result.status !== 0 || value === '') {
+    throw new Error(
+      `Could not read ${STYLUS_HANDWRITING_SETTING} on ${serial}, so it was ` +
+        'left unchanged: ' +
+        `${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim() || 'no output'}`,
+    )
+  }
+  return value
+}
+
 // The device writes cleanup and failed-launch teardown make, only on the
 // emulator that was recorded: another AVD now on the serial (booted after
-// this run's emulator went away) keeps its package, reverses, and settings.
-// Returns the mismatch, or null when the writes ran.
+// this run's emulator went away), or one whose name cannot be read, keeps its
+// package, reverses, and settings. Returns the problem, or null when the
+// writes ran.
 function releaseRecordedDevice(
   state,
   {
     uninstallOwned = shouldUninstallRecordedPackage(state),
     avdProblem = () =>
-      connectedAvdProblem(state.serial, state.avdName ?? chosenAvdName()),
+      recordedAvdProblem(state.serial, state.avdName ?? chosenAvdName()),
     uninstall = () => uninstallPackage(state.serial, state.androidPackage),
     clearReverses = () => adbClearReverses(state.serial),
     restoreStylus = () =>
@@ -3443,8 +3493,7 @@ async function cmdLaunchDevice(opts = {}) {
     adbReverse(DEVICE_SERIAL, metroPort)
     adbReverse(DEVICE_SERIAL, webPort)
     if (attachedEmulator) {
-      const before = `${adbStylusHandwriting(DEVICE_SERIAL) ?? ''}`.trim()
-      partial.stylusHandwritingBefore = before || undefined
+      partial.stylusHandwritingBefore = readStylusBaseline(DEVICE_SERIAL)
       persistLaunchPartial(partial)
     }
     ensureStylusHandwritingOff(DEVICE_SERIAL)
@@ -3573,10 +3622,7 @@ async function cmdDriveDevice(flow) {
     die(preexistingInstallClearStateMessage(), EXIT_NOT_DRIVABLE)
   }
   // Before any write, so a different AVD now on the serial is left untouched.
-  const avdProblem = connectedAvdProblem(
-    state.serial,
-    state.avdName ?? AVD_NAME,
-  )
+  const avdProblem = recordedAvdProblem(state.serial, state.avdName ?? AVD_NAME)
   if (avdProblem) {
     die(
       `Device ${state.serial} is not the recorded emulator: ${avdProblem}.`,
@@ -4386,7 +4432,7 @@ async function cmdCleanup() {
     }
     const foreignAvd = releaseRecordedDevice(state)
     if (state.emulatorPid && foreignAvd) {
-      // Not `emu kill` on the serial: that is the other AVD now. Signal only
+      // Not `emu kill` on the serial: it may be another AVD now. Signal only
       // the pid this run started.
       stopRecordedPid(state.emulatorPid, 'emulator', stopped)
     } else if (state.emulatorPid) {
@@ -4491,6 +4537,8 @@ export {
   ensureStylusHandwritingOff,
   restoreStylusHandwriting,
   connectedAvdProblem,
+  recordedAvdProblem,
+  readStylusBaseline,
   releaseRecordedDevice,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,

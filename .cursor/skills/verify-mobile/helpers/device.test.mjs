@@ -66,6 +66,8 @@ import {
   ensureStylusHandwritingOff,
   restoreStylusHandwriting,
   connectedAvdProblem,
+  recordedAvdProblem,
+  readStylusBaseline,
   releaseRecordedDevice,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
@@ -1423,7 +1425,7 @@ describe('releaseRecordedDevice', () => {
       {
         uninstallOwned: opts.uninstallOwned ?? true,
         avdProblem: () =>
-          connectedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => avd),
+          recordedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => avd),
         uninstall: () => calls.push('uninstall'),
         clearReverses: () => calls.push('reverses'),
         restoreStylus: () => calls.push('stylus'),
@@ -1442,19 +1444,49 @@ describe('releaseRecordedDevice', () => {
       'reverses',
       'stylus',
     ])
-    // An unreadable name is not a mismatch.
-    assert.deepEqual(release(null).calls, ['uninstall', 'reverses', 'stylus'])
   })
 
-  it('writes nothing to another AVD now on the serial', () => {
+  it('writes nothing to another AVD now on the serial, or an unknown one', () => {
     assert.deepEqual(release('Pixel_7'), {
       calls: [],
       problem: `${DEVICE_SERIAL} is AVD Pixel_7, not verify-pixel`,
+    })
+    assert.deepEqual(release(null), {
+      calls: [],
+      problem: `could not read the AVD name on ${DEVICE_SERIAL}`,
     })
     assert.deepEqual(release('verify-pixel', { state: { serial: null } }), {
       calls: [],
       problem: null,
     })
+  })
+})
+
+describe('readStylusBaseline', () => {
+  it('returns the value read, unset included', () => {
+    const read = (stdout) => () => ({ status: 0, stdout })
+    assert.equal(readStylusBaseline(DEVICE_SERIAL, { read: read('1\n') }), '1')
+    assert.equal(
+      readStylusBaseline(DEVICE_SERIAL, { read: read('null') }),
+      'null',
+    )
+  })
+
+  it('throws, so launch writes nothing, when the read fails', () => {
+    assert.throws(
+      () =>
+        readStylusBaseline(DEVICE_SERIAL, {
+          read: () => ({ status: 1, stdout: '', stderr: 'error: closed' }),
+        }),
+      /Could not read stylus_handwriting_enabled/,
+    )
+    assert.throws(
+      () =>
+        readStylusBaseline(DEVICE_SERIAL, {
+          read: () => ({ status: 0, stdout: '' }),
+        }),
+      /left unchanged/,
+    )
   })
 })
 
@@ -1481,10 +1513,10 @@ describe('connectedAvdProblem', () => {
       'utf8',
     )
     const drive = src.slice(src.indexOf('async function cmdDriveDevice'))
-    assert.ok(
-      drive.indexOf('connectedAvdProblem(') <
-        drive.indexOf('ensureAdbReverses(state.serial'),
-    )
+    const check = drive.indexOf('recordedAvdProblem(')
+    const firstWrite = drive.indexOf('ensureAdbReverses(state.serial')
+    assert.ok(check >= 0 && firstWrite >= 0)
+    assert.ok(check < firstWrite)
   })
 })
 
