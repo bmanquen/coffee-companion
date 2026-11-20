@@ -21,7 +21,9 @@ function sentrySourceMaps() {
 //
 // Sentry pulls @opentelemetry/api onto the graph; better-auth then imports
 // @opentelemetry/semantic-conventions. The SSR router leaves that import bare,
-// so it is a direct apps/web dependency.
+// so it is a direct apps/web dependency. Likewise @sentry/server-utils: with
+// source-map upload on, the Sentry plugin adds a bare import of it to the server
+// entry.
 const sentryServerExternals = [
   /^@sentry\//,
   /^@opentelemetry\//,

@@ -117,6 +117,9 @@ importers:
       '@radix-ui/react-slot':
         specifier: ^1.5.0
         version: 1.5.0(@types/react@19.3.0)(react@19.3.1)
+      '@sentry/server-utils':
+        specifier: ^11.14.0
+        version: 11.14.0
       '@sentry/tanstackstart-react':
         specifier: ^11.12.0
         version: 11.14.0(react@19.3.1)(rollup@4.68.5)
