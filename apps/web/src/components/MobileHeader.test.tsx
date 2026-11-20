@@ -118,6 +118,37 @@ describe('MobileHeader', () => {
     expect(mocks.navigate).not.toHaveBeenCalled()
   })
 
+  it('allows one sign-out attempt at a time, and a retry after it fails', async () => {
+    authState.session = {
+      user: { name: 'Test User', email: 'test@example.com', image: null },
+    }
+    mocks.signOut.mockClear()
+    let fail: () => void = () => {}
+    mocks.signOut.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          fail = () => resolve({ error: { message: 'nope' } })
+        }),
+    )
+    renderHeader(<MobileHeader />)
+    const button = screen.getByRole('button', { name: 'Sign Out' })
+
+    await act(async () => {
+      fireEvent.click(button)
+    })
+    await act(async () => {
+      fireEvent.click(button)
+    })
+    expect(mocks.signOut).toHaveBeenCalledOnce()
+    expect(button).toHaveProperty('disabled', true)
+
+    await act(async () => {
+      fail()
+    })
+    expect(screen.getByRole('alert').textContent).toBe(SIGN_OUT_FAILED)
+    expect(button).toHaveProperty('disabled', false)
+  })
+
   it('shows a sign-in button and no account details when signed out', async () => {
     authState.session = null
     renderHeader(<MobileHeader />)

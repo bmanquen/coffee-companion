@@ -246,7 +246,14 @@ export function NewEspressoShot() {
       keep,
       null,
     )
-    const device = brewingDevices.find(
+    // The lists as they are now: a refresh during the lookup may have dropped
+    // or retyped this gear since the render that started it.
+    const currentGrinders =
+      queryClient.getQueryData(trpc.grinder.list.queryKey()) ?? grinders
+    const currentDevices =
+      queryClient.getQueryData(trpc.brewingDevice.list.queryKey()) ??
+      brewingDevices
+    const device = currentDevices.find(
       (item) => item.id === next.brewingDeviceId,
     )
     const priorKey = idempotencyKeys.current.get(
@@ -256,7 +263,7 @@ export function NewEspressoShot() {
     if (!keep.grinderId) {
       form.setFieldValue(
         'grinderId',
-        grinders.some((item) => item.id === next.grinderId)
+        currentGrinders.some((item) => item.id === next.grinderId)
           ? next.grinderId
           : '',
       )
@@ -361,6 +368,9 @@ export function NewEspressoShot() {
         className="w-full max-w-md flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault()
+          // A second submit would clear the in-flight flag when it returns,
+          // while the first save is still pending.
+          if (saveInFlight.current) return
           saveSucceeded.current = false
           saveInFlight.current = true
           void form.handleSubmit().finally(() => {

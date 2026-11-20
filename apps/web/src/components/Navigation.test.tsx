@@ -134,6 +134,35 @@ describe('Navigation', () => {
     expect(mocks.navigate).not.toHaveBeenCalled()
   })
 
+  it('allows one sign-out attempt at a time, and a retry after it fails', async () => {
+    authState.session = { user: { name: 'Test User', image: null } }
+    mocks.signOut.mockClear()
+    let fail: () => void = () => {}
+    mocks.signOut.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          fail = () => resolve({ error: { message: 'nope' } })
+        }),
+    )
+    renderNav(<Navigation open setOpen={() => {}} />)
+    const button = screen.getByRole('button', { name: 'Sign Out' })
+
+    await act(async () => {
+      fireEvent.click(button)
+    })
+    await act(async () => {
+      fireEvent.click(button)
+    })
+    expect(mocks.signOut).toHaveBeenCalledOnce()
+    expect(button).toHaveProperty('disabled', true)
+
+    await act(async () => {
+      fail()
+    })
+    expect(screen.getByRole('alert').textContent).toBe(SIGN_OUT_FAILED)
+    expect(button).toHaveProperty('disabled', false)
+  })
+
   it('takes the user to their account from their avatar and name', () => {
     authState.session = { user: { name: 'Test User', image: null } }
     const setOpen = vi.fn()

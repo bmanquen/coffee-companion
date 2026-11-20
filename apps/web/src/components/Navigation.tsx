@@ -16,6 +16,7 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
   const { data: session } = authClient.useSession()
   const signOut = useSignOut()
   const [signOutError, setSignOutError] = useState<string | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
 
   const handleSignIn = () => {
     authClient.signIn.social({ provider: 'google' })
@@ -104,11 +105,17 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
                 </Link>
                 <Button
                   variant="outline"
+                  // One attempt at a time, so an earlier failure cannot show while a
+                  // later attempt is still pending.
+                  disabled={signingOut}
                   onClick={() => {
+                    setSigningOut(true)
                     setSignOutError(null)
-                    void signOut().catch(() => {
-                      setSignOutError(SIGN_OUT_FAILED)
-                    })
+                    void signOut()
+                      .catch(() => {
+                        setSignOutError(SIGN_OUT_FAILED)
+                      })
+                      .finally(() => setSigningOut(false))
                   }}
                 >
                   Sign Out

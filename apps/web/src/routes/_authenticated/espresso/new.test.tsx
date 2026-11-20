@@ -787,6 +787,64 @@ describe('NewEspressoShot form', () => {
     expect(screen.queryByDisplayValue('Niche Zero')).toBeNull()
   })
 
+  it('checks prefilled gear against the lists as they are when the lookup lands', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper } = providers
+    queryClient.removeQueries({
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+    })
+    let resolvePrefill: (
+      shot: ReturnType<typeof makeRecentShot>,
+    ) => void = () => {}
+    const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+      (resolve) => {
+        resolvePrefill = resolve
+      },
+    )
+    void queryClient.prefetchQuery({
+      ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId: COFFEE }),
+      queryFn: () => pending,
+    })
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+
+    // While the lookup is out, the grinder is deleted and the Linea Mini
+    // retyped as an AeroPress, so neither is in its picker any more.
+    await act(async () => {
+      queryClient.setQueryData(trpc.grinder.list.queryKey(), [
+        makeGrinder({ id: GRINDER_B, name: 'P64' }),
+      ])
+      queryClient.setQueryData(trpc.brewingDevice.list.queryKey(), [
+        makeBrewingDevice({ id: ESP_DEVICE, name: 'Linea Mini' }),
+        makeBrewingDevice({ id: AERO_DEVICE, name: 'AeroPress Go' }),
+      ])
+    })
+    resolvePrefill(
+      makeRecentShot({
+        id: 'shot-1',
+        coffeeId: COFFEE,
+        grinderId: GRINDER,
+        brewingDeviceId: ESP_DEVICE,
+        roastDate: '2026-05-01',
+      }),
+    )
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+    expect(
+      screen
+        .getByRole('combobox', { name: 'Grinder' })
+        .getAttribute('data-field-value'),
+    ).toBe('')
+    expect(
+      screen
+        .getByRole('combobox', { name: 'Brewing Device' })
+        .getAttribute('data-field-value'),
+    ).toBe('')
+  })
+
   it('prefills roast date and device when the latest shot has no grinder', async () => {
     const { queryClient, trpc, Wrapper } = seeded()
     seedLatestUnsealed(
@@ -1525,6 +1583,14 @@ describe('NewEspressoShot form', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
       await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
       const prefillsDuringSave = prefillCalls(fetchSpy).length
+      // A second submit (Enter in a field) while the save is pending is
+      // ignored, so the save still counts as pending below.
+      await act(async () => {
+        fireEvent.submit(
+          screen.getByRole('button', { name: 'Logging…' }).closest('form')!,
+        )
+      })
+      expect(createCalls(fetchSpy)).toHaveLength(1)
 
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE_B },
