@@ -95,6 +95,11 @@ const getRecentInput = z.object({
   offset: z.never({ error: 'Reload to continue paging' }).optional(),
 })
 
+// What JS String.prototype.trim() strips, which coffeeOptionLabel uses.
+const JS_TRIM_CHARS =
+  ' \t\n\v\f\r\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006' +
+  '\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff'
+
 function likeContains(value: string) {
   return `%${value.replace(/[\\%_]/g, '\\$&')}%`
 }
@@ -162,7 +167,9 @@ const MAX_RATIO_DECIMALS = 20
 // that would round to zero keeps more decimals, up to MAX_RATIO_DECIMALS
 // (1:0.003).
 function shownRatio() {
-  const ratio = sql`(${espressoShots.yield} / NULLIF(${espressoShots.dose}, 0))`
+  // A quotient past numeric's ~131072 integer digits would fail the whole
+  // query, so a ratio that large is no ratio; the log bounds it first.
+  const ratio = sql`(CASE WHEN log(GREATEST(${espressoShots.yield}, 1)) - log(NULLIF(abs(${espressoShots.dose}), 0)) < 130000 THEN ${espressoShots.yield} / ${espressoShots.dose} END)`
   const places = Array.from(
     { length: MAX_RATIO_DECIMALS - 1 },
     (_, index) => index + 2,
@@ -203,8 +210,7 @@ function recentWhere(
     const identityMatch = or(
       ilike(coffees.name, pattern),
       ilike(roasters.name, pattern),
-      // JS trim() also strips tabs and line breaks, so the label does too.
-      sql`${coffees.name} || ' · ' || btrim(${roasters.name}, ${' \t\n\r\f\v'}) ILIKE ${pattern}`,
+      sql`${coffees.name} || ' · ' || btrim(${roasters.name}, ${JS_TRIM_CHARS}) ILIKE ${pattern}`,
     )
     const readable = settingsReadable(shelf)
     parts.push(

@@ -1256,6 +1256,11 @@ describe('espressoShot.getRecent', () => {
     // rounds up to 1:0.0000001.
     expect(await search('1:0.0000001')).toEqual([tinier.id])
     expect(await search('1:0.00000005')).toEqual([])
+
+    // A quotient past numeric's range is no ratio, not a failed search.
+    const huge = await log(`0.${'0'.repeat(16000)}1`, '9'.repeat(130000))
+    expect(await search('1:2.5')).toEqual([even.id])
+    expect(await search('Ratio Search')).toContain(huge.id)
   })
 
   it('filters getRecent to dialed-in shots', async () => {
@@ -1361,8 +1366,10 @@ describe('espressoShot.getRecent', () => {
   })
 
   it('searches the Coffee column’s combined coffee and roaster label', async () => {
-    // coffeeOptionLabel trims the tab, so the label shows `Coffee · Sey`.
-    const roaster = await asA.roaster.create({ name: `\t${uniq('Sey')}` })
+    // coffeeOptionLabel trims these, so the label shows `Coffee · Sey`.
+    const roaster = await asA.roaster.create({
+      name: `\t\u00a0${uniq('Sey')}\u3000`,
+    })
     const coffee = await createCoffee(uniq('Ethiopia Guji'), {
       roasterId: roaster.id,
     })
@@ -1927,7 +1934,32 @@ describe('espressoShot.getDialedIn', () => {
   })
 
   it('returns shots ordered most recent first', async () => {
+    // Two of its own, one after the other, so the order is checked even when
+    // this test runs alone.
+    const seeded: Array<string> = []
+    for (const label of ['Older Dialed', 'Newer Dialed']) {
+      const coffee = await createCoffee(uniq(label))
+      const shot = await asA.espressoShot.create({
+        coffeeId: coffee.id,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+        time: 30,
+        grindSetting: '1.5',
+        idempotencyKey: crypto.randomUUID(),
+      })
+      await asA.dialedInBrew.set({
+        brewingMethod: 'espresso',
+        brewingDeviceId: espressoDeviceId,
+        brewId: shot.id,
+      })
+      seeded.push(shot.id)
+    }
     const dialedIn = await asA.espressoShot.getDialedIn()
+    expect(
+      dialedIn.map((s) => s.id).filter((id) => seeded.includes(id)),
+    ).toEqual([seeded[1], seeded[0]])
     const times = dialedIn.map((s) => new Date(s.createdAt).getTime())
     expect(times).toEqual([...times].sort((a, b) => b - a))
   })
