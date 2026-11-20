@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   isAbortEvent,
   scrubSentryEvent,
+  scrubSentrySpan,
   sentryBrowserOptions,
   sentryCommonOptions,
   sentryEnabled,
@@ -160,7 +161,9 @@ describe('sentryServerOptions', () => {
   const DSN = 'https://key@o1.ingest.sentry.io/1'
 
   it('traces no health check', () => {
-    expect(sentryServerOptions(DSN).ignoreTransactions).toEqual(['/api/health'])
+    expect(sentryServerOptions(DSN).ignoreSpans).toEqual([
+      { op: 'http.server', attributes: { 'url.path': '/api/health' } },
+    ])
   })
 
   it('carries the common options', () => {
@@ -400,5 +403,34 @@ describe('scrubSentryEvent', () => {
     expect(event.extra).toEqual({
       loop: { email: '[Filtered]', self: '[Truncated]' },
     })
+  })
+})
+
+describe('scrubSentrySpan', () => {
+  it('drops the caller IP, user details, and sensitive headers', () => {
+    const span = scrubSentrySpan({
+      name: 'GET /api/auth/get-session',
+      attributes: {
+        'user.id': 'user_123',
+        'user.email': 'ada@example.com',
+        'user.ip_address': '203.0.113.8',
+        'client.address': '203.0.113.8',
+        'network.peer.address': '203.0.113.8',
+        'http.request.header.cookie': ['better-auth.session_token=[Filtered]'],
+        'http.request.header.x-api-key': ['key'],
+        'http.response.header.set-cookie': ['session=abc'],
+        'http.request.header.user-agent': ['curl/8'],
+        'user_agent.original': 'curl/8',
+        'url.full': 'https://coffee.example/api/auth/get-session',
+      },
+    })
+
+    expect(span.attributes).toEqual({
+      'user.id': 'user_123',
+      'http.request.header.user-agent': ['curl/8'],
+      'user_agent.original': 'curl/8',
+      'url.full': 'https://coffee.example/api/auth/get-session',
+    })
+    expect(span.name).toBe('GET /api/auth/get-session')
   })
 })

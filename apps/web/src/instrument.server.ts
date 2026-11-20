@@ -6,6 +6,7 @@ import { setPersonErasure } from '@coffee-companion/api/lib/erase-person'
 import {
   isAbortEvent,
   scrubSentryEvent,
+  scrubSentrySpan,
   sentryEnabled,
   sentryServerDsn,
   sentryServerOptions,
@@ -21,9 +22,7 @@ if (sentryEnabled(dsn)) {
       if (isAbortEvent(event)) return null
       return scrubSentryEvent(event)
     },
-    beforeSendTransaction(event) {
-      return scrubSentryEvent(event)
-    },
+    beforeSendSpan: scrubSentrySpan,
   })
   setErrorCapture((error, { tags, user }) => {
     Sentry.captureException(error, { tags, user })

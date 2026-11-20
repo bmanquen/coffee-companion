@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/tanstackstart-react'
 import {
   isAbortEvent,
   scrubSentryEvent,
+  scrubSentrySpan,
   sentryBrowserOptions,
   sentryClientDsn,
   sentryEnabled,
@@ -17,8 +18,6 @@ if (sentryEnabled(dsn)) {
       if (isAbortEvent(event)) return null
       return scrubSentryEvent(event)
     },
-    beforeSendTransaction(event) {
-      return scrubSentryEvent(event)
-    },
+    beforeSendSpan: scrubSentrySpan,
   })
 }

@@ -87,12 +87,14 @@ export function sentryCommonOptions(dsn: string) {
 }
 
 // Railway polls the health check every few seconds; a trace each time would be
-// most of production's traffic. Matched as a substring, so it holds whatever
-// the transaction ends up named.
+// most of production's traffic. Streamed spans are matched when they start,
+// before the route names them, so this matches the request path instead.
 export function sentryServerOptions(dsn: string) {
   return {
     ...sentryCommonOptions(dsn),
-    ignoreTransactions: [HEALTH_PATH],
+    ignoreSpans: [
+      { op: 'http.server', attributes: { 'url.path': HEALTH_PATH } },
+    ],
   }
 }
 
@@ -161,6 +163,30 @@ export function scrubSentryEvent<T>(event: T): T {
   }
 
   return event
+}
+
+// Streamed spans carry the request as attributes. Sentry masks cookie and
+// authorization values itself but still sends the caller's IP, even with
+// sendDefaultPii off.
+const SENSITIVE_SPAN_ATTRIBUTE =
+  /^(user\.(?!id$).+|client\.address|network\.peer\.address)$/
+
+function isSensitiveSpanAttribute(key: string): boolean {
+  const header = /^http\.(request|response)\.header\.(.+)$/.exec(key)?.[2]
+  return header
+    ? SENSITIVE_HEADER.test(header)
+    : SENSITIVE_SPAN_ATTRIBUTE.test(key)
+}
+
+export function scrubSentrySpan<T extends { attributes?: object }>(span: T): T {
+  if (span.attributes) {
+    span.attributes = Object.fromEntries(
+      Object.entries(span.attributes).filter(
+        ([key]) => !isSensitiveSpanAttribute(key),
+      ),
+    )
+  }
+  return span
 }
 
 function scrubRecord(record: Record<string, unknown>): Record<string, unknown> {
