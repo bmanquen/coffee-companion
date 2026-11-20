@@ -154,6 +154,24 @@ function afterCursor(cursor: EspressoShotCursorKey) {
   )
 }
 
+// Matches formatBrewRatio in @coffee-companion/brew-display.
+const MAX_RATIO_DECIMALS = 20
+
+// The ratio as the log shows it (formatBrewRatio): yield/dose to two
+// decimals without trailing zeros, so "1:2" finds 18g → 36g. A positive ratio
+// that would round to zero keeps more decimals, up to MAX_RATIO_DECIMALS
+// (1:0.003).
+function shownRatio() {
+  const ratio = sql`(${espressoShots.yield} / NULLIF(${espressoShots.dose}, 0))`
+  const places = Array.from(
+    { length: MAX_RATIO_DECIMALS - 1 },
+    (_, index) => index + 2,
+  ).map(
+    (decimals) => sql`NULLIF(round(${ratio}, ${sql.raw(String(decimals))}), 0)`,
+  )
+  return sql`trim_scale(COALESCE(CASE WHEN ${ratio} > 0 THEN COALESCE(${sql.join(places, sql`, `)}) END, round(${ratio}, 2)))`
+}
+
 function recentWhere(
   userId: string,
   input: {
@@ -178,9 +196,7 @@ function recentWhere(
       sql`CAST(${espressoShots.dose} AS TEXT) ILIKE ${pattern}`,
       sql`CAST(${espressoShots.yield} AS TEXT) ILIKE ${pattern}`,
       sql`CAST(${espressoShots.time} AS TEXT) ILIKE ${pattern}`,
-      // The ratio as the log shows it (formatBrewRatio): "1:" and yield/dose
-      // to two decimals without trailing zeros, so "1:2" finds 18g → 36g.
-      sql`'1:' || CAST(trim_scale(round(${espressoShots.yield} / NULLIF(${espressoShots.dose}, 0), 2)) AS TEXT) ILIKE ${pattern}`,
+      sql`'1:' || CAST(${shownRatio()} AS TEXT) ILIKE ${pattern}`,
     )
     const identityMatch = or(
       ilike(coffees.name, pattern),
@@ -539,12 +555,22 @@ export const espressoShotRouter = createTRPCRouter({
     .input(insertEspressoShotSchema.extend({ idempotencyKey: uuidInput() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id
-      const keyRow = await loadIdempotencyKey(userId, input.idempotencyKey)
+      let keyRow = await loadIdempotencyKey(userId, input.idempotencyKey)
+      if (!keyRow) {
+        try {
+          await assertOwnEspressoGear(input, userId)
+        } catch (error) {
+          // A retry may have read no key while the first request saved and
+          // its gear was then deleted: replay that key (deleted, here) rather
+          // than report the gear missing. Without a claimed key, it stands.
+          keyRow = await loadIdempotencyKey(userId, input.idempotencyKey)
+          if (!keyRow) throw error
+        }
+      }
       let shotId: string
       if (keyRow) {
         shotId = await replayShotId(userId, keyRow, input)
       } else {
-        await assertOwnEspressoGear(input, userId)
         await stampFallenBrews(userId, ctx.plan)
         shotId = await insertShotWithKey(userId, input)
       }

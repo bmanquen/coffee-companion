@@ -36,5 +36,9 @@ describe('formatBrewRatio', () => {
   it('does not round a tiny positive output to 1:0', () => {
     expect(formatBrewRatio('18', '0.05')).toBe('1:0.003')
     expect(formatBrewRatio('18', '0.05')).not.toBe('1:0')
+    // Past six decimals too, in plain decimals rather than 1:5e-8.
+    expect(formatBrewRatio('20', '0.0000004')).toBe('1:0.00000002')
+    // 0.00000005 rounds up at the first decimal that is not zero.
+    expect(formatBrewRatio('20', '0.000001')).toBe('1:0.0000001')
   })
 })

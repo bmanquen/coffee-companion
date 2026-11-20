@@ -173,6 +173,8 @@ describe.each(methods)('$router', ({ router, table }) => {
 
   it('leaves out a legacy Brew on another user’s Coffee', async () => {
     const brew = await create[router](own)
+    // On the owner's Coffee, so an empty result cannot pass for filtering.
+    const control = await create[router](own)
     await db
       .update(table)
       .set({ coffeeId: foreign.coffeeId })
@@ -180,8 +182,10 @@ describe.each(methods)('$router', ({ router, table }) => {
 
     const all = await asOwner[router].getAll()
     expect(all.map((row) => row.id)).not.toContain(brew.id)
+    expect(all.map((row) => row.id)).toContain(control.id)
     const recent = await asOwner[router].getRecent({ limit: 50, offset: 0 })
     expect(recent.items.map((row) => row.id)).not.toContain(brew.id)
+    expect(recent.items.map((row) => row.id)).toContain(control.id)
     expect(recent.total).toBe(recent.items.length)
     await expect(asOwner[router].getById(brew.id)).rejects.toMatchObject({
       code: 'NOT_FOUND',
@@ -196,15 +200,19 @@ describe('espressoShot', () => {
       brand: 'Brand',
       typeId: await deviceType(ESPRESSO_DEVICE_TYPE),
     })
-    const shot = await asOwner.espressoShot.create({
-      ...own,
-      brewingDeviceId: device.id,
-      grindSetting: '1.5',
-      dose: '18',
-      yield: '36',
-      time: 30,
-      idempotencyKey: crypto.randomUUID(),
-    })
+    const logShot = () =>
+      asOwner.espressoShot.create({
+        ...own,
+        brewingDeviceId: device.id,
+        grindSetting: '1.5',
+        dose: '18',
+        yield: '36',
+        time: 30,
+        idempotencyKey: crypto.randomUUID(),
+      })
+    const shot = await logShot()
+    // On the owner's Coffee, so an empty page cannot pass for filtering.
+    const control = await logShot()
     await db
       .update(espressoShots)
       .set({ coffeeId: foreign.coffeeId })
@@ -212,6 +220,7 @@ describe('espressoShot', () => {
 
     const recent = await asOwner.espressoShot.getRecent({ limit: 50 })
     expect(recent.items.map((row) => row.id)).not.toContain(shot.id)
+    expect(recent.items.map((row) => row.id)).toContain(control.id)
     expect(recent.total).toBe(recent.items.length)
     await expect(asOwner.espressoShot.getById(shot.id)).rejects.toMatchObject({
       code: 'NOT_FOUND',

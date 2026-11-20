@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { daysAgo } from '../db/seed-e2e'
@@ -837,8 +837,8 @@ describe('espressoShot.create idempotency', () => {
     const released = new Promise<void>((resolve) => {
       release = resolve
     })
-    let locked: () => void = () => {}
-    const coffeeLocked = new Promise<void>((resolve) => {
+    let locked: (pid: number) => void = () => {}
+    const coffeeLocked = new Promise<number>((resolve) => {
       locked = resolve
     })
     // Another request: holds the coffee so this create's insert waits on its
@@ -848,7 +848,10 @@ describe('espressoShot.create idempotency', () => {
       await tx.execute(
         sql`SELECT id FROM coffees WHERE id = ${coffee.id} FOR UPDATE`,
       )
-      locked()
+      const backend = await tx.execute<{ pid: number }>(
+        sql`SELECT pg_backend_pid() AS pid`,
+      )
+      locked(backend.rows[0].pid)
       await released
       await tx.insert(espressoShotIdempotencyKeys).values({
         userId: USER_A,
@@ -857,27 +860,88 @@ describe('espressoShot.create idempotency', () => {
       })
       await tx.delete(coffees).where(eq(coffees.id, coffee.id))
     })
-    await coffeeLocked
-    const create = asA.espressoShot.create(input)
-    const outcome = create.then(
-      () => null,
-      (error: unknown) => error,
-    )
-    // Wait until the insert is blocked on the coffee row.
-    for (let i = 0; i < 200; i++) {
-      const waiting = await db.execute<{ n: number }>(
-        sql`SELECT count(*)::int AS n FROM pg_stat_activity
-            WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+    let outcome: Promise<unknown> = Promise.resolve(null)
+    try {
+      // Fails here, not by hanging, if the lock is never taken.
+      const blockerPid = await Promise.race([coffeeLocked, overlapping])
+      outcome = asA.espressoShot.create(input).then(
+        () => null,
+        (error: unknown) => error,
       )
-      if (waiting.rows[0].n > 0) break
-      await new Promise((resolve) => setTimeout(resolve, 25))
+      // Only the shot insert waiting on this transaction proves the create
+      // got past its key lookup to the foreign-key check.
+      let insertBlocked = false
+      for (let i = 0; i < 200 && !insertBlocked; i++) {
+        const waiting = await db.execute<{ n: number }>(
+          sql`SELECT count(*)::int AS n FROM pg_stat_activity
+              WHERE ${blockerPid} = ANY(pg_blocking_pids(pid))
+                AND query ILIKE 'insert into "espresso_shots"%'`,
+        )
+        insertBlocked = waiting.rows[0].n > 0
+        if (!insertBlocked)
+          await new Promise((resolve) => setTimeout(resolve, 25))
+      }
+      expect(insertBlocked).toBe(true)
+    } finally {
+      release()
+      await Promise.allSettled([overlapping])
     }
-    release()
     await overlapping
 
     expect(await outcome).toMatchObject({
       code: TRPC_CONFLICT,
       message: SHOT_IDEMPOTENCY_DELETED,
+    })
+  })
+
+  it('replays a key claimed while gear validation ran instead of reporting the gear missing', async () => {
+    const espressoTypeId = await findOrCreateDeviceType(ESPRESSO_DEVICE_TYPE)
+    const device = await asA.brewingDevice.create({
+      name: uniq('Validated Linea'),
+      brand: 'La Marzocco',
+      typeId: espressoTypeId,
+    })
+    const idempotencyKey = crypto.randomUUID()
+    const input = {
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: device.id,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey,
+    }
+    // This retry read no key; while it checks the gear, the first request
+    // saves under the key and the device (with its shot) is deleted.
+    const spy = vi
+      .spyOn(db.query.brewingDevices, 'findFirst')
+      .mockImplementationOnce(async () => {
+        await db.insert(espressoShotIdempotencyKeys).values({
+          userId: USER_A,
+          idempotencyKey,
+          shotId: null,
+        })
+        await asA.brewingDevice.delete(device.id)
+        return undefined
+      })
+    try {
+      await expect(asA.espressoShot.create(input)).rejects.toMatchObject({
+        code: TRPC_CONFLICT,
+        message: SHOT_IDEMPOTENCY_DELETED,
+      })
+    } finally {
+      spy.mockRestore()
+    }
+    // Without a claimed key, the missing gear is still reported.
+    await expect(
+      asA.espressoShot.create({
+        ...input,
+        idempotencyKey: crypto.randomUUID(),
+      }),
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Brewing device not found',
     })
   })
 
@@ -1103,6 +1167,8 @@ describe('espressoShot.getRecent', () => {
     const even = await log('18', '45')
     const rounded = await log('18', '41')
     const half = await log('20', '53.5')
+    const tiny = await log('20', '0.05')
+    const tinier = await log('20', '0.000001')
     const search = async (q: string) =>
       (
         await asA.espressoShot.getRecent({ limit: 50, coffeeId: coffee.id, q })
@@ -1115,6 +1181,13 @@ describe('espressoShot.getRecent', () => {
     expect(await search('1:2.277')).toEqual([])
     // An exact half-hundredth rounds up, as formatBrewRatio shows it.
     expect(await search('1:2.68')).toEqual([half.id])
+    // 0.05/20 would round to 1:0, so it shows (and is found) as 1:0.003.
+    expect(await search('1:0.003')).toEqual([tiny.id])
+    expect(await search('1:0.0025')).toEqual([])
+    // Past six decimals too, as the log shows it: 0.000001/20 (0.00000005)
+    // rounds up to 1:0.0000001.
+    expect(await search('1:0.0000001')).toEqual([tinier.id])
+    expect(await search('1:0.00000005')).toEqual([])
   })
 
   it('filters getRecent to dialed-in shots', async () => {
