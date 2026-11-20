@@ -321,13 +321,17 @@ async function historyItems(method: MethodKey) {
 describe.each(methods)('%s feeds', (method) => {
   const feedFor = () => asUser[method]
 
-  it('withholds a Sealed brew from the history feed', async () => {
-    const all = await historyItems(method)
-    const brew = all.find((row) => row.id === sealedId(method))
+  // Espresso's history is getRecent, checked below; the others still have getAll.
+  it.skipIf(method === 'espressoShot')(
+    'withholds a Sealed brew from the history feed',
+    async () => {
+      const all = await historyItems(method)
+      const brew = all.find((row) => row.id === sealedId(method))
 
-    expect(brew?.sealed).toBe(true)
-    expect(brew?.dose).toBe(null)
-  })
+      expect(brew?.sealed).toBe(true)
+      expect(brew?.dose).toBe(null)
+    },
+  )
 
   it('withholds a Sealed brew from getRecent', async () => {
     const { items } =
@@ -405,7 +409,11 @@ describe('espressoShot.getLatestUnsealed', () => {
 })
 
 describe('the enumeration itself', () => {
-  const paths = Object.keys(trpcRouter._def.procedures)
+  const procedures = trpcRouter._def.procedures as unknown as Record<
+    string,
+    { _def: { type: string } }
+  >
+  const paths = Object.keys(procedures)
 
   it('covers every router that owns Brews', () => {
     const owners = new Set(
@@ -430,9 +438,10 @@ describe('the enumeration itself', () => {
     ])
 
     for (const method of methods) {
+      // Every query, whatever its name; mutations are checked elsewhere.
       const reads = paths
         .filter((path) => path.startsWith(`${method}.`))
-        .filter((path) => path.split('.')[1].startsWith('get'))
+        .filter((path) => procedures[path]._def.type === 'query')
 
       expect(
         reads.filter(

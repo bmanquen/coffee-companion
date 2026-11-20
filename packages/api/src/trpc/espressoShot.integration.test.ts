@@ -588,6 +588,7 @@ describe('espressoShot.delete', () => {
 describe('espressoShot.create idempotency', () => {
   it('returns the existing row when the same key and fields are reused', async () => {
     const idempotencyKey = crypto.randomUUID()
+    const grindSetting = `replay-${idempotencyKey}`
     const input = {
       coffeeId: coffeeAId,
       grinderId,
@@ -595,15 +596,25 @@ describe('espressoShot.create idempotency', () => {
       dose: '18',
       yield: '36',
       time: 30,
-      grindSetting: '1.5',
+      grindSetting,
       idempotencyKey,
     }
     const first = await asA.espressoShot.create(input)
     const second = await asA.espressoShot.create(input)
     expect(second.id).toBe(first.id)
     expect(second.dose).toBe('18')
-    const page = await asA.espressoShot.getRecent({ limit: 50 })
-    expect(page.items.filter((shot) => shot.id === first.id)).toHaveLength(1)
+    // Every stored shot from this request, so a second row under another id
+    // fails too.
+    const stored = await db
+      .select({ id: espressoShots.id })
+      .from(espressoShots)
+      .where(
+        and(
+          eq(espressoShots.userId, USER_A),
+          eq(espressoShots.grindSetting, grindSetting),
+        ),
+      )
+    expect(stored).toEqual([{ id: first.id }])
   })
 
   it('returns one shot when two identical creates overlap', async () => {
@@ -619,10 +630,57 @@ describe('espressoShot.create idempotency', () => {
       grindSetting,
       idempotencyKey,
     }
-    const [first, second] = await Promise.all([
-      asA.espressoShot.create(input),
-      asA.espressoShot.create(input),
+    // Holding the coffee makes both shot inserts wait on its foreign key, so
+    // both creates have missed the key before either can claim it.
+    let release: () => void = () => {}
+    const released = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let locked: (pid: number) => void = () => {}
+    const coffeeLocked = new Promise<number>((resolve) => {
+      locked = resolve
+    })
+    const holder = db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT id FROM coffees WHERE id = ${coffeeAId} FOR UPDATE`,
+      )
+      const backend = await tx.execute<{ pid: number }>(
+        sql`SELECT pg_backend_pid() AS pid`,
+      )
+      locked(backend.rows[0].pid)
+      await released
+    })
+    let creates: Promise<Array<PromiseSettledResult<{ id: string }>>> =
+      Promise.resolve([])
+    try {
+      const blockerPid = await Promise.race([coffeeLocked, holder])
+      creates = Promise.allSettled([
+        asA.espressoShot.create(input),
+        asA.espressoShot.create(input),
+      ])
+      let blocked = 0
+      for (let i = 0; i < 200 && blocked < 2; i++) {
+        const waiting = await db.execute<{ n: number }>(
+          sql`SELECT count(*)::int AS n FROM pg_stat_activity
+              WHERE ${blockerPid} = ANY(pg_blocking_pids(pid))
+                AND query ILIKE 'insert into "espresso_shots"%'`,
+        )
+        blocked = waiting.rows[0].n
+        if (blocked < 2) await new Promise((resolve) => setTimeout(resolve, 25))
+      }
+      expect(blocked).toBe(2)
+    } finally {
+      release()
+      await Promise.allSettled([holder, creates])
+    }
+    const results = await creates
+    expect(results.map((result) => result.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
     ])
+    const [first, second] = results.map(
+      (result) => (result as PromiseFulfilledResult<{ id: string }>).value,
+    )
     expect(second.id).toBe(first.id)
     const shots = await db
       .select({ id: espressoShots.id })
@@ -884,7 +942,9 @@ describe('espressoShot.create idempotency', () => {
       expect(insertBlocked).toBe(true)
     } finally {
       release()
-      await Promise.allSettled([overlapping])
+      // The create too, so a failed check never leaves it running into the
+      // next test.
+      await Promise.allSettled([overlapping, outcome])
     }
     await overlapping
 
@@ -1613,6 +1673,20 @@ describe('espressoShot.getLatestUnsealed', () => {
   })
 
   it('does not return another user’s shot', async () => {
+    const shot = await asA.espressoShot.create({
+      coffeeId: coffeeAId,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    // A finds it, so B's null is the user scope, not a missing shot.
+    expect(
+      (await asA.espressoShot.getLatestUnsealed({ coffeeId: coffeeAId }))?.id,
+    ).toBe(shot.id)
     const found = await asB.espressoShot.getLatestUnsealed({
       coffeeId: coffeeAId,
     })

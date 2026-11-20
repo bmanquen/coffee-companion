@@ -575,17 +575,27 @@ export const espressoShotRouter = createTRPCRouter({
         shotId = await insertShotWithKey(userId, input)
       }
 
-      // A fresh Shelf, not the request's: another read in the same batch may
-      // have computed it before this insert lifted the Coffee onto it.
-      const shelf = () => loadShelf(userId, ctx.plan)
-      return sealBrewWithDialedIn(userId, shelf, async () => {
-        const shot = await db.query.espressoShots.findFirst({
-          where: { id: shotId, userId },
-        })
-        // Deleted since the key was claimed, e.g. from another device.
-        throwIfKeyDeleted(shot)
-        return shot
-      })
+      // A fresh Shelf, not the request's (another read in the same batch may
+      // have computed it before this insert lifted the Coffee onto it), and
+      // read with the shot from one snapshot, so an edit in between cannot
+      // pair the shot with a Shelf it never had.
+      const found = await db.transaction(
+        async (tx) => ({
+          shelf: await loadShelf(userId, ctx.plan, tx),
+          shot: await tx.query.espressoShots.findFirst({
+            where: { id: shotId, userId },
+          }),
+        }),
+        { isolationLevel: 'repeatable read', accessMode: 'read only' },
+      )
+      // Deleted since the key was claimed, e.g. from another device.
+      throwIfKeyDeleted(found.shot)
+      const shot = found.shot
+      return sealBrewWithDialedIn(
+        userId,
+        () => Promise.resolve(found.shelf),
+        () => Promise.resolve(shot),
+      )
     }),
 
   update: authedProcedure
