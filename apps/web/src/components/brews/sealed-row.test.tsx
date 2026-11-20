@@ -1,12 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { createTestProviders } from '@/test/providers'
-import { seedCoffees, seedEspressoShotPage } from '@/test/espresso-shots'
 import {
-  makeCoffee,
-  makeRecentCoffee,
-  makeRecentShot,
-} from '@/test/factories'
+  coffeesFromShots,
+  seedCoffees,
+  seedEspressoShotPage,
+} from '@/test/espresso-shots'
+import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
 import { EspressoBrewsSection } from './espresso-brews-section'
 import type { ReactNode } from 'react'
 
@@ -25,13 +25,7 @@ function seedSection(
   shots: Array<ReturnType<typeof makeRecentShot>>,
 ) {
   seedEspressoShotPage(queryClient, trpc, shots)
-  const coffees = new Map(
-    shots.map((shot) => [
-      shot.coffeeId,
-      makeCoffee({ id: shot.coffeeId, name: shot.coffee.name }),
-    ]),
-  )
-  seedCoffees(queryClient, trpc, [...coffees.values()])
+  seedCoffees(queryClient, trpc, coffeesFromShots(shots))
 }
 
 describe('a Sealed row', () => {

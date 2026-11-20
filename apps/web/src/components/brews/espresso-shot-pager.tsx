@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 // when a load fails. It stays focusable while loading (aria-disabled, not
 // disabled) and ignores activation until the load settles. When the last page
 // lands while it has focus, focus moves to an end-of-list note instead of
-// falling back to the page.
+// falling back to the page, and back to the button if more shots turn up.
 export function EspressoShotPager({
   hasMore,
   loadingMore,
@@ -39,6 +39,10 @@ export function EspressoShotPager({
       <Button
         type="button"
         variant="outline"
+        // Only while focus was here: on the note, or this button itself.
+        ref={(button) => {
+          if (focused) button?.focus()
+        }}
         aria-disabled={loadingMore}
         className={loadingMore ? 'opacity-50' : undefined}
         onFocus={() => setFocused(true)}

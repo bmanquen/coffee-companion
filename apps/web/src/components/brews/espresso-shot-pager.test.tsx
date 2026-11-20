@@ -56,4 +56,22 @@ describe('EspressoShotPager', () => {
     )
     expect(screen.queryByText('All shots loaded')).toBeNull()
   })
+
+  it('moves focus back to Load more when more shots turn up under the end note', () => {
+    const props = { loadMore: vi.fn(), loadMoreError: null }
+    const { rerender } = render(
+      <EspressoShotPager {...props} hasMore loadingMore={false} />,
+    )
+    screen.getByRole('button', { name: 'Load more' }).focus()
+    rerender(
+      <EspressoShotPager {...props} hasMore={false} loadingMore={false} />,
+    )
+    expect(document.activeElement).toBe(screen.getByText('All shots loaded'))
+
+    // A refresh finds another page, say after a shot was logged elsewhere.
+    rerender(<EspressoShotPager {...props} hasMore loadingMore={false} />)
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Load more' }),
+    )
+  })
 })

@@ -17,6 +17,7 @@ import {
   espressoShotInfiniteOptions,
 } from '@/hooks/use-espresso-shot-pages'
 import {
+  coffeesFromShots,
   espressoShotCursor,
   espressoShotFixtureId,
   seedCoffees,
@@ -72,23 +73,6 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function coffeesFrom(shots: Array<ReturnType<typeof makeRecentShot>>) {
-  const byId = new Map<string, ReturnType<typeof makeCoffee>>()
-  for (const shot of shots) {
-    if (!byId.has(shot.coffeeId)) {
-      byId.set(
-        shot.coffeeId,
-        makeCoffee({
-          id: shot.coffeeId,
-          name: shot.coffee.name,
-          roaster: shot.coffee.roaster ?? null,
-        }),
-      )
-    }
-  }
-  return [...byId.values()]
-}
-
 function seedLog(
   queryClient: ReturnType<typeof createTestProviders>['queryClient'],
   trpc: ReturnType<typeof createTestProviders>['trpc'],
@@ -109,7 +93,7 @@ function seedLog(
     extra.filters,
   )
   if (!extra.cursor && !extra.filters) {
-    seedCoffees(queryClient, trpc, extra.coffees ?? coffeesFrom(shots))
+    seedCoffees(queryClient, trpc, extra.coffees ?? coffeesFromShots(shots))
   }
 }
 
@@ -889,7 +873,7 @@ describe('EspressoBrewsSection', () => {
 
     // Huila was deleted in another tab.
     act(() => {
-      seedCoffees(queryClient, trpc, coffeesFrom([guji]))
+      seedCoffees(queryClient, trpc, coffeesFromShots([guji]))
     })
     expect(await screen.findAllByText('Ethiopia Guji')).not.toHaveLength(0)
     expect(screen.getByRole('button', { name: 'All coffees' })).toBeTruthy()
@@ -1045,7 +1029,7 @@ describe('EspressoBrewsSection', () => {
       )
       seedLog(queryClient, trpc, first, first.length + 1, {
         coffees: [
-          ...coffeesFrom(first),
+          ...coffeesFromShots(first),
           makeCoffee({ id: 'c-huila', name: 'Colombia Huila' }),
         ],
       })
@@ -1490,7 +1474,7 @@ describe('EspressoBrewsSection', () => {
       {},
       cursor,
     )
-    seedCoffees(queryClient, trpc, coffeesFrom(first))
+    seedCoffees(queryClient, trpc, coffeesFromShots(first))
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       trpcSuccess({ items: [], total: first.length, nextCursor: null }),
     )

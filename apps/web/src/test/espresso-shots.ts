@@ -3,6 +3,8 @@ import {
   encodeEspressoShotCursor,
 } from '@coffee-companion/api/lib/espresso'
 import { espressoShotPageInput } from '@/hooks/use-espresso-shot-pages'
+import { makeCoffee } from './factories'
+import type { makeRecentShot } from './factories'
 import type { EspressoShotCursor } from '@coffee-companion/api/lib/espresso'
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { EspressoShotWithRelations } from '@/types'
@@ -36,6 +38,27 @@ type Trpc = {
 }
 
 export { ESPRESSO_SHOT_PAGE_SIZE }
+
+// The Coffee list that holds the Coffees of these shots, with their roasters.
+// A Coffee in several shots is built from the first of them.
+export function coffeesFromShots(
+  shots: Array<ReturnType<typeof makeRecentShot>>,
+) {
+  const byId = new Map<string, ReturnType<typeof makeCoffee>>()
+  for (const shot of shots) {
+    if (!byId.has(shot.coffeeId)) {
+      byId.set(
+        shot.coffeeId,
+        makeCoffee({
+          id: shot.coffeeId,
+          name: shot.coffee.name,
+          roaster: shot.coffee.roaster ?? null,
+        }),
+      )
+    }
+  }
+  return [...byId.values()]
+}
 
 export function espressoShotFixtureId(index: number): string {
   return `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`

@@ -27,7 +27,12 @@ import { refreshEspressoShotReads } from '@/hooks/use-espresso-shot-pages'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
 import { track } from '@/lib/analytics'
-import { submitFormMutation, trpcErrorCode } from '@/lib/form-error'
+import {
+  rememberSubmittedValues,
+  submitFormMutation,
+  submittedValuesKey,
+  trpcErrorCode,
+} from '@/lib/form-error'
 import type { PrefillKeep } from '@coffee-companion/brew-display'
 import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
 
@@ -120,10 +125,10 @@ export function NewEspressoShot() {
   const saveInterruptedLookup = useRef(false)
   const saveRejected = useRef(false)
   // The gear and roast date of each save that may have committed, by coffee
-  // and then by recipe, newest last, so a retry of any of them can send what
-  // it first sent.
+  // and then by idempotency key, newest last, so a retry of any of them can
+  // send what it first sent.
   const unresolvedSaves = useRef(
-    new Map<string, Map<string, PrefillSource & { idempotencyKey: string }>>(),
+    new Map<string, Map<string, PrefillSource & { recipe: string }>>(),
   )
   const [prefillError, setPrefillError] = useState(false)
 
@@ -210,25 +215,20 @@ export function NewEspressoShot() {
         for (const [draft, key] of idempotencyKeys.current) {
           if (key === idempotencyKey) idempotencyKeys.current.delete(draft)
         }
-        // Only its own snapshot: a later save of the recipe under another
+        // Only its own snapshot: another save of the recipe under another
         // key may still have committed.
-        const saves = unresolvedSaves.current.get(value.coffeeId)
-        const recipe = recipeFingerprint(value)
-        if (saves?.get(recipe)?.idempotencyKey === idempotencyKey) {
-          saves.delete(recipe)
-        }
+        unresolvedSaves.current.get(value.coffeeId)?.delete(idempotencyKey)
       } else if (!saveSucceeded.current && !outcome.rejected) {
         // Only a save that may have committed must replay as submitted.
         const saves =
           unresolvedSaves.current.get(value.coffeeId) ??
-          new Map<string, PrefillSource & { idempotencyKey: string }>()
-        const recipe = recipeFingerprint(value)
-        saves.delete(recipe)
-        saves.set(recipe, {
+          new Map<string, PrefillSource & { recipe: string }>()
+        saves.delete(idempotencyKey)
+        saves.set(idempotencyKey, {
           grinderId: value.grinderId,
           brewingDeviceId: value.brewingDeviceId,
           roastDate: value.roastDate ?? null,
-          idempotencyKey,
+          recipe: recipeFingerprint(value),
         })
         unresolvedSaves.current.set(value.coffeeId, saves)
       }
@@ -272,6 +272,9 @@ export function NewEspressoShot() {
     const priorKey = idempotencyKeys.current.get(
       draftFingerprint(form.state.values),
     )
+    // The save's error stays shown while the form holds what was submitted.
+    const errorShown =
+      submittedValuesKey(form) === JSON.stringify(form.state.values)
     applyingPrefill.current = true
     if (!keep.grinderId) {
       form.setFieldValue(
@@ -289,7 +292,9 @@ export function NewEspressoShot() {
     }
     if (!keep.roastDate) form.setFieldValue('roastDate', next.roastDate)
     applyingPrefill.current = false
-    // A prefill is not an edit: a lost save must replay under its first key.
+    // A prefill is not an edit, so it keeps that error up, and a lost save
+    // must replay under its first key.
+    if (errorShown) rememberSubmittedValues(form, form.state.values)
     const fingerprint = draftFingerprint(form.state.values)
     if (priorKey && !idempotencyKeys.current.has(fingerprint)) {
       idempotencyKeys.current.set(fingerprint, priorKey)
@@ -307,12 +312,11 @@ export function NewEspressoShot() {
     const startedSaveGen = saveGen.current
     // After a save whose response was lost, its retry must send the same
     // payload, so restore what was submitted instead of any shot read since.
-    // The one with the form's recipe if there is one, else the newest.
-    const saves = unresolvedSaves.current.get(coffeeId)
-    const unresolved = saves
-      ? (saves.get(recipeFingerprint({ ...form.state.values, coffeeId })) ??
-        [...saves.values()].at(-1))
-      : undefined
+    // The newest with the form's recipe if there is one, else the newest.
+    const saves = [...(unresolvedSaves.current.get(coffeeId)?.values() ?? [])]
+    const recipe = recipeFingerprint({ ...form.state.values, coffeeId })
+    const unresolved =
+      saves.filter((save) => save.recipe === recipe).at(-1) ?? saves.at(-1)
     if (unresolved) {
       applyPrefill(coffeeId, seq, unresolved, startedSaveGen)
       return
@@ -356,9 +360,12 @@ export function NewEspressoShot() {
   const restoreMatchingSave = () => {
     const values = form.state.values
     if (!values.coffeeId || values.coffeeId !== prefillCoffeeId.current) return
-    const match = unresolvedSaves.current
-      .get(values.coffeeId)
-      ?.get(recipeFingerprint(values))
+    const recipe = recipeFingerprint(values)
+    const match = [
+      ...(unresolvedSaves.current.get(values.coffeeId)?.values() ?? []),
+    ]
+      .filter((save) => save.recipe === recipe)
+      .at(-1)
     if (match) {
       applyPrefill(values.coffeeId, prefillSeq.current, match, saveGen.current)
     }

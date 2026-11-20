@@ -18,7 +18,7 @@ describe('useDeviceDialedIn', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders({ fetch })
     // A filtered page left mid-load, so no screen observes it any more.
     const page = espressoShotInfiniteOptions(trpc, { coffeeId: 'c1' })
-    void queryClient.prefetchInfiniteQuery(page)
+    const prefetched = queryClient.prefetchInfiniteQuery(page)
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
 
     const { result } = renderHook(() => useDeviceDialedIn('espresso'), {
@@ -40,7 +40,7 @@ describe('useDeviceDialedIn', () => {
     // The page's response was read before the toggle.
     await act(async () => {
       finishPage(trpcSuccess({ items: [], total: 0, nextCursor: null }))
-      await new Promise((resolve) => setTimeout(resolve, 0))
+      await prefetched
     })
     expect(queryClient.getQueryState(page.queryKey)?.isInvalidated).toBe(true)
   })
