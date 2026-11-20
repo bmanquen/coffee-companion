@@ -83,6 +83,9 @@ export function sentryCommonOptions(dsn: string) {
     environment: sentryEnvironment(),
     sendDefaultPii: false,
     tracesSampleRate: sentryTracesSampleRate(),
+    // Sentry 11 defaults to 'stream', which silently skips beforeSendTransaction
+    // (our scrubbing) and ignoreTransactions (the health-check filter).
+    traceLifecycle: 'static' as const,
   }
 }
 

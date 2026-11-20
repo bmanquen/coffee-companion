@@ -145,6 +145,14 @@ describe('sentryCommonOptions', () => {
     ).toBe(false)
   })
 
+  // Under Sentry 11's default 'stream' lifecycle, transaction scrubbing and the
+  // health-check filter are skipped without an error.
+  it('keeps the static trace lifecycle', () => {
+    expect(
+      sentryCommonOptions('https://key@o1.ingest.sentry.io/1').traceLifecycle,
+    ).toBe('static')
+  })
+
   it('carries the traces sample rate', () => {
     process.env.SENTRY_ENVIRONMENT = 'production'
     process.env.SENTRY_TRACES_SAMPLE_RATE = '0.2'
