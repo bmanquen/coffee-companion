@@ -3282,7 +3282,14 @@ async function stopRecordedEmulator(
 async function stopLaunchDevice(
   partial,
   stopped = [],
-  { avdProblem, clearReverses, restoreStylus, killSerial, signalPid } = {},
+  {
+    avdProblem,
+    clearReverses,
+    restoreStylus,
+    killSerial,
+    signalPid,
+    restoreEnv = restoreMobileExpoPublicEnv,
+  } = {},
 ) {
   const plan = launchDeviceTeardownPlan(partial)
   if (partial.expoPid) stopRecordedPid(partial.expoPid, 'expo', stopped)
@@ -3308,7 +3315,7 @@ async function stopLaunchDevice(
     signalPid,
   })
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
-  restoreMobileExpoPublicEnv()
+  restoreEnv()
 }
 
 async function cmdLaunchDevice(opts = {}) {
@@ -3578,6 +3585,13 @@ async function cmdLaunchDevice(opts = {}) {
     adbReverse(DEVICE_SERIAL, metroPort)
     adbReverse(DEVICE_SERIAL, webPort)
     if (attachedEmulator) {
+      // Attaching falls back to the chosen AVD when the name cannot be read,
+      // so check the serial really is it before recording or writing a value
+      // that cleanup could then never put back.
+      const avdProblem = recordedAvdProblem(DEVICE_SERIAL, avdName)
+      if (avdProblem) {
+        throw new Error(`Not changing stylus handwriting: ${avdProblem}`)
+      }
       // A record a failed cleanup kept is the value from before any run
       // changed it; the setting may still read 0 from that run.
       partial.stylusHandwritingBefore =
@@ -4551,22 +4565,25 @@ async function cmdCleanup() {
   }
 
   restoreMobileExpoPublicEnv()
-  const claim = readRunClaim(runDir)
-  if (existsSync(runDir)) {
-    rmSync(runDir, { recursive: true, force: true })
-  }
   if (restoreError) {
     // Only what another cleanup needs to put the setting back, and nothing it
-    // could uninstall or stop. An owner-scoped run keeps its claim, so the
-    // same VERIFY_OWNER can retry and no other owner can take it.
+    // could uninstall or stop. The record is written before anything goes, so
+    // a launch never finds the dir without it. An owner-scoped run leaves its
+    // claim in place, so the same VERIFY_OWNER can retry and no other owner
+    // can take the instance in between.
     writeState(stylusRestoreRecord(state))
-    if (owner && claim) {
-      writeFileSync(ownerPath(runDir), `${JSON.stringify(claim)}\n`)
+    for (const name of readdirSync(runDir)) {
+      if (name === basename(statePath)) continue
+      if (owner && name === basename(ownerPath(runDir))) continue
+      rmSync(join(runDir, name), { recursive: true, force: true })
     }
     die(
       `${restoreError.message}. Kept it in ${statePath}; run cleanup again ` +
         `once that emulator is back, or delete ${runDir} to drop it.`,
     )
+  }
+  if (existsSync(runDir)) {
+    rmSync(runDir, { recursive: true, force: true })
   }
 
   console.log(

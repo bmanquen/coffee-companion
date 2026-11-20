@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -1636,12 +1645,21 @@ describe('cleanup with a kept stylus record', () => {
         join(run, 'owner.json'),
         JSON.stringify({ owner: 'run-a', pid: 1 }),
       )
+      // A second name for the claim file, so a delete and rewrite (which a
+      // launch could claim in between) shows up as a different file.
+      linkSync(join(run, 'owner.json'), join(root, 'claim-link'))
+      writeFileSync(join(run, 'metro.log'), 'scratch')
       const scoped = cli('cleanup', 'run-a')
       assert.notEqual(scoped.status, 0, scoped.stdout)
       assert.equal(
         JSON.parse(readFileSync(join(run, 'owner.json'), 'utf8')).owner,
         'run-a',
       )
+      assert.equal(
+        statSync(join(run, 'owner.json')).ino,
+        statSync(join(root, 'claim-link')).ino,
+      )
+      assert.equal(existsSync(join(run, 'metro.log')), false)
       const other = cli('cleanup', 'run-b')
       assert.equal(other.status, 0, other.stderr)
       assert.match(other.stdout, /not claimed by VERIFY_OWNER run-b/)
@@ -1667,6 +1685,8 @@ describe('stopLaunchDevice', () => {
         restoreStylus: () => calls.push(['stylus']),
         killSerial: ({ serial }) => calls.push(['emu kill', serial]),
         signalPid: (pid) => calls.push(['signal', pid]),
+        // The real one would copy a backup over apps/mobile's env file.
+        restoreEnv: () => {},
       },
     )
     return calls
@@ -1741,6 +1761,19 @@ describe('connectedAvdProblem', () => {
     const firstWrite = drive.indexOf('ensureAdbReverses(state.serial')
     assert.ok(check >= 0 && firstWrite >= 0)
     assert.ok(check < firstWrite)
+  })
+
+  it('is checked before launch-device records or changes stylus handwriting', () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'),
+      'utf8',
+    )
+    const launch = src.slice(src.indexOf('async function cmdLaunchDevice'))
+    const check = launch.indexOf('recordedAvdProblem(')
+    const read = launch.indexOf('readStylusBaseline(DEVICE_SERIAL)')
+    const write = launch.indexOf('ensureStylusHandwritingOff(DEVICE_SERIAL)')
+    assert.ok(check >= 0 && read >= 0 && write >= 0)
+    assert.ok(check < read && check < write)
   })
 })
 
