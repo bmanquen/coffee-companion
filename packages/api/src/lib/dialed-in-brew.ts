@@ -509,10 +509,18 @@ export async function stampDialedIn<T extends { id: string }>(
   brews: Array<T>,
 ): Promise<Array<T & { isDialedIn: boolean }>> {
   if (brews.length === 0) return []
-  const rows = await db.query.dialedInBrews.findMany({
-    where: { userId, brewId: { in: brews.map((brew) => brew.id) } },
-    columns: { brewId: true },
-  })
+  // One array parameter, not one per id: unpaged getAll histories can pass
+  // more ids than Postgres's 65535 bind parameters.
+  const ids = brews.map((brew) => brew.id)
+  const rows = await db
+    .select({ brewId: dialedInBrews.brewId })
+    .from(dialedInBrews)
+    .where(
+      and(
+        eq(dialedInBrews.userId, userId),
+        sql`${dialedInBrews.brewId} = ANY(${sql.param(ids)}::uuid[])`,
+      ),
+    )
   return withDialedInFlag(brews, new Set(rows.map((row) => row.brewId)))
 }
 
