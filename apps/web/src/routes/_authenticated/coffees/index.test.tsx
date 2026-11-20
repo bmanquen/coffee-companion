@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { createTestProviders } from '@/test/providers'
 import { makeCoffee } from '@/test/factories'
+import { trpcSuccess } from '@/test/trpc-response'
 import { Coffee } from './index'
 import type * as ReactRouter from '@tanstack/react-router'
 
@@ -279,11 +280,15 @@ describe('Coffees page', () => {
     expect(region1.className).toContain('grid-rows-[0fr]')
   })
 
-  it('does not expand the row when a control is activated', () => {
+  it('does not expand the row when a control is activated', async () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [
       makeCoffeeRow({ id: 'cf1', name: 'Ethiopia Guji' }),
     ])
+    // The confirmation fetches this coffee's brew count when it opens.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(trpcSuccess(3)),
+    )
 
     render(<Coffee />, { wrapper: Wrapper })
 
@@ -302,7 +307,12 @@ describe('Coffees page', () => {
 
     // Delete opens its confirmation dialog (fires) and still doesn't expand.
     fireEvent.click(table.getByRole('button', { name: 'Delete coffee' }))
-    expect(within(screen.getByRole('dialog')).getByText(/Ethiopia Guji/)).toBeTruthy()
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByText(/Ethiopia Guji/)).toBeTruthy()
+    // The confirmation warns with this coffee's own brew count.
+    expect(
+      await dialog.findByRole('button', { name: 'Delete coffee and 3 brews' }),
+    ).toBeTruthy()
     expect(region.className).toContain('grid-rows-[0fr]')
   })
 })

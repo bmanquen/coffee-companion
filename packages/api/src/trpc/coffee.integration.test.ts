@@ -1,7 +1,12 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { brewingDeviceTypes, countries } from '../db/schema'
+import {
+  brewingDeviceTypes,
+  coldBrewBrews,
+  countries,
+  espressoShots,
+} from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import {
   UNKNOWN_UUID,
@@ -418,6 +423,53 @@ describe('coffee.delete', () => {
     await expect(asB.coffee.delete(coffeeAId)).rejects.toThrow(/not found/i)
     // The owner can still retrieve it afterward.
     expect((await asA.coffee.getById(coffeeAId)).id).toBe(coffeeAId)
+  })
+})
+
+// The grinder and device are shared with other tests' shots, so their counts are
+// checked as a change across this test's inserts.
+describe('brewCount for coffee, grinder and brewing device', () => {
+  it('counts the caller’s brews across methods, and never another user’s', async () => {
+    const coffee = await createCoffee(uniq('Counted'))
+    const counts = () =>
+      Promise.all([
+        asA.coffee.brewCount(coffee.id),
+        asA.grinder.brewCount(grinderId),
+        asA.brewingDevice.brewCount(espressoDeviceId),
+      ])
+    const [coffeeBefore, grinderBefore, deviceBefore] = await counts()
+    expect(coffeeBefore).toBe(0)
+
+    const gear = {
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+    }
+    await db.insert(espressoShots).values([
+      { ...gear, userId: USER_A },
+      { ...gear, userId: USER_A },
+      // Another user's row on A's gear: deleting A's coffee cascades to it, but
+      // A must never learn it exists.
+      { ...gear, userId: USER_B },
+    ])
+    await db.insert(coldBrewBrews).values({ ...gear, userId: USER_A })
+
+    expect(await counts()).toEqual([3, grinderBefore + 3, deviceBefore + 3])
+    // B can't delete A's coffee or gear, so nothing of B's would go with them,
+    // even though B's own brew points at them.
+    expect(
+      await Promise.all([
+        asB.coffee.brewCount(coffee.id),
+        asB.grinder.brewCount(grinderId),
+        asB.brewingDevice.brewCount(espressoDeviceId),
+      ]),
+    ).toEqual([0, 0, 0])
+  })
+
+  it('is zero for an id the caller does not own', async () => {
+    expect(await asB.coffee.brewCount(coffeeAId)).toBe(0)
+    expect(await asA.grinder.brewCount(UNKNOWN_UUID)).toBe(0)
+    expect(await asA.brewingDevice.brewCount(UNKNOWN_UUID)).toBe(0)
   })
 })
 

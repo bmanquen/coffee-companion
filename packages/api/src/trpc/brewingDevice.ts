@@ -6,6 +6,7 @@ import { brewingDevices } from '../db/schema'
 import { insertBrewingDeviceSchema } from '../db/zod'
 import { assertRoomForAnother } from '../lib/allowance'
 import { isPgUniqueViolation } from '../lib/pg-error'
+import { countBrewsUsing } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 function rethrowUniqueDeviceConflict(err: unknown): never {
@@ -87,6 +88,13 @@ export const brewingDeviceRouter = createTRPCRouter({
         rethrowUniqueDeviceConflict(err)
       }
     }),
+
+  // What deleting it would cascade to, so the confirmation can say so.
+  brewCount: authedProcedure
+    .input(z.uuid())
+    .query(({ ctx, input }) =>
+      countBrewsUsing(ctx.session.user.id, 'brewingDeviceId', input),
+    ),
 
   delete: authedProcedure
     .input(z.uuid())

@@ -6,6 +6,7 @@ import { grinders } from '../db/schema'
 import { insertGrinderSchema } from '../db/zod'
 import { assertRoomForAnother } from '../lib/allowance'
 import { isPgUniqueViolation } from '../lib/pg-error'
+import { countBrewsUsing } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 function rethrowUniqueGrinderConflict(err: unknown): never {
@@ -79,6 +80,13 @@ export const grinderRouter = createTRPCRouter({
         rethrowUniqueGrinderConflict(err)
       }
     }),
+
+  // What deleting it would cascade to, so the confirmation can say so.
+  brewCount: authedProcedure
+    .input(z.uuid())
+    .query(({ ctx, input }) =>
+      countBrewsUsing(ctx.session.user.id, 'grinderId', input),
+    ),
 
   delete: authedProcedure
     .input(z.uuid())

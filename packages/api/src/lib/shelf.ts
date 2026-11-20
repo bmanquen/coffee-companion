@@ -2,9 +2,12 @@ import { and, eq, isNull, notInArray, sql } from 'drizzle-orm'
 import { db } from '../db'
 import {
   aeropressBrews,
+  brewingDevices,
+  coffees,
   coldBrewBrews,
   espressoShots,
   frenchpressBrews,
+  grinders,
   pouroverBrews,
 } from '../db/schema'
 import { shelfSizes } from './plan'
@@ -19,6 +22,35 @@ const brewTables = [
   frenchpressBrews,
   coldBrewBrews,
 ]
+
+// How many of the user's Brews, of every method, use one Coffee, Grinder or
+// Brewing Device: the Brews deleting it cascades to. Sealed Brews count too,
+// since they go with it.
+export async function countBrewsUsing(
+  userId: string,
+  column: 'coffeeId' | 'grinderId' | 'brewingDeviceId',
+  id: string,
+): Promise<number> {
+  // A Coffee or gear the user doesn't own isn't theirs to delete, so nothing
+  // goes, even when one of their own Brews points at it.
+  const parent = {
+    coffeeId: coffees,
+    grinderId: grinders,
+    brewingDeviceId: brewingDevices,
+  }[column]
+  const owned = await db.$count(
+    parent,
+    and(eq(parent.id, id), eq(parent.userId, userId)),
+  )
+  if (owned === 0) return 0
+
+  const counts = await Promise.all(
+    brewTables.map((table) =>
+      db.$count(table, and(eq(table.userId, userId), eq(table[column], id))),
+    ),
+  )
+  return counts.reduce((sum, n) => sum + n, 0)
+}
 
 // The Coffees a user may read the Brews of, or null when their Plan holds the
 // whole library. A Set because every Brew of every feed is tested against it.
