@@ -5,6 +5,7 @@ import {
   ENTER_A_NUMBER,
   MUST_BE_A_NUMBER,
   MUST_BE_A_WHOLE_NUMBER,
+  NUMBER_TOO_LARGE,
   SEALED_SHOT,
   SELECT_COFFEE_ERROR,
   SELECT_DEVICE_ERROR,
@@ -35,6 +36,8 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const DECIMAL_PATTERN = /^\d+(\.\d+)?$/
 const WHOLE_NUMBER_PATTERN = /^\d+$/
+// The API's time column is a 32-bit integer.
+const TIME_MAX = 2_147_483_647
 
 export function decimalFieldText(value: string): string {
   return value.replace(/,/g, '.')
@@ -83,6 +86,8 @@ export function parseShotDraft(draft: ShotDraft): ParseResult {
     errors.time = ENTER_A_NUMBER
   } else if (!WHOLE_NUMBER_PATTERN.test(draft.time)) {
     errors.time = MUST_BE_A_WHOLE_NUMBER
+  } else if (Number(draft.time) > TIME_MAX) {
+    errors.time = NUMBER_TOO_LARGE
   }
 
   if (draft.grindSetting.length === 0) {

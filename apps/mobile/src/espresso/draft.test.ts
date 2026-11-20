@@ -98,6 +98,17 @@ describe('parseShotDraft', () => {
     })
   })
 
+  it('refuses a time too large for the API to store', () => {
+    expect(parseShotDraft({ ...valid, time: '2147483647' })).toEqual({
+      ok: true,
+      value: expect.objectContaining({ time: 2147483647 }),
+    })
+    const tooLarge = parseShotDraft({ ...valid, time: '2147483648' })
+    expect(tooLarge.ok).toBe(false)
+    if (tooLarge.ok) return
+    expect(tooLarge.errors).toEqual({ time: 'Enter a smaller number' })
+  })
+
   it('rejects a timestamp roast date', () => {
     const parsed = parseShotDraft({
       ...valid,

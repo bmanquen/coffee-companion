@@ -47,6 +47,18 @@ describe('insertEspressoShotSchema', () => {
     ).toBe(true)
   })
 
+  it('refuses a time too large for its 32-bit column', () => {
+    const parse = (time: number | string) =>
+      insertEspressoShotSchema.safeParse({ ...valid, time })
+    expect(parse(2147483647).success).toBe(true)
+    expect(parse('2147483647').success).toBe(true)
+    for (const time of [2147483648, '2147483648']) {
+      const result = parse(time)
+      expect(result.success).toBe(false)
+      expect(result.error?.issues[0]?.message).toBe('Enter a smaller number')
+    }
+  })
+
   it('keeps roast date as a YYYY-MM-DD string', () => {
     const parsed = insertEspressoShotSchema.parse({
       ...valid,
@@ -287,6 +299,15 @@ describe('insertPouroverBrewSchema', () => {
         insertPouroverBrewSchema.safeParse({ ...valid, brewTime }).success,
       ).toBe(false)
     }
+    // Still within the 32-bit column.
+    expect(
+      insertPouroverBrewSchema.safeParse({ ...valid, waterTemp: -2147483648 })
+        .success,
+    ).toBe(true)
+    expect(
+      insertPouroverBrewSchema.safeParse({ ...valid, waterTemp: '-2147483649' })
+        .success,
+    ).toBe(false)
   })
 })
 

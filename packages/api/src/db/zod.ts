@@ -156,6 +156,11 @@ const decimalString = () =>
 // duration inputs and tRPC callers send numbers. Null/blank still fail.
 // Durations cannot be negative. Water temperatures stay as permissive as
 // before, so a brew already stored with one can still have its notes edited.
+// Every one is a 32-bit integer column, so larger values are refused here
+// rather than failing the insert.
+const RECIPE_INT_MAX = 2_147_483_647
+const RECIPE_INT_TOO_LARGE = 'Enter a smaller number'
+
 const requiredInt = ({ allowNegative = false } = {}) =>
   z
     .union([z.number(), z.string(), z.null()])
@@ -174,6 +179,11 @@ const requiredInt = ({ allowNegative = false } = {}) =>
       const pattern = allowNegative ? /^-?\d+$/ : /^\d+$/
       if (typeof value === 'string' && !pattern.test(value)) {
         ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
+        return
+      }
+      const n = Number(value)
+      if (n > RECIPE_INT_MAX || n < -RECIPE_INT_MAX - 1) {
+        ctx.addIssue({ code: 'custom', message: RECIPE_INT_TOO_LARGE })
       }
     })
     .transform((value) => (typeof value === 'string' ? Number(value) : value))

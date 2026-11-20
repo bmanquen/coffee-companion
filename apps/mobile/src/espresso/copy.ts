@@ -41,6 +41,7 @@ export const SELECT_DEVICE_ERROR = 'Select a brewing device'
 export const ENTER_A_NUMBER = 'Enter a number'
 export const MUST_BE_A_NUMBER = 'Must be a number'
 export const MUST_BE_A_WHOLE_NUMBER = 'Must be a whole number'
+export const NUMBER_TOO_LARGE = 'Enter a smaller number'
 export const ENTER_A_GRIND_SETTING = 'Enter a grind setting'
 export const USE_CALENDAR_DATE = 'Use YYYY-MM-DD'
 
