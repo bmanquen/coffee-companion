@@ -99,10 +99,15 @@ export function ShotForm({
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () =>
-      consumeHardwareBack(busy, onBack),
+      // The ref covers a press whose busy render has not landed yet.
+      consumeHardwareBack(busy || saveInFlight.current, onBack),
     )
     return () => sub.remove()
   }, [busy, onBack])
+
+  useEffect(() => {
+    if (!busy) saveInFlight.current = false
+  }, [busy])
 
   const setField = (key: keyof ShotDraft, value: string) => {
     onClearError()
@@ -378,6 +383,8 @@ export function ShotForm({
         testID={LOG_TEST_ID}
         disabled={busy}
         onPress={() => {
+          // A second press in the same render still sees busy as false.
+          if (saveInFlight.current) return
           const parsed = parseShotDraft(draft)
           if (!parsed.ok) {
             setFieldErrors(parsed.errors)

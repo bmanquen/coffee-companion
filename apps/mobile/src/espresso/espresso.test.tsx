@@ -6,7 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react-native'
 import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
-import { AccessibilityInfo, StyleSheet } from 'react-native'
+import { AccessibilityInfo, BackHandler, StyleSheet } from 'react-native'
 import { TRPC_CONFLICT } from '../api-error'
 import { App } from '../App'
 import { SignedInHome } from '../auth/SignedInHome'
@@ -994,6 +994,37 @@ describe('log espresso shot', () => {
 
     expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
     expect(screen.getByText(LOGGED_RECIPE)).toBeTruthy()
+  })
+
+  it('holds Log and hardware back until the parent renders busy', async () => {
+    // busy stays false here, as it does between a press and the parent's render.
+    const addListener = jest.spyOn(BackHandler, 'addEventListener')
+    const onSubmit = jest.fn()
+    const onBack = jest.fn()
+    await render(
+      <ShotForm
+        catalog={catalog()}
+        idempotencyKeys={new Map()}
+        busy={false}
+        error={null}
+        onBack={onBack}
+        onClearError={() => {}}
+        onSubmit={onSubmit}
+        loadPrefill={() => Promise.resolve(seedShot())}
+      />,
+    )
+    await pickCoffee()
+    await enterRecipe()
+    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
+    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
+    const backListener = addListener.mock.calls.at(-1)?.[1]
+    addListener.mockRestore()
+
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    expect(backListener?.({ type: 'hardwareBackPress', timeStamp: 0 })).toBe(
+      true,
+    )
+    expect(onBack).not.toHaveBeenCalled()
   })
 
   it('does not go back on hardware back during save', () => {
@@ -2676,6 +2707,7 @@ describe('log espresso shot', () => {
       }),
     )
     let attempts = 0
+    const cursors: Array<EspressoShotCursor> = []
     let resolveFirst:
       | ((page: {
           items: Array<ShotRow>
@@ -2697,6 +2729,7 @@ describe('log espresso shot', () => {
           })
         }
         attempts += 1
+        cursors.push(cursor)
         if (attempts === 1) {
           return new Promise((resolve) => {
             resolveFirst = resolve
@@ -2737,6 +2770,8 @@ describe('log espresso shot', () => {
     await fireEvent(screen.getByTestId(SHOT_LIST_TEST_ID), 'onEndReached')
     await waitFor(() => expect(attempts).toBe(2))
     expect(screen.queryByText(ERROR_LOAD_MORE_FAILED)).toBeNull()
+    // Each page is asked for once, after the page before it.
+    expect(cursors).toEqual([pageCursor('shot-19'), pageCursor('shot-20')])
   })
 
   it('names same-name coffees with their roaster in the list', async () => {
