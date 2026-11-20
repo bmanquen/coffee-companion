@@ -1398,8 +1398,9 @@ function restoreStylusHandwriting(
       ? ['delete', 'secure', STYLUS_HANDWRITING_SETTING]
       : ['put', 'secure', STYLUS_HANDWRITING_SETTING, before],
   )
+  // Thrown, so cleanup keeps the recorded value for another try.
   if (result.status !== 0) {
-    console.error(
+    throw new Error(
       `Could not restore ${STYLUS_HANDWRITING_SETTING}=${before} on ${serial}: ` +
         `${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
     )
@@ -3214,23 +3215,77 @@ function launchDeviceTeardownPlan(partial) {
   }
 }
 
+// Whether cleanup still has to put the stylus setting back: a recorded value
+// other than 0 (the string 'null' means it was unset and is deleted).
+function stylusRestoreOwed(state) {
+  const before = state?.stylusHandwritingBefore
+  return before != null && before !== '0'
+}
+
+// The stylus value a kept restore record holds for this launch, if any. A
+// record for another AVD is refused: launching would record this AVD under
+// it, and cleanup would then write that AVD's value here.
+function keptStylusBaseline(existing, serial, avdName) {
+  if (!stylusRestoreOwed(existing) || existing.serial !== serial) return null
+  if (existing.avdName !== avdName) {
+    throw new Error(
+      `${serial} still owes AVD ${existing.avdName} its ` +
+        `${STYLUS_HANDWRITING_SETTING}=${existing.stylusHandwritingBefore}. ` +
+        `Start that AVD and run cleanup, or delete ${runDir} to drop the ` +
+        `restore, before launching ${avdName}.`,
+    )
+  }
+  return existing.stylusHandwritingBefore
+}
+
+function stylusRestoreRecord(state) {
+  return {
+    serial: state.serial,
+    avdName: state.avdName,
+    ownedPackage: false,
+    stylusHandwritingBefore: state.stylusHandwritingBefore,
+  }
+}
+
+// Stops the emulator this run started: `emu kill` on its serial when that is
+// still its AVD, else (foreignAvd set) only a signal to its pid, since the
+// serial may be another AVD now. Returns the serial it killed, if any.
+async function stopRecordedEmulator(
+  state,
+  foreignAvd,
+  stopped,
+  { killSerial = killEmulatorSerial, signalPid = stopRecordedPid } = {},
+) {
+  if (!state.emulatorPid) return null
+  if (foreignAvd) {
+    signalPid(state.emulatorPid, 'emulator', stopped)
+    return null
+  }
+  await killSerial({
+    serial: state.serial,
+    pid: state.emulatorPid,
+    avdName: state.avdName ?? chosenAvdName(),
+    stopped,
+  })
+  return state.serial ?? DEVICE_SERIAL
+}
+
 async function stopLaunchDevice(partial, stopped = []) {
   const plan = launchDeviceTeardownPlan(partial)
   if (partial.expoPid) stopRecordedPid(partial.expoPid, 'expo', stopped)
   if (partial.metroPid) stopRecordedPid(partial.metroPid, 'metro', stopped)
   // A failed wait still leaves an APK this run installed. Cleanup uninstalls
   // only when ownedPackage is not false.
+  let foreignAvd = null
   if (plan.clearReverses) {
-    releaseRecordedDevice(partial, { uninstallOwned: false })
+    try {
+      foreignAvd = releaseRecordedDevice(partial, { uninstallOwned: false })
+    } catch (error) {
+      // .run/ keeps the stylus record, so cleanup tries the restore again.
+      console.error(error.message)
+    }
   }
-  if (partial.emulatorPid) {
-    await killEmulatorSerial({
-      serial: partial.serial,
-      pid: partial.emulatorPid,
-      avdName: partial.avdName,
-      stopped,
-    })
-  }
+  await stopRecordedEmulator(partial, foreignAvd, stopped)
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
   restoreMobileExpoPublicEnv()
 }
@@ -3310,6 +3365,13 @@ async function cmdLaunchDevice(opts = {}) {
     attachment = { action: 'boot', avdName: chosenAvd }
   }
   const avdName = attachment.avdName
+  // Before anything records this AVD over a restore another one is owed.
+  let keptStylus = null
+  try {
+    keptStylus = keptStylusBaseline(existing, DEVICE_SERIAL, avdName)
+  } catch (error) {
+    die(error.message)
+  }
   if (attachment.action === 'boot') {
     try {
       requireAvd(avdName, listInstalledAvds())
@@ -3493,7 +3555,10 @@ async function cmdLaunchDevice(opts = {}) {
     adbReverse(DEVICE_SERIAL, metroPort)
     adbReverse(DEVICE_SERIAL, webPort)
     if (attachedEmulator) {
-      partial.stylusHandwritingBefore = readStylusBaseline(DEVICE_SERIAL)
+      // A record a failed cleanup kept is the value from before any run
+      // changed it; the setting may still read 0 from that run.
+      partial.stylusHandwritingBefore =
+        keptStylus ?? readStylusBaseline(DEVICE_SERIAL)
       persistLaunchPartial(partial)
     }
     ensureStylusHandwritingOff(DEVICE_SERIAL)
@@ -4423,6 +4488,7 @@ async function cmdCleanup() {
   const state = readState()
   const stopped = []
   let killedSerial = null
+  let restoreError = null
   if (state) {
     if (state.expoPid) stopRecordedPid(state.expoPid, 'expo', stopped)
     for (const pid of recordedPids(state)) {
@@ -4430,20 +4496,22 @@ async function cmdCleanup() {
       if (pid === state.emulatorPid || pid === state.webPid) continue
       stopRecordedPid(pid, pidKind(pid, state), stopped)
     }
-    const foreignAvd = releaseRecordedDevice(state)
-    if (state.emulatorPid && foreignAvd) {
-      // Not `emu kill` on the serial: it may be another AVD now. Signal only
-      // the pid this run started.
-      stopRecordedPid(state.emulatorPid, 'emulator', stopped)
-    } else if (state.emulatorPid) {
-      await killEmulatorSerial({
-        serial: state.serial,
-        pid: state.emulatorPid,
-        avdName: state.avdName ?? chosenAvdName(),
-        stopped,
-      })
-      killedSerial = state.serial ?? DEVICE_SERIAL
+    let foreignAvd = null
+    try {
+      foreignAvd = releaseRecordedDevice(state)
+    } catch (error) {
+      // The rest still stops; the stylus record outlives this cleanup.
+      restoreError = error
     }
+    // A skipped device still owes its setting: keep the record for a cleanup
+    // once the recorded AVD is back.
+    if (foreignAvd && stylusRestoreOwed(state)) {
+      restoreError = new Error(
+        `Could not restore ${STYLUS_HANDWRITING_SETTING}=` +
+          `${state.stylusHandwritingBefore} on ${state.serial}: ${foreignAvd}`,
+      )
+    }
+    killedSerial = await stopRecordedEmulator(state, foreignAvd, stopped)
     if (state.webPid) stopRecordedPid(state.webPid, 'web', stopped)
   }
   stopListenersOnOwnedVerifyPorts(state, stopped)
@@ -4462,6 +4530,15 @@ async function cmdCleanup() {
   restoreMobileExpoPublicEnv()
   if (existsSync(runDir)) {
     rmSync(runDir, { recursive: true, force: true })
+  }
+  if (restoreError) {
+    // Only what another cleanup needs to put the setting back, and nothing it
+    // could uninstall or stop.
+    writeState(stylusRestoreRecord(state))
+    die(
+      `${restoreError.message}. Kept it in ${statePath}; run cleanup again ` +
+        `once that emulator is back, or delete ${runDir} to drop it.`,
+    )
   }
 
   console.log(
@@ -4540,6 +4617,10 @@ export {
   recordedAvdProblem,
   readStylusBaseline,
   releaseRecordedDevice,
+  stopRecordedEmulator,
+  stylusRestoreRecord,
+  stylusRestoreOwed,
+  keptStylusBaseline,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   adbShellCookieGetCommands,

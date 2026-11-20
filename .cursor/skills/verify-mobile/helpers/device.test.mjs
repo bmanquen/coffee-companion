@@ -69,6 +69,9 @@ import {
   recordedAvdProblem,
   readStylusBaseline,
   releaseRecordedDevice,
+  stopRecordedEmulator,
+  stylusRestoreRecord,
+  keptStylusBaseline,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   adbShellCookieGetCommands,
@@ -1415,6 +1418,16 @@ describe('stylus handwriting setting', () => {
     assert.deepEqual(restored('0'), [])
     assert.deepEqual(restored(undefined), [])
   })
+
+  it('throws when the write fails, so cleanup keeps the value', () => {
+    assert.throws(
+      () =>
+        restoreStylusHandwriting(DEVICE_SERIAL, '1', {
+          run: () => ({ status: 1, stderr: 'error: closed' }),
+        }),
+      /Could not restore stylus_handwriting_enabled=1/,
+    )
+  })
 })
 
 describe('releaseRecordedDevice', () => {
@@ -1446,6 +1459,27 @@ describe('releaseRecordedDevice', () => {
     ])
   })
 
+  it('reports a failed stylus restore after the other writes', () => {
+    const calls = []
+    assert.throws(
+      () =>
+        releaseRecordedDevice(
+          { serial: DEVICE_SERIAL, avdName: 'verify-pixel' },
+          {
+            uninstallOwned: true,
+            avdProblem: () => null,
+            uninstall: () => calls.push('uninstall'),
+            clearReverses: () => calls.push('reverses'),
+            restoreStylus: () => {
+              throw new Error('restore failed')
+            },
+          },
+        ),
+      /restore failed/,
+    )
+    assert.deepEqual(calls, ['uninstall', 'reverses'])
+  })
+
   it('writes nothing to another AVD now on the serial, or an unknown one', () => {
     assert.deepEqual(release('Pixel_7'), {
       calls: [],
@@ -1459,6 +1493,135 @@ describe('releaseRecordedDevice', () => {
       calls: [],
       problem: null,
     })
+  })
+})
+
+describe('stopRecordedEmulator', () => {
+  const state = {
+    serial: DEVICE_SERIAL,
+    emulatorPid: 4242,
+    avdName: 'verify-pixel',
+  }
+  const stop = async (recorded, foreignAvd) => {
+    const calls = []
+    const killed = await stopRecordedEmulator(recorded, foreignAvd, [], {
+      killSerial: ({ serial, pid }) => calls.push(['emu kill', serial, pid]),
+      signalPid: (pid) => calls.push(['signal', pid]),
+    })
+    return { calls, killed }
+  }
+
+  it('kills the recorded emulator through its serial', async () => {
+    assert.deepEqual(await stop(state, null), {
+      calls: [['emu kill', DEVICE_SERIAL, 4242]],
+      killed: DEVICE_SERIAL,
+    })
+  })
+
+  it('only signals its pid when the serial is another or an unknown AVD', async () => {
+    assert.deepEqual(await stop(state, 'could not read the AVD name'), {
+      calls: [['signal', 4242]],
+      killed: null,
+    })
+  })
+
+  it('leaves an emulator this run did not start alone', async () => {
+    assert.deepEqual(await stop({ serial: DEVICE_SERIAL }, null), {
+      calls: [],
+      killed: null,
+    })
+  })
+})
+
+describe('stylusRestoreRecord', () => {
+  it('keeps only what another cleanup needs to restore the setting', () => {
+    assert.deepEqual(
+      stylusRestoreRecord({
+        serial: DEVICE_SERIAL,
+        avdName: 'Pixel_7',
+        ownedPackage: true,
+        emulatorPid: 4242,
+        metroPid: 4343,
+        stylusHandwritingBefore: '1',
+      }),
+      {
+        serial: DEVICE_SERIAL,
+        avdName: 'Pixel_7',
+        // Nothing to uninstall or stop next time.
+        ownedPackage: false,
+        stylusHandwritingBefore: '1',
+      },
+    )
+  })
+})
+
+describe('keptStylusBaseline', () => {
+  const kept = {
+    serial: DEVICE_SERIAL,
+    avdName: 'verify-pixel',
+    stylusHandwritingBefore: '1',
+  }
+
+  it('reuses a kept value only for the AVD it was read from', () => {
+    assert.equal(keptStylusBaseline(kept, DEVICE_SERIAL, 'verify-pixel'), '1')
+    assert.throws(
+      () => keptStylusBaseline(kept, DEVICE_SERIAL, 'Pixel_7'),
+      /still owes AVD verify-pixel its stylus_handwriting_enabled=1/,
+    )
+  })
+
+  it('has nothing to reuse without an owed record', () => {
+    assert.equal(keptStylusBaseline(null, DEVICE_SERIAL, 'Pixel_7'), null)
+    assert.equal(
+      keptStylusBaseline(
+        { ...kept, stylusHandwritingBefore: '0' },
+        DEVICE_SERIAL,
+        'Pixel_7',
+      ),
+      null,
+    )
+  })
+})
+
+describe('cleanup with a kept stylus record', () => {
+  it('keeps the record when the AVD name cannot be read on retry', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-stylus-'))
+    const bin = join(root, 'bin')
+    const run = join(root, '.run')
+    mkdirSync(bin)
+    mkdirSync(run)
+    // An adb that reaches the serial but cannot read its AVD name.
+    writeFileSync(
+      join(bin, 'adb'),
+      '#!/bin/sh\ncase "$*" in *"emu avd name"*) exit 1;; esac\nexit 0\n',
+      { mode: 0o755 },
+    )
+    const record = {
+      serial: DEVICE_SERIAL,
+      avdName: 'verify-pixel',
+      ownedPackage: false,
+      stylusHandwritingBefore: '1',
+    }
+    writeFileSync(join(run, 'state.json'), JSON.stringify(record))
+    const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+    delete env.ANDROID_HOME
+    delete env.ANDROID_SDK_ROOT
+    env.PATH = `${bin}:${process.env.PATH}`
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'), 'cleanup'],
+        { env, encoding: 'utf8', timeout: 60_000 },
+      )
+      assert.notEqual(result.status, 0, result.stdout)
+      assert.match(result.stderr, /Could not restore stylus_handwriting_enabled=1/)
+      assert.deepEqual(
+        JSON.parse(readFileSync(join(run, 'state.json'), 'utf8')),
+        record,
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 
