@@ -64,7 +64,11 @@ async function walkCursors(
     }
     const page = await load(cursor ?? undefined)
     ids.push(...page.items.map((shot) => shot.id))
-    if (!page.nextCursor) return ids
+    // Only null ends the list; clients would send '' back as a cursor.
+    if (page.nextCursor === '') {
+      throw new Error('getRecent returned an empty cursor')
+    }
+    if (page.nextCursor === null) return ids
     if (seen.has(page.nextCursor)) {
       throw new Error(`getRecent repeated cursor ${page.nextCursor}`)
     }
@@ -1511,7 +1515,13 @@ describe('espressoShot.getRecent', () => {
 
     expect(collected).toHaveLength(rows.length)
     expect(new Set(collected).size).toBe(rows.length)
-    expect([...collected].sort()).toEqual([...rows.map((row) => row.id)].sort())
+    // Newest first, then the higher id among equal timestamps (uuid order is
+    // the order of their lowercase hex text).
+    const newestFirst = [...rows].sort(
+      (a, b) =>
+        b.createdAt.localeCompare(a.createdAt) || (b.id < a.id ? -1 : 1),
+    )
+    expect(collected).toEqual(newestFirst.map((row) => row.id))
   })
 
   it('rejects a malformed cursor', async () => {
