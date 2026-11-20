@@ -639,6 +639,21 @@ describe('Dashboard', () => {
         within(screen.getByRole('table')).getByText('Extra 1'),
       ).toBeTruthy()
       expect(fetchSpy).toHaveBeenCalledTimes(3)
+      // The refresh starts over, and Next pages on from where it ended, not
+      // from the stale tenth row: the API reads strictly after the cursor.
+      const cursorOf = (call: Array<unknown>) => {
+        const input = new URL(String(call[0]), 'http://localhost').searchParams
+          .get('input')
+        const parsed = JSON.parse(input ?? '{}') as Record<
+          string,
+          { json?: { cursor?: string } } | undefined
+        >
+        return parsed['0']?.json?.cursor
+      }
+      expect(cursorOf(fetchSpy.mock.calls[1])).toBeUndefined()
+      expect(cursorOf(fetchSpy.mock.calls[2])).toBe(
+        espressoShotCursor(kept[kept.length - 1]),
+      )
     } finally {
       fetchSpy.mockRestore()
     }
@@ -1425,11 +1440,19 @@ describe('Dashboard', () => {
       queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
       queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
       seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      // Page one ended at a newer shot that was then deleted; its cursor
+      // stays, and the surviving shot is after it.
+      const deleted = makeRecentShot({
+        id: espressoShotFixtureId(1),
+        coffee: makeRecentCoffee({ name: 'Colombia Huila' }),
+        createdAt: new Date('2026-06-04T08:00:00.000Z'),
+      })
       const shot = makeRecentShot({
+        id: espressoShotFixtureId(0),
         coffee: makeRecentCoffee({ name: 'Ethiopia Guji' }),
         createdAt: new Date('2026-06-03T08:00:00.000Z'),
       })
-      const cursor = espressoShotCursor(shot)
+      const cursor = espressoShotCursor(deleted)
       queryClient.setQueryData(
         trpc.espressoShot.getRecent.infiniteQueryKey(espressoShotPageInput()),
         {

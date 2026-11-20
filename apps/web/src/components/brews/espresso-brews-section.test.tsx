@@ -830,10 +830,15 @@ describe('EspressoBrewsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'All coffees' }))
     fireEvent.click(screen.getByRole('option', { name: 'Kenya Nyeri' }))
 
-    await waitFor(() =>
-      expect(screen.queryByText('Ethiopia Guji')).toBeNull(),
-    )
-    expect(screen.getByPlaceholderText('Filter shots...')).toBeTruthy()
+    // Kenya Nyeri is the filter, and its (empty) page loaded: no spinner, no
+    // error, and no Guji row left over.
+    expect(screen.getByRole('button', { name: 'Kenya Nyeri' })).toBeTruthy()
+    expect(
+      await within(screen.getByRole('table')).findByText('No results.'),
+    ).toBeTruthy()
+    expect(screen.queryByText('Ethiopia Guji')).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('drops a coffee filter once the catalog loads without that coffee', async () => {
@@ -1195,7 +1200,8 @@ describe('EspressoBrewsSection', () => {
         espressoShotInfiniteOptions(trpc).queryKey,
       )
       const ids = history?.pages.flatMap((page) => page.items.map((s) => s.id))
-      expect(ids).not.toContain(first[0].id)
+      // Only the deleted shot is gone; the held page added nothing.
+      expect(ids).toEqual(first.slice(1).map((shot) => shot.id))
     } finally {
       settleLoadMore()
       fetchSpy.mockRestore()

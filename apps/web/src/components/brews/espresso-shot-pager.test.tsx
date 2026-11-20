@@ -32,4 +32,28 @@ describe('EspressoShotPager', () => {
     fireEvent.click(button)
     expect(loadMore).toHaveBeenCalledOnce()
   })
+
+  it('moves focus to an end note when the last page lands, and shows nothing otherwise', () => {
+    const props = { loadMore: vi.fn(), loadMoreError: null }
+    const { rerender } = render(
+      <EspressoShotPager {...props} hasMore loadingMore={false} />,
+    )
+    screen.getByRole('button', { name: 'Load more' }).focus()
+    rerender(<EspressoShotPager {...props} hasMore loadingMore />)
+    rerender(
+      <EspressoShotPager {...props} hasMore={false} loadingMore={false} />,
+    )
+
+    const note = screen.getByText('All shots loaded')
+    expect(document.activeElement).toBe(note)
+
+    // Once focus moves on, the note goes; without focus there is none.
+    fireEvent.blur(note)
+    expect(screen.queryByText('All shots loaded')).toBeNull()
+    rerender(<EspressoShotPager {...props} hasMore loadingMore={false} />)
+    rerender(
+      <EspressoShotPager {...props} hasMore={false} loadingMore={false} />,
+    )
+    expect(screen.queryByText('All shots loaded')).toBeNull()
+  })
 })

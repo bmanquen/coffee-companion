@@ -122,7 +122,9 @@ export function NewEspressoShot() {
   // The gear and roast date of each save that may have committed, by coffee
   // and then by recipe, newest last, so a retry of any of them can send what
   // it first sent.
-  const unresolvedSaves = useRef(new Map<string, Map<string, PrefillSource>>())
+  const unresolvedSaves = useRef(
+    new Map<string, Map<string, PrefillSource & { idempotencyKey: string }>>(),
+  )
   const [prefillError, setPrefillError] = useState(false)
 
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
@@ -208,20 +210,25 @@ export function NewEspressoShot() {
         for (const [draft, key] of idempotencyKeys.current) {
           if (key === idempotencyKey) idempotencyKeys.current.delete(draft)
         }
-        unresolvedSaves.current
-          .get(value.coffeeId)
-          ?.delete(recipeFingerprint(value))
+        // Only its own snapshot: a later save of the recipe under another
+        // key may still have committed.
+        const saves = unresolvedSaves.current.get(value.coffeeId)
+        const recipe = recipeFingerprint(value)
+        if (saves?.get(recipe)?.idempotencyKey === idempotencyKey) {
+          saves.delete(recipe)
+        }
       } else if (!saveSucceeded.current && !outcome.rejected) {
         // Only a save that may have committed must replay as submitted.
         const saves =
           unresolvedSaves.current.get(value.coffeeId) ??
-          new Map<string, PrefillSource>()
+          new Map<string, PrefillSource & { idempotencyKey: string }>()
         const recipe = recipeFingerprint(value)
         saves.delete(recipe)
         saves.set(recipe, {
           grinderId: value.grinderId,
           brewingDeviceId: value.brewingDeviceId,
           roastDate: value.roastDate ?? null,
+          idempotencyKey,
         })
         unresolvedSaves.current.set(value.coffeeId, saves)
       }

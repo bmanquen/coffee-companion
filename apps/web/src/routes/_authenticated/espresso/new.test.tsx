@@ -1454,6 +1454,94 @@ describe('NewEspressoShot form', () => {
     },
   )
 
+  it('keeps a later lost save of the recipe when an earlier key turns out deleted', async () => {
+    const { Wrapper, fetchSpy } = seeded()
+    let creates = 0
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) {
+        if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
+        return trpcSuccess(
+          makeRecentShot({
+            id: 'shot-1',
+            coffeeId: COFFEE,
+            grinderId: GRINDER,
+            brewingDeviceId: ESP_DEVICE,
+            roastDate: '2026-05-01',
+          }),
+        )
+      }
+      if (isCreateCall(call)) {
+        creates += 1
+        // The May 1 shot is deleted elsewhere before its retry lands.
+        if (creates === 3) {
+          return trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED)
+        }
+        throw new Error('Network request failed')
+      }
+      return trpcSuccess()
+    })
+    const pickCoffee = (id: string) =>
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: id },
+      })
+    const pickRoastDay = async (name: RegExp) => {
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText(/^Roast Date/))
+      })
+      fireEvent.click(await screen.findByRole('button', { name }))
+    }
+    const logAndSettle = async (count: number) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+    }
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      pickCoffee(COFFEE)
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      // The same recipe from two bags, both saves lost: May 1, then May 2.
+      await logAndSettle(1)
+      await pickRoastDay(/May 2nd, 2026/)
+      expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+      await logAndSettle(2)
+
+      // Retrying the May 1 save finds its shot deleted.
+      await pickRoastDay(/May 1st, 2026/)
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      await logAndSettle(3)
+
+      // The May 2 save may still have committed, so reselecting the coffee
+      // restores it rather than reading the latest shot.
+      pickCoffee(COFFEE_B)
+      pickCoffee(COFFEE)
+      expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+      expect(
+        prefillCalls(fetchSpy).filter(
+          (call) => coffeeIdFromCall(call) === COFFEE,
+        ),
+      ).toHaveLength(1)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it("reuses a lost save's key after a note is typed and erased", async () => {
     const providers = seeded()
     const { Wrapper, fetchSpy } = providers
