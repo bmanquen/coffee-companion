@@ -1326,6 +1326,66 @@ describe('Dashboard', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('keeps an opened Espresso shot shown when a refresh moves recency away', async () => {
+    let search: { method?: DashboardMethod } = {}
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockImplementation(() => search)
+    const navigate = vi.fn((options: { search: typeof search }) => {
+      search = options.search
+    })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(navigate as never)
+    try {
+      const shot = makeRecentShot({
+        roastDate: '2026-05-25',
+        createdAt: new Date('2026-06-03T08:00:00.000Z'),
+      })
+      const { queryClient, trpc, Wrapper } = seed([shot], {
+        pourover: [
+          makePouroverBrew({
+            coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+            createdAt: new Date('2026-06-02T08:00:00.000Z'),
+          }),
+        ],
+      })
+      const { rerender } = render(<DashboardContainer />, { wrapper: Wrapper })
+      const table = within(screen.getByRole('table'))
+      await act(async () => {
+        fireEvent.click(table.getByText('Ethiopia Guji').closest('tr')!)
+      })
+      expect(navigate).toHaveBeenCalledWith({
+        search: { method: 'espresso' },
+        replace: true,
+      })
+      rerender(<DashboardContainer />)
+
+      // A refresh now finds the shot older than the Pour Over brew.
+      await act(async () => {
+        queryClient.setQueryData(espressoShotInfiniteOptions(trpc).queryKey, {
+          pages: [
+            {
+              items: [
+                { ...shot, createdAt: new Date('2026-05-01T08:00:00.000Z') },
+              ],
+              total: 1,
+              nextCursor: null,
+            },
+          ],
+          pageParams: [null],
+        })
+      })
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getByText(/Niche Zero/),
+      ).toBeTruthy()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
   it('keeps Espresso chosen while Next refreshes a feed whose refresh failed', async () => {
     const pageOne = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
       makeRecentShot({

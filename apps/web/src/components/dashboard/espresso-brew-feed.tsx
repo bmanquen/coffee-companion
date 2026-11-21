@@ -58,8 +58,8 @@ const columns = [
   expanderColumn<EspressoShotWithRelations>(),
 ]
 
-// onChoose runs whenever the user changes a filter or pages on, which the
-// dashboard takes as choosing Espresso.
+// onChoose runs whenever the user changes a filter, pages on, or opens a
+// shot, which the dashboard takes as choosing Espresso.
 export function EspressoBrewFeed({ onChoose }: { onChoose?: () => void } = {}) {
   const trpc = useTRPC()
   const coffeesQuery = useQuery({
@@ -158,6 +158,8 @@ export function EspressoBrewFeed({ onChoose }: { onChoose?: () => void } = {}) {
           onChoose?.()
         },
       }}
+      // An open shot must not vanish when a refresh moves recency elsewhere.
+      onExpand={onChoose}
       stale={stale}
       hasMore={hasMore}
       loadMore={() => {

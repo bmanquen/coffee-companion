@@ -250,6 +250,13 @@ export function NewEspressoShot() {
       return
     }
     if (startedSaveGen !== saveGen.current) return
+    // Log marks the save in flight before validation, and saveGen moves only
+    // once it passes, so a lookup landing in between waits for the save to
+    // settle instead of changing what it sends.
+    if (saveInFlight.current) {
+      prefillQueued.current = true
+      return
+    }
     const keep = keepPrefill.current
     const values = form.state.values
     const next = applyCoffeePrefill(
@@ -347,6 +354,10 @@ export function NewEspressoShot() {
           }
           // A lookup from before a save is dropped, its failure included.
           if (startedSaveGen !== saveGen.current) return
+          if (saveInFlight.current) {
+            prefillQueued.current = true
+            return
+          }
           setPrefillError(true)
           applyPrefill(coffeeId, seq, null, startedSaveGen)
         },

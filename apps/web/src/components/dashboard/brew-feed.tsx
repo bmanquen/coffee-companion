@@ -55,6 +55,7 @@ export function BrewFeed<T extends BrewRow>({
   loadMore,
   loadingMore = false,
   loadMoreError,
+  onExpand,
 }: {
   title: string
   brews: Array<T>
@@ -81,6 +82,8 @@ export function BrewFeed<T extends BrewRow>({
   loadingMore?: boolean
   // Why the last loadMore failed; shown under the table with a retry.
   loadMoreError?: string | null
+  // Runs when the user opens or closes a row's details.
+  onExpand?: () => void
 }) {
   // TanStack Table's instance is a stable, mutable object the React Compiler
   // would otherwise over-memoize; opt this component out (mirrors DataTable).
@@ -190,7 +193,10 @@ export function BrewFeed<T extends BrewRow>({
     columns,
     // Accordion: opening one brew collapses the others (see grilling decision).
     state: { expanded: expansion.expanded, pagination },
-    onExpandedChange: expansion.onExpandedChange,
+    onExpandedChange: (updater) => {
+      expansion.onExpandedChange(updater)
+      onExpand?.()
+    },
     // Paging by hand cancels a pending move to newly loaded rows.
     onPaginationChange: (updater) => {
       navGeneration.current += 1

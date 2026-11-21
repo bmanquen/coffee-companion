@@ -121,8 +121,8 @@ export function DashboardContainer() {
     <Dashboard
       selectedMethod={selectedMethod}
       onSelectMethod={(next) => navigate({ search: { method: next } })}
-      // Filtering or paging Espresso chooses it, so a late recency result
-      // cannot switch the feed away and drop the filter or the page.
+      // Filtering, paging, or opening a shot in Espresso chooses it, so a late
+      // recency result cannot switch the feed away from what the user has.
       onChooseEspresso={
         isDashboardMethod(method)
           ? undefined
