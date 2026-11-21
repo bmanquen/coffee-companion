@@ -1,27 +1,34 @@
+import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useFieldContext } from '@/hooks/form-context'
-import { createTestProviders } from '@/test/providers'
-import { trpcSuccess } from '@/test/trpc-response'
+import { seedLatestUnsealed } from '@/test/espresso-shots'
 import {
   makeBrewingDevice,
   makeCoffee,
   makeGrinder,
   makeRecentShot,
 } from '@/test/factories'
+import { createTestProviders } from '@/test/providers'
+import { trpcErrorResponse, trpcSuccess } from '@/test/trpc-response'
 import { Route } from './new'
 
 const COFFEE = '00000000-0000-4000-8000-000000000001'
+const COFFEE_B = '00000000-0000-4000-8000-000000000002'
 const GRINDER = '00000000-0000-4000-8000-000000000003'
+const GRINDER_B = '00000000-0000-4000-8000-000000000006'
 const ESP_DEVICE = '00000000-0000-4000-8000-000000000005'
 const AERO_DEVICE = '00000000-0000-4000-8000-000000000004'
 const ts = new Date('2026-06-01T08:00:00.000Z')
+const IDEMPOTENCY_KEY_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const mocks = vi.hoisted(() => ({ navigate: vi.fn(), track: vi.fn() }))
 
@@ -47,6 +54,9 @@ vi.mock('@/components/form/search-select', () => ({
     return (
       <select
         aria-label={label}
+        // The stored value, which a <select> hides behind its placeholder
+        // when no option matches.
+        data-field-value={field.state.value}
         value={field.state.value}
         onChange={(e) => field.handleChange(e.target.value)}
       >
@@ -66,9 +76,11 @@ function seeded() {
   const { queryClient: qc, trpc } = providers
   qc.setQueryData(trpc.coffee.getAll.queryKey(), [
     makeCoffee({ id: COFFEE, name: 'Ethiopia Guji' }),
+    makeCoffee({ id: COFFEE_B, name: 'Colombia Huila' }),
   ])
   qc.setQueryData(trpc.grinder.list.queryKey(), [
     makeGrinder({ id: GRINDER, name: 'Niche Zero' }),
+    makeGrinder({ id: GRINDER_B, name: 'P64' }),
   ])
   qc.setQueryData(trpc.brewingDevice.list.queryKey(), [
     makeBrewingDevice({
@@ -85,7 +97,10 @@ function seeded() {
     }),
     makeBrewingDevice({ id: AERO_DEVICE, name: 'AeroPress Go' }),
   ])
-  qc.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+  seedLatestUnsealed(
+    qc,
+    trpc,
+    COFFEE,
     makeRecentShot({
       id: 'shot-1',
       coffeeId: COFFEE,
@@ -93,7 +108,19 @@ function seeded() {
       brewingDeviceId: ESP_DEVICE,
       roastDate: '2026-05-01',
     }),
-  ])
+  )
+  seedLatestUnsealed(
+    qc,
+    trpc,
+    COFFEE_B,
+    makeRecentShot({
+      id: 'shot-b',
+      coffeeId: COFFEE_B,
+      grinderId: GRINDER_B,
+      brewingDeviceId: ESP_DEVICE,
+      roastDate: '2026-04-01',
+    }),
+  )
   qc.setQueryData(
     trpc.dialedInBrew.get.queryKey({
       coffeeId: COFFEE,
@@ -102,12 +129,113 @@ function seeded() {
     }),
     [],
   )
-  return providers
+  const fetchSpy = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(serveFromCache(providers))
+  return { ...providers, fetchSpy }
 }
 
 const NewEspressoShot = Route.options.component!
 
+function callText(call: Array<unknown>) {
+  const url = String(call[0])
+  const body = String((call[1] as RequestInit | undefined)?.body ?? '')
+  return `${url}\n${body}`
+}
+
+function isCreateCall(call: Array<unknown>) {
+  return callText(call).includes('espressoShot.create')
+}
+
+function isPrefillCall(call: Array<unknown>) {
+  return callText(call).includes('getLatestUnsealed')
+}
+
+function coffeeIdFromCall(call: Array<unknown>) {
+  return decodeURIComponent(callText(call)).match(
+    /"coffeeId"\s*:\s*"([^"]+)"/,
+  )?.[1]
+}
+
+// Answers every operation of a batched tRPC request in order: a Coffee's
+// latest-shot lookup from the query cache, anything else with an empty
+// result. httpBatchStreamLink can put the prefill and Dialed-in lookups in one
+// request, so each needs its own slot in the reply.
+function batchResponse(
+  queryClient: ReturnType<typeof createTestProviders>['queryClient'],
+  trpc: ReturnType<typeof createTestProviders>['trpc'],
+  call: Array<unknown>,
+) {
+  const url = new URL(String(call[0]), 'http://localhost')
+  const procedures = decodeURIComponent(
+    url.pathname.split('/').pop() ?? '',
+  ).split(',')
+  const inputs = JSON.parse(url.searchParams.get('input') ?? '{}') as Record<
+    string,
+    { json?: { coffeeId?: string } } | undefined
+  >
+  const head = Object.fromEntries(
+    procedures.map((procedure, index) => {
+      const coffeeId = inputs[index]?.json?.coffeeId
+      const data =
+        procedure.endsWith('getLatestUnsealed') && coffeeId
+          ? (queryClient.getQueryData(
+              trpc.espressoShot.getLatestUnsealed.queryKey({ coffeeId }),
+            ) ?? null)
+          : procedure.endsWith('getLatestUnsealed')
+            ? null
+            : {}
+      return [String(index), [[{ result: { data } }]]]
+    }),
+  )
+  return new Response(JSON.stringify({ json: head }) + '\n', {
+    status: 200,
+    headers: { 'content-type': 'application/jsonl' },
+  })
+}
+
+function serveFromCache(
+  providers: ReturnType<typeof createTestProviders>,
+  create?: (call: Array<unknown>) => Promise<Response> | Response,
+) {
+  return async (...call: Array<unknown>) => {
+    if (isCreateCall(call)) return create ? create(call) : trpcSuccess()
+    return batchResponse(providers.queryClient, providers.trpc, call)
+  }
+}
+
+function createCalls(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
+  return fetchSpy.mock.calls.filter((call) => isCreateCall(call))
+}
+
+// Each create request's input, in order, as the API receives it.
+function createInputs(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
+  return createCalls(fetchSpy).map((call) => {
+    const body = JSON.parse(
+      String((call[1] as RequestInit | undefined)?.body ?? '{}'),
+    ) as Record<string, { json: Record<string, unknown> }>
+    return body['0'].json
+  })
+}
+
+function createKeys(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
+  return createInputs(fetchSpy).map((input) => input.idempotencyKey)
+}
+
+function prefillCalls(fetchSpy: { mock: { calls: Array<Array<unknown>> } }) {
+  return fetchSpy.mock.calls.filter((call) => isPrefillCall(call))
+}
+
 describe('NewEspressoShot form', () => {
+  beforeEach(() => {
+    mocks.track.mockClear()
+    mocks.navigate.mockClear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('offers only Espresso-type brewing devices', () => {
     const { Wrapper } = seeded()
     render(<NewEspressoShot />, { wrapper: Wrapper })
@@ -123,7 +251,86 @@ describe('NewEspressoShot form', () => {
     ).toBeNull()
   })
 
-  it('surfaces the Dialed-in Brew for the prefilled device', () => {
+  it('leaves brewing device blank when the last shot was not espresso', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper } = providers
+    seedLatestUnsealed(
+      queryClient,
+      trpc,
+      COFFEE,
+      makeRecentShot({
+        id: 'shot-1',
+        coffeeId: COFFEE,
+        grinderId: GRINDER,
+        brewingDeviceId: AERO_DEVICE,
+        roastDate: '2026-05-01',
+      }),
+    )
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+    expect(screen.getByDisplayValue('Niche Zero')).toBeTruthy()
+    expect(
+      screen
+        .getByRole('combobox', { name: 'Brewing Device' })
+        .getAttribute('data-field-value'),
+    ).toBe('')
+  })
+
+  it('does not submit a prefilled grinder that is not in the list', async () => {
+    const { queryClient, trpc, Wrapper, fetchSpy } = seeded()
+    try {
+      seedLatestUnsealed(
+        queryClient,
+        trpc,
+        COFFEE,
+        makeRecentShot({
+          id: 'shot-1',
+          coffeeId: COFFEE,
+          grinderId: '00000000-0000-4000-8000-0000000000ff',
+          brewingDeviceId: ESP_DEVICE,
+          roastDate: '2026-05-01',
+        }),
+      )
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await act(async () => {})
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBeGreaterThan(0))
+      expect(createCalls(fetchSpy)).toHaveLength(1)
+      expect(createInputs(fetchSpy)[0].grinderId).toBe(GRINDER)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('surfaces the Dialed-in Brew for the prefilled device', async () => {
     const { queryClient, trpc, Wrapper } = seeded()
     queryClient.setQueryData(
       trpc.dialedInBrew.get.queryKey({
@@ -156,7 +363,7 @@ describe('NewEspressoShot form', () => {
     })
 
     expect(
-      screen.getByRole('status', { name: 'Dialed-in for Linea Mini' }),
+      await screen.findByRole('status', { name: 'Dialed-in for Linea Mini' }),
     ).toBeTruthy()
     expect(
       screen.getByText(
@@ -165,7 +372,7 @@ describe('NewEspressoShot form', () => {
     ).toBeTruthy()
   })
 
-  it('prefills grinder and device from the coffee’s latest shot', () => {
+  it('prefills grinder and device from the coffee’s latest shot', async () => {
     const { Wrapper } = seeded()
     render(<NewEspressoShot />, { wrapper: Wrapper })
 
@@ -173,12 +380,11 @@ describe('NewEspressoShot form', () => {
       target: { value: COFFEE },
     })
 
-    // Prefill selects the grinder + device options (shown by their labels).
-    expect(screen.getByDisplayValue('Niche Zero')).toBeTruthy()
+    expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
     expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
   })
 
-  it('auto-fills roast date as the same calendar day', () => {
+  it('auto-fills roast date as the same calendar day', async () => {
     const { Wrapper } = seeded()
     render(<NewEspressoShot />, { wrapper: Wrapper })
 
@@ -186,21 +392,19 @@ describe('NewEspressoShot form', () => {
       target: { value: COFFEE },
     })
 
-    expect(screen.getByText('May 1st, 2026')).toBeTruthy()
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
     expect(screen.queryByText('April 30th, 2026')).toBeNull()
   })
 
   it('submits a create with the entered dose and yield', async () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(trpcSuccess())
+    const { Wrapper, fetchSpy } = seeded()
     try {
-      const { Wrapper } = seeded()
       render(<NewEspressoShot />, { wrapper: Wrapper })
 
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '18' },
       })
@@ -216,27 +420,1927 @@ describe('NewEspressoShot form', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
 
-      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
-      const [url, init] = fetchSpy.mock.calls[0]
-      expect(String(url)).toContain('espressoShot.create')
-      const body = String(init?.body ?? '')
-      expect(body).toContain('18')
-      expect(body).toContain('36')
-      expect(body).toContain(COFFEE)
-      expect(body).toContain('2026-05-01')
-      expect(body).not.toContain('2026-04-30')
-      expect(body).not.toMatch(/2026-05-01T/)
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      const createCall = createCalls(fetchSpy)[0]
+      expect(String(createCall[0])).toContain('espressoShot.create')
+      expect(createInputs(fetchSpy)[0]).toMatchObject({
+        dose: '18',
+        yield: '36',
+        coffeeId: COFFEE,
+        // The calendar day, not a timestamp a time zone could shift.
+        roastDate: '2026-05-01',
+      })
+      // Navigation waits for the shot reads to refresh after tracking.
       await waitFor(() =>
-        expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
-          method: 'espresso',
+        expect(mocks.navigate).toHaveBeenCalledWith({
+          to: '/brews',
+          search: { method: 'espresso' },
         }),
       )
-      expect(mocks.navigate).toHaveBeenCalledWith({
-        to: '/brews',
-        search: { method: 'espresso' },
+      expect(mocks.track).toHaveBeenCalledTimes(1)
+      expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
+        method: 'espresso',
       })
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+
+  it('retries a lost create with the same idempotency key', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates === 1) throw new Error('Network request failed')
+        return trpcSuccess()
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
+
+      const keys = createKeys(fetchSpy)
+      expect(keys[0]).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      )
+      expect(keys[0]).toBe(keys[1])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('mints a new key once the API says the replayed shot was deleted', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates === 1) throw new Error('Network request failed')
+        if (creates === 2) {
+          return trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED)
+        }
+        return trpcSuccess()
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      const log = async (calls: number) => {
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(calls))
+      }
+      await log(1)
+      await log(2)
+      await log(3)
+
+      const keys = createKeys(fetchSpy)
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      // The lost save replays under its key until the API says it is gone.
+      expect(keys[1]).toBe(keys[0])
+      expect(keys[2]).not.toBe(keys[0])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it.each([
+    {
+      reply: 'a replay conflict',
+      second: () =>
+        trpcErrorResponse('CONFLICT', 'This key was used for another shot.'),
+    },
+    {
+      reply: 'the deleted-key message without its CONFLICT code',
+      second: () => {
+        throw new Error(SHOT_IDEMPOTENCY_DELETED)
+      },
+    },
+    {
+      reply: 'the deleted-key message under another code',
+      second: () => trpcErrorResponse('BAD_REQUEST', SHOT_IDEMPOTENCY_DELETED),
+    },
+  ])("keeps the lost save's key after $reply", async ({ second }) => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates === 1) throw new Error('Network request failed')
+        if (creates === 2) return second()
+        return trpcSuccess()
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      const log = async (calls: number) => {
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(calls))
+      }
+      await log(1)
+      await log(2)
+      await log(3)
+
+      const keys = createKeys(fetchSpy)
+      // Only a CONFLICT that says the shot was deleted frees the key; a new
+      // key here could store the lost save a second time.
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      expect(keys[1]).toBe(keys[0])
+      expect(keys[2]).toBe(keys[0])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('mints a new key when the draft changes after a failed save', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates === 1) throw new Error('Network request failed')
+        return trpcSuccess({ id: 'shot-new', dose: '22' })
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '22' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
+
+      const keys = createKeys(fetchSpy)
+      expect(keys[0]).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      expect(keys[1]).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      expect(keys[0]).not.toBe(keys[1])
+      expect(createInputs(fetchSpy)[1].dose).toBe('22')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('reuses the first key when a failed draft is edited back to it', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates < 3) throw new Error('Network request failed')
+        return trpcSuccess({ id: 'shot-new', dose: '18' })
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      const logWithDose = async (dose: string, count: number) => {
+        fireEvent.change(screen.getByLabelText(/^Dose/), {
+          target: { value: dose },
+        })
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        )
+      }
+      await logWithDose('18', 1)
+      await logWithDose('22', 2)
+      await logWithDose('18', 3)
+
+      const keys = createKeys(fetchSpy)
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      expect(keys[0]).not.toBe(keys[1])
+      expect(keys[2]).toBe(keys[0])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('clears the previous coffee’s roast date as soon as another coffee is chosen', async () => {
+    const { Wrapper } = seeded()
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE_B },
+    })
+    expect(screen.queryByText('May 1st, 2026')).toBeNull()
+    expect(await screen.findByText('April 1st, 2026')).toBeTruthy()
+  })
+
+  it('keeps a grinder chosen while prefill is still loading', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper } = providers
+    queryClient.removeQueries({
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+    })
+    let resolvePrefill: (
+      shot: ReturnType<typeof makeRecentShot>,
+    ) => void = () => {}
+    const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+      (resolve) => {
+        resolvePrefill = resolve
+      },
+    )
+    void queryClient.prefetchQuery({
+      ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId: COFFEE }),
+      queryFn: () => pending,
+    })
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+      target: { value: GRINDER_B },
+    })
+    expect(screen.getByDisplayValue('P64')).toBeTruthy()
+
+    resolvePrefill(
+      makeRecentShot({
+        id: 'shot-1',
+        coffeeId: COFFEE,
+        grinderId: GRINDER,
+        brewingDeviceId: ESP_DEVICE,
+        roastDate: '2026-05-01',
+      }),
+    )
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+    expect(screen.getByDisplayValue('P64')).toBeTruthy()
+    expect(screen.queryByDisplayValue('Niche Zero')).toBeNull()
+  })
+
+  it('checks prefilled gear against the lists as they are when the lookup lands', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper } = providers
+    queryClient.removeQueries({
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+    })
+    let resolvePrefill: (
+      shot: ReturnType<typeof makeRecentShot>,
+    ) => void = () => {}
+    const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+      (resolve) => {
+        resolvePrefill = resolve
+      },
+    )
+    void queryClient.prefetchQuery({
+      ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId: COFFEE }),
+      queryFn: () => pending,
+    })
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+
+    // While the lookup is out, the grinder is deleted and the Linea Mini
+    // retyped as an AeroPress, so neither is in its picker any more.
+    await act(async () => {
+      queryClient.setQueryData(trpc.grinder.list.queryKey(), [
+        makeGrinder({ id: GRINDER_B, name: 'P64' }),
+      ])
+      queryClient.setQueryData(trpc.brewingDevice.list.queryKey(), [
+        makeBrewingDevice({ id: ESP_DEVICE, name: 'Linea Mini' }),
+        makeBrewingDevice({ id: AERO_DEVICE, name: 'AeroPress Go' }),
+      ])
+    })
+    resolvePrefill(
+      makeRecentShot({
+        id: 'shot-1',
+        coffeeId: COFFEE,
+        grinderId: GRINDER,
+        brewingDeviceId: ESP_DEVICE,
+        roastDate: '2026-05-01',
+      }),
+    )
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+    expect(
+      screen
+        .getByRole('combobox', { name: 'Grinder' })
+        .getAttribute('data-field-value'),
+    ).toBe('')
+    expect(
+      screen
+        .getByRole('combobox', { name: 'Brewing Device' })
+        .getAttribute('data-field-value'),
+    ).toBe('')
+  })
+
+  it('prefills roast date and device when the latest shot has no grinder', async () => {
+    const { queryClient, trpc, Wrapper } = seeded()
+    seedLatestUnsealed(
+      queryClient,
+      trpc,
+      COFFEE,
+      makeRecentShot({
+        id: 'shot-1',
+        coffeeId: COFFEE,
+        grinderId: null,
+        grinder: null,
+        brewingDeviceId: ESP_DEVICE,
+        roastDate: '2026-05-01',
+      }),
+    )
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+
+    expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+    expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
+    expect(screen.queryByDisplayValue('Niche Zero')).toBeNull()
+  })
+
+  it('does not apply prefill after a save has started', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates === 1) throw new Error('Network request failed')
+        return trpcSuccess()
+      }),
+    )
+    try {
+      queryClient.removeQueries({
+        queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+          coffeeId: COFFEE,
+        }),
+      })
+      let resolvePrefill: (
+        shot: ReturnType<typeof makeRecentShot>,
+      ) => void = () => {}
+      const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+        (resolve) => {
+          resolvePrefill = resolve
+        },
+      )
+      void queryClient.prefetchQuery({
+        ...trpc.espressoShot.getLatestUnsealed.queryOptions({
+          coffeeId: COFFEE,
+        }),
+        queryFn: () => pending,
+      })
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      resolvePrefill(
+        makeRecentShot({
+          id: 'shot-1',
+          coffeeId: COFFEE,
+          grinderId: GRINDER,
+          brewingDeviceId: ESP_DEVICE,
+          roastDate: '2026-05-01',
+        }),
+      )
+      await act(async () => {
+        await pending
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
+      const keys = createKeys(fetchSpy)
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      expect(keys[0]).toBe(keys[1])
+      // The retry sends exactly what the lost save sent.
+      expect(createInputs(fetchSpy)[1]).toEqual(createInputs(fetchSpy)[0])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('does not apply a prefill that lands while Log is validating', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    let creates = 0
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        creates += 1
+        if (creates === 1) throw new Error('Network request failed')
+        return trpcSuccess()
+      }),
+    )
+    try {
+      queryClient.removeQueries({
+        queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+          coffeeId: COFFEE,
+        }),
+      })
+      let resolvePrefill: (
+        shot: ReturnType<typeof makeRecentShot>,
+      ) => void = () => {}
+      const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+        (resolve) => {
+          resolvePrefill = resolve
+        },
+      )
+      void queryClient.prefetchQuery({
+        ...trpc.espressoShot.getLatestUnsealed.queryOptions({
+          coffeeId: COFFEE,
+        }),
+        queryFn: () => pending,
+      })
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      // The lookup's answer is already on its way when Log is pressed, so it
+      // lands after the click and before the save is sent.
+      resolvePrefill(
+        makeRecentShot({
+          id: 'shot-1',
+          coffeeId: COFFEE,
+          grinderId: GRINDER,
+          brewingDeviceId: ESP_DEVICE,
+          roastDate: '2026-05-01',
+        }),
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      expect(createInputs(fetchSpy)[0].roastDate ?? null).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('retries a lost save unchanged when Try again would prefill a newer shot', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    queryClient.removeQueries({
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+    })
+    let lookups = 0
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) {
+        lookups += 1
+        if (lookups === 1) throw new Error('Network request failed')
+        return trpcSuccess(
+          makeRecentShot({
+            id: 'shot-1',
+            coffeeId: COFFEE,
+            grinderId: GRINDER,
+            brewingDeviceId: ESP_DEVICE,
+            roastDate: '2026-05-01',
+          }),
+        )
+      }
+      if (isCreateCall(call)) throw new Error('Network request failed')
+      return trpcSuccess()
+    })
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(
+        await screen.findByRole('button', { name: 'Try again' }),
+      ).toBeTruthy()
+      expect(prefillCalls(fetchSpy)).toHaveLength(1)
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      // The save may have committed, so the retry must send what it sent.
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull(),
+      )
+      // Let tRPC dispatch any lookup Try again queued before counting.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(lookups).toBe(1)
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(2))
+      const bodies = createCalls(fetchSpy).map((call) =>
+        String((call[1] as RequestInit | undefined)?.body ?? ''),
+      )
+      expect(bodies[0]).toContain('idempotencyKey')
+      expect(bodies[1]).toBe(bodies[0])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('restores a lost save, not a lookup started before it, when its coffee is reselected', async () => {
+    const { Wrapper, fetchSpy } = seeded()
+    let resolveFirstLookup: (response: Response) => void = () => {}
+    const firstLookup = new Promise<Response>((resolve) => {
+      resolveFirstLookup = resolve
+    })
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) {
+        if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
+        return firstLookup
+      }
+      if (isCreateCall(call)) throw new Error('Network request failed')
+      return trpcSuccess()
+    })
+    const pickCoffee = (id: string) =>
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: id },
+      })
+    const logAndSettle = async (count: number) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+    }
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      pickCoffee(COFFEE)
+      await waitFor(() => expect(prefillCalls(fetchSpy)).toHaveLength(1))
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        { target: { value: ESP_DEVICE } },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      await logAndSettle(1)
+
+      pickCoffee(COFFEE_B)
+      pickCoffee(COFFEE)
+      // The lookup that began before the save answers with an older shot.
+      await act(async () => {
+        resolveFirstLookup(
+          trpcSuccess(
+            makeRecentShot({
+              id: 'shot-1',
+              coffeeId: COFFEE,
+              grinderId: GRINDER,
+              brewingDeviceId: ESP_DEVICE,
+              roastDate: '2026-05-01',
+            }),
+          ),
+        )
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      const lookupsForA = prefillCalls(fetchSpy).filter(
+        (call) => coffeeIdFromCall(call) === COFFEE,
+      )
+      expect(lookupsForA).toHaveLength(1)
+
+      // Only the number formats change, so the retry keeps its key.
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18.0' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '030' },
+      })
+      await logAndSettle(2)
+
+      const keys = createKeys(fetchSpy)
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      expect(keys[1]).toBe(keys[0])
+      expect(createInputs(fetchSpy)[1].roastDate).not.toBe('2026-05-01')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('resumes a prefill lookup the save interrupted once the API rejects that save', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () =>
+        trpcErrorResponse('BAD_REQUEST', 'Brewing device is not espresso'),
+      ),
+    )
+    try {
+      queryClient.removeQueries({
+        queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+          coffeeId: COFFEE,
+        }),
+      })
+      let resolvePrefill: (
+        shot: ReturnType<typeof makeRecentShot>,
+      ) => void = () => {}
+      const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+        (resolve) => {
+          resolvePrefill = resolve
+        },
+      )
+      void queryClient.prefetchQuery({
+        ...trpc.espressoShot.getLatestUnsealed.queryOptions({
+          coffeeId: COFFEE,
+        }),
+        queryFn: () => pending,
+      })
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        { target: { value: ESP_DEVICE } },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy)).toHaveLength(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      // Nothing was saved, so the lookup the save interrupted still applies.
+      resolvePrefill(
+        makeRecentShot({
+          id: 'shot-1',
+          coffeeId: COFFEE,
+          grinderId: GRINDER_B,
+          brewingDeviceId: ESP_DEVICE,
+          roastDate: '2026-05-01',
+        }),
+      )
+      await waitFor(() => expect(screen.getByText('May 1st, 2026')))
+      // The gear entered by hand stays.
+      expect(screen.getByRole('combobox', { name: 'Grinder' })).toHaveProperty(
+        'value',
+        GRINDER,
+      )
+      expect(screen.getByLabelText(/^Dose/)).toHaveProperty('value', '18')
+      // A prefill is not an edit, so the save's error stays up.
+      expect(screen.getByText('Brewing device is not espresso')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('looks up a reselected coffee again after the API rejects its save', async () => {
+    const { Wrapper, fetchSpy } = seeded()
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) return trpcSuccess(null)
+      if (isCreateCall(call)) {
+        return trpcErrorResponse('BAD_REQUEST', 'Grinder not found')
+      }
+      return trpcSuccess()
+    })
+    const pickCoffee = (id: string) =>
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: id },
+      })
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      pickCoffee(COFFEE)
+      await waitFor(() => expect(prefillCalls(fetchSpy)).toHaveLength(1))
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        { target: { value: ESP_DEVICE } },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy)).toHaveLength(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      // Nothing was saved, so there is no lost save to restore: the coffee's
+      // latest shot is read again.
+      pickCoffee(COFFEE_B)
+      await waitFor(() => expect(prefillCalls(fetchSpy)).toHaveLength(2))
+      pickCoffee(COFFEE)
+      await waitFor(() =>
+        expect(
+          prefillCalls(fetchSpy).filter(
+            (call) => coffeeIdFromCall(call) === COFFEE,
+          ),
+        ).toHaveLength(2),
+      )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it.each([
+    { order: 'the coffee is reselected after the recipe returns' },
+    { order: 'the recipe returns after the coffee is reselected' },
+    { order: 'the recipe returns while a retry of the other is pending' },
+  ])(
+    'retries the first of two lost saves for one coffee when $order',
+    async ({ order }) => {
+      const { Wrapper, fetchSpy } = seeded()
+      const pending = order.includes('pending')
+      let creates = 0
+      let failPendingRetry: () => void = () => {}
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isPrefillCall(call)) {
+          if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
+          return trpcSuccess(
+            makeRecentShot({
+              id: 'shot-1',
+              coffeeId: COFFEE,
+              grinderId: GRINDER,
+              brewingDeviceId: ESP_DEVICE,
+              roastDate: '2026-05-01',
+            }),
+          )
+        }
+        if (isCreateCall(call)) {
+          creates += 1
+          if (pending && creates === 3) {
+            await new Promise<void>((resolve) => {
+              failPendingRetry = resolve
+            })
+          }
+          throw new Error('Network request failed')
+        }
+        return trpcSuccess()
+      })
+      const pickCoffee = (id: string) =>
+        fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+          target: { value: id },
+        })
+      const setDose = (value: string) =>
+        fireEvent.change(screen.getByLabelText(/^Dose/), { target: { value } })
+      const logAndSettle = async (count: number) => {
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        )
+      }
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        setDose('18')
+        fireEvent.change(screen.getByLabelText(/^Yield/), {
+          target: { value: '36' },
+        })
+        fireEvent.change(screen.getByLabelText(/^Time/), {
+          target: { value: '30' },
+        })
+        fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+          target: { value: '1.5' },
+        })
+        await logAndSettle(1)
+
+        // A second shot of the same coffee, also lost.
+        setDose('22')
+        await act(async () => {
+          fireEvent.click(screen.getByLabelText(/^Roast Date/))
+        })
+        fireEvent.click(
+          await screen.findByRole('button', { name: /May 2nd, 2026/ }),
+        )
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+        await logAndSettle(2)
+
+        const reselect = async () => {
+          pickCoffee(COFFEE_B)
+          pickCoffee(COFFEE)
+        }
+        if (order === 'the coffee is reselected after the recipe returns') {
+          setDose('18')
+          await reselect()
+        } else if (pending) {
+          await reselect()
+          expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+          // Retry the 22 g save, and go back to 18 g before it settles.
+          fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+          await waitFor(() => expect(createCalls(fetchSpy).length).toBe(3))
+          setDose('18')
+          await act(async () => {
+            failPendingRetry()
+            await new Promise((resolve) => setTimeout(resolve, 0))
+          })
+          await waitFor(() =>
+            expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+              'disabled',
+              false,
+            ),
+          )
+        } else {
+          await reselect()
+          expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+          setDose('18')
+        }
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        await logAndSettle(pending ? 4 : 3)
+
+        const bodies = createCalls(fetchSpy).map((call) =>
+          String((call[1] as RequestInit | undefined)?.body ?? ''),
+        )
+        // The 18 g retry sends exactly what the 18 g save sent, so the API
+        // replays it instead of storing a second shot.
+        const keys = createKeys(fetchSpy)
+        expect(keys[0]).toMatch(IDEMPOTENCY_KEY_PATTERN)
+        expect(keys[1]).toMatch(IDEMPOTENCY_KEY_PATTERN)
+        // Two shots, two keys: the API would refuse the 22 g save as a replay
+        // conflict under the 18 g save's key.
+        expect(keys[1]).not.toBe(keys[0])
+        expect(bodies[1]).not.toBe(bodies[0])
+        if (pending) expect(bodies[2]).toBe(bodies[1])
+        expect(bodies.at(-1)).toBe(bodies[0])
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    },
+  )
+
+  it('keeps a later lost save of the recipe when an earlier key turns out deleted', async () => {
+    const { Wrapper, fetchSpy } = seeded()
+    let creates = 0
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) {
+        if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
+        return trpcSuccess(
+          makeRecentShot({
+            id: 'shot-1',
+            coffeeId: COFFEE,
+            grinderId: GRINDER,
+            brewingDeviceId: ESP_DEVICE,
+            roastDate: '2026-05-01',
+          }),
+        )
+      }
+      if (isCreateCall(call)) {
+        creates += 1
+        // The May 1 shot is deleted elsewhere before its retry lands.
+        if (creates === 3) {
+          return trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED)
+        }
+        throw new Error('Network request failed')
+      }
+      return trpcSuccess()
+    })
+    const pickCoffee = (id: string) =>
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: id },
+      })
+    const pickRoastDay = async (name: RegExp) => {
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText(/^Roast Date/))
+      })
+      fireEvent.click(await screen.findByRole('button', { name }))
+    }
+    const logAndSettle = async (count: number) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+    }
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      pickCoffee(COFFEE)
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      // The same recipe from two bags, both saves lost: May 1, then May 2.
+      await logAndSettle(1)
+      await pickRoastDay(/May 2nd, 2026/)
+      expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+      await logAndSettle(2)
+
+      // Retrying the May 1 save finds its shot deleted.
+      await pickRoastDay(/May 1st, 2026/)
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      await logAndSettle(3)
+
+      // The May 2 save may still have committed, so reselecting the coffee
+      // restores it rather than reading the latest shot.
+      pickCoffee(COFFEE_B)
+      pickCoffee(COFFEE)
+      expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+      expect(
+        prefillCalls(fetchSpy).filter(
+          (call) => coffeeIdFromCall(call) === COFFEE,
+        ),
+      ).toHaveLength(1)
+      // The retry replayed May 1 under its own key, apart from May 2's.
+      const keys = createKeys(fetchSpy)
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      expect(keys[2]).toBe(keys[0])
+      expect(keys[1]).not.toBe(keys[0])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('keeps an earlier lost save of the recipe when a later key turns out deleted', async () => {
+    const { Wrapper, fetchSpy } = seeded()
+    let creates = 0
+    let prefills = 0
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) {
+        if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
+        prefills += 1
+        // A later lookup would find a newer shot than either lost save.
+        return trpcSuccess(
+          makeRecentShot({
+            id: `shot-${prefills}`,
+            coffeeId: COFFEE,
+            grinderId: GRINDER,
+            brewingDeviceId: ESP_DEVICE,
+            roastDate: prefills === 1 ? '2026-05-01' : '2026-05-03',
+          }),
+        )
+      }
+      if (isCreateCall(call)) {
+        creates += 1
+        // The May 2 shot is deleted elsewhere before its retry lands.
+        if (creates === 3) {
+          return trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED)
+        }
+        throw new Error('Network request failed')
+      }
+      return trpcSuccess()
+    })
+    const pickCoffee = (id: string) =>
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: id },
+      })
+    const pickRoastDay = async (name: RegExp) => {
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText(/^Roast Date/))
+      })
+      fireEvent.click(await screen.findByRole('button', { name }))
+    }
+    const logAndSettle = async (count: number) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+    }
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      pickCoffee(COFFEE)
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      // The same recipe from two bags, both saves lost: May 1, then May 2.
+      await logAndSettle(1)
+      await pickRoastDay(/May 2nd, 2026/)
+      expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+      await logAndSettle(2)
+
+      // Reselecting restores the newest lost save, May 2, as an untouched
+      // prefill; retrying it finds its shot deleted.
+      pickCoffee(COFFEE_B)
+      pickCoffee(COFFEE)
+      expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+      await logAndSettle(3)
+      // The draft stays as sent, so the next Log saves May 2 anew.
+      expect(screen.getByText('May 2nd, 2026')).toBeTruthy()
+
+      // The May 1 save may still have committed, so reselecting the coffee
+      // restores it rather than reading the latest shot, and Log replays it.
+      pickCoffee(COFFEE_B)
+      pickCoffee(COFFEE)
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      expect(prefills).toBe(1)
+      await logAndSettle(4)
+      const keys = createKeys(fetchSpy)
+      expect(keys[3]).toBe(keys[0])
+      expect(keys[1]).not.toBe(keys[0])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  describe('while a retry that finds its shot deleted is out', () => {
+    // Fills the recipe; dose sets it apart.
+    const fillRecipe = (dose: string) => {
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: dose },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+    }
+    const pickCoffee = (id: string) =>
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: id },
+      })
+    const pickRoastDay = async (name: RegExp) => {
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText(/^Roast Date/))
+      })
+      fireEvent.click(await screen.findByRole('button', { name }))
+    }
+    // Every create fails as lost except the third, which waits for the test
+    // and then reports its shot deleted.
+    const serve = (fetchSpy: ReturnType<typeof seeded>['fetchSpy']) => {
+      let creates = 0
+      let answerThird: () => void = () => {}
+      const third = new Promise<Response>((resolve) => {
+        answerThird = () =>
+          resolve(trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED))
+      })
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isPrefillCall(call)) {
+          if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
+          return trpcSuccess(
+            makeRecentShot({
+              id: 'shot-1',
+              coffeeId: COFFEE,
+              grinderId: GRINDER,
+              brewingDeviceId: ESP_DEVICE,
+              roastDate: '2026-05-01',
+            }),
+          )
+        }
+        if (isCreateCall(call)) {
+          creates += 1
+          if (creates === 3) return third
+          throw new Error('Network request failed')
+        }
+        return trpcSuccess()
+      })
+      return { answerThird: () => act(async () => answerThird()) }
+    }
+    const logAndSettle = async (
+      fetchSpy: ReturnType<typeof seeded>['fetchSpy'],
+      count: number,
+    ) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+    }
+
+    it('still loads a prefill for a coffee reselected meanwhile', async () => {
+      const { Wrapper, fetchSpy } = seeded()
+      const { answerThird } = serve(fetchSpy)
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        fillRecipe('18')
+        await logAndSettle(fetchSpy, 1)
+        await logAndSettle(fetchSpy, 2)
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(3))
+
+        pickCoffee(COFFEE_B)
+        pickCoffee(COFFEE)
+        await answerThird()
+        // The lost save is gone, so the reselection reads the latest shot.
+        await waitFor(() =>
+          expect(
+            prefillCalls(fetchSpy).filter(
+              (call) => coffeeIdFromCall(call) === COFFEE,
+            ),
+          ).toHaveLength(2),
+        )
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+
+    it("restores another lost save's roast date for a recipe edited meanwhile", async () => {
+      const { Wrapper, fetchSpy } = seeded()
+      const { answerThird } = serve(fetchSpy)
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        // Two lost saves: dose 18 from the May 2 bag, dose 19 from May 3.
+        fillRecipe('18')
+        await pickRoastDay(/May 2nd, 2026/)
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+        await logAndSettle(fetchSpy, 1)
+        fillRecipe('19')
+        await pickRoastDay(/May 3rd, 2026/)
+        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+        await logAndSettle(fetchSpy, 2)
+        // A reselection leaves the roast date to the saves, and editing back
+        // to dose 18 restores its May 2.
+        pickCoffee(COFFEE_B)
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+        fillRecipe('18')
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+
+        // The dose 18 retry is out when the recipe goes back to dose 19.
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(3))
+        fillRecipe('19')
+        await answerThird()
+        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+  })
+
+  it("reuses a lost save's key after a note is typed and erased", async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        throw new Error('Network request failed')
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      const log = async (calls: number) => {
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(calls))
+      }
+      await log(1)
+      const notes = screen.getByLabelText(/^Notes/)
+      fireEvent.change(notes, { target: { value: 'sour' } })
+      fireEvent.change(notes, { target: { value: '' } })
+      await log(2)
+
+      const bodies = createCalls(fetchSpy).map((call) =>
+        String((call[1] as RequestInit | undefined)?.body ?? ''),
+      )
+      // The form looks as it did, so the retry sends the same shot.
+      expect(createKeys(fetchSpy)[0]).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      expect(bodies[1]).toBe(bodies[0])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('prefills a newly chosen coffee after a failed save', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        throw new Error('Network request failed')
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE_B },
+      })
+      expect(await screen.findByText('April 1st, 2026')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('does not apply a pre-save prefill after a later coffee is chosen', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    queryClient.removeQueries({
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+    })
+    let resolvePrefill: (
+      shot: ReturnType<typeof makeRecentShot>,
+    ) => void = () => {}
+    const pending = new Promise<ReturnType<typeof makeRecentShot>>(
+      (resolve) => {
+        resolvePrefill = resolve
+      },
+    )
+    void queryClient.prefetchQuery({
+      ...trpc.espressoShot.getLatestUnsealed.queryOptions({
+        coffeeId: COFFEE,
+      }),
+      queryFn: () => pending,
+    })
+    fetchSpy.mockImplementation(
+      serveFromCache(providers, () => {
+        throw new Error('Network request failed')
+      }),
+    )
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE_B },
+      })
+      expect(await screen.findByText('April 1st, 2026')).toBeTruthy()
+
+      resolvePrefill(
+        makeRecentShot({
+          id: 'shot-1',
+          coffeeId: COFFEE,
+          grinderId: GRINDER,
+          brewingDeviceId: ESP_DEVICE,
+          roastDate: '2026-05-01',
+        }),
+      )
+      await act(async () => {
+        await pending
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      expect(screen.getByText('April 1st, 2026')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('prefills the coffee chosen during a pending save once the save fails', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let rejectCreate: (reason: Error) => void = () => {}
+    const pendingCreate = new Promise<Response>((_resolve, reject) => {
+      rejectCreate = reject
+    })
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isCreateCall(call)) return pendingCreate
+      return serveFromCache(providers)(...call)
+    })
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      const prefillsDuringSave = prefillCalls(fetchSpy).length
+      // A second submit (Enter in a field) while the save is pending is
+      // ignored, so the save still counts as pending below.
+      await act(async () => {
+        fireEvent.submit(
+          screen.getByRole('button', { name: 'Logging…' }).closest('form')!,
+        )
+      })
+      expect(createCalls(fetchSpy)).toHaveLength(1)
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE_B },
+      })
+      // Let tRPC dispatch any batched lookup while the create is still pending.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(prefillCalls(fetchSpy)).toHaveLength(prefillsDuringSave)
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      expect(screen.queryByText('April 1st, 2026')).toBeNull()
+
+      rejectCreate(new Error('Network request failed'))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+
+      expect(await screen.findByText('April 1st, 2026')).toBeTruthy()
+      expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      const coffeeIds = prefillCalls(fetchSpy).map((call) =>
+        coffeeIdFromCall(call),
+      )
+      expect(coffeeIds.at(-1)).toBe(COFFEE_B)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('does not prefill from Try again while a create is pending', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    queryClient.removeQueries({
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+    })
+    let resolveCreate: (value: Response) => void = () => {}
+    const pendingCreate = new Promise<Response>((resolve) => {
+      resolveCreate = resolve
+    })
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) throw new Error('Network request failed')
+      if (isCreateCall(call)) return pendingCreate
+      return trpcSuccess()
+    })
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(
+        await screen.findByRole('button', { name: 'Try again' }),
+      ).toBeTruthy()
+      fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+        target: { value: GRINDER },
+      })
+      fireEvent.change(
+        screen.getByRole('combobox', { name: 'Brewing Device' }),
+        {
+          target: { value: ESP_DEVICE },
+        },
+      )
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      // Retry only once the save is visibly pending and its request is held.
+      expect(
+        await screen.findByRole('button', { name: 'Logging…' }),
+      ).toBeTruthy()
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      // Let tRPC dispatch any lookup Try again queued before counting.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(prefillCalls(fetchSpy)).toHaveLength(1)
+    } finally {
+      resolveCreate(trpcSuccess())
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('shows a retry when the last shot cannot be loaded and still lets you enter one', async () => {
+    const providers = seeded()
+    const { queryClient, trpc, Wrapper, fetchSpy } = providers
+    const shot = makeRecentShot({
+      id: 'shot-1',
+      coffeeId: COFFEE,
+      grinderId: GRINDER,
+      brewingDeviceId: ESP_DEVICE,
+      roastDate: '2026-05-01',
+    })
+    let lookups = 0
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call)) {
+        lookups += 1
+        if (lookups === 1) throw new Error('Network request failed')
+        return trpcSuccess(shot)
+      }
+      return trpcSuccess()
+    })
+    try {
+      queryClient.removeQueries({
+        queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+          coffeeId: COFFEE,
+        }),
+      })
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+
+      expect(
+        await screen.findByText(
+          "We couldn't load this coffee's last shot. Enter it yourself, or try again.",
+        ),
+      ).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+      expect(prefillCalls(fetchSpy)).toHaveLength(1)
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      expect(screen.getByDisplayValue('18')).toBeTruthy()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      expect(prefillCalls(fetchSpy)).toHaveLength(2)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('clears the previous coffee’s grinder and device before the next lookup', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let resolveB: (shot: ReturnType<typeof makeRecentShot>) => void = () => {}
+    const pendingB = new Promise<ReturnType<typeof makeRecentShot>>(
+      (resolve) => {
+        resolveB = resolve
+      },
+    )
+    fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+      if (isPrefillCall(call) && coffeeIdFromCall(call) === COFFEE_B) {
+        return trpcSuccess(await pendingB)
+      }
+      return serveFromCache(providers)(...call)
+    })
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+    expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+    expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE_B },
+    })
+    expect(screen.queryByDisplayValue('Niche Zero')).toBeNull()
+    expect(screen.getByRole('combobox', { name: 'Grinder' })).toHaveProperty(
+      'value',
+      '',
+    )
+    expect(
+      screen.getByRole('combobox', { name: 'Brewing Device' }),
+    ).toHaveProperty('value', '')
+
+    resolveB(
+      makeRecentShot({
+        id: 'shot-b',
+        coffeeId: COFFEE_B,
+        grinderId: GRINDER_B,
+        brewingDeviceId: ESP_DEVICE,
+        roastDate: '2026-04-01',
+      }),
+    )
+    expect(await screen.findByDisplayValue('P64')).toBeTruthy()
+    expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
+  })
+
+  it('clears prefill when Coffee is emptied', async () => {
+    const { Wrapper } = seeded()
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+    expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+    expect(screen.getByDisplayValue('Linea Mini')).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: '' },
+    })
+    expect(screen.getByRole('combobox', { name: 'Grinder' })).toHaveProperty(
+      'value',
+      '',
+    )
+    expect(
+      screen.getByRole('combobox', { name: 'Brewing Device' }),
+    ).toHaveProperty('value', '')
+    expect(screen.queryByText('May 1st, 2026')).toBeNull()
+  })
+
+  it('shows Logging… on the Log button while a save is in flight', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let finishCreate: (() => void) | undefined
+    fetchSpy.mockImplementation(
+      serveFromCache(
+        providers,
+        () =>
+          new Promise((resolve) => {
+            finishCreate = () => resolve(trpcSuccess())
+          }),
+      ),
+    )
+    render(<NewEspressoShot />, { wrapper: Wrapper })
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+      target: { value: COFFEE },
+    })
+    expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(/^Dose/), {
+      target: { value: '18' },
+    })
+    fireEvent.change(screen.getByLabelText(/^Yield/), {
+      target: { value: '36' },
+    })
+    fireEvent.change(screen.getByLabelText(/^Time/), {
+      target: { value: '30' },
+    })
+    fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+      target: { value: '1.5' },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+    const log = await screen.findByRole('button', { name: 'Logging…' })
+    expect(log).toHaveProperty('disabled', true)
+    expect(log.getAttribute('aria-busy')).toBe('true')
+    const completeCreate = await waitFor(() => {
+      expect(finishCreate).toBeTypeOf('function')
+      return finishCreate as () => void
+    })
+    completeCreate()
+    expect(await screen.findByRole('button', { name: 'Log' })).toBeTruthy()
   })
 })

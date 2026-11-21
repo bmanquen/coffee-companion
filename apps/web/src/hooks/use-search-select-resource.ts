@@ -1,8 +1,17 @@
+import { coffeeOptionLabel } from '@coffee-companion/brew-display'
+
 export function useSearchSelectResource(
-  data: Array<{ id: string; name: string }>,
+  data: Array<{
+    id: string
+    name: string
+    roaster?: { name: string | null } | null
+  }>,
   createFn?: (name: string) => Promise<{ id: string; name: string }>,
 ) {
-  const options = data.map((item) => ({ value: item.id, label: item.name }))
+  const options = data.map((item) => ({
+    value: item.id,
+    label: coffeeOptionLabel(item),
+  }))
 
   const onAddItem = createFn
     ? async (name: string) => {

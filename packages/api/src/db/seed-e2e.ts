@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
 import { E2E_USER_DELETE, E2E_USER_FREE, E2E_USER_WITH_DATA } from '../lib/e2e-auth'
 import {
+  E2E_ETHIOPIA_GUJI_ID,
   E2E_LIBRARY,
   FREE_GEAR,
   OFF_SHELF_DIALED_IN_COFFEE,
@@ -26,8 +27,12 @@ import {
 } from './schema'
 import { db } from './index'
 
-const DAY_MS = 24 * 60 * 60 * 1000
-const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS)
+// Database clock, not `new Date()`. node-pg writes a Date as Node local wall
+// into timestamp-without-time-zone (offset dropped), while defaultNow() writes
+// the session TimeZone wall. Mixed writers invert recency when those walls
+// disagree — the e2e "brewed now" row sorted above a shot logged a minute later.
+export const daysAgo = (days: number) =>
+  sql`now() - (${days}::int * interval '1 day')`
 
 // Shared defaults (null userId); reuse or create so repeated runs don't
 // collide on the per-user unique name.
@@ -215,7 +220,11 @@ async function seedGrantedUser() {
   // anything added to the library has to stay older than this.
   const [coffee] = await db
     .insert(coffees)
-    .values({ userId: E2E_USER_WITH_DATA, name: 'Ethiopia Guji' })
+    .values({
+      id: E2E_ETHIOPIA_GUJI_ID,
+      userId: E2E_USER_WITH_DATA,
+      name: 'Ethiopia Guji',
+    })
     .returning()
 
   await attachOrigin(coffee.id, 'Ethiopia', 'Guji', 'Washed')

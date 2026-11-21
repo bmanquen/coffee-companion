@@ -1,19 +1,43 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { dashboardMethods } from '@/components/dashboard/methods'
-import { createTestProviders } from '@/test/providers'
+import {
+  ESPRESSO_COFFEES_LOAD_FAILED,
+  ESPRESSO_LOADING_SHOTS,
+  ESPRESSO_LOAD_FAILED,
+  ESPRESSO_SHOT_PAGE_SIZE,
+  espressoShotInfiniteOptions,
+  espressoShotPageInput,
+} from '@/hooks/use-espresso-shot-pages'
+import {
+  coffeesFromShots,
+  espressoShotCursor,
+  espressoShotFixtureId,
+  seedCoffees,
+  seedEspressoShotPage,
+} from '@/test/espresso-shots'
+import { trpcSuccess } from '@/test/trpc-response'
 import {
   makeAeropressBrew,
+  makeCoffee,
   makeColdBrewBrew,
   makeFrenchpressBrew,
   makePouroverBrew,
   makeRecentCoffee,
   makeRecentShot,
 } from '@/test/factories'
-import { Dashboard } from './dashboard'
-import type * as ReactRouter from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { createTestProviders } from '@/test/providers'
+import { Dashboard, DashboardContainer, Route } from './dashboard'
 import type { DashboardMethod } from '@/components/dashboard/methods'
+import type { ReactNode } from 'react'
+import type * as ReactRouter from '@tanstack/react-router'
 
 // Link needs router context; swap it for a plain anchor for unit rendering.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
@@ -58,9 +82,8 @@ vi.mock('@/components/ui/command', () => ({
   ),
 }))
 
-// Seed every method's getAll so any tab can render; each defaults to empty and
-// is overridden per test. Espresso accepts the bare-array shorthand the older
-// tests already pass.
+// Seed every method's history so any tab can render; each defaults to empty and
+// is overridden per test. Espresso is a paged getRecent result.
 function seed(
   shots: Array<ReturnType<typeof makeRecentShot>>,
   others: {
@@ -72,7 +95,8 @@ function seed(
 ) {
   const providers = createTestProviders()
   const { queryClient, trpc } = providers
-  queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), shots)
+  seedEspressoShotPage(queryClient, trpc, shots)
+  seedCoffees(queryClient, trpc, coffeesFromShots(shots))
   queryClient.setQueryData(
     trpc.pouroverBrew.getAll.queryKey(),
     others.pourover ?? [],
@@ -106,8 +130,10 @@ function renderDashboard(
   selectedMethod: DashboardMethod,
   shots: Array<ReturnType<typeof makeRecentShot>> = [],
   others: Parameters<typeof seed>[1] = {},
+  extraSeed?: (providers: ReturnType<typeof seed>) => void,
 ) {
   const providers = seed(shots, others)
+  extraSeed?.(providers)
   const onSelectMethod = vi.fn()
   const feeds = [
     { method: 'espresso' as const, brews: shots },
@@ -205,20 +231,95 @@ describe('Dashboard', () => {
     ).toBeTruthy()
   })
 
+  it('shows loading instead of the empty state while the first page is pending', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    seedCoffees(queryClient, trpc, [])
+    queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+    void queryClient.prefetchInfiniteQuery({
+      ...espressoShotInfiniteOptions(trpc),
+      queryFn: () => new Promise<never>(() => {}),
+    })
+    render(
+      <Dashboard
+        selectedMethod="espresso"
+        onSelectMethod={vi.fn()}
+        feeds={[
+          { method: 'espresso', brews: [] },
+          { method: 'pourover', brews: [] },
+          { method: 'frenchpress', brews: [] },
+          { method: 'aeropress', brews: [] },
+          { method: 'coldbrew', brews: [] },
+        ]}
+        now={NOW}
+      />,
+      { wrapper: Wrapper },
+    )
+    expect(screen.getByRole('status')).toBeTruthy()
+    expect(screen.getByText(ESPRESSO_LOADING_SHOTS)).toBeTruthy()
+    expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
+  })
+
+  it('shows a retry instead of the empty state when the first page fails', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValue(
+        trpcSuccess({ items: [], total: 0, nextCursor: null }),
+      )
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      seedCoffees(queryClient, trpc, [])
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      render(
+        <Dashboard
+          selectedMethod="espresso"
+          onSelectMethod={vi.fn()}
+          feeds={[
+            { method: 'espresso', brews: [] },
+            { method: 'pourover', brews: [] },
+            { method: 'frenchpress', brews: [] },
+            { method: 'aeropress', brews: [] },
+            { method: 'coldbrew', brews: [] },
+          ]}
+          now={NOW}
+        />,
+        { wrapper: Wrapper },
+      )
+      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(
+        await screen.findByText(/No espresso shots yet/i),
+      ).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('narrows the feed to dialed-in shots when the toggle is on', async () => {
-    renderDashboard('espresso', [
-      makeRecentShot({
-        id: 's1',
-        isDialedIn: true,
-        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
-      }),
-      makeRecentShot({
-        id: 's2',
-        isDialedIn: false,
-        coffeeId: 'c2',
-        coffee: makeRecentCoffee({ id: 'c2', name: 'Kenya AA' }),
-      }),
-    ])
+    const dialed = makeRecentShot({
+      id: 's1',
+      isDialedIn: true,
+      coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    })
+    const other = makeRecentShot({
+      id: 's2',
+      isDialedIn: false,
+      coffeeId: 'c2',
+      coffee: makeRecentCoffee({ id: 'c2', name: 'Kenya AA' }),
+    })
+    renderDashboard('espresso', [dialed, other], {}, ({ queryClient, trpc }) => {
+      seedEspressoShotPage(queryClient, trpc, [dialed], 1, undefined, {
+        dialedIn: true,
+      })
+    })
 
     let table = within(screen.getByRole('table'))
     expect(table.getByText('Kenya AA')).toBeTruthy()
@@ -233,17 +334,20 @@ describe('Dashboard', () => {
   })
 
   it('narrows the feed to a single coffee when one is picked', async () => {
-    renderDashboard('espresso', [
-      makeRecentShot({
-        id: 's1',
-        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
-      }),
-      makeRecentShot({
-        id: 's2',
+    const guji = makeRecentShot({
+      id: 's1',
+      coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    })
+    const kenya = makeRecentShot({
+      id: 's2',
+      coffeeId: 'c2',
+      coffee: makeRecentCoffee({ id: 'c2', name: 'Kenya AA' }),
+    })
+    renderDashboard('espresso', [guji, kenya], {}, ({ queryClient, trpc }) => {
+      seedEspressoShotPage(queryClient, trpc, [kenya], 1, undefined, {
         coffeeId: 'c2',
-        coffee: makeRecentCoffee({ id: 'c2', name: 'Kenya AA' }),
-      }),
-    ])
+      })
+    })
 
     // Open the coffee filter and pick Kenya AA.
     await act(async () => {
@@ -258,10 +362,635 @@ describe('Dashboard', () => {
     expect(table.queryByText('Ethiopia Guji')).toBeNull()
   })
 
+  it('lists coffees from the library, not only loaded shots', async () => {
+    renderDashboard(
+      'espresso',
+      [
+        makeRecentShot({
+          coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        }),
+      ],
+      {},
+      ({ queryClient, trpc }) => {
+        seedCoffees(queryClient, trpc, [
+          makeCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+          makeCoffee({ id: 'c-extra', name: 'Kenya Nyeri' }),
+        ])
+        seedEspressoShotPage(queryClient, trpc, [], 0, undefined, {
+          coffeeId: 'c-extra',
+        })
+      },
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('All coffees'))
+    })
+    expect(screen.getByRole('option', { name: 'Kenya Nyeri' })).toBeTruthy()
+  })
+
+  it('fills a part-full last page from Next, and resets the page when the filter changes', async () => {
+    const shots = Array.from({ length: 6 }, (_, i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(i),
+        coffeeId: `c${i}`,
+        coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
+      }),
+    )
+    const extra = Array.from({ length: 5 }, (_, i) =>
+      makeRecentShot({
+        id: `n${i}`,
+        coffeeId: `n${i}`,
+        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
+      }),
+    )
+    const filtered = Array.from({ length: 6 }, (_, i) =>
+      makeRecentShot({
+        id: `f${i}`,
+        coffeeId: shots[0].coffeeId,
+        coffee: shots[0].coffee,
+      }),
+    )
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      trpcSuccess({
+        items: extra,
+        total: shots.length + extra.length,
+        nextCursor: null,
+      }),
+    )
+    try {
+      renderDashboard('espresso', shots, {}, ({ queryClient, trpc }) => {
+        seedEspressoShotPage(
+          queryClient,
+          trpc,
+          shots,
+          shots.length + extra.length,
+          undefined,
+          {},
+          espressoShotCursor(shots[shots.length - 1]),
+        )
+        // Enough filtered shots that page two stays valid, so only the
+        // filter reset (not the page clamp) can return the table to page one.
+        seedEspressoShotPage(
+          queryClient,
+          trpc,
+          filtered,
+          filtered.length,
+          undefined,
+          { coffeeId: shots[0].coffeeId },
+        )
+        seedCoffees(queryClient, trpc, coffeesFromShots([...shots, ...extra]))
+      })
+
+      expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      })
+      expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+      expect(within(screen.getByRole('table')).getByText('Coffee 6')).toBeTruthy()
+
+      expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull()
+      // Page 2 holds one shot, so the loaded shots fill it before page 3.
+      fireEvent.click(screen.getByLabelText('Next page'))
+      expect(await screen.findByText('Page 2 of 3')).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getByText('Extra 1'),
+      ).toBeTruthy()
+      expect(within(screen.getByRole('table')).getByText('Coffee 6')).toBeTruthy()
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('All coffees'))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('option', { name: 'Coffee 1' }))
+      })
+      expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getAllByText('Coffee 1'),
+      ).toHaveLength(5)
+      expect(within(screen.getByRole('table')).queryByText('Coffee 6')).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('loads older shots and moves to them when Next is pressed on the last loaded page', async () => {
+    // Two full table pages, as a 20-shot server page always fills its pages.
+    const shots = Array.from({ length: 10 }, (_, i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(i),
+        coffeeId: `c${i}`,
+        coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
+      }),
+    )
+    const extra = Array.from({ length: 5 }, (_, i) =>
+      makeRecentShot({
+        id: `n${i}`,
+        coffeeId: `n${i}`,
+        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
+      }),
+    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValue(
+        trpcSuccess({
+          items: extra,
+          total: shots.length + extra.length,
+          nextCursor: null,
+        }),
+      )
+    try {
+      renderDashboard('espresso', shots, {}, (providers) => {
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          shots,
+          shots.length + extra.length,
+          undefined,
+          {},
+          espressoShotCursor(shots[shots.length - 1]),
+        )
+        seedCoffees(
+          providers.queryClient,
+          providers.trpc,
+          coffeesFromShots([...shots, ...extra]),
+        )
+      })
+      const table = () => within(screen.getByRole('table'))
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      })
+      expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+      expect(fetchSpy).not.toHaveBeenCalled()
+
+      // A failed load keeps the last loaded page on screen.
+      fireEvent.click(screen.getByLabelText('Next page'))
+      expect(
+        await screen.findByText("We couldn't load more shots. Try again."),
+      ).toBeTruthy()
+      expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+      expect(table().getByText('Coffee 10')).toBeTruthy()
+
+      fireEvent.click(screen.getByLabelText('Next page'))
+      expect(await screen.findByText('Page 3 of 3')).toBeTruthy()
+      expect(table().getByText('Extra 1')).toBeTruthy()
+      expect(table().queryByText('Coffee 10')).toBeNull()
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+      // The history is fully loaded, so Next has nowhere left to go.
+      expect(
+        screen.getByLabelText<HTMLButtonElement>('Next page').disabled,
+      ).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  // A full first page whose background refresh failed, shown on its last
+  // table page, so Next refreshes before it pages on.
+  async function nextAfterFailedRefresh(
+    refreshed: (shots: Array<ReturnType<typeof makeRecentShot>>) => {
+      items: Array<ReturnType<typeof makeRecentShot>>
+      nextCursor: string | null
+    },
+    more: Array<ReturnType<typeof makeRecentShot>> = [],
+  ) {
+    // Tied shots run by descending id, as the API orders them.
+    const shots = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(1000 - i),
+        coffeeId: `c${i}`,
+        coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
+      }),
+    )
+    const page = refreshed(shots)
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      // A background refresh fails, leaving the cached pages stale.
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValueOnce(
+        trpcSuccess({ ...page, total: page.items.length + more.length }),
+      )
+      .mockResolvedValueOnce(
+        trpcSuccess({
+          items: more,
+          total: page.items.length + more.length,
+          nextCursor: null,
+        }),
+      )
+    // A failure before the spy is returned would leave fetch mocked.
+    try {
+      const { queryClient, trpc } = renderDashboard(
+        'espresso',
+        shots,
+        {},
+        (providers) => {
+          seedEspressoShotPage(
+            providers.queryClient,
+            providers.trpc,
+            shots,
+            shots.length + more.length,
+            undefined,
+            {},
+            espressoShotCursor(shots[shots.length - 1]),
+          )
+          seedCoffees(
+            providers.queryClient,
+            providers.trpc,
+            coffeesFromShots([...shots, ...page.items, ...more]),
+          )
+        },
+      )
+      for (let step = 0; step < 3; step += 1) {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      }
+      expect(screen.getByText('Page 4 of 4')).toBeTruthy()
+      await act(async () => {
+        await queryClient.refetchQueries(
+          trpc.espressoShot.getRecent.infiniteQueryFilter(),
+        )
+      })
+      expect(
+        await screen.findByText("We couldn't load your shots. Try again."),
+      ).toBeTruthy()
+      fireEvent.click(screen.getByLabelText('Next page'))
+    } catch (error) {
+      fetchSpy.mockRestore()
+      throw error
+    }
+    return fetchSpy
+  }
+
+  const cursorOf = (call: Array<unknown>) => {
+    const input = new URL(String(call[0]), 'http://localhost').searchParams.get(
+      'input',
+    )
+    const parsed = JSON.parse(input ?? '{}') as Record<
+      string,
+      { json?: { cursor?: string } } | undefined
+    >
+    return parsed['0']?.json?.cursor
+  }
+
+  it('pages Next on from the boundary of the page a refresh returns', async () => {
+    // Two shots were deleted elsewhere, so the refreshed page ends two older
+    // shots further on.
+    const older = [0, 1].map((i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(900 - i),
+        coffeeId: `o${i}`,
+        coffee: makeRecentCoffee({ id: `o${i}`, name: `Older ${i + 1}` }),
+      }),
+    )
+    const extra = Array.from({ length: 5 }, (_, i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(800 - i),
+        coffeeId: `n${i}`,
+        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
+      }),
+    )
+    const fetchSpy = await nextAfterFailedRefresh(
+      (shots) => ({
+        items: [...shots.slice(2), ...older],
+        nextCursor: espressoShotCursor(older[1]),
+      }),
+      extra,
+    )
+    try {
+      // The first new shot is row 21, on page 5.
+      expect(await screen.findByText('Page 5 of 5')).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getByText('Extra 1'),
+      ).toBeTruthy()
+      expect(fetchSpy).toHaveBeenCalledTimes(3)
+      // The refresh starts over, and Next pages on from where it ended, not
+      // from the stale last row: the API reads strictly after the cursor.
+      expect(cursorOf(fetchSpy.mock.calls[1])).toBeUndefined()
+      expect(cursorOf(fetchSpy.mock.calls[2])).toBe(
+        espressoShotCursor(older[1]),
+      )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('stops Next when a refresh returns a short final page', async () => {
+    // Twelve shots were deleted elsewhere: the history now ends at eight.
+    const fetchSpy = await nextAfterFailedRefresh((shots) => ({
+      items: shots.slice(0, 8),
+      nextCursor: null,
+    }))
+    try {
+      expect(await screen.findByText('Page 2 of 2')).toBeTruthy()
+      expect(
+        screen.getByLabelText<HTMLButtonElement>('Next page').disabled,
+      ).toBe(true)
+      // The refresh, and no continuation after it.
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('stays where Previous left it when a pending Next load settles', async () => {
+    const shots = Array.from({ length: 10 }, (_, i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(i),
+        coffeeId: `c${i}`,
+        coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
+      }),
+    )
+    const extra = Array.from({ length: 5 }, (_, i) =>
+      makeRecentShot({
+        id: `n${i}`,
+        coffeeId: `n${i}`,
+        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
+      }),
+    )
+    let release: (response: Response) => void = () => {}
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = resolve
+        }),
+    )
+    try {
+      renderDashboard('espresso', shots, {}, (providers) => {
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          shots,
+          shots.length + extra.length,
+          undefined,
+          {},
+          espressoShotCursor(shots[shots.length - 1]),
+        )
+        seedCoffees(
+          providers.queryClient,
+          providers.trpc,
+          coffeesFromShots([...shots, ...extra]),
+        )
+      })
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      })
+      fireEvent.click(screen.getByLabelText('Next page'))
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Previous page'))
+      })
+      expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+
+      await act(async () => {
+        release(
+          trpcSuccess({
+            items: extra,
+            total: shots.length + extra.length,
+            nextCursor: null,
+          }),
+        )
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      // The loaded shots are kept, but the table stays on page 1.
+      expect(await screen.findByText('Page 1 of 3')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('ignores a Next load that settles after the filter changed', async () => {
+    const shots = Array.from({ length: 10 }, (_, i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(i),
+        coffeeId: `c${i}`,
+        coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
+      }),
+    )
+    const extra = Array.from({ length: 5 }, (_, i) =>
+      makeRecentShot({
+        id: `n${i}`,
+        coffeeId: `n${i}`,
+        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
+      }),
+    )
+    // Three pages of Coffee 1, so a stray move to page 3 would be visible.
+    const filtered = Array.from({ length: 15 }, (_, i) =>
+      makeRecentShot({
+        id: `f${i}`,
+        coffeeId: shots[0].coffeeId,
+        coffee: shots[0].coffee,
+      }),
+    )
+    let release: (response: Response) => void = () => {}
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = resolve
+        }),
+    )
+    try {
+      renderDashboard('espresso', shots, {}, (providers) => {
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          shots,
+          shots.length + extra.length,
+          undefined,
+          {},
+          espressoShotCursor(shots[shots.length - 1]),
+        )
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          filtered,
+          filtered.length,
+          undefined,
+          { coffeeId: shots[0].coffeeId },
+        )
+        seedCoffees(
+          providers.queryClient,
+          providers.trpc,
+          coffeesFromShots([...shots, ...extra]),
+        )
+      })
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      })
+      fireEvent.click(screen.getByLabelText('Next page'))
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('All coffees'))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('option', { name: 'Coffee 1' }))
+      })
+      expect(screen.getByText('Page 1 of 3')).toBeTruthy()
+
+      await act(async () => {
+        release(
+          trpcSuccess({
+            items: extra,
+            total: shots.length + extra.length,
+            nextCursor: null,
+          }),
+        )
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(screen.getByText('Page 1 of 3')).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('drops a deleted coffee filter for good, even after a later failed refresh', async () => {
+    const guji = makeRecentShot({
+      id: 's1',
+      coffeeId: 'c1',
+      coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    })
+    const huila = makeRecentShot({
+      id: 's2',
+      coffeeId: 'c2',
+      coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+    })
+    const { queryClient, trpc } = renderDashboard(
+      'espresso',
+      [guji, huila],
+      {},
+      (providers) => {
+        seedEspressoShotPage(providers.queryClient, providers.trpc, [
+          guji,
+          huila,
+        ])
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          [huila],
+          1,
+          undefined,
+          { coffeeId: 'c2' },
+        )
+        seedCoffees(
+          providers.queryClient,
+          providers.trpc,
+          coffeesFromShots([guji, huila]),
+        )
+      },
+    )
+    const table = () => within(screen.getByRole('table'))
+    const failCatalogRefresh = async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockRejectedValue(new Error('Network request failed'))
+      try {
+        await act(async () => {
+          await queryClient.refetchQueries({
+            queryKey: trpc.coffee.getAll.queryKey(),
+          })
+          // Query notifies observers on a later tick; let the feed re-render.
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    }
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('All coffees'))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('option', { name: 'Colombia Huila' }))
+    })
+    expect(table().queryByText('Ethiopia Guji')).toBeNull()
+
+    // A failed refresh says nothing about Huila, so the pick stands.
+    await failCatalogRefresh()
+    expect(table().queryByText('Ethiopia Guji')).toBeNull()
+
+    // Huila was deleted in another tab.
+    act(() => {
+      seedCoffees(queryClient, trpc, coffeesFromShots([guji]))
+    })
+    expect(await table().findByText('Ethiopia Guji')).toBeTruthy()
+
+    // A later failed refresh must not bring the deleted pick back.
+    await failCatalogRefresh()
+    expect(table().getByText('Ethiopia Guji')).toBeTruthy()
+  })
+
+  it('clamps the table page when loaded shots shrink', async () => {
+    const shots = Array.from({ length: 6 }, (_, i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(i),
+        coffeeId: `c${i}`,
+        coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
+      }),
+    )
+    const extra = Array.from({ length: 5 }, (_, i) =>
+      makeRecentShot({
+        id: `n${i}`,
+        coffeeId: `n${i}`,
+        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
+      }),
+    )
+    const { queryClient, trpc } = renderDashboard(
+      'espresso',
+      shots,
+      {},
+      (providers) => {
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          shots,
+          shots.length + extra.length,
+          undefined,
+          {},
+          espressoShotCursor(shots[shots.length - 1]),
+        )
+        seedEspressoShotPage(
+          providers.queryClient,
+          providers.trpc,
+          extra,
+          shots.length + extra.length,
+          espressoShotCursor(shots[shots.length - 1]),
+        )
+        seedCoffees(
+          providers.queryClient,
+          providers.trpc,
+          coffeesFromShots([...shots, ...extra]),
+        )
+      },
+    )
+
+    expect(screen.getByText('Page 1 of 3')).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Next page'))
+    })
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Next page'))
+    })
+    expect(screen.getByText('Page 3 of 3')).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('Extra 5')).toBeTruthy()
+
+    await act(async () => {
+      queryClient.setQueryData(espressoShotInfiniteOptions(trpc).queryKey, {
+        pages: [{ items: shots, total: shots.length, nextCursor: null }],
+        pageParams: [null],
+      })
+    })
+    expect(await screen.findByText('Page 2 of 2')).toBeTruthy()
+    expect(within(screen.getByRole('table')).getByText('Coffee 6')).toBeTruthy()
+    expect(screen.queryByText(/No results/i)).toBeNull()
+  })
+
   it('pages through the feed client-side', async () => {
     const shots = Array.from({ length: 6 }, (_, i) =>
       makeRecentShot({
-        id: `s${i}`,
+        id: espressoShotFixtureId(i),
         coffeeId: `c${i}`,
         coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
       }),
@@ -482,6 +1211,856 @@ describe('Dashboard', () => {
     expect(
       screen.getByRole('link', { name: /Log your first cold brew/i }),
     ).toBeTruthy()
+  })
+
+  it('retries a failed espresso load-more from the error', async () => {
+    const extra = makeRecentShot({
+      id: espressoShotFixtureId(0),
+      coffeeId: 'c-next',
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+    })
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new Error('Network request failed'))
+      .mockResolvedValueOnce(
+        trpcSuccess({
+          items: [extra],
+          total: ESPRESSO_SHOT_PAGE_SIZE + 1,
+          nextCursor: null,
+        }),
+      )
+    // Tied shots run by descending id, as the API orders them, so the extra
+    // shot sorts after the page's last one.
+    const shots = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(ESPRESSO_SHOT_PAGE_SIZE - index),
+        coffeeId: `c${index}`,
+        coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
+      }),
+    )
+    const { queryClient, trpc, Wrapper } = createTestProviders({
+      fetch: fetchMock,
+    })
+    seedEspressoShotPage(queryClient, trpc, shots, shots.length + 1)
+    seedCoffees(queryClient, trpc, coffeesFromShots(shots))
+    queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+    render(
+      <Dashboard
+        selectedMethod="espresso"
+        onSelectMethod={vi.fn()}
+        feeds={[
+          { method: 'espresso', brews: shots },
+          { method: 'pourover', brews: [] },
+          { method: 'frenchpress', brews: [] },
+          { method: 'aeropress', brews: [] },
+          { method: 'coldbrew', brews: [] },
+        ]}
+        now={NOW}
+      />,
+      { wrapper: Wrapper },
+    )
+
+    for (let step = 0; step < 3; step += 1) {
+      fireEvent.click(screen.getByLabelText('Next page'))
+    }
+    expect(screen.getByText('Page 4 of 4')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Next page'))
+    expect(
+      await screen.findByText("We couldn't load more shots. Try again."),
+    ).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Page 4 of 4')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() =>
+      expect(
+        screen.queryByText("We couldn't load more shots. Try again."),
+      ).toBeNull(),
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    // Both the failed request and its retry continue from page one's cursor.
+    const cursors = fetchMock.mock.calls.map(([url]) => {
+      const input = new URL(String(url), 'http://localhost').searchParams.get(
+        'input',
+      )
+      const batch = JSON.parse(input ?? '{}') as Record<
+        string,
+        { json?: { cursor?: string } }
+      >
+      return batch['0'].json?.cursor
+    })
+    expect(cursors).toEqual([
+      espressoShotCursor(shots[shots.length - 1]),
+      espressoShotCursor(shots[shots.length - 1]),
+    ])
+    // The retry moves on to the shot it loaded, as Next would have.
+    expect(await screen.findByText('Page 5 of 5')).toBeTruthy()
+    expect(
+      within(screen.getByRole('table')).getByText('Coffee extra'),
+    ).toBeTruthy()
+  })
+
+  it('keeps loading the route when coffee.getAll and getRecent reject', async () => {
+    // The optional preloads stay pending until the loader has resolved, so
+    // the loader cannot be waiting on them.
+    let failRequests: () => void = () => {}
+    const requestsFail = new Promise<never>((_, reject) => {
+      failRequests = () => reject(new Error('Network request failed'))
+    })
+    requestsFail.catch(() => {})
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => requestsFail)
+    try {
+      const { queryClient, trpc } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      const loader = Route.options.loader
+      if (typeof loader !== 'function') throw new Error('no loader')
+      await expect(
+        loader({
+          context: { queryClient, trpc },
+        } as never),
+      ).resolves.toBeUndefined()
+      expect(
+        queryClient.getQueryState(trpc.coffee.getAll.queryKey())?.fetchStatus,
+      ).toBe('fetching')
+      failRequests()
+      await waitFor(() => {
+        expect(queryClient.getQueryState(trpc.coffee.getAll.queryKey())?.status).toBe(
+          'error',
+        )
+        expect(
+          queryClient.getQueryState(espressoShotInfiniteOptions(trpc).queryKey)
+            ?.status,
+        ).toBe('error')
+      })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('keeps loaded espresso pages from the loader instead of refetching them', async () => {
+    const fetchMock = vi.fn<typeof fetch>(() => new Promise<never>(() => {}))
+    const { queryClient, trpc } = createTestProviders({ fetch: fetchMock })
+    queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+    seedCoffees(queryClient, trpc, [makeCoffee()])
+    const older = makeRecentShot({ id: 's-older' })
+    // Two loaded pages, long stale.
+    queryClient.setQueryData(
+      espressoShotInfiniteOptions(trpc).queryKey,
+      {
+        pages: [
+          {
+            items: [makeRecentShot()],
+            total: 2,
+            nextCursor: espressoShotCursor(makeRecentShot()),
+          },
+          { items: [older], total: 2, nextCursor: null },
+        ],
+        pageParams: [null, espressoShotCursor(makeRecentShot())],
+      },
+      { updatedAt: 0 },
+    )
+    const loader = Route.options.loader
+    if (typeof loader !== 'function') throw new Error('no loader')
+    await loader({ context: { queryClient, trpc } } as never)
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps an opened Espresso shot shown when a refresh moves recency away', async () => {
+    let search: { method?: DashboardMethod } = {}
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockImplementation(() => search)
+    const navigate = vi.fn((options: { search: typeof search }) => {
+      search = options.search
+    })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(navigate as never)
+    try {
+      const shot = makeRecentShot({
+        roastDate: '2026-05-25',
+        createdAt: new Date('2026-06-03T08:00:00.000Z'),
+      })
+      const { queryClient, trpc, Wrapper } = seed([shot], {
+        pourover: [
+          makePouroverBrew({
+            coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+            createdAt: new Date('2026-06-02T08:00:00.000Z'),
+          }),
+        ],
+      })
+      const { rerender } = render(<DashboardContainer />, { wrapper: Wrapper })
+      const table = within(screen.getByRole('table'))
+      await act(async () => {
+        fireEvent.click(table.getByText('Ethiopia Guji').closest('tr')!)
+      })
+      expect(navigate).toHaveBeenCalledWith({
+        search: { method: 'espresso' },
+        replace: true,
+      })
+      rerender(<DashboardContainer />)
+
+      // A refresh now finds the shot older than the Pour Over brew.
+      await act(async () => {
+        queryClient.setQueryData(espressoShotInfiniteOptions(trpc).queryKey, {
+          pages: [
+            {
+              items: [
+                { ...shot, createdAt: new Date('2026-05-01T08:00:00.000Z') },
+              ],
+              total: 1,
+              nextCursor: null,
+            },
+          ],
+          pageParams: [null],
+        })
+      })
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getByText(/Niche Zero/),
+      ).toBeTruthy()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('chooses Espresso when the user pages through its loaded shots', async () => {
+    let search: { method?: DashboardMethod } = {}
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockImplementation(() => search)
+    const navigate = vi.fn((options: { search: typeof search }) => {
+      search = options.search
+    })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(navigate as never)
+    try {
+      // More shots than one table page, all loaded: Next pages locally.
+      const shots = Array.from({ length: 6 }, (_, index) =>
+        makeRecentShot({
+          id: `shot-${index}`,
+          createdAt: new Date(Date.UTC(2026, 5, 3, 8, 0) - index * 60_000),
+        }),
+      )
+      const { Wrapper } = seed(shots, {
+        pourover: [
+          makePouroverBrew({
+            coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+            createdAt: new Date('2026-06-02T08:00:00.000Z'),
+          }),
+        ],
+      })
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findByText('Page 1 of 2')).toBeTruthy()
+      expect(navigate).not.toHaveBeenCalled()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+      })
+      expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+      expect(navigate).toHaveBeenCalledWith({
+        search: { method: 'espresso' },
+        replace: true,
+      })
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('keeps Espresso chosen while Next refreshes a feed whose refresh failed', async () => {
+    const pageOne = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(index),
+        coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
+        createdAt: new Date('2026-06-03T08:00:00.000Z'),
+      }),
+    )
+    // After the refresh every shot is older than the Pour Over brew, so
+    // recency alone would now pick Pour Over.
+    const refreshed = pageOne.map((shot) => ({
+      ...shot,
+      createdAt: new Date('2026-05-01T08:00:00.000Z'),
+    }))
+    const extra = makeRecentShot({
+      id: 's-next',
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+      createdAt: new Date('2026-04-01T08:00:00.000Z'),
+    })
+    let pageOneReads = 0
+    const fetchMock = vi.fn<typeof fetch>((input) => {
+      const url = new URL(String(input), 'http://localhost')
+      if (!url.pathname.includes('espressoShot.getRecent')) {
+        return Promise.reject(new Error('Network request failed'))
+      }
+      const batch = JSON.parse(url.searchParams.get('input') ?? '{}') as Record<
+        string,
+        { json?: { cursor?: string | null } }
+      >
+      if (batch['0'].json?.cursor) {
+        return Promise.resolve(
+          trpcSuccess({
+            items: [extra],
+            total: ESPRESSO_SHOT_PAGE_SIZE + 1,
+            nextCursor: null,
+          }),
+        )
+      }
+      pageOneReads += 1
+      return pageOneReads === 1
+        ? Promise.reject(new Error('Network request failed'))
+        : Promise.resolve(
+            trpcSuccess({
+              items: refreshed,
+              total: ESPRESSO_SHOT_PAGE_SIZE + 1,
+              nextCursor: espressoShotCursor(refreshed[refreshed.length - 1]),
+            }),
+          )
+    })
+    let search: { method?: DashboardMethod } = {}
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockImplementation(() => search)
+    const navigate = vi.fn((options: { search: typeof search }) => {
+      search = options.search
+    })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(navigate as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders({
+        fetch: fetchMock,
+      })
+      seedEspressoShotPage(queryClient, trpc, pageOne, pageOne.length + 1)
+      seedCoffees(queryClient, trpc, coffeesFromShots(pageOne))
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+          createdAt: new Date('2026-06-02T08:00:00.000Z'),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      const { rerender } = render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+
+      const shotKey = espressoShotInfiniteOptions(trpc).queryKey
+      await act(() => queryClient.invalidateQueries({ queryKey: shotKey }))
+      await waitFor(() =>
+        expect(queryClient.getQueryState(shotKey)?.status).toBe('error'),
+      )
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+
+      for (let step = 0; step < 3; step += 1) {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      }
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      })
+      expect(navigate).toHaveBeenCalledWith({
+        search: { method: 'espresso' },
+        replace: true,
+      })
+      rerender(<DashboardContainer />)
+      expect(await screen.findByText('Page 5 of 5')).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getByText('Coffee extra'),
+      ).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Pour Over' })).toBeNull()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('holds the recency default until the first espresso page settles', async () => {
+    type EspressoPage = {
+      items: Array<ReturnType<typeof makeRecentShot>>
+      total: number
+      nextCursor: null
+    }
+    let resolvePage: ((page: EspressoPage) => void) | null = null
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+          createdAt: new Date('2026-06-02T08:00:00.000Z'),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      void queryClient.prefetchInfiniteQuery({
+        ...espressoShotInfiniteOptions(trpc),
+        queryFn: () =>
+          new Promise<EspressoPage>((resolve) => {
+            resolvePage = resolve
+          }),
+      })
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findByText(ESPRESSO_LOADING_SHOTS)).toBeTruthy()
+      expect(screen.queryByText('Kenya AA')).toBeNull()
+      expect(screen.queryByText('Pour Over')).toBeNull()
+
+      const shot = makeRecentShot({
+        coffee: makeRecentCoffee({ name: 'Ethiopia Guji' }),
+        createdAt: new Date('2026-06-03T08:00:00.000Z'),
+      })
+      await act(async () => {
+        resolvePage?.({ items: [shot], total: 1, nextCursor: null })
+      })
+      expect(await screen.findAllByText('Ethiopia Guji')).not.toHaveLength(0)
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+      expect(screen.queryByText('Kenya AA')).toBeNull()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('keeps Espresso chosen once its feed is filtered before recency settles', async () => {
+    type EspressoPage = {
+      items: Array<ReturnType<typeof makeRecentShot>>
+      total: number
+      nextCursor: null
+    }
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => new Promise<never>(() => {}))
+    // The route search follows navigation, as the router's would.
+    let search: { method?: DashboardMethod } = {}
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockImplementation(() => search)
+    const navigate = vi.fn((options: { search: typeof search }) => {
+      search = options.search
+    })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(navigate as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({ coffee: makeRecentCoffee({ name: 'Kenya AA' }) }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      let resolvePage: ((page: EspressoPage) => void) | undefined
+      void queryClient.prefetchInfiniteQuery({
+        ...espressoShotInfiniteOptions(trpc),
+        queryFn: () =>
+          new Promise<EspressoPage>((resolve) => {
+            resolvePage = resolve
+          }),
+      })
+      const { rerender } = render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findByText(ESPRESSO_LOADING_SHOTS)).toBeTruthy()
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('All coffees'))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('option', { name: /Kenya AA/ }))
+      })
+      expect(navigate).toHaveBeenCalledWith({
+        search: { method: 'espresso' },
+        replace: true,
+      })
+      rerender(<DashboardContainer />)
+
+      // No espresso shots at all: recency alone would pick Pour Over. The
+      // open picker shows when the page has reached the dashboard.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Espresso' }))
+      })
+      await act(async () => {
+        resolvePage?.({ items: [], total: 0, nextCursor: null })
+      })
+      expect(
+        await screen.findByRole('option', { name: /Espresso.*No brews yet/ }),
+      ).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Pour Over' })).toBeNull()
+      expect(screen.getByRole('button', { name: /Kenya AA/ })).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('uses an explicit URL method before espresso settles', async () => {
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockReturnValue({ method: 'pourover' })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      void queryClient.prefetchInfiniteQuery({
+        ...espressoShotInfiniteOptions(trpc),
+        queryFn: () => new Promise<never>(() => {}),
+      })
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findAllByText('Kenya AA')).not.toHaveLength(0)
+      expect(screen.getByRole('button', { name: 'Pour Over' })).toBeTruthy()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('picks the method from a later espresso page when a delete emptied page one', async () => {
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+          createdAt: new Date('2026-06-01T08:00:00.000Z'),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      // Page one ended at a newer shot that was then deleted; its cursor
+      // stays, and the surviving shot is after it.
+      const deleted = makeRecentShot({
+        id: espressoShotFixtureId(1),
+        coffee: makeRecentCoffee({ name: 'Colombia Huila' }),
+        createdAt: new Date('2026-06-04T08:00:00.000Z'),
+      })
+      const shot = makeRecentShot({
+        id: espressoShotFixtureId(0),
+        coffee: makeRecentCoffee({ name: 'Ethiopia Guji' }),
+        createdAt: new Date('2026-06-03T08:00:00.000Z'),
+      })
+      const cursor = espressoShotCursor(deleted)
+      queryClient.setQueryData(
+        trpc.espressoShot.getRecent.infiniteQueryKey(espressoShotPageInput()),
+        {
+          pages: [
+            { items: [], total: 1, nextCursor: cursor },
+            { items: [shot], total: 1, nextCursor: null },
+          ],
+          pageParams: [null, cursor],
+        },
+      )
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findAllByText('Ethiopia Guji')).not.toHaveLength(0)
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('does not call Espresso unbrewed while its first page is loading or failed', async () => {
+    let failPage: (error: Error) => void = () => {}
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockReturnValue({ method: 'pourover' })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [])
+      void queryClient
+        .prefetchInfiniteQuery({
+          ...espressoShotInfiniteOptions(trpc),
+          queryFn: () =>
+            new Promise<never>((_resolve, reject) => {
+              failPage = reject
+            }),
+        })
+        .catch(() => {})
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      const espressoRow = () =>
+        screen
+          .getAllByRole('option')
+          .find((option) => option.textContent.startsWith('Espresso'))
+          ?.textContent
+      fireEvent.click(screen.getByRole('button', { name: 'Pour Over' }))
+      expect(espressoRow()).toBe('EspressoLoading…')
+
+      await act(async () => {
+        failPage(new Error('Network request failed'))
+      })
+      await waitFor(() => expect(espressoRow()).toBe("EspressoCouldn't load"))
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('shows the espresso feed retry when getRecent fails with no cached page', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [])
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(
+        1,
+      )
+      expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy()
+      expect(screen.queryByText(/Something went wrong/i)).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('keeps Espresso selected when its empty feed fails so retry stays visible', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [])
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findByText(ESPRESSO_LOAD_FAILED)).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+      expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('keeps the newest method when a refresh of an empty espresso page fails', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    const searchSpy = vi.spyOn(Route, 'useSearch').mockReturnValue({})
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(vi.fn() as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      seedCoffees(queryClient, trpc, [makeCoffee({ name: 'Kenya AA' })])
+      const shotKey = trpc.espressoShot.getRecent.infiniteQueryKey(
+        espressoShotPageInput(),
+      )
+      queryClient.setQueryData(shotKey, {
+        pages: [{ items: [], total: 0, nextCursor: null }],
+        pageParams: [null],
+      })
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(
+        await screen.findByRole('button', { name: 'Pour Over' }),
+      ).toBeTruthy()
+      await act(() => queryClient.invalidateQueries({ queryKey: shotKey }))
+      await waitFor(() =>
+        expect(queryClient.getQueryState(shotKey)?.status).toBe('error'),
+      )
+      // Let the error's render settle before checking what it chose.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+      // The page already shown has no shots, so Pour Over stays chosen; a
+      // failed refresh of it does not owe Espresso a retry.
+      expect(screen.getByRole('button', { name: 'Pour Over' })).toBeTruthy()
+      expect(screen.queryByText(ESPRESSO_LOAD_FAILED)).toBeNull()
+    } finally {
+      fetchSpy.mockRestore()
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('offers a coffee-library retry while cached coffees stay pickable', async () => {
+    let coffeeLoads = 0
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input) => {
+        if (String(input).includes('coffee.getAll')) {
+          coffeeLoads += 1
+          if (coffeeLoads === 1) {
+            return Promise.reject(new Error('Network request failed'))
+          }
+          return Promise.resolve(
+            trpcSuccess([makeCoffee({ name: 'Ethiopia Guji' })]),
+          )
+        }
+        return Promise.reject(new Error('Network request failed'))
+      })
+    try {
+      const guji = makeRecentShot({
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+      })
+      const { queryClient, trpc } = renderDashboard(
+        'espresso',
+        [guji],
+        {},
+        (providers) => {
+          // So picking the coffee reads no shots.
+          seedEspressoShotPage(
+            providers.queryClient,
+            providers.trpc,
+            [guji],
+            1,
+            undefined,
+            {
+              coffeeId: 'c1',
+            },
+          )
+        },
+      )
+      await act(() =>
+        queryClient.invalidateQueries(trpc.coffee.getAll.queryFilter()),
+      )
+      const coffeeError = await screen.findByText(ESPRESSO_COFFEES_LOAD_FAILED)
+      // The cached coffee is still offered and can be picked.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'All coffees' }))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('option', { name: 'Ethiopia Guji' }))
+      })
+      expect(screen.getByRole('button', { name: 'Ethiopia Guji' })).toBeTruthy()
+      expect(screen.getByText(ESPRESSO_COFFEES_LOAD_FAILED)).toBeTruthy()
+
+      fireEvent.click(
+        within(coffeeError.parentElement as HTMLElement).getByRole('button', {
+          name: 'Try again',
+        }),
+      )
+      await waitFor(() =>
+        expect(screen.queryByText(ESPRESSO_COFFEES_LOAD_FAILED)).toBeNull(),
+      )
+      expect(coffeeLoads).toBe(2)
+      expect(screen.getByRole('button', { name: 'Ethiopia Guji' })).toBeTruthy()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('shows shot and coffee retries independently when both loads fail', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Network request failed'))
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders()
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      render(
+        <Dashboard
+          selectedMethod="espresso"
+          onSelectMethod={vi.fn()}
+          feeds={[
+            { method: 'espresso', brews: [] },
+            { method: 'pourover', brews: [] },
+            { method: 'frenchpress', brews: [] },
+            { method: 'aeropress', brews: [] },
+            { method: 'coldbrew', brews: [] },
+          ]}
+          now={NOW}
+        />,
+        { wrapper: Wrapper },
+      )
+      const shotError = await screen.findByText(ESPRESSO_LOAD_FAILED)
+      const coffeeError = await screen.findByText(ESPRESSO_COFFEES_LOAD_FAILED)
+      expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(
+        2,
+      )
+      const callsTo = (procedure: string) =>
+        fetchSpy.mock.calls.filter((call) =>
+          String(call[0]).includes(procedure),
+        ).length
+      const retry = async (error: HTMLElement, own: string, other: string) => {
+        const ownBefore = callsTo(own)
+        const otherBefore = callsTo(other)
+        fireEvent.click(
+          within(error.parentElement as HTMLElement).getByRole('button', {
+            name: 'Try again',
+          }),
+        )
+        await waitFor(() => expect(callsTo(own)).toBe(ownBefore + 1))
+        expect(callsTo(other)).toBe(otherBefore)
+      }
+      // Each Try again sits with its own message and retries only its load.
+      await retry(shotError, 'espressoShot.getRecent', 'coffee.getAll')
+      await retry(coffeeError, 'coffee.getAll', 'espressoShot.getRecent')
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })
 

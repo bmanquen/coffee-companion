@@ -1,0 +1,1 @@
+ALTER TABLE "espresso_shot_idempotency_keys" ADD COLUMN "request_fingerprint" text;

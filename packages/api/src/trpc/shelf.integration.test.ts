@@ -31,7 +31,19 @@ const createPromotedCoffee = createCoffeeFor(asPromoted, uniqPromoted)
 
 const types = deviceTypes()
 
-seedUsers([USER, PROMOTED], types.cleanup)
+// A third user for the snapshot test, with a Shelf of its own.
+const SNAPSHOT = 'shelf-snapshot-user'
+const asSnapshot = callerFor(SNAPSHOT)
+const uniqSnapshot = uniqFor(SNAPSHOT)
+const createSnapshotCoffee = createCoffeeFor(asSnapshot, uniqSnapshot)
+
+// A fourth for the batched create test.
+const BATCH = 'shelf-batch-user'
+const asBatch = callerFor(BATCH)
+const uniqBatch = uniqFor(BATCH)
+const createBatchCoffee = createCoffeeFor(asBatch, uniqBatch)
+
+seedUsers([USER, PROMOTED, SNAPSHOT, BATCH], types.cleanup)
 
 let grinderId: string
 let deviceId: string
@@ -51,6 +63,7 @@ async function logShot(coffeeId: string) {
     yield: '36',
     time: 28,
     grindSetting: '1.5',
+    idempotencyKey: crypto.randomUUID(),
   })
   shotsLogged++
   return shot.id
@@ -91,7 +104,7 @@ beforeAll(async () => {
 })
 
 const shotById = async (id: string) => {
-  const all = await asUser.espressoShot.getAll()
+  const all = (await asUser.espressoShot.getRecent({ limit: 50 })).items
   const found = all.find((shot) => shot.id === id)
   if (!found) throw new Error(`Shot ${id} missing from the feed entirely`)
   return found
@@ -159,7 +172,11 @@ describe('Sealing and the Plan', () => {
 
     await grantPlan(USER, 'pro')
 
-    const all = await asUser.espressoShot.getAll()
+    const all = (await asUser.espressoShot.getRecent({ limit: 50 })).items
+    // An empty page would pass the checks below without reopening anything.
+    expect(all.map((shot) => shot.id)).toEqual(
+      expect.arrayContaining(coffees.map((coffee) => coffee.shotId)),
+    )
     expect(all.every((shot) => shot.sealed === false)).toBe(true)
     expect(all.every((shot) => shot.dose === '18')).toBe(true)
 
@@ -188,8 +205,8 @@ describe('Sealing and the Plan', () => {
       )[0].sealedAt
 
     const first = await stampOf(coffees[1].shotId)
-    await asUser.espressoShot.getAll()
-    await asUser.espressoShot.getAll()
+    await asUser.espressoShot.getRecent({ limit: 50 })
+    await asUser.espressoShot.getRecent({ limit: 50 })
 
     expect(await stampOf(coffees[1].shotId)).toEqual(first)
   })
@@ -277,10 +294,13 @@ describe('reading needs no prior write', () => {
     const inOneRequest = batchedCallerFor(USER)
     const execute = vi.spyOn(db, 'execute')
     try {
+      // Only reads that share the request's Shelf: espressoShot.getRecent and
+      // getLatestUnsealed read their own inside their snapshot, through the
+      // transaction, which this spy does not see.
       await Promise.all([
-        inOneRequest.espressoShot.getAll(),
         inOneRequest.espressoShot.getDialedIn(),
-        inOneRequest.espressoShot.getRecent({ limit: 10, offset: 0 }),
+        inOneRequest.aeropressBrew.getDialedIn(),
+        inOneRequest.pouroverBrew.getRecent({ limit: 10, offset: 0 }),
         inOneRequest.coffee.getAll(),
       ])
       expect(execute).toHaveBeenCalledTimes(1)
@@ -332,6 +352,7 @@ describe('a Coffee promoted back onto the Shelf', () => {
         yield: '36',
         time: 28,
         grindSetting: '1.5',
+        idempotencyKey: crypto.randomUUID(),
       })
     ).id
 
@@ -343,7 +364,7 @@ describe('a Coffee promoted back onto the Shelf', () => {
     ).id
 
   const promotedShotById = async (id: string) => {
-    const all = await asPromoted.espressoShot.getAll()
+    const all = (await asPromoted.espressoShot.getRecent({ limit: 50 })).items
     const found = all.find((shot) => shot.id === id)
     if (!found) throw new Error(`Shot ${id} missing from the feed entirely`)
     return found
@@ -401,5 +422,157 @@ describe('a Coffee promoted back onto the Shelf', () => {
     await asPromoted.espressoShot.delete(jumperShot)
 
     expect((await promotedShotById(displacedShot)).sealed).toBe(true)
+  })
+})
+
+describe('espressoShot.getLatestUnsealed', () => {
+  it('answers from one snapshot even when writes land between its reads', async () => {
+    const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
+    const device = await asSnapshot.brewingDevice.create({
+      name: uniqSnapshot('Linea Mini'),
+      brand: 'La Marzocco',
+      typeId,
+    })
+    const grinder = await asSnapshot.grinder.create({
+      name: uniqSnapshot('Niche Zero'),
+      brand: 'Niche',
+    })
+    const log = async (coffeeId: string) =>
+      (
+        await asSnapshot.espressoShot.create({
+          coffeeId,
+          grinderId: grinder.id,
+          brewingDeviceId: device.id,
+          dose: '18',
+          yield: '36',
+          time: 28,
+          grindSetting: '1.5',
+          idempotencyKey: crypto.randomUUID(),
+        })
+      ).id
+    // Five Coffees fill the Free Shelf; the first is the next to fall off.
+    const shelfCoffees: Array<string> = []
+    for (let i = 0; i < 5; i++) {
+      shelfCoffees.push(
+        (await createSnapshotCoffee(uniqSnapshot(`Coffee ${i}`))).id,
+      )
+      await log(shelfCoffees[i])
+    }
+    const target = shelfCoffees[0]
+
+    // Hold the read after its first statement, the Shelf query, which is
+    // where a repeatable-read transaction takes its snapshot.
+    let reachedShelf: () => void = () => {}
+    const atShelf = new Promise<void>((resolve) => {
+      reachedShelf = resolve
+    })
+    let release: () => void = () => {}
+    const released = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const transaction = db.transaction.bind(db)
+    const spy = vi
+      .spyOn(db, 'transaction')
+      .mockImplementationOnce((run, config) =>
+        transaction(async (tx) => {
+          const execute = tx.execute.bind(tx)
+          let paused = false
+          tx.execute = (async (query: Parameters<typeof execute>[0]) => {
+            const result = await execute(query)
+            if (!paused) {
+              paused = true
+              reachedShelf()
+              await released
+            }
+            return result
+          }) as typeof tx.execute
+          return run(tx)
+        }, config),
+      )
+    let reading: Promise<unknown> | undefined
+    try {
+      const read = asSnapshot.espressoShot.getLatestUnsealed({
+        coffeeId: target,
+      })
+      reading = read
+      // Fail fast rather than hang if the read stops pausing in one
+      // transaction, and with the read's own error if it fails first.
+      const notPaused = new Error('Shelf and shot not read in one transaction')
+      await Promise.race([
+        atShelf,
+        read.then(() => {
+          throw notPaused
+        }),
+        new Promise((_resolve, reject) =>
+          setTimeout(
+            () => reject(new Error('Read did not reach the Shelf within 5s')),
+            5_000,
+          ),
+        ),
+      ])
+      // Another connection edits the shot and pushes its Coffee off the Shelf.
+      await db
+        .update(espressoShots)
+        .set({ dose: '99' })
+        .where(eq(espressoShots.coffeeId, target))
+      await log((await createSnapshotCoffee(uniqSnapshot('Newcomer'))).id)
+      release()
+
+      const found = await read
+      expect(found?.dose).toBe('18')
+      expect(found?.sealed).toBe(false)
+    } finally {
+      release()
+      // Whatever failed above, let the read finish before cleanup runs.
+      await reading?.catch(() => {})
+      spy.mockRestore()
+    }
+
+    // The control: read afresh, the Coffee is off the Shelf.
+    expect(
+      await asSnapshot.espressoShot.getLatestUnsealed({ coffeeId: target }),
+    ).toBeNull()
+  })
+})
+
+describe('espressoShot.create', () => {
+  it('returns the new shot unsealed when its request already read the Shelf', async () => {
+    const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
+    const device = await asBatch.brewingDevice.create({
+      name: uniqBatch('Linea Mini'),
+      brand: 'La Marzocco',
+      typeId,
+    })
+    const grinder = await asBatch.grinder.create({
+      name: uniqBatch('Niche Zero'),
+      brand: 'Niche',
+    })
+    const shot = (coffeeId: string) => ({
+      coffeeId,
+      grinderId: grinder.id,
+      brewingDeviceId: device.id,
+      dose: '18',
+      yield: '36',
+      time: 28,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    // Added first and then outranked by five brewed Coffees, so it starts off
+    // the Free Shelf, and logging a shot on it puts it back on.
+    const returning = (await createBatchCoffee(uniqBatch('Returning'))).id
+    let onShelf = ''
+    for (let i = 0; i < 5; i++) {
+      const coffee = await createBatchCoffee(uniqBatch(`Coffee ${i}`))
+      onShelf = (await asBatch.espressoShot.create(shot(coffee.id))).id
+    }
+
+    // One request, as a tRPC batch is: a read computes its Shelf before the
+    // create's insert moves the Coffee onto it.
+    const inOneRequest = batchedCallerFor(BATCH)
+    await inOneRequest.espressoShot.getById(onShelf)
+    const created = await inOneRequest.espressoShot.create(shot(returning))
+
+    expect(created.sealed).toBe(false)
+    expect(created.dose).toBe('18')
   })
 })

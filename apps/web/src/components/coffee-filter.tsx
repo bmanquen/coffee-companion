@@ -1,3 +1,4 @@
+import { defaultFilter } from 'cmdk'
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
 import { useRef, useState } from 'react'
 import {
@@ -13,6 +14,13 @@ import { cn } from '@/lib/utils'
 export type CoffeeFilterOption = {
   value: string
   label: string
+}
+
+// Coffee items are valued by id, so search only their label keywords.
+function matchLabel(value: string, search: string, keywords?: Array<string>) {
+  return keywords?.length
+    ? defaultFilter('', search, keywords)
+    : defaultFilter(value, search)
 }
 
 /**
@@ -62,7 +70,7 @@ export function CoffeeFilter({
       </button>
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
-          <Command>
+          <Command filter={matchLabel}>
             <CommandInput placeholder="Search coffees..." autoFocus />
             <CommandList>
               <CommandEmpty>No coffees found.</CommandEmpty>
@@ -81,8 +89,13 @@ export function CoffeeFilter({
                 </CommandItem>
                 {options.map((option) => (
                   <CommandItem
-                    key={option.value}
-                    value={option.label}
+                    // cmdk reads keywords only when an item mounts, so a
+                    // renamed coffee remounts to be found by its new label.
+                    key={`${option.value}:${option.label}`}
+                    // Ids, so two coffees with the same label stay separately
+                    // selectable; the label is what search matches.
+                    value={`coffee:${option.value}`}
+                    keywords={[option.label]}
                     onSelect={() => handleSelect(option.value)}
                   >
                     <CheckIcon

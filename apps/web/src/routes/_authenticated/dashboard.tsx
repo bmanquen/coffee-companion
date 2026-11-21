@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { H1 } from '@/components/typography/h1'
 import { EspressoBrewFeed } from '@/components/dashboard/espresso-brew-feed'
@@ -11,6 +11,10 @@ import {
   isDashboardMethod,
   resolveSelectedMethod,
 } from '@/components/dashboard/methods'
+import {
+  ESPRESSO_COFFEES_STALE_TIME_MS,
+  espressoShotInfiniteOptions,
+} from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 import type {
   DashboardMethod,
@@ -28,14 +32,20 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
       typeof search.method === 'string' ? search.method : undefined
     return isDashboardMethod(method) ? { method } : {}
   },
-  // Warm every method's full brew history so any tab renders server-side
-  // instead of flashing a spinner when selected. Each feed reads its own with
-  // useSuspenseQuery. The session is guaranteed by the _authenticated layout.
+  // Warm every tab so selecting one renders server-side instead of flashing a spinner.
   loader: async ({ context }) => {
+    void context.queryClient
+      .prefetchQuery({
+        ...context.trpc.coffee.getAll.queryOptions(),
+        staleTime: ESPRESSO_COFFEES_STALE_TIME_MS,
+      })
+      .catch(() => {})
+    // Like the Brews loader: a warm cache keeps its pages rather than
+    // refetching every loaded one.
+    void context.queryClient
+      .ensureInfiniteQueryData(espressoShotInfiniteOptions(context.trpc))
+      .catch(() => {})
     await Promise.all([
-      context.queryClient.ensureQueryData(
-        context.trpc.espressoShot.getAll.queryOptions(),
-      ),
       context.queryClient.ensureQueryData(
         context.trpc.pouroverBrew.getAll.queryOptions(),
       ),
@@ -58,11 +68,13 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
 // the search param so the Dashboard component below stays router-free and easy
 // to test. The per-method feeds are warmed in the loader; the queries here just
 // supply the recency fallback when no method is in the URL.
-function DashboardContainer() {
+export function DashboardContainer() {
   const trpc = useTRPC()
-  const { data: espresso } = useSuspenseQuery(
-    trpc.espressoShot.getAll.queryOptions(),
-  )
+  const espressoQuery = useInfiniteQuery(espressoShotInfiniteOptions(trpc))
+  // A delete can empty page one while a later cached page still has shots.
+  const espresso =
+    espressoQuery.data?.pages.find((page) => page.items.length > 0)?.items ??
+    []
   const { data: pourover } = useSuspenseQuery(
     trpc.pouroverBrew.getAll.queryOptions(),
   )
@@ -80,19 +92,42 @@ function DashboardContainer() {
   const navigate = Route.useNavigate()
 
   const feeds: Array<MethodFeed> = [
-    { method: 'espresso', brews: espresso },
+    {
+      method: 'espresso',
+      brews: espresso,
+      // Until a page has loaded, an empty list is not "No brews yet". A failed
+      // refresh keeps the recency of the page already loaded.
+      ...(espressoQuery.data
+        ? {}
+        : { status: espressoQuery.isError ? 'failed' : 'loading' }),
+    },
     { method: 'pourover', brews: pourover },
     { method: 'frenchpress', brews: frenchpress },
     { method: 'aeropress', brews: aeropress },
     { method: 'coldbrew', brews: coldbrew },
   ]
 
-  const selectedMethod = resolveSelectedMethod(method, feeds)
+  // Recency needs the espresso page. Until it settles — and while a load that
+  // never succeeded still owes a retry — hold Espresso so Pour Over cannot
+  // hide it. A failed refresh of a page already shown keeps the feed chosen
+  // from that page.
+  const selectedMethod = isDashboardMethod(method)
+    ? method
+    : espressoQuery.isPending || (espressoQuery.isError && !espressoQuery.data)
+      ? 'espresso'
+      : resolveSelectedMethod(undefined, feeds)
 
   return (
     <Dashboard
       selectedMethod={selectedMethod}
       onSelectMethod={(next) => navigate({ search: { method: next } })}
+      // Filtering, paging, or opening a shot in Espresso chooses it, so a late
+      // recency result cannot switch the feed away from what the user has.
+      onChooseEspresso={
+        isDashboardMethod(method)
+          ? undefined
+          : () => navigate({ search: { method: 'espresso' }, replace: true })
+      }
       feeds={feeds}
       now={new Date()}
     />
@@ -108,11 +143,13 @@ function DashboardContainer() {
 export function Dashboard({
   selectedMethod,
   onSelectMethod,
+  onChooseEspresso,
   feeds,
   now,
 }: {
   selectedMethod: DashboardMethod
   onSelectMethod: (method: DashboardMethod) => void
+  onChooseEspresso?: () => void
   feeds: Array<MethodFeed>
   now: Date
 }) {
@@ -126,7 +163,9 @@ export function Dashboard({
           feeds={feeds}
           now={now}
         />
-        {selectedMethod === 'espresso' && <EspressoBrewFeed />}
+        {selectedMethod === 'espresso' && (
+          <EspressoBrewFeed onChoose={onChooseEspresso} />
+        )}
         {selectedMethod === 'pourover' && <PouroverBrewFeed />}
         {selectedMethod === 'frenchpress' && <FrenchpressBrewFeed />}
         {selectedMethod === 'aeropress' && <AeropressBrewFeed />}

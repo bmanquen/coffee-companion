@@ -2,14 +2,18 @@
 // Control CLI for Coffee Companion mobile verification. See SKILL.md.
 
 import { spawn, spawnSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import {
   copyFileSync,
   existsSync,
+  linkSync,
   mkdirSync,
   closeSync,
   openSync,
   readdirSync,
   readFileSync,
+  renameSync,
+  rmdirSync,
   rmSync,
   writeFileSync,
   writeSync,
@@ -24,7 +28,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const skillDir = resolve(here, '..')
 const repoRoot = process.env.VERIFY_REPO_ROOT ?? resolve(skillDir, '../../..')
 const mobileDir = join(repoRoot, 'apps/mobile')
-const runDir = join(skillDir, '.run')
+const runDir = process.env.VERIFY_RUN_DIR ?? join(skillDir, '.run')
 const statePath = join(runDir, 'state.json')
 const artifactsDir = join(skillDir, 'artifacts')
 
@@ -153,6 +157,19 @@ const BUNDLE_PATHS = [
 const MOBILE_DOTENV_LOCAL = '.env.development.local'
 const MOBILE_DOTENV_BACKUP = 'env.development.local.bak'
 const MOBILE_DOTENV_CREATED = 'env.development.local.created'
+// Everything the helper writes under the run dir. Cleanup deletes only these,
+// since VERIFY_RUN_DIR can name a directory that holds other files.
+// owner.json goes last, so no launch can claim the dir before the rest is gone.
+const RUN_DIR_ENTRIES = [
+  'state.json',
+  'metro.log',
+  'emulator.log',
+  'expo-android.log',
+  'maestro',
+  MOBILE_DOTENV_BACKUP,
+  MOBILE_DOTENV_CREATED,
+  'owner.json',
+]
 
 function die(message, code = 1) {
   console.error(message)
@@ -186,6 +203,95 @@ function requireState() {
 function writeState(state) {
   ensureDir(runDir)
   writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`)
+}
+
+// Which run owns the instance in a run dir. Launch creates owner.json
+// exclusively before it starts anything, so of two racing launches only one
+// gets it, and `cleanup` with VERIFY_OWNER set touches only its own instance,
+// including one a failed launch left half started.
+function ownerPath(dir) {
+  return join(dir, 'owner.json')
+}
+
+export function readRunClaim(dir) {
+  try {
+    return JSON.parse(readFileSync(ownerPath(dir), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+// Null when this call claimed the dir, else the claim already there. The
+// claim is written to a private file and linked into place, so owner.json
+// never exists without its owner and pid in it.
+export function claimRun(dir, owner) {
+  ensureDir(dir)
+  const draft = `${ownerPath(dir)}.${process.pid}-${randomUUID()}`
+  writeFileSync(
+    draft,
+    `${JSON.stringify({ owner, pid: process.pid })}\n`,
+  )
+  try {
+    linkSync(draft, ownerPath(dir))
+    return null
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error
+    return readRunClaim(dir) ?? {}
+  } finally {
+    rmSync(draft, { force: true })
+  }
+}
+
+// Claims the dir for an unscoped cleanup, taking over a claim whose process
+// is gone. Null once this cleanup holds it, else the live claim in the way.
+// Launches only ever create owner.json, never replace it, so a stale claim
+// is moved aside to a private name (one rename wins) and checked to be the
+// one judged stale before this cleanup claims the dir.
+function claimForCleanup(dir) {
+  for (;;) {
+    const held = claimRun(dir, `cleanup-${process.pid}`)
+    if (!held) return null
+    if (pidAlive(held.pid)) return held
+    const aside = `${ownerPath(dir)}.stale-${process.pid}`
+    try {
+      renameSync(ownerPath(dir), aside)
+    } catch (error) {
+      if (error.code === 'ENOENT') continue
+      throw error
+    }
+    let moved = null
+    try {
+      moved = JSON.parse(readFileSync(aside, 'utf8'))
+    } catch {
+      // Unreadable: not anyone's live claim.
+    }
+    if (moved?.pid && pidAlive(moved.pid)) {
+      // Another cleanup took the stale claim over first; this moved its
+      // fresh one. Put it back and stand aside.
+      try {
+        linkSync(aside, ownerPath(dir))
+      } catch {
+        // shortcut: a third claimer got in during the few microseconds the
+        // claim was aside; both now think they hold the dir.
+      }
+      rmSync(aside, { force: true })
+      return moved
+    }
+    rmSync(aside, { force: true })
+  }
+}
+
+function claimRunOrDie() {
+  const owner = process.env.VERIFY_OWNER || `${process.pid}-${Date.now()}`
+  const held = claimRun(runDir, owner)
+  if (!held) return
+  die(
+    pidAlive(held.pid) || hasLiveRecordedPids(readState())
+      ? `Another verification run (owner ${held.owner ?? 'unknown'}) holds ${runDir}. ` +
+          'Drive that one, or run `helpers/control cleanup` first. Do not double-drive.'
+      : `A previous run left ${runDir} behind and nothing it started is running. ` +
+          'Run `helpers/control cleanup` first.',
+  )
 }
 
 function pidAlive(pid) {
@@ -1295,6 +1401,178 @@ function ensureAdbReverses(serial, ports, reverse = adbReverse) {
   for (const port of ports) reverse(serial, port)
 }
 
+// Gboard's first text-keyboard focus opens a stylus handwriting sheet on
+// Pixel system images unless this secure setting is off.
+const STYLUS_HANDWRITING_SETTING = 'stylus_handwriting_enabled'
+
+function adbPutStylusHandwritingOff(serial) {
+  const result = runCapture(
+    adbBin(),
+    ['-s', serial, 'shell', 'settings', 'put', 'secure', STYLUS_HANDWRITING_SETTING, '0'],
+    { allowFail: true },
+  )
+  if (result.status !== 0) {
+    throw new Error(
+      `adb settings put secure ${STYLUS_HANDWRITING_SETTING} failed: ` +
+        `${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
+    )
+  }
+}
+
+function adbStylusHandwriting(serial) {
+  return runCapture(
+    adbBin(),
+    ['-s', serial, 'shell', 'settings', 'get', 'secure', STYLUS_HANDWRITING_SETTING],
+    { allowFail: true },
+  ).stdout
+}
+
+function stylusHandwritingProblem(stdout) {
+  const value = `${stdout ?? ''}`.trim()
+  if (value === '0') return null
+  const current = value && value !== 'null' ? value : 'unset'
+  return (
+    `emulator stylus handwriting is on ` +
+    `(secure ${STYLUS_HANDWRITING_SETTING}=${current}). ` +
+    `Set it to 0 so a text field does not open ` +
+    `Gboard's stylus onboarding sheet.`
+  )
+}
+
+// An attached emulator is the user's, so its setting goes back to what launch
+// found: "null" (never set) is deleted, "0" needs nothing, and an unread
+// value (undefined) is left alone. A failure is reported, not thrown, so the
+// rest of cleanup still runs.
+function restoreStylusHandwriting(
+  serial,
+  before,
+  {
+    run = (args) =>
+      runCapture(adbBin(), ['-s', serial, 'shell', 'settings', ...args], {
+        allowFail: true,
+      }),
+  } = {},
+) {
+  if (!serial || before == null || before === '0') return
+  const result = run(
+    before === 'null'
+      ? ['delete', 'secure', STYLUS_HANDWRITING_SETTING]
+      : ['put', 'secure', STYLUS_HANDWRITING_SETTING, before],
+  )
+  // Thrown, so cleanup keeps the recorded value for another try.
+  if (result.status !== 0) {
+    throw new Error(
+      `Could not restore ${STYLUS_HANDWRITING_SETTING}=${before} on ${serial}: ` +
+        `${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim()}`,
+    )
+  }
+}
+
+// Null when the emulator at serial is the recorded AVD (or its name cannot be
+// read, which doctor's readiness check reports in other ways), else the
+// mismatch.
+function connectedAvdProblem(
+  serial,
+  expected,
+  readAvd = () => readConnectedAvdName(serial),
+) {
+  const avd = readAvd()
+  return avd && avd !== expected
+    ? `${serial} is AVD ${avd}, not ${expected}`
+    : null
+}
+
+// For a write to the device: null only when its AVD name reads back as the
+// recorded one. An unreadable name could be any emulator, so it is a problem.
+function recordedAvdProblem(serial, expected, readAvd) {
+  let avd = null
+  const problem = connectedAvdProblem(serial, expected, () => {
+    avd = readAvd ? readAvd() : readConnectedAvdName(serial)
+    return avd
+  })
+  if (problem) return problem
+  return avd ? null : `could not read the AVD name on ${serial}`
+}
+
+function readConnectedAvdName(serial) {
+  return parseAvdName(
+    runCapture(adbBin(), ['-s', serial, 'emu', 'avd', 'name'], {
+      allowFail: true,
+    }).stdout,
+  )
+}
+
+// What an attached emulator's stylus setting was before launch changed it, so
+// cleanup can put it back. A read that fails stops launch before the write.
+function readStylusBaseline(
+  serial,
+  {
+    read = () =>
+      runCapture(
+        adbBin(),
+        [
+          '-s',
+          serial,
+          'shell',
+          'settings',
+          'get',
+          'secure',
+          STYLUS_HANDWRITING_SETTING,
+        ],
+        { allowFail: true },
+      ),
+  } = {},
+) {
+  const result = read()
+  const value = `${result.stdout ?? ''}`.trim()
+  if (result.status !== 0 || value === '') {
+    throw new Error(
+      `Could not read ${STYLUS_HANDWRITING_SETTING} on ${serial}, so it was ` +
+        'left unchanged: ' +
+        `${`${result.stderr ?? ''} ${result.stdout ?? ''}`.trim() || 'no output'}`,
+    )
+  }
+  return value
+}
+
+// The device writes cleanup and failed-launch teardown make, only on the
+// emulator that was recorded: another AVD now on the serial (booted after
+// this run's emulator went away), or one whose name cannot be read, keeps its
+// package, reverses, and settings. Returns the problem, or null when the
+// writes ran.
+function releaseRecordedDevice(
+  state,
+  {
+    uninstallOwned = shouldUninstallRecordedPackage(state),
+    avdProblem = () =>
+      recordedAvdProblem(state.serial, state.avdName ?? chosenAvdName()),
+    uninstall = () => uninstallPackage(state.serial, state.androidPackage),
+    clearReverses = () => adbClearReverses(state.serial),
+    restoreStylus = () =>
+      restoreStylusHandwriting(state.serial, state.stylusHandwritingBefore),
+  } = {},
+) {
+  if (!state.serial) return null
+  const problem = avdProblem()
+  if (problem) {
+    console.error(`Left ${state.serial} alone: ${problem}.`)
+    return problem
+  }
+  if (uninstallOwned) uninstall()
+  clearReverses()
+  restoreStylus()
+  return null
+}
+
+function ensureStylusHandwritingOff(
+  serial,
+  { put = adbPutStylusHandwritingOff, get = adbStylusHandwriting } = {},
+) {
+  put(serial)
+  const problem = stylusHandwritingProblem(get(serial))
+  if (problem) throw new Error(problem)
+}
+
 function adbOpenDevClientArgs({ serial, url, pkg }) {
   return [
     '-s',
@@ -1701,6 +1979,7 @@ function deviceReadyProblems({
   deviceStatusBody = null,
   checkedDeviceMetro = false,
   ui = null,
+  stylusHandwritingEnabled,
 } = {}) {
   const problems = []
   for (const port of missingAdbReverses(
@@ -1720,6 +1999,11 @@ function deviceReadyProblems({
       `Metro is not reachable from the device at 127.0.0.1 (expected ${METRO_READY_MARKER})`,
     )
   }
+  const stylusProblem =
+    stylusHandwritingEnabled === undefined
+      ? null
+      : stylusHandwritingProblem(stylusHandwritingEnabled)
+  if (stylusProblem) problems.push(stylusProblem)
   if (ui?.hasDevMenuOnboarding) {
     problems.push(devMenuOnboardingMessage())
   } else if (ui?.hasDevMenu) {
@@ -2546,6 +2830,15 @@ async function cmdLaunch() {
         'Drive that one, or run `helpers/control cleanup` first. Do not double-drive.',
     )
   }
+  // Writing Metro's state would drop the only record of that value.
+  if (stylusRestoreOwed(existing)) {
+    die(
+      `${existing.serial} still owes AVD ${existing.avdName} its ` +
+        `${STYLUS_HANDWRITING_SETTING}=${existing.stylusHandwritingBefore}. ` +
+        `Run cleanup once that emulator is back, or delete ${runDir} to drop ` +
+        'the restore, before launching.',
+    )
+  }
 
   const port = DEFAULT_METRO_PORT
   const portFree = await waitForPortFree(port, PORT_FREE_TIMEOUT_MS)
@@ -2553,6 +2846,18 @@ async function cmdLaunch() {
     die(portBusyMessage(port, portFree.pids, 'metro'))
   }
 
+  claimRunOrDie()
+  // A device run's cleanup may have left a restore record during the port
+  // wait; with the claim held, check again before Metro's state replaces it.
+  const claimed = readState()
+  if (stylusRestoreOwed(claimed)) {
+    die(
+      `${claimed.serial} still owes AVD ${claimed.avdName} its ` +
+        `${STYLUS_HANDWRITING_SETTING}=${claimed.stylusHandwritingBefore}. ` +
+        `Run cleanup once that emulator is back, or delete ${runDir} to drop ` +
+        'the restore, before launching.',
+    )
+  }
   ensureDir(runDir)
   ensureDir(artifactsDir)
 
@@ -2991,28 +3296,107 @@ function launchDeviceTeardownPlan(partial) {
   }
 }
 
-async function stopLaunchDevice(partial, stopped = []) {
+// Whether cleanup still has to put the stylus setting back: a recorded value
+// other than 0 (the string 'null' means it was unset and is deleted).
+function stylusRestoreOwed(state) {
+  const before = state?.stylusHandwritingBefore
+  return before != null && before !== '0'
+}
+
+// The stylus value a kept restore record holds for this launch, if any. A
+// record for another AVD is refused: launching would record this AVD under
+// it, and cleanup would then write that AVD's value here.
+function keptStylusBaseline(existing, serial, avdName) {
+  if (!stylusRestoreOwed(existing) || existing.serial !== serial) return null
+  if (existing.avdName !== avdName) {
+    throw new Error(
+      `${serial} still owes AVD ${existing.avdName} its ` +
+        `${STYLUS_HANDWRITING_SETTING}=${existing.stylusHandwritingBefore}. ` +
+        `Start that AVD and run cleanup, or delete ${runDir} to drop the ` +
+        `restore, before launching ${avdName}.`,
+    )
+  }
+  return existing.stylusHandwritingBefore
+}
+
+function stylusRestoreRecord(state) {
+  return {
+    serial: state.serial,
+    avdName: state.avdName,
+    ownedPackage: false,
+    stylusHandwritingBefore: state.stylusHandwritingBefore,
+  }
+}
+
+// Stops the emulator this run started: `emu kill` on its serial when that is
+// still its AVD, else (foreignAvd set) only a signal to its pid, since the
+// serial may be another AVD now. Returns the serial it killed, if any.
+async function stopRecordedEmulator(
+  state,
+  foreignAvd,
+  stopped,
+  { killSerial = killEmulatorSerial, signalPid = stopRecordedPid } = {},
+) {
+  if (!state.emulatorPid) return null
+  if (foreignAvd) {
+    signalPid(state.emulatorPid, 'emulator', stopped)
+    return null
+  }
+  await killSerial({
+    serial: state.serial,
+    pid: state.emulatorPid,
+    avdName: state.avdName ?? chosenAvdName(),
+    stopped,
+  })
+  return state.serial ?? DEVICE_SERIAL
+}
+
+async function stopLaunchDevice(
+  partial,
+  stopped = [],
+  {
+    avdProblem,
+    clearReverses,
+    restoreStylus,
+    killSerial,
+    signalPid,
+    restoreEnv = restoreMobileExpoPublicEnv,
+  } = {},
+) {
   const plan = launchDeviceTeardownPlan(partial)
   if (partial.expoPid) stopRecordedPid(partial.expoPid, 'expo', stopped)
   if (partial.metroPid) stopRecordedPid(partial.metroPid, 'metro', stopped)
   // A failed wait still leaves an APK this run installed. Cleanup uninstalls
   // only when ownedPackage is not false.
-  if (plan.clearReverses) adbClearReverses(partial.serial)
-  if (partial.emulatorPid) {
-    await killEmulatorSerial({
-      serial: partial.serial,
-      pid: partial.emulatorPid,
-      avdName: partial.avdName,
-      stopped,
-    })
+  let foreignAvd = null
+  let released = false
+  if (plan.clearReverses) {
+    try {
+      foreignAvd = releaseRecordedDevice(partial, {
+        uninstallOwned: false,
+        avdProblem,
+        clearReverses,
+        restoreStylus,
+      })
+      released = foreignAvd == null
+    } catch (error) {
+      // .run/ keeps the stylus record, so cleanup tries the restore again.
+      console.error(error.message)
+    }
   }
+  await stopRecordedEmulator(partial, foreignAvd, stopped, {
+    killSerial,
+    signalPid,
+  })
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
-  restoreMobileExpoPublicEnv()
+  restoreEnv()
+  // True once the recorded device's setting is back, so the record can go.
+  return released
 }
 
 async function cmdLaunchDevice(opts = {}) {
   const plannedFlow = `${opts.plannedFlow ?? ''}`.trim() || null
-  const existing = readState()
+  let existing = readState()
   if (hasLiveRecordedPids(existing)) {
     die(
       `A verification instance is already running. ` +
@@ -3030,6 +3414,10 @@ async function cmdLaunchDevice(opts = {}) {
   if (webFree.status !== 'ok') {
     die(portBusyMessage(webPort, webFree.pids, 'web'))
   }
+  claimRunOrDie()
+  // A cleanup during the port waits may have restored and dropped a kept
+  // stylus record; with the claim held, this read is the one to reuse.
+  existing = readState()
 
   const sdk = resolveSdkRoot()
   if (!sdk) {
@@ -3084,6 +3472,13 @@ async function cmdLaunchDevice(opts = {}) {
     attachment = { action: 'boot', avdName: chosenAvd }
   }
   const avdName = attachment.avdName
+  // Before anything records this AVD over a restore another one is owed.
+  let keptStylus = null
+  try {
+    keptStylus = keptStylusBaseline(existing, DEVICE_SERIAL, avdName)
+  } catch (error) {
+    die(error.message)
+  }
   if (attachment.action === 'boot') {
     try {
       requireAvd(avdName, listInstalledAvds())
@@ -3146,6 +3541,8 @@ async function cmdLaunchDevice(opts = {}) {
     webPid: null,
     expoPid: null,
     ownedPackage: !attachedEmulator,
+    // A kept value also holds when this run boots that AVD again.
+    stylusHandwritingBefore: keptStylus ?? undefined,
   }
 
   try {
@@ -3262,10 +3659,26 @@ async function cmdLaunchDevice(opts = {}) {
     persistLaunchPartial(partial)
 
     console.error(
-      `adb reverse tcp:${metroPort} and tcp:${webPort}; opening expo-development-client`,
+      `adb reverse tcp:${metroPort} and tcp:${webPort}; disable stylus handwriting; opening expo-development-client`,
     )
+    // Attaching falls back to the chosen AVD when the name cannot be read,
+    // and a booted emulator can exit while Metro starts and leave the serial
+    // to another AVD, so check the serial really is it before writing
+    // reverses or a value that cleanup could then never put back.
+    const avdProblem = recordedAvdProblem(DEVICE_SERIAL, avdName)
+    if (avdProblem) {
+      throw new Error(`Not changing ${DEVICE_SERIAL}: ${avdProblem}`)
+    }
     adbReverse(DEVICE_SERIAL, metroPort)
     adbReverse(DEVICE_SERIAL, webPort)
+    if (attachedEmulator) {
+      // A record a failed cleanup kept is the value from before any run
+      // changed it; the setting may still read 0 from that run.
+      partial.stylusHandwritingBefore =
+        keptStylus ?? readStylusBaseline(DEVICE_SERIAL)
+      persistLaunchPartial(partial)
+    }
+    ensureStylusHandwritingOff(DEVICE_SERIAL)
     const devClientUrl = expoDevClientUrl({ scheme, metroPort })
     openDevClient(DEVICE_SERIAL, devClientUrl, ANDROID_PACKAGE)
     await waitForAppForeground(DEVICE_SERIAL, APP_READY_TIMEOUT_MS)
@@ -3277,6 +3690,7 @@ async function cmdLaunchDevice(opts = {}) {
       avdName,
       attachedEmulator,
       ownedPackage: partial.ownedPackage,
+      stylusHandwritingBefore: partial.stylusHandwritingBefore,
       androidPackage: ANDROID_PACKAGE,
       emulatorPid,
       metroPid: metro.metroPid,
@@ -3340,7 +3754,11 @@ async function cmdLaunchDevice(opts = {}) {
       ),
     )
   } catch (error) {
-    await stopLaunchDevice(partial)
+    if (await stopLaunchDevice(partial)) {
+      // Restored: a later cleanup must not write that old value again.
+      const recorded = readState()
+      if (recorded) writeState({ ...recorded, stylusHandwritingBefore: undefined })
+    }
     die(error.message, error.exitCode)
   }
 }
@@ -3389,7 +3807,16 @@ async function cmdDriveDevice(flow) {
   ) {
     die(preexistingInstallClearStateMessage(), EXIT_NOT_DRIVABLE)
   }
+  // Before any write, so a different AVD now on the serial is left untouched.
+  const avdProblem = recordedAvdProblem(state.serial, state.avdName ?? AVD_NAME)
+  if (avdProblem) {
+    die(
+      `Device ${state.serial} is not the recorded emulator: ${avdProblem}.`,
+      EXIT_NOT_DRIVABLE,
+    )
+  }
   ensureAdbReverses(state.serial, driveDeviceReversePorts(state))
+  ensureStylusHandwritingOff(state.serial)
   await requireDrivableDevice(state)
   const dest = join(artifactsDir, state.runId, flow)
   ensureDir(dest)
@@ -3794,14 +4221,8 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
   }
 
   if (serial && attached?.state === 'device') {
-    const avd = parseAvdName(
-      runCapture(adbBin(), ['-s', serial, 'emu', 'avd', 'name'], {
-        allowFail: true,
-      }).stdout,
-    )
-    if (avd && avd !== (state.avdName ?? AVD_NAME)) {
-      problems.push(`${serial} is AVD ${avd}, not ${state.avdName ?? AVD_NAME}`)
-    }
+    const avdProblem = connectedAvdProblem(serial, state.avdName ?? AVD_NAME)
+    if (avdProblem) problems.push(avdProblem)
   }
 
   const expectedSha = gitHeadShortSha()
@@ -3880,6 +4301,7 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
     ui = parseUiDump(adbUiDump(serial))
     deviceMetro = fetchDeviceMetroStatus(serial, metroPort)
     deviceE2E = fetchDeviceE2ESession(serial, webPort)
+    const stylusHandwritingEnabled = adbStylusHandwriting(serial)
     problems.push(
       ...deviceReadyProblems({
         reverseList,
@@ -3887,6 +4309,7 @@ async function inspectDevice(state, timeoutMs = DOCTOR_FETCH_TIMEOUT_MS) {
         checkedDeviceMetro: deviceMetro.checked,
         deviceStatusBody: deviceMetro.body,
         ui,
+        stylusHandwritingEnabled,
       }),
     )
   }
@@ -4024,13 +4447,41 @@ const DRIVES = {
       toggleTestID: 'sign-in-toggle',
     },
   },
+  espresso: {
+    test: 'src/espresso/espresso.test.tsx',
+    identity: 'data',
+    fail: 'espresso drive failed — the RNTL render did not log a shot and show it in the list',
+    required: [
+      'Coffee Companion',
+      'shot-list',
+      'Ethiopia Guji',
+      'Grind verify-grind-7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s',
+    ],
+    observed: {
+      heading: 'Coffee Companion',
+      listTestID: 'shot-list',
+      coffee: 'Ethiopia Guji',
+      grind: 'verify-grind-7',
+      dose: '18',
+      yield: '36',
+      time: '30',
+    },
+    handles: {
+      formTestID: 'shot-form',
+      logShotTestID: 'log-shot',
+      coffeeTriggerTestID: 'select-trigger-coffee',
+      coffeeSheetTestID: 'select-sheet-coffee',
+      coffeeOptionTestID: 'select-option-00000000-0000-4000-8000-000000000001',
+      coffeeSearchTestID: 'select-search-coffee',
+    },
+  },
 }
 
 async function cmdDrive(feature) {
   const recipe = DRIVES[feature]
   if (!recipe) {
     die(
-      `Only \`drive welcome\` and \`drive sign-in\` are implemented as one-shot recipes. ` +
+      `Only \`drive welcome\`, \`drive sign-in\`, and \`drive espresso\` are implemented as one-shot recipes. ` +
         `${feature ? `"${feature}"` : 'That feature'} is mapped under features/ — drive it from its file. ` +
         `Do not treat a missing drive stub as verification.`,
     )
@@ -4076,6 +4527,7 @@ async function cmdDrive(feature) {
     capturedAt: new Date().toISOString(),
     artifacts: [treePath, treeJsonPath, join(dest, 'proof.json')],
     observed: recipe.observed,
+    ...(recipe.handles ? { handles: recipe.handles } : {}),
     note:
       'In-process React Native Testing Library render. No iOS simulator or Android emulator was attached. Native Google and Apple sheets were not presented.',
   }
@@ -4139,10 +4591,64 @@ function stopListenersOnOwnedVerifyPorts(
   return stopped
 }
 
+// Deletes what the helper wrote to the run dir, except keep, then the dir
+// itself only once nothing else is in it.
+function clearRunDir(keep = []) {
+  // A claim draft or a stale claim moved aside, left by a claimer killed
+  // before it removed it; a live claimer's own is left alone.
+  for (const name of existsSync(runDir) ? readdirSync(runDir) : []) {
+    const claimer = /^owner\.json\.(?:stale-)?(\d+)/.exec(name)?.[1]
+    if (claimer && !pidAlive(Number(claimer))) {
+      rmSync(join(runDir, name), { force: true })
+    }
+  }
+  for (const name of RUN_DIR_ENTRIES) {
+    if (keep.includes(name)) continue
+    rmSync(join(runDir, name), { recursive: true, force: true })
+  }
+  try {
+    rmdirSync(runDir)
+  } catch {
+    // Missing, or holds files the helper did not write.
+  }
+}
+
 async function cmdCleanup() {
+  const owner = process.env.VERIFY_OWNER
+  if (owner && readRunClaim(runDir)?.owner !== owner) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          skipped: `${runDir} is not claimed by VERIFY_OWNER ${owner}; left as is.`,
+        },
+        null,
+        2,
+      ),
+    )
+    return
+  }
+  // Unscoped cleanup claims an unclaimed dir itself and holds that claim
+  // until it deletes it last, so a launch cannot claim the dir mid-cleanup
+  // and lose its files to it.
+  const claim = owner ? null : claimForCleanup(runDir)
+  if (claim) {
+    // A launch claims the dir before it records anything to stop, so a
+    // cleanup now could free the dir for a second launch mid-start.
+    const who = `${claim.owner ?? ''}`.startsWith('cleanup-')
+      ? 'Another cleanup'
+      : 'A launch'
+    die(
+      `${who} (pid ${claim.pid}, owner ${claim.owner ?? 'unknown'}) is still ` +
+        `running in ${runDir}. Wait for it to exit, then run cleanup. If ` +
+        `nothing is running there (that pid was reused), run cleanup as its ` +
+        `owner: VERIFY_OWNER=${claim.owner ?? '<owner>'} helpers/control cleanup.`,
+    )
+  }
   const state = readState()
   const stopped = []
   let killedSerial = null
+  let restoreError = null
   if (state) {
     if (state.expoPid) stopRecordedPid(state.expoPid, 'expo', stopped)
     for (const pid of recordedPids(state)) {
@@ -4150,19 +4656,22 @@ async function cmdCleanup() {
       if (pid === state.emulatorPid || pid === state.webPid) continue
       stopRecordedPid(pid, pidKind(pid, state), stopped)
     }
-    if (shouldUninstallRecordedPackage(state)) {
-      uninstallPackage(state.serial, state.androidPackage)
+    let foreignAvd = null
+    try {
+      foreignAvd = releaseRecordedDevice(state)
+    } catch (error) {
+      // The rest still stops; the stylus record outlives this cleanup.
+      restoreError = error
     }
-    if (state.serial) adbClearReverses(state.serial)
-    if (state.emulatorPid) {
-      await killEmulatorSerial({
-        serial: state.serial,
-        pid: state.emulatorPid,
-        avdName: state.avdName ?? chosenAvdName(),
-        stopped,
-      })
-      killedSerial = state.serial ?? DEVICE_SERIAL
+    // A skipped device still owes its setting: keep the record for a cleanup
+    // once the recorded AVD is back.
+    if (foreignAvd && stylusRestoreOwed(state)) {
+      restoreError = new Error(
+        `Could not restore ${STYLUS_HANDWRITING_SETTING}=` +
+          `${state.stylusHandwritingBefore} on ${state.serial}: ${foreignAvd}`,
+      )
     }
+    killedSerial = await stopRecordedEmulator(state, foreignAvd, stopped)
     if (state.webPid) stopRecordedPid(state.webPid, 'web', stopped)
   }
   stopListenersOnOwnedVerifyPorts(state, stopped)
@@ -4179,9 +4688,23 @@ async function cmdCleanup() {
   }
 
   restoreMobileExpoPublicEnv()
-  if (existsSync(runDir)) {
-    rmSync(runDir, { recursive: true, force: true })
+  if (restoreError) {
+    // Only what another cleanup needs to put the setting back, and nothing it
+    // could uninstall or stop. The record is written before anything goes, so
+    // a launch never finds the dir without it. An owner-scoped run leaves its
+    // claim in place, so the same VERIFY_OWNER can retry and no other owner
+    // can take the instance in between.
+    writeState(stylusRestoreRecord(state))
+    clearRunDir([
+      basename(statePath),
+      ...(owner ? [basename(ownerPath(runDir))] : []),
+    ])
+    die(
+      `${restoreError.message}. Kept it in ${statePath}; run cleanup again ` +
+        `once that emulator is back, or delete ${runDir} to drop it.`,
+    )
   }
+  clearRunDir()
 
   console.log(
     JSON.stringify(
@@ -4210,11 +4733,12 @@ function usage() {
   console.log(`Usage: helpers/control <launch|launch-device|doctor|drive|drive-device|verify-device|cleanup>
 
   launch              Start Expo Metro on VERIFY_METRO_PORT (default 8081)
-  launch-device       Attach or boot ${DEVICE_SERIAL} (AVD verify-pixel unless VERIFY_AVD is set); web on VERIFY_PORT (default 3910); rebuild if versionName is stale; reverse Metro/web; open the expo-development-client deep link
+  launch-device       Attach or boot ${DEVICE_SERIAL} (AVD verify-pixel unless VERIFY_AVD is set); web on VERIFY_PORT (default 3910); rebuild if versionName is stale; reverse Metro/web; disable stylus handwriting; open the expo-development-client deep link
   doctor              Read-only check that this instance is worth driving
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
-  drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}; refuse clearState when ownedPackage is false
+  drive espresso      Log an Espresso Shot through the signed-in list and form
+  drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}; refuse clearState when ownedPackage is false; re-apply reverses and disable stylus handwriting
   verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); refuse a clearState flow on an attached preexisting install before Expo; the instance stays up if a later step fails
   cleanup             Stop recorded pids, free ports this helper recorded, uninstall a package this run owns; keep artifacts/
 
@@ -4250,6 +4774,19 @@ export {
   adbReverseArgs,
   driveDeviceReversePorts,
   ensureAdbReverses,
+  STYLUS_HANDWRITING_SETTING,
+  stylusHandwritingProblem,
+  ensureStylusHandwritingOff,
+  restoreStylusHandwriting,
+  connectedAvdProblem,
+  recordedAvdProblem,
+  readStylusBaseline,
+  releaseRecordedDevice,
+  stopRecordedEmulator,
+  stylusRestoreRecord,
+  stylusRestoreOwed,
+  keptStylusBaseline,
+  stopLaunchDevice,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   adbShellCookieGetCommands,

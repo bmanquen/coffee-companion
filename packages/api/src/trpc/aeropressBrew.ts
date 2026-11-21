@@ -2,7 +2,7 @@ import { and, count, eq } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
-import { aeropressBrews } from '../db/schema'
+import { aeropressBrews, coffees } from '../db/schema'
 import { insertAeropressBrewSchema } from '../db/zod'
 import { AEROPRESS_DEVICE_TYPE, isAeropressDevice } from '../lib/aeropress'
 import {
@@ -12,14 +12,19 @@ import {
   sealBrewsWithDialedIn,
 } from '../lib/dialed-in-brew'
 import { isSealed, stampFallenBrews } from '../lib/shelf'
+import {
+  assertOwnCoffeeAndGrinder,
+  onOwnCoffee,
+  ownGear,
+} from '../lib/brew-ownership'
 import { authedProcedure, createTRPCRouter } from './init'
 
-const withRelations = {
-  coffee: true,
-  grinder: true,
-  brewingDevice: { with: { type: true } },
-  method: true,
-} as const
+const withRelations = (userId: string) =>
+  ({
+    coffee: true,
+    ...ownGear(userId),
+    method: true,
+  }) as const
 
 // AeroPress brews must be brewed on an AeroPress-type device. Throws if the
 // device is missing, owned by another user, or not an aeropress device.
@@ -59,9 +64,12 @@ export const aeropressBrewRouter = createTRPCRouter({
   getAll: authedProcedure.query(({ ctx }) =>
     sealBrewsWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
       db.query.aeropressBrews.findMany({
-        where: { userId: ctx.session.user.id },
+        where: {
+          userId: ctx.session.user.id,
+          ...onOwnCoffee(ctx.session.user.id),
+        },
         orderBy: { createdAt: 'desc' },
-        with: withRelations,
+        with: withRelations(ctx.session.user.id),
       }),
     ),
   ),
@@ -71,22 +79,37 @@ export const aeropressBrewRouter = createTRPCRouter({
       z.object({ limit: z.number().min(1).max(50), offset: z.number().min(0) }),
     )
     .query(({ ctx, input }) =>
-      sealBrewPageWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {
-        const [items, [{ total }]] = await Promise.all([
-          db.query.aeropressBrews.findMany({
-            where: { userId: ctx.session.user.id },
-            orderBy: { createdAt: 'desc' },
-            with: withRelations,
-            limit: input.limit,
-            offset: input.offset,
-          }),
-          db
-            .select({ total: count() })
-            .from(aeropressBrews)
-            .where(eq(aeropressBrews.userId, ctx.session.user.id)),
-        ])
-        return { items, total }
-      }),
+      sealBrewPageWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
+        // One snapshot, so an edit between the two reads cannot leave the
+        // total out of step with the page.
+        db.transaction(
+          async (tx) => {
+            const items = await tx.query.aeropressBrews.findMany({
+              where: {
+                userId: ctx.session.user.id,
+                ...onOwnCoffee(ctx.session.user.id),
+              },
+              orderBy: { createdAt: 'desc' },
+              with: withRelations(ctx.session.user.id),
+              limit: input.limit,
+              offset: input.offset,
+            })
+            const [{ total }] = await tx
+              .select({ total: count() })
+              .from(aeropressBrews)
+              .innerJoin(
+                coffees,
+                and(
+                  eq(coffees.id, aeropressBrews.coffeeId),
+                  eq(coffees.userId, ctx.session.user.id),
+                ),
+              )
+              .where(eq(aeropressBrews.userId, ctx.session.user.id))
+            return { items, total }
+          },
+          { isolationLevel: 'repeatable read', accessMode: 'read only' },
+        ),
+      ),
     ),
 
   // Dialed-in brews, most recent first. An optional limit caps the result;
@@ -98,9 +121,13 @@ export const aeropressBrewRouter = createTRPCRouter({
       if (ids.length === 0) return []
       return sealBrewsWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
         db.query.aeropressBrews.findMany({
-          where: { userId: ctx.session.user.id, id: { in: ids } },
+          where: {
+            userId: ctx.session.user.id,
+            id: { in: ids },
+            ...onOwnCoffee(ctx.session.user.id),
+          },
           orderBy: { createdAt: 'desc' },
-          with: withRelations,
+          with: withRelations(ctx.session.user.id),
           limit: input?.limit,
         }),
       )
@@ -109,7 +136,11 @@ export const aeropressBrewRouter = createTRPCRouter({
   getById: authedProcedure.input(z.uuid()).query(({ ctx, input }) =>
     sealBrewWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {
       const brew = await db.query.aeropressBrews.findFirst({
-        where: { id: input, userId: ctx.session.user.id },
+        where: {
+          id: input,
+          userId: ctx.session.user.id,
+          ...onOwnCoffee(ctx.session.user.id),
+        },
       })
       if (!brew) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
@@ -122,6 +153,7 @@ export const aeropressBrewRouter = createTRPCRouter({
     .input(insertAeropressBrewSchema)
     .mutation(async ({ ctx, input }) => {
       await assertAeropressDevice(input.brewingDeviceId, ctx.session.user.id)
+      await assertOwnCoffeeAndGrinder(input, ctx.session.user.id)
       await assertAeropressMethod(input.methodId, ctx.session.user.id)
 
       await stampFallenBrews(ctx.session.user.id, ctx.plan)
@@ -150,6 +182,7 @@ export const aeropressBrewRouter = createTRPCRouter({
         })
       }
       await assertAeropressDevice(data.brewingDeviceId, ctx.session.user.id)
+      await assertOwnCoffeeAndGrinder(data, ctx.session.user.id)
       await assertAeropressMethod(data.methodId, ctx.session.user.id)
 
       const updated = await db

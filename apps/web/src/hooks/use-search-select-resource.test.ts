@@ -13,6 +13,17 @@ describe('useSearchSelectResource', () => {
     ])
   })
 
+  it('labels coffees with their roaster so same names stay distinct', () => {
+    const { options } = useSearchSelectResource([
+      { id: '1', name: 'Ethiopia Guji', roaster: { name: 'Sey' } },
+      { id: '2', name: 'Ethiopia Guji', roaster: { name: 'Heart' } },
+    ])
+    expect(options).toEqual([
+      { value: '1', label: 'Ethiopia Guji · Sey' },
+      { value: '2', label: 'Ethiopia Guji · Heart' },
+    ])
+  })
+
   it('omits onAddItem when no createFn is provided', () => {
     const { onAddItem } = useSearchSelectResource([])
     expect(onAddItem).toBeUndefined()

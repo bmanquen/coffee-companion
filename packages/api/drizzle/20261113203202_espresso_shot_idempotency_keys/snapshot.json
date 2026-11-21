@@ -1,0 +1,412 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "e9418cb3-3942-43ee-bd58-1652a673f35a",
+  "prevIds": [
+    "1f35e0cc-d67a-4db6-9d5c-2af70241195e"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shot_idempotency_keys"
+      ],
+      "writes": [
+        "s|tbl|public.espresso_shot_idempotency_keys",
+        "n|tbl|public.espresso_shot_idempotency_keys",
+        "e|tbl|public.espresso_shot_idempotency_keys",
+        "n|rel|public.espresso_shot_idempotency_keys",
+        "n|type|public.espresso_shot_idempotency_keys",
+        "n|rel|public.espresso_shot_idempotency_keys_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "espresso_shots",
+        "espresso_shots_user_idx"
+      ],
+      "writes": [
+        "s|idx|public.espresso_shots_user_idx",
+        "n|idx|public.espresso_shots_user_idx",
+        "e|idx|public.espresso_shots_user_idx",
+        "n|rel|public.espresso_shots_user_idx"
+      ],
+      "reads": [
+        "e|tbl|public.espresso_shots",
+        "n|sch|public",
+        "e|col|public.espresso_shots.user_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "espresso_shots",
+        "espresso_shots_user_coffee_idx"
+      ],
+      "writes": [
+        "s|idx|public.espresso_shots_user_coffee_idx",
+        "n|idx|public.espresso_shots_user_coffee_idx",
+        "e|idx|public.espresso_shots_user_coffee_idx",
+        "n|rel|public.espresso_shots_user_coffee_idx"
+      ],
+      "reads": [
+        "e|tbl|public.espresso_shots",
+        "n|sch|public",
+        "e|col|public.espresso_shots.user_id",
+        "e|col|public.espresso_shots.coffee_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "espresso_shot_idempotency_keys",
+        "espresso_shot_idempotency_keys_shot_id_idx"
+      ],
+      "writes": [
+        "s|idx|public.espresso_shot_idempotency_keys_shot_id_idx",
+        "n|idx|public.espresso_shot_idempotency_keys_shot_id_idx",
+        "e|idx|public.espresso_shot_idempotency_keys_shot_id_idx",
+        "n|rel|public.espresso_shot_idempotency_keys_shot_id_idx"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shot_idempotency_keys",
+        "n|sch|public",
+        "n|col|public.espresso_shot_idempotency_keys.shot_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "espresso_shots",
+        "espresso_shots_user_created_id_idx"
+      ],
+      "writes": [
+        "s|idx|public.espresso_shots_user_created_id_idx",
+        "n|idx|public.espresso_shots_user_created_id_idx",
+        "e|idx|public.espresso_shots_user_created_id_idx",
+        "n|rel|public.espresso_shots_user_created_id_idx"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|col|public.espresso_shots.user_id",
+        "n|col|public.espresso_shots.created_at",
+        "n|col|public.espresso_shots.id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "espresso_shots",
+        "espresso_shots_user_coffee_created_id_idx"
+      ],
+      "writes": [
+        "s|idx|public.espresso_shots_user_coffee_created_id_idx",
+        "n|idx|public.espresso_shots_user_coffee_created_id_idx",
+        "e|idx|public.espresso_shots_user_coffee_created_id_idx",
+        "n|rel|public.espresso_shots_user_coffee_created_id_idx"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|col|public.espresso_shots.user_id",
+        "n|col|public.espresso_shots.coffee_id",
+        "n|col|public.espresso_shots.created_at",
+        "n|col|public.espresso_shots.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shot_idempotency_keys"
+      ],
+      "writes": [
+        "s|fk|public.espresso_shot_idempotency_keys.espresso_shot_idempotency_keys_user_id_user_id_fkey",
+        "n|fk|public.espresso_shot_idempotency_keys.espresso_shot_idempotency_keys_user_id_user_id_fkey",
+        "e|fk|public.espresso_shot_idempotency_keys.espresso_shot_idempotency_keys_user_id_user_id_fkey",
+        "n|con|public.espresso_shot_idempotency_keys.espresso_shot_idempotency_keys_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shot_idempotency_keys",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.espresso_shot_idempotency_keys.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shot_idempotency_keys"
+      ],
+      "writes": [
+        "s|fk|public.espresso_shot_idempotency_keys.espresso_shot_idempotency_keys_shot_id_espresso_shots_id_fkey",
+        "n|fk|public.espresso_shot_idempotency_keys.espresso_shot_idempotency_keys_shot_id_espresso_shots_id_fkey",
+        "e|fk|public.espresso_shot_idempotency_keys.espresso_shot_idempotency_keys_shot_id_espresso_shots_id_fkey",
+        "n|con|public.espresso_shot_idempotency_keys.espresso_shot_idempotency_keys_shot_id_espresso_shots_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shot_idempotency_keys",
+        "n|sch|public",
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|col|public.espresso_shot_idempotency_keys.shot_id",
+        "n|col|public.espresso_shots.id",
+        "e|uniqueness|public.espresso_shots.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "espresso_shot_idempotency_keys",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shot_idempotency_keys",
+        "name": "user_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shot_idempotency_keys",
+        "name": "idempotency_key",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shot_idempotency_keys",
+        "name": "shot_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shot_idempotency_keys",
+        "name": "espresso_shot_idempotency_keys_shot_id_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "shot_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shots",
+        "name": "espresso_shots_user_created_id_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shots",
+        "name": "espresso_shots_user_coffee_created_id_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "coffee_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shot_idempotency_keys",
+        "name": "espresso_shot_idempotency_keys_user_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shot_idempotency_keys",
+        "name": "espresso_shot_idempotency_keys_shot_id_espresso_shots_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "shot_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "espresso_shots",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shot_idempotency_keys",
+        "name": "espresso_shot_idempotency_keys_pkey",
+        "columns": [
+          "user_id",
+          "idempotency_key"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"espresso_shots_user_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"espresso_shots_user_coffee_idx\"]"
+    }
+  ]
+}

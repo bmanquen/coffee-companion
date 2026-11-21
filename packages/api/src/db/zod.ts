@@ -154,7 +154,14 @@ const decimalString = () =>
 
 // Recipe integers (seconds, minutes, °C). Text fields send numeric strings;
 // duration inputs and tRPC callers send numbers. Null/blank still fail.
-const requiredInt = () =>
+// Durations cannot be negative. Water temperatures stay as permissive as
+// before, so a brew already stored with one can still have its notes edited.
+// Every one is a 32-bit integer column, so larger values are refused here
+// rather than failing the insert.
+const RECIPE_INT_MAX = 2_147_483_647
+const RECIPE_INT_TOO_LARGE = 'Enter a smaller number'
+
+const requiredInt = ({ allowNegative = false } = {}) =>
   z
     .union([z.number(), z.string(), z.null()])
     .superRefine((value, ctx) => {
@@ -162,12 +169,21 @@ const requiredInt = () =>
         ctx.addIssue({ code: 'custom', message: 'Enter a number' })
         return
       }
-      if (typeof value === 'number' && !Number.isInteger(value)) {
+      if (
+        typeof value === 'number' &&
+        (!Number.isInteger(value) || (!allowNegative && value < 0))
+      ) {
         ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
         return
       }
-      if (typeof value === 'string' && !/^-?\d+$/.test(value)) {
+      const pattern = allowNegative ? /^-?\d+$/ : /^\d+$/
+      if (typeof value === 'string' && !pattern.test(value)) {
         ctx.addIssue({ code: 'custom', message: 'Must be a whole number' })
+        return
+      }
+      const n = Number(value)
+      if (n > RECIPE_INT_MAX || n < -RECIPE_INT_MAX - 1) {
+        ctx.addIssue({ code: 'custom', message: RECIPE_INT_TOO_LARGE })
       }
     })
     .transform((value) => (typeof value === 'string' ? Number(value) : value))
@@ -176,15 +192,26 @@ const requiredGrindSetting = () => z.string().min(1, 'Enter a grind setting')
 
 const roastDate = () => calendarDateSchema.nullable().optional()
 
+export function uuidInput(message?: string) {
+  return (message === undefined ? z.uuid() : z.uuid(message)).transform((id) =>
+    id.toLowerCase(),
+  )
+}
+
 // Espresso Shots
 export const insertEspressoShotSchema = createInsertSchema(espressoShots, {
-  coffeeId: () => z.uuid('Select a coffee'),
-  grinderId: () => z.uuid('Select a grinder'),
-  brewingDeviceId: () => z.uuid('Select a brewing device'),
+  coffeeId: () => uuidInput('Select a coffee'),
+  grinderId: () => uuidInput('Select a grinder'),
+  brewingDeviceId: () => uuidInput('Select a brewing device'),
 })
+  // Timestamps are server-owned: createdAt is the shot list's sort key, and
+  // sealedAt decides whether a shot's settings are readable.
   .omit({
     id: true,
     userId: true,
+    createdAt: true,
+    updatedAt: true,
+    sealedAt: true,
   })
   .extend({
     dose: decimalString(),
@@ -259,7 +286,7 @@ export const insertPouroverBrewSchema = createInsertSchema(pouroverBrews, {
     dose: decimalString(),
     water: decimalString(),
     brewTime: requiredInt(),
-    waterTemp: requiredInt(),
+    waterTemp: requiredInt({ allowNegative: true }),
     grindSetting: requiredGrindSetting(),
     roastDate: roastDate(),
   })
@@ -302,7 +329,7 @@ export const insertFrenchpressBrewSchema = createInsertSchema(
     dose: decimalString(),
     water: decimalString(),
     steepTime: requiredInt(),
-    waterTemp: requiredInt(),
+    waterTemp: requiredInt({ allowNegative: true }),
     grindSetting: requiredGrindSetting(),
     roastDate: roastDate(),
   })

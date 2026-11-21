@@ -27,6 +27,9 @@ export const dashboardMethods: Array<{
 export type MethodFeed = {
   method: DashboardMethod
   brews: ReadonlyArray<{ createdAt: Date }>
+  // Set while the feed has no loaded history yet, so its empty `brews` is not
+  // read as "never brewed".
+  status?: 'loading' | 'failed'
 }
 
 // Whether a raw URL-param value is one of the known dashboard methods. Used to
@@ -73,6 +76,7 @@ export type MethodPickerItem = {
   method: DashboardMethod
   label: string
   lastBrewedAt: Date | null
+  status?: 'loading' | 'failed'
 }
 
 // The picker's rows: every known method (even ones with no feed or no Brews),
@@ -81,13 +85,17 @@ export type MethodPickerItem = {
 export function methodPickerItems(
   feeds: Array<MethodFeed>,
 ): Array<MethodPickerItem> {
-  const brewsByMethod = new Map(feeds.map((feed) => [feed.method, feed.brews]))
+  const feedByMethod = new Map(feeds.map((feed) => [feed.method, feed]))
   return dashboardMethods
-    .map(({ value, label }) => ({
-      method: value,
-      label,
-      lastBrewedAt: brewsByMethod.get(value)?.[0]?.createdAt ?? null,
-    }))
+    .map(({ value, label }) => {
+      const feed = feedByMethod.get(value)
+      return {
+        method: value,
+        label,
+        lastBrewedAt: feed?.brews[0]?.createdAt ?? null,
+        ...(feed?.status ? { status: feed.status } : {}),
+      }
+    })
     .sort((a, b) => a.label.localeCompare(b.label))
 }
 
@@ -96,7 +104,10 @@ export function methodPickerItems(
 export function formatLastBrewed(
   lastBrewedAt: Date | null,
   now: Date,
+  status?: MethodPickerItem['status'],
 ): string {
+  if (status === 'loading') return 'Loading…'
+  if (status === 'failed') return "Couldn't load"
   if (lastBrewedAt === null) return 'No brews yet'
 
   const seconds = Math.max(

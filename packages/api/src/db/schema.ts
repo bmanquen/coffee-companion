@@ -286,8 +286,41 @@ export const espressoShots = pgTable(
     time: integer(),
   },
   (table) => [
-    index('espresso_shots_user_idx').on(table.userId),
-    index('espresso_shots_user_coffee_idx').on(table.userId, table.coffeeId),
+    index('espresso_shots_user_created_id_idx').on(
+      table.userId,
+      table.createdAt,
+      table.id,
+    ),
+    index('espresso_shots_user_coffee_created_id_idx').on(
+      table.userId,
+      table.coffeeId,
+      table.createdAt,
+      table.id,
+    ),
+  ],
+)
+
+// Lives past shot deletion so a delayed retry of the same key cannot recreate
+// a shot the user already removed.
+export const espressoShotIdempotencyKeys = pgTable(
+  'espresso_shot_idempotency_keys',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    idempotencyKey: uuid('idempotency_key').notNull(),
+    shotId: uuid('shot_id').references(() => espressoShots.id, {
+      onDelete: 'set null',
+    }),
+    // Hash of the create request that claimed the key, so a retry still
+    // matches after the shot is edited. Null on keys claimed before it existed.
+    requestFingerprint: text('request_fingerprint'),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.userId, table.idempotencyKey],
+    }),
+    index('espresso_shot_idempotency_keys_shot_id_idx').on(table.shotId),
   ],
 )
 
@@ -500,7 +533,7 @@ export const pendingPersonErasure = pgTable('pending_person_erasure', {
 // Relations
 
 export const relations = defineRelations(
-  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, coffeeOrigins, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, dialedInBrews, planGrants, planInterests, subscription },
+  { user, session, account, countries, regions, farms, roasters, roastLevels, coffeeProcesses, varieties, greenCoffees, coffees, coffeesVarieties, coffeeOrigins, greenCoffeesVarieties, grinders, brewingDeviceTypes, brewingDevices, espressoShots, espressoShotIdempotencyKeys, aeropressMethods, aeropressBrews, pouroverMethods, pouroverBrews, frenchpressMethods, frenchpressBrews, coldBrewBrews, dialedInBrews, planGrants, planInterests, subscription },
   (r) => ({
     user: {
       sessions: r.many.session(),
@@ -518,6 +551,7 @@ export const relations = defineRelations(
       brewingDeviceTypes: r.many.brewingDeviceTypes(),
       brewingDevices: r.many.brewingDevices(),
       espressoShots: r.many.espressoShots(),
+      espressoShotIdempotencyKeys: r.many.espressoShotIdempotencyKeys(),
       aeropressMethods: r.many.aeropressMethods(),
       aeropressBrews: r.many.aeropressBrews(),
       pouroverMethods: r.many.pouroverMethods(),
@@ -680,6 +714,17 @@ export const relations = defineRelations(
       coffee: r.one.coffees({ from: r.espressoShots.coffeeId, to: r.coffees.id, optional: false }),
       grinder: r.one.grinders({ from: r.espressoShots.grinderId, to: r.grinders.id, optional: false }),
       brewingDevice: r.one.brewingDevices({ from: r.espressoShots.brewingDeviceId, to: r.brewingDevices.id, optional: false }),
+    },
+    espressoShotIdempotencyKeys: {
+      user: r.one.user({
+        from: r.espressoShotIdempotencyKeys.userId,
+        to: r.user.id,
+        optional: false,
+      }),
+      shot: r.one.espressoShots({
+        from: r.espressoShotIdempotencyKeys.shotId,
+        to: r.espressoShots.id,
+      }),
     },
     aeropressMethods: {
       user: r.one.user({ from: r.aeropressMethods.userId, to: r.user.id }),

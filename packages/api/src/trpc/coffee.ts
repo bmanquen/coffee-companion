@@ -76,6 +76,29 @@ function processVisibleTo(userId: string) {
   return or(isNull(coffeeProcesses.userId), eq(coffeeProcesses.userId, userId))
 }
 
+async function assertLookupsWritable(
+  userId: string,
+  input: Pick<InsertCoffee, 'roasterId' | 'roastLevelId'>,
+) {
+  const visible = { OR: [{ userId: { isNull: true as const } }, { userId }] }
+  const [roaster, roastLevel] = await Promise.all([
+    db.query.roasters.findFirst({
+      where: { id: input.roasterId, ...visible },
+      columns: { id: true },
+    }),
+    db.query.roastLevels.findFirst({
+      where: { id: input.roastLevelId, ...visible },
+      columns: { id: true },
+    }),
+  ])
+  if (!roaster) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Roaster not found' })
+  }
+  if (!roastLevel) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Roast level not found' })
+  }
+}
+
 async function assertOriginsWritable(
   userId: string,
   origins: Array<CoffeeOriginInput>,
@@ -147,13 +170,17 @@ async function replaceOrigins(
 
 export const coffeeRouter = createTRPCRouter({
   getAll: authedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id
+    // A legacy Coffee may reference another user's private lookup; show it as
+    // missing rather than leak it.
+    const visible = { OR: [{ userId: { isNull: true as const } }, { userId }] }
     const [rows, dialedInCoffeeIds] = await Promise.all([
       db.query.coffees.findMany({
-        where: { userId: ctx.session.user.id },
+        where: { userId },
         orderBy: { updatedAt: 'desc' },
         with: {
-          roaster: true,
-          roastLevel: true,
+          roaster: { where: visible },
+          roastLevel: { where: visible },
           origins: { with: originWithPlace },
           // Varieties are a many-to-many via the join table; flatten below.
           coffeesVarieties: { with: { variety: true } },
@@ -204,6 +231,7 @@ export const coffeeRouter = createTRPCRouter({
     .input(insertCoffeeSchema)
     .mutation(async ({ ctx, input }) => {
       const origins = input.origins ?? []
+      await assertLookupsWritable(ctx.session.user.id, input)
       await assertOriginsWritable(ctx.session.user.id, origins)
       try {
         return await db.transaction(async (tx) => {
@@ -233,6 +261,7 @@ export const coffeeRouter = createTRPCRouter({
       if (!existing) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
       }
+      await assertLookupsWritable(ctx.session.user.id, data)
       if (data.origins) {
         await assertOriginsWritable(ctx.session.user.id, data.origins)
       }

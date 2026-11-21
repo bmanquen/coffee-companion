@@ -6,7 +6,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { SealedRowNotice, sealedRowClass } from '@/components/brews/sealed-row'
 import { CoffeeFilter } from '@/components/coffee-filter'
@@ -14,8 +14,9 @@ import { DataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
+import type { CoffeeFilterOption } from '@/components/coffee-filter'
 import type { ReactNode } from 'react'
-import type { ColumnDef, Row } from '@tanstack/react-table'
+import type { ColumnDef, PaginationState, Row } from '@tanstack/react-table'
 import type { LinkProps } from '@tanstack/react-router'
 
 // The minimum a brew needs to expose to be shown in the feed: an id, whether
@@ -28,13 +29,12 @@ type BrewRow = {
   sealed: boolean
 }
 
-// The dashboard's reference-only per-method Brew feed. Given a method's full
-// brew history (from its getAll), it renders a glanceable, paginated feed of
-// cards with the dialed-in Brew highlighted, a "dialed-in only" toggle and a
-// by-coffee filter (both applied across the whole history before pagination),
-// and a per-method log button. It carries no edit/delete/dialed-in controls —
-// managing Brews stays on the Brews page. All filtering and pagination happen
-// client-side over `brews`.
+export type BrewFeedFilter<T> = {
+  value: T
+  onChange: (value: T) => void
+}
+
+// Filters run client-side unless the parent owns them (espresso filters on the server).
 export function BrewFeed<T extends BrewRow>({
   title,
   brews,
@@ -45,6 +45,18 @@ export function BrewFeed<T extends BrewRow>({
   emptyMessage,
   emptyLinkLabel,
   pageSize = 5,
+  coffeeOptions: coffeeOptionsProp,
+  coffeeFilter,
+  dialedInFilter,
+  banner,
+  stale,
+  status,
+  hasMore = false,
+  loadMore,
+  loadingMore = false,
+  loadMoreError,
+  onExpand,
+  onPageChange,
 }: {
   title: string
   brews: Array<T>
@@ -56,24 +68,64 @@ export function BrewFeed<T extends BrewRow>({
   emptyMessage: string
   emptyLinkLabel: string
   pageSize?: number
+  coffeeOptions?: Array<CoffeeFilterOption>
+  coffeeFilter?: BrewFeedFilter<string>
+  dialedInFilter?: BrewFeedFilter<boolean>
+  banner?: ReactNode
+  stale?: boolean
+  status?: ReactNode
+  // Another server page exists, so an empty list is not an empty history.
+  hasMore?: boolean
+  // Fetches the next server page, resolving with the first appended row's id
+  // (null if none). Next on the last loaded page uses it, then moves there.
+  loadMore?: () => Promise<string | null>
+  // The shot query is busy, so a load started now would be dropped.
+  loadingMore?: boolean
+  // Why the last loadMore failed; shown under the table with a retry.
+  loadMoreError?: string | null
+  // Runs when the user opens or closes a row's details.
+  onExpand?: () => void
+  // Runs when the user pages with Next or Previous, not when a filter or a
+  // shrinking list moves the page.
+  onPageChange?: () => void
 }) {
   // TanStack Table's instance is a stable, mutable object the React Compiler
   // would otherwise over-memoize; opt this component out (mirrors DataTable).
   'use no memo'
-  const [coffeeId, setCoffeeId] = useState('')
-  const [dialedInOnly, setDialedInOnly] = useState(false)
+  const [internalCoffeeId, setInternalCoffeeId] = useState('')
+  const [internalDialedInOnly, setInternalDialedInOnly] = useState(false)
+  const coffeeId = coffeeFilter?.value ?? internalCoffeeId
+  const setCoffeeId = coffeeFilter?.onChange ?? setInternalCoffeeId
+  const dialedInOnly = dialedInFilter?.value ?? internalDialedInOnly
+  const setDialedInOnly = dialedInFilter?.onChange ?? setInternalDialedInOnly
   const expansion = useAccordionExpansion()
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize,
+  })
+  // The first row a Next load appended, to move to once it renders.
+  const [pendingRowId, setPendingRowId] = useState<string | null>(null)
+  // Bumped on each filter change and manual page change, so a load that
+  // settles after either cannot move this table.
+  const navGeneration = useRef(0)
 
-  // Unique coffees that actually appear in this method's history, sorted by name.
+  // Unique coffees that actually appear in this method's history, sorted by
+  // name, unless the parent supplies the options.
   const coffeeOptions = useMemo(
     () =>
+      coffeeOptionsProp ??
       Array.from(
         new Map(brews.map((b) => [b.coffeeId, b.coffee.name])).entries(),
       )
         .map(([value, label]) => ({ value, label }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [brews],
+    [brews, coffeeOptionsProp],
   )
+  const filterCoffeeOnClient = coffeeFilter == null
+  const filterDialedInOnClient = dialedInFilter == null
+  const filtering = Boolean(coffeeId || dialedInOnly)
+  const showEmpty =
+    status == null && brews.length === 0 && !filtering && !hasMore
 
   // Memoized so the filtered array keeps a stable reference between renders —
   // a fresh array each render trips the table's autoReset* state and loops.
@@ -81,25 +133,90 @@ export function BrewFeed<T extends BrewRow>({
     () =>
       brews.filter(
         (b) =>
-          (!coffeeId || b.coffeeId === coffeeId) &&
-          (!dialedInOnly || b.isDialedIn),
+          (!filterCoffeeOnClient || !coffeeId || b.coffeeId === coffeeId) &&
+          (!filterDialedInOnClient || !dialedInOnly || b.isDialedIn),
       ),
-    [brews, coffeeId, dialedInOnly],
+    [
+      brews,
+      coffeeId,
+      dialedInOnly,
+      filterCoffeeOnClient,
+      filterDialedInOnClient,
+    ],
   )
+
+  useEffect(() => {
+    navGeneration.current += 1
+    setPendingRowId(null)
+    setPagination((current) =>
+      current.pageIndex === 0 ? current : { ...current, pageIndex: 0 },
+    )
+  }, [coffeeId, dialedInOnly])
+
+  // Move to the page holding the first appended row once it renders. Found
+  // by id, since a refresh before the append can change the rows above it.
+  useEffect(() => {
+    if (pendingRowId == null) return
+    const index = visibleBrews.findIndex((brew) => brew.id === pendingRowId)
+    if (index < 0) return
+    setPendingRowId(null)
+    setPagination((current) => ({
+      ...current,
+      pageIndex: Math.floor(index / current.pageSize),
+    }))
+  }, [pendingRowId, visibleBrews])
+
+  const loadNextPage =
+    loadMore && hasMore
+      ? () => {
+          const generation = navGeneration.current
+          void loadMore().then((firstId) => {
+            // A failed or empty request leaves the current page in place.
+            if (firstId && generation === navGeneration.current) {
+              setPendingRowId(firstId)
+            }
+          })
+        }
+      : undefined
+
+  useEffect(() => {
+    setPagination((current) => {
+      const pageCount = Math.max(
+        1,
+        Math.ceil(visibleBrews.length / current.pageSize),
+      )
+      const pageIndex = Math.min(current.pageIndex, pageCount - 1)
+      return pageIndex === current.pageIndex
+        ? current
+        : { ...current, pageIndex }
+    })
+  }, [visibleBrews.length])
 
   const table = useReactTable({
     data: visibleBrews,
     columns,
     // Accordion: opening one brew collapses the others (see grilling decision).
-    state: { expanded: expansion.expanded },
-    onExpandedChange: expansion.onExpandedChange,
+    state: { expanded: expansion.expanded, pagination },
+    onExpandedChange: (updater) => {
+      expansion.onExpandedChange(updater)
+      onExpand?.()
+    },
+    // Paging by hand cancels a pending move to newly loaded rows.
+    onPaginationChange: (updater) => {
+      navGeneration.current += 1
+      setPendingRowId(null)
+      setPagination(updater)
+      onPageChange?.()
+    },
+    autoResetPageIndex: false,
+    // By id, so a filter or refresh cannot move the open row to another brew.
+    getRowId: (brew) => brew.id,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     // A Sealed Brew has no settings to reveal.
     getRowCanExpand: (row) => !row.original.sealed,
     enableSorting: false,
-    initialState: { pagination: { pageSize } },
   })
 
   return (
@@ -113,12 +230,15 @@ export function BrewFeed<T extends BrewRow>({
           </Button>
         </Link>
       </div>
-      {brews.length === 0 ? (
-        <BrewsEmptyState
-          message={emptyMessage}
-          to={newTo}
-          linkLabel={emptyLinkLabel}
-        />
+      {showEmpty ? (
+        <>
+          {banner}
+          <BrewsEmptyState
+            message={emptyMessage}
+            to={newTo}
+            linkLabel={emptyLinkLabel}
+          />
+        </>
       ) : (
         <>
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
@@ -131,26 +251,48 @@ export function BrewFeed<T extends BrewRow>({
               type="button"
               variant={dialedInOnly ? 'default' : 'outline'}
               aria-pressed={dialedInOnly}
-              onClick={() => setDialedInOnly((v) => !v)}
+              onClick={() => setDialedInOnly(!dialedInOnly)}
             >
               Dialed-in only
             </Button>
           </div>
-          <DataTable
-            table={table}
-            renderSubComponent={renderDetails}
-            replaceRow={(row) =>
-              row.original.sealed ? <SealedRowNotice /> : null
-            }
-            paginated
-            rowClassName={(row) =>
-              row.original.sealed
-                ? sealedRowClass
-                : row.original.isDialedIn
-                  ? 'bg-primary/10 hover:bg-primary/15'
-                  : undefined
-            }
-          />
+          {banner}
+          {status ?? (
+            <div
+              aria-busy={stale || undefined}
+              className={stale ? 'opacity-60' : undefined}
+            >
+              <DataTable
+                table={table}
+                renderSubComponent={renderDetails}
+                replaceRow={(row) =>
+                  row.original.sealed ? <SealedRowNotice /> : null
+                }
+                paginated
+                loadNextPage={loadingMore ? undefined : loadNextPage}
+                rowClassName={(row) =>
+                  row.original.sealed
+                    ? sealedRowClass
+                    : row.original.isDialedIn
+                      ? 'bg-primary/10 hover:bg-primary/15'
+                      : undefined
+                }
+              />
+            </div>
+          )}
+          {status == null && loadMoreError && loadNextPage ? (
+            <div className="flex flex-col gap-2">
+              <p role="alert">{loadMoreError}</p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={loadingMore}
+                onClick={loadNextPage}
+              >
+                Try again
+              </Button>
+            </div>
+          ) : null}
         </>
       )}
     </Card>

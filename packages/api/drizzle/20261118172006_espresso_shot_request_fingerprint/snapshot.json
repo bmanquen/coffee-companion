@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "4c4c810b-5550-4bfb-8ce9-abf2519fc7b5",
+  "prevIds": [
+    "e9418cb3-3942-43ee-bd58-1652a673f35a"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "espresso_shot_idempotency_keys",
+        "request_fingerprint"
+      ],
+      "writes": [
+        "s|col|public.espresso_shot_idempotency_keys.request_fingerprint",
+        "n|col|public.espresso_shot_idempotency_keys.request_fingerprint",
+        "e|col|public.espresso_shot_idempotency_keys.request_fingerprint"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shot_idempotency_keys",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shot_idempotency_keys",
+        "name": "request_fingerprint",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

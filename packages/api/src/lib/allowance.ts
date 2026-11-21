@@ -13,6 +13,7 @@ import {
 import { TRPCError } from '@trpc/server'
 import { db } from '../db'
 import {
+  brewingDeviceTypes,
   brewingDevices,
   grinders,
   planGrants,
@@ -189,10 +190,31 @@ export async function assertRoomForAnother(
   if (limit === null) return
 
   const table = gearTable[resource]
-  const [{ owned }] = await db
-    .select({ owned: count() })
-    .from(table)
-    .where(eq(table.userId, userId))
+  const [{ owned }] =
+    resource === 'brewingDevices'
+      ? // A device written with another user's private type before writes
+        // checked it is hidden from every list, so it cannot be removed and
+        // must not use up the allowance.
+        await db
+          .select({ owned: count() })
+          .from(brewingDevices)
+          .innerJoin(
+            brewingDeviceTypes,
+            eq(brewingDeviceTypes.id, brewingDevices.typeId),
+          )
+          .where(
+            and(
+              eq(brewingDevices.userId, userId),
+              or(
+                isNull(brewingDeviceTypes.userId),
+                eq(brewingDeviceTypes.userId, userId),
+              ),
+            ),
+          )
+      : await db
+          .select({ owned: count() })
+          .from(table)
+          .where(eq(table.userId, userId))
   if (owned < limit) return
 
   throw new TRPCError({

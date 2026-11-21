@@ -1,6 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { createTestProviders } from '@/test/providers'
+import {
+  coffeesFromShots,
+  seedCoffees,
+  seedEspressoShotPage,
+} from '@/test/espresso-shots'
 import { makeRecentCoffee, makeRecentShot } from '@/test/factories'
 import { EspressoBrewsSection } from './espresso-brews-section'
 import type { ReactNode } from 'react'
@@ -14,10 +19,19 @@ vi.mock('@tanstack/react-router', () => ({
 
 const coffee = makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' })
 
+function seedSection(
+  queryClient: ReturnType<typeof createTestProviders>['queryClient'],
+  trpc: ReturnType<typeof createTestProviders>['trpc'],
+  shots: Array<ReturnType<typeof makeRecentShot>>,
+) {
+  seedEspressoShotPage(queryClient, trpc, shots)
+  seedCoffees(queryClient, trpc, coffeesFromShots(shots))
+}
+
 describe('a Sealed row', () => {
   it('is marked Sealed and offers no edit, delete or detail', async () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedSection(queryClient, trpc, [
       makeRecentShot({
         id: 'sealed',
         coffee,
@@ -56,7 +70,7 @@ describe('a Sealed row', () => {
 
   it('keeps edit and delete on a readable row', async () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedSection(queryClient, trpc, [
       makeRecentShot({ id: 'readable', coffee, coffeeId: 'c1' }),
     ])
 
@@ -74,7 +88,7 @@ describe('a Sealed row', () => {
 describe('the table header', () => {
   it('does not highlight on hover, and takes nothing from a Sealed row', async () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedSection(queryClient, trpc, [
       makeRecentShot({
         id: 'sealed',
         coffee,
@@ -101,7 +115,7 @@ describe('the table header', () => {
 describe('column alignment', () => {
   it('leaves a Sealed row’s coffee in the same column as a readable one', async () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
-    queryClient.setQueryData(trpc.espressoShot.getAll.queryKey(), [
+    seedSection(queryClient, trpc, [
       makeRecentShot({ id: 'readable', coffee, coffeeId: 'c1' }),
       makeRecentShot({
         id: 'sealed',

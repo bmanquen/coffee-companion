@@ -57,6 +57,7 @@ async function subscriberWithSixCoffees(userId: string) {
       yield: '36',
       time: 28,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
 
   const shotIds: Array<string> = []
@@ -77,7 +78,7 @@ async function subscriberWithSixCoffees(userId: string) {
     // way to trigger Sealing's write without rescuing anything from below.
     brewTheNewest: () => logShot(coffeeIds[5]),
     sealed: async (shotId: string) => {
-      const all = await as.espressoShot.getAll()
+      const all = (await as.espressoShot.getRecent({ limit: 50 })).items
       const found = all.find((shot) => shot.id === shotId)
       if (!found) throw new Error(`Shot ${shotId} missing from the feed`)
       return found.sealed

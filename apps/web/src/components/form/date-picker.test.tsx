@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 import { useAppForm } from '@/hooks/form'
 import type { ReactNode } from 'react'
 
@@ -88,15 +89,20 @@ vi.mock('@/components/ui/calendar', () => ({
 function Harness({
   value,
   showLabel,
+  required = false,
 }: {
   value?: string | null
   showLabel?: boolean
+  required?: boolean
 }) {
   const form = useAppForm({
     defaultValues: { roastDate: value ?? null },
   })
   return (
-    <form.AppField name="roastDate">
+    <form.AppField
+      name="roastDate"
+      validators={required ? { onChange: z.string() } : undefined}
+    >
       {(field) => (
         <>
           <field.DatePicker label="Roast date" showLabel={showLabel} />
@@ -207,6 +213,29 @@ describe('DatePicker', () => {
       '"2026-01-15"',
     )
     expect(screen.queryByText('reselect-current')).toBeNull()
+  })
+
+  it('clears an optional date back to blank', async () => {
+    render(<Harness value="2026-05-01" />)
+    const clear = screen.getByRole('button', { name: 'Clear Roast date' })
+    clear.focus()
+    await act(async () => {
+      fireEvent.click(clear)
+    })
+    expect(screen.getByText('Pick a date')).toBeTruthy()
+    // Focus stays in the field rather than falling to the page.
+    expect(document.activeElement).toBe(screen.getByLabelText('Roast date'))
+    expect(screen.getByTestId('stored-roast-date').textContent).toBe('null')
+    expect(
+      screen.queryByRole('button', { name: 'Clear Roast date' }),
+    ).toBeNull()
+  })
+
+  it('offers no Clear for a required date', () => {
+    render(<Harness value="2026-05-01" required />)
+    expect(
+      screen.queryByRole('button', { name: 'Clear Roast date' }),
+    ).toBeNull()
   })
 
   it('associates the label with the trigger', () => {

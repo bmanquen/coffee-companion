@@ -9,9 +9,10 @@ import {
   frenchpressBrews,
   pouroverBrews,
 } from '../db/schema'
+import { onOwnCoffee } from './brew-ownership'
 import { isPgUniqueViolation } from './pg-error'
 import { isSealed, sealBrew, sealBrewPage, sealBrews } from './shelf'
-import type { SealableBrew, Shelf } from './shelf'
+import type { Sealable, SealableBrew, Shelf } from './shelf'
 
 type BrewTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -49,10 +50,11 @@ export type DialedInBrewView = DialedInMapping & {
   sealed: boolean
 }
 
-const brewRelations = {
-  coffee: true,
-  brewingDevice: true,
-} as const
+const brewRelations = (userId: string) =>
+  ({
+    coffee: true,
+    brewingDevice: { where: { userId } },
+  }) as const
 
 type LoadedBrew = {
   id: string
@@ -96,12 +98,12 @@ async function loadBrews(
   userId: string,
 ): Promise<Map<string, LoadedBrew>> {
   if (brewIds.length === 0) return new Map()
-  const where = { id: { in: brewIds }, userId }
+  const where = { id: { in: brewIds }, userId, ...onOwnCoffee(userId) }
   switch (brewingMethod) {
     case 'espresso': {
       const brews = await db.query.espressoShots.findMany({
         where,
-        with: brewRelations,
+        with: brewRelations(userId),
       })
       return new Map(
         brews.map((brew) => [
@@ -113,7 +115,7 @@ async function loadBrews(
     case 'aeropress': {
       const brews = await db.query.aeropressBrews.findMany({
         where,
-        with: brewRelations,
+        with: brewRelations(userId),
       })
       return new Map(
         brews.map((brew) => [
@@ -125,7 +127,7 @@ async function loadBrews(
     case 'pourover': {
       const brews = await db.query.pouroverBrews.findMany({
         where,
-        with: brewRelations,
+        with: brewRelations(userId),
       })
       return new Map(
         brews.map((brew) => [
@@ -137,7 +139,7 @@ async function loadBrews(
     case 'frenchpress': {
       const brews = await db.query.frenchpressBrews.findMany({
         where,
-        with: brewRelations,
+        with: brewRelations(userId),
       })
       return new Map(
         brews.map((brew) => [
@@ -149,7 +151,7 @@ async function loadBrews(
     case 'coldBrew': {
       const brews = await db.query.coldBrewBrews.findMany({
         where,
-        with: brewRelations,
+        with: brewRelations(userId),
       })
       return new Map(
         brews.map((brew) => [
@@ -506,8 +508,20 @@ export async function stampDialedIn<T extends { id: string }>(
   userId: string,
   brews: Array<T>,
 ): Promise<Array<T & { isDialedIn: boolean }>> {
-  const ids = await dialedInBrewIdsForUser(userId)
-  return withDialedInFlag(brews, ids)
+  if (brews.length === 0) return []
+  // One array parameter, not one per id: unpaged getAll histories can pass
+  // more ids than Postgres's 65535 bind parameters.
+  const ids = brews.map((brew) => brew.id)
+  const rows = await db
+    .select({ brewId: dialedInBrews.brewId })
+    .from(dialedInBrews)
+    .where(
+      and(
+        eq(dialedInBrews.userId, userId),
+        sql`${dialedInBrews.brewId} = ANY(${sql.param(ids)}::uuid[])`,
+      ),
+    )
+  return withDialedInFlag(brews, new Set(rows.map((row) => row.brewId)))
 }
 
 export async function sealBrewsWithDialedIn<
@@ -521,12 +535,16 @@ export async function sealBrewsWithDialedIn<
 }
 
 export async function sealBrewPageWithDialedIn<
-  T extends SealableBrew & { id: string },
+  TPage extends { items: Array<SealableBrew & { id: string }>; total: number },
 >(
   userId: string,
   shelf: () => Promise<Shelf>,
-  load: () => Promise<{ items: Array<T>; total: number }>,
-) {
+  load: () => Promise<TPage>,
+): Promise<
+  Omit<TPage, 'items'> & {
+    items: Array<Sealable<TPage['items'][number]> & { isDialedIn: boolean }>
+  }
+> {
   const page = await sealBrewPage(shelf, load)
   return { ...page, items: await stampDialedIn(userId, page.items) }
 }

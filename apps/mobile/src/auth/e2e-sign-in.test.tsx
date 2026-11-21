@@ -64,7 +64,7 @@ describe('e2e sign-in handle', () => {
     )
 
     expect(screen.getByRole('button', { name: E2E_SIGN_IN })).toBeTruthy()
-    fireEvent.press(screen.getByTestId(E2E_SIGN_IN_TEST_ID))
+    await fireEvent.press(screen.getByTestId(E2E_SIGN_IN_TEST_ID))
     expect(onE2ESignIn).toHaveBeenCalledTimes(1)
   })
 })
