@@ -30,7 +30,11 @@ import {
 } from '../lib/espresso'
 import { PG_FOREIGN_KEY_VIOLATION, pgErrorIn } from '../lib/pg-error'
 import { isSealed, loadShelf, stampFallenBrews } from '../lib/shelf'
-import { onOwnCoffee, ownGear } from '../lib/brew-ownership'
+import {
+  onOwnCoffee,
+  ownGear,
+  visibleDeviceType,
+} from '../lib/brew-ownership'
 import { authedProcedure, createTRPCRouter } from './init'
 import type {
   EspressoShotCursor,
@@ -339,8 +343,13 @@ async function assertOwnEspressoGear(
       where: { id: input.grinderId, userId },
       columns: { id: true },
     }),
+    // Only a device the user can list, as ownGear reads it back.
     db.query.brewingDevices.findFirst({
-      where: { id: input.brewingDeviceId, userId },
+      where: {
+        id: input.brewingDeviceId,
+        userId,
+        type: visibleDeviceType(userId),
+      },
       with: { type: true },
     }),
   ])

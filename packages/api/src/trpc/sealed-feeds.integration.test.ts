@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes, espressoShots } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
@@ -31,7 +31,10 @@ async function findOrCreateDeviceType(name: string): Promise<string> {
   const existing = await db
     .select()
     .from(brewingDeviceTypes)
-    .where(eq(brewingDeviceTypes.name, name))
+    // A shared type only: another user's private one fails the visibility check.
+    .where(
+      and(eq(brewingDeviceTypes.name, name), isNull(brewingDeviceTypes.userId)),
+    )
   if (existing[0]) return existing[0].id
   const [row] = await db.insert(brewingDeviceTypes).values({ name }).returning()
   createdTypeIds.push(row.id)

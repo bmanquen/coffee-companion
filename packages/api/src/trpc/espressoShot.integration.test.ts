@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { daysAgo } from '../db/seed-e2e'
 import {
   brewingDeviceTypes,
+  brewingDevices,
   coffees,
   espressoShotIdempotencyKeys,
   espressoShots,
@@ -83,7 +84,10 @@ async function findOrCreateDeviceType(name: string): Promise<string> {
   const existing = await db
     .select()
     .from(brewingDeviceTypes)
-    .where(eq(brewingDeviceTypes.name, name))
+    // A shared type only: another user's private one fails the visibility check.
+    .where(
+      and(eq(brewingDeviceTypes.name, name), isNull(brewingDeviceTypes.userId)),
+    )
   if (existing[0]) return existing[0].id
   const [row] = await db.insert(brewingDeviceTypes).values({ name }).returning()
   createdTypeIds.push(row.id)
@@ -267,6 +271,52 @@ describe('espressoShot.create', () => {
         idempotencyKey: crypto.randomUUID(),
       }),
     ).rejects.toThrow(/Grinder not found/)
+  })
+
+  it('rejects a device the user cannot list, even one typed Espresso', async () => {
+    // Only a row from before lookup_name_guard can carry another user's
+    // private type named like the shared one, so the guard is off here.
+    const deviceId = await db.transaction(async (tx) => {
+      await tx.execute(sql`SET LOCAL session_replication_role = replica`)
+      const [type] = await tx
+        .insert(brewingDeviceTypes)
+        .values({ name: ESPRESSO_DEVICE_TYPE, userId: USER_B })
+        .returning({ id: brewingDeviceTypes.id })
+      const [device] = await tx
+        .insert(brewingDevices)
+        .values({
+          userId: USER_A,
+          name: uniq('Legacy machine'),
+          brand: 'Legacy',
+          typeId: type.id,
+        })
+        .returning({ id: brewingDevices.id })
+      return device.id
+    })
+    try {
+      await expect(
+        asA.espressoShot.create({
+          coffeeId: coffeeAId,
+          grinderId,
+          brewingDeviceId: deviceId,
+          dose: '18',
+          yield: '36',
+          time: 30,
+          grindSetting: '1.5',
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      ).rejects.toThrow(/Brewing device not found/)
+    } finally {
+      await db.delete(brewingDevices).where(eq(brewingDevices.id, deviceId))
+      await db
+        .delete(brewingDeviceTypes)
+        .where(
+          and(
+            eq(brewingDeviceTypes.name, ESPRESSO_DEVICE_TYPE),
+            eq(brewingDeviceTypes.userId, USER_B),
+          ),
+        )
+    }
   })
 })
 
@@ -1540,10 +1590,11 @@ describe('espressoShot.getRecent', () => {
       idempotencyKey: crypto.randomUUID(),
     })
 
-    // Three older shots remain after page one: two pages, plus one spare.
+    // Three older shots remain after page one: two pages, the last with no
+    // cursor.
     const collectedIds = [
       ...page1.items.map((shot) => shot.id),
-      ...(await walkCursors(3, page1.nextCursor, (cursor) =>
+      ...(await walkCursors(2, page1.nextCursor, (cursor) =>
         asA.espressoShot.getRecent({ limit: 2, coffeeId: coffee.id, cursor }),
       )),
     ]
@@ -1552,8 +1603,8 @@ describe('espressoShot.getRecent', () => {
     expect(collectedIds).not.toContain(inserted.id)
     expect(collectedIds).toHaveLength(created.length)
 
-    // Six shots at two a page, plus one spare in case the last page is empty.
-    const refreshed = await walkCursors(4, undefined, (cursor) =>
+    // Six shots at two a page: the third page must end the list.
+    const refreshed = await walkCursors(3, undefined, (cursor) =>
       asA.espressoShot.getRecent({ limit: 2, coffeeId: coffee.id, cursor }),
     )
     expect(refreshed).toHaveLength(page1.total + 1)
@@ -1591,8 +1642,8 @@ describe('espressoShot.getRecent', () => {
       })),
     )
 
-    // Six rows at two a page, plus one spare in case the last page is empty.
-    const collected = await walkCursors(4, undefined, (cursor) =>
+    // Six rows at two a page: the third page must end the list.
+    const collected = await walkCursors(3, undefined, (cursor) =>
       asA.espressoShot.getRecent({ limit: 2, coffeeId: coffee.id, cursor }),
     )
 
