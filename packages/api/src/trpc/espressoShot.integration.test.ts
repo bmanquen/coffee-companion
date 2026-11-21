@@ -1140,7 +1140,9 @@ describe('espressoShot.create idempotency', () => {
 describe('espressoShot.getRecent', () => {
   it('returns a later API create ahead of a daysAgo(0) seed row', async () => {
     const coffee = await createCoffee(uniq('Js Clock Seed Coffee'))
-    await withPoolTimeZone('Pacific/Honolulu', async () => {
+    // East of UTC, the database-clock seed sorts ahead of a shot stamped
+    // with a JS Date, so a create that went back to the JS clock fails here.
+    await withPoolTimeZone('Asia/Tokyo', async () => {
       await db.insert(espressoShots).values({
         userId: USER_A,
         coffeeId: coffee.id,

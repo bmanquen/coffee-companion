@@ -387,8 +387,8 @@ importers:
   packages/brew-display:
     devDependencies:
       '@tanstack/eslint-config':
-        specifier: ^0.3.4
-        version: 0.3.4(@typescript-eslint/utils@8.73.0(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3)
+        specifier: ^0.5.0
+        version: 0.5.0(@typescript-eslint/utils@8.73.0(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3)
       eslint:
         specifier: ^10.5.0
         version: 10.15.0(jiti@2.7.0)
@@ -1298,10 +1298,6 @@ packages:
     peerDependenciesMeta:
       eslint:
         optional: true
-
-  '@eslint/js@9.39.5':
-    resolution: {integrity: sha512-QywQuszQh77pIXCsq998c8hbhSTI/azTty1Z6N53dmAudKHhy573j3yvRLsX2BSp8YpLtoCEG8E9DJe+8zUh4A==}
-    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   '@eslint/object-schema@3.0.5':
     resolution: {integrity: sha512-vqTaUEgxzm+YDSdElad6PiRoX4t8VGDjCtt05zn4nU810UIx/uNEV7/lZJ6KwFThKZOzOxzXy48da+No7HZaMw==}
@@ -3361,12 +3357,6 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       solid-js: ^1.9.13
-
-  '@tanstack/eslint-config@0.3.4':
-    resolution: {integrity: sha512-5Ou1XWJRCTx5G8WoCbT7+6nQ4iNdsISzBAc4lXpFy2fEOO7xioOSPvcPIv+r9V0drPPETou2tr6oLGZZ909FKg==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      eslint: ^8.0.0 || ^9.0.0
 
   '@tanstack/eslint-config@0.5.0':
     resolution: {integrity: sha512-ViENA1MY9G9PN+xCRPI4aVUgHWZqQdlhiAWi/Gxw9PP4rvsmlyPYx8wLm6Xw7Mb8coRUvNZt3NxKiyQCeulY7w==}
@@ -9215,8 +9205,6 @@ snapshots:
     optionalDependencies:
       eslint: 10.15.0(jiti@2.7.0)
 
-  '@eslint/js@9.39.5': {}
-
   '@eslint/object-schema@3.0.5': {}
 
   '@eslint/plugin-kit@0.7.3':
@@ -11445,23 +11433,6 @@ snapshots:
       - bufferutil
       - csstype
       - utf-8-validate
-
-  '@tanstack/eslint-config@0.3.4(@typescript-eslint/utils@8.73.0(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3)':
-    dependencies:
-      '@eslint/js': 9.39.5
-      '@stylistic/eslint-plugin': 5.10.0(eslint@10.15.0(jiti@2.7.0))
-      eslint: 10.15.0(jiti@2.7.0)
-      eslint-plugin-import-x: 4.18.1(@typescript-eslint/utils@8.73.0(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.15.0(jiti@2.7.0))
-      eslint-plugin-n: 17.24.0(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3)
-      globals: 16.5.0
-      typescript-eslint: 8.73.0(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3)
-      vue-eslint-parser: 10.4.2(eslint@10.15.0(jiti@2.7.0))
-    transitivePeerDependencies:
-      - '@typescript-eslint/utils'
-      - '@typescript/native'
-      - eslint-import-resolver-node
-      - supports-color
-      - typescript
 
   '@tanstack/eslint-config@0.5.0(@typescript-eslint/utils@8.73.0(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3))(eslint@10.15.0(jiti@2.7.0))(typescript@5.9.3)':
     dependencies:

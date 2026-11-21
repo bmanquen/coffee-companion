@@ -277,6 +277,28 @@ describe('brewingDevice plan limits', () => {
         typeId: own,
       }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+
+    // Giving the hidden one a visible type adds a slot, so at the cap it is
+    // refused, while an ordinary edit at the cap still saves.
+    const repair = {
+      id: devices[0].id,
+      name: devices[0].name,
+      brand: 'Brand',
+      typeId: own,
+    }
+    await expect(asLegacy.brewingDevice.update(repair)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    })
+    await asLegacy.brewingDevice.update({
+      id: devices[1].id,
+      name: uniqLegacy('Renamed'),
+      brand: 'Brand',
+      typeId: own,
+    })
+    // Below the cap the repair goes through.
+    await asLegacy.brewingDevice.delete(devices[2].id)
+    await asLegacy.brewingDevice.update(repair)
+    expect(await asLegacy.brewingDevice.list()).toHaveLength(3)
   })
 
   it('lets a granted paid Plan add devices past the Free limit', async () => {

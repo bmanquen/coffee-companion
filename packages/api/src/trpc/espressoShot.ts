@@ -179,6 +179,8 @@ function shownRatio() {
   return sql`trim_scale(COALESCE(CASE WHEN ${ratio} > 0 THEN COALESCE(${sql.join(places, sql`, `)}) END, round(${ratio}, 2)))`
 }
 
+const RATIO_TERM = /^[0-9.:-]+$/
+
 function recentWhere(
   userId: string,
   input: {
@@ -203,7 +205,11 @@ function recentWhere(
       sql`CAST(${espressoShots.dose} AS TEXT) ILIKE ${pattern}`,
       sql`CAST(${espressoShots.yield} AS TEXT) ILIKE ${pattern}`,
       sql`CAST(${espressoShots.time} AS TEXT) ILIKE ${pattern}`,
-      sql`'1:' || CAST(${shownRatio()} AS TEXT) ILIKE ${pattern}`,
+      // Ratio text is `1:` and a decimal, so a term with any other character
+      // cannot match it; skipping it spares every row the division.
+      ...(RATIO_TERM.test(q)
+        ? [sql`'1:' || CAST(${shownRatio()} AS TEXT) ILIKE ${pattern}`]
+        : []),
     )
     // Also the Coffee column's label, coffeeOptionLabel's `Coffee · Roaster`,
     // with the same visible roaster.

@@ -75,7 +75,28 @@ export const brewingDeviceRouter = createTRPCRouter({
     .input(insertBrewingDeviceSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
-      await assertVisibleDeviceType(data.typeId, ctx.session.user.id)
+      const userId = ctx.session.user.id
+      await assertVisibleDeviceType(data.typeId, userId)
+      // A hidden device takes no Free slot, so giving it a visible type adds
+      // one, and must fit the allowance like a create.
+      const listed = await db.query.brewingDevices.findFirst({
+        columns: { id: true },
+        where: { id, userId, type: visibleDeviceType(userId) },
+      })
+      if (!listed) {
+        // A wrong id is not found, whatever the allowance says.
+        const owned = await db.query.brewingDevices.findFirst({
+          columns: { id: true },
+          where: { id, userId },
+        })
+        if (!owned) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Brewing device not found',
+          })
+        }
+        await assertRoomForAnother(ctx.plan, 'brewingDevices', userId)
+      }
       try {
         const updated = await db
           .update(brewingDevices)
