@@ -130,6 +130,14 @@ export function seedEspressoShotPage(
       const data = current ?? { pages: [], pageParams: [] }
       const index = data.pageParams.findIndex((param) => param === cursor)
       if (index >= 0) return replaceAt(data, index)
+      // An append must continue the chain, as fetchNextPage would: a page
+      // for a cursor the cached pages no longer end on is unreachable.
+      const tail = data.pages.at(-1)
+      if (tail && tail.nextCursor !== cursor) {
+        throw new Error(
+          `seedEspressoShotPage: cursor ${cursor} does not follow the cached pages`,
+        )
+      }
       return {
         pages: [...data.pages, page],
         pageParams: [...data.pageParams, cursor],

@@ -1,11 +1,20 @@
+import superjson from 'superjson'
+
+// A batch stream link reply carrying this head, encoded as the server's
+// SuperJSON transformer sends it, so Dates and other types come through as
+// they do in the app.
+export function trpcStreamResponse(head: unknown) {
+  return new Response(JSON.stringify(superjson.serialize(head)) + '\n', {
+    status: 200,
+    headers: { 'content-type': 'application/jsonl' },
+  })
+}
+
 // A successful reply from the tRPC batch stream link for a single procedure,
 // so a test's fetch spy can let a mutation reach its onSuccess.
 export function trpcSuccess(data: unknown = {}) {
   const head = { '0': [[{ result: { data } }]] }
-  return new Response(JSON.stringify({ json: head }) + '\n', {
-    status: 200,
-    headers: { 'content-type': 'application/jsonl' },
-  })
+  return trpcStreamResponse(head)
 }
 
 // An error reply from the tRPC batch stream link for a single procedure, in
@@ -23,10 +32,7 @@ export function trpcErrorResponse(
     data: { code, httpStatus: httpStatuses[code] },
   }
   const head = { '0': [[{ error }]] }
-  return new Response(JSON.stringify({ json: head }) + '\n', {
-    status: 200,
-    headers: { 'content-type': 'application/jsonl' },
-  })
+  return trpcStreamResponse(head)
 }
 
 // A reply to a request the batch stream link may have batched: one result
@@ -48,8 +54,5 @@ export function trpcBatchSuccess(
       [[{ result: { data: dataFor(procedure) } }]],
     ]),
   )
-  return new Response(JSON.stringify({ json: head }) + '\n', {
-    status: 200,
-    headers: { 'content-type': 'application/jsonl' },
-  })
+  return trpcStreamResponse(head)
 }

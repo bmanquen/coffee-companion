@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -157,6 +158,37 @@ describe('EditEspressoShot form', () => {
           search: { method: 'espresso' },
         }),
       )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('does not go to Brews when the update lands after the form closed', async () => {
+    mocks.navigate.mockClear()
+    let answer: (response: Response) => void = () => {}
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (input) =>
+        String(input).includes('espressoShot.update')
+          ? new Promise<Response>((resolve) => {
+              answer = resolve
+            })
+          : Promise.resolve(trpcSuccess()),
+    )
+    try {
+      const { Wrapper } = seeded()
+      const { unmount } = render(<EditEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '19' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+
+      unmount()
+      await act(async () => {
+        answer(trpcSuccess())
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+      expect(mocks.navigate).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }

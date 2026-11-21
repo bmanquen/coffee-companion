@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
 import { brewsLogLocation } from '@/components/brews/methods'
 import { FormBanner } from '@/components/form/form-banner'
@@ -150,6 +150,16 @@ export function NewEspressoShot() {
   // server-side in espressoShot.create).
   const brewingDevice = useBrewingDeviceSelect(ESPRESSO_DEVICE_TYPE)
 
+  // A save that settles after the user left the form must not pull them
+  // back to Brews; it still refreshes the cached reads.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
   const createShot = useMutation(
     trpc.espressoShot.create.mutationOptions({
       onSuccess: async () => {
@@ -159,7 +169,7 @@ export function NewEspressoShot() {
         // A Brews preload begun before the save would otherwise land without
         // this shot and look fresh when the log opens.
         await refreshEspressoShotReads(queryClient, trpc)
-        navigate(brewsLogLocation('espresso'))
+        if (mounted.current) navigate(brewsLogLocation('espresso'))
       },
     }),
   )
@@ -215,15 +225,25 @@ export function NewEspressoShot() {
       )
       saveRejected.current = outcome.rejected
       savedKeyDeletedFor.current = outcome.keyDeleted ? value.coffeeId : ''
-      if (outcome.keyDeleted) {
-        // That shot is gone for good, so the next Log saves a new one.
+      const forgetKey = () => {
         for (const [draft, key] of idempotencyKeys.current) {
           if (key === idempotencyKey) idempotencyKeys.current.delete(draft)
         }
+      }
+      if (outcome.keyDeleted) {
+        // That shot is gone for good, so the next Log saves a new one.
+        forgetKey()
         // Only its own snapshot: another save of the recipe under another
         // key may still have committed.
         unresolvedSaves.current.get(value.coffeeId)?.delete(idempotencyKey)
-      } else if (!saveSucceeded.current && !outcome.rejected) {
+      } else if (outcome.rejected) {
+        // A refused save committed nothing, so a prefill must not carry its
+        // key into another draft, unless an earlier lost attempt under that
+        // key may still have committed and must replay.
+        if (!unresolvedSaves.current.get(value.coffeeId)?.has(idempotencyKey)) {
+          forgetKey()
+        }
+      } else if (!saveSucceeded.current) {
         // Only a save that may have committed must replay as submitted.
         const saves =
           unresolvedSaves.current.get(value.coffeeId) ??

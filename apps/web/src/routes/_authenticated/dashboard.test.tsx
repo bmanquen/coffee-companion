@@ -474,17 +474,18 @@ describe('Dashboard', () => {
   })
 
   it('loads older shots and moves to them when Next is pressed on the last loaded page', async () => {
-    // Two full table pages, as a 20-shot server page always fills its pages.
-    const shots = Array.from({ length: 10 }, (_, i) =>
+    // A full server page, tied shots in the API's descending-id order, and
+    // older shots after its boundary.
+    const shots = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, i) =>
       makeRecentShot({
-        id: espressoShotFixtureId(i),
+        id: espressoShotFixtureId(1000 - i),
         coffeeId: `c${i}`,
         coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
       }),
     )
     const extra = Array.from({ length: 5 }, (_, i) =>
       makeRecentShot({
-        id: `n${i}`,
+        id: espressoShotFixtureId(900 - i),
         coffeeId: `n${i}`,
         coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
       }),
@@ -519,9 +520,11 @@ describe('Dashboard', () => {
       const table = () => within(screen.getByRole('table'))
 
       await act(async () => {
-        fireEvent.click(screen.getByLabelText('Next page'))
+        for (let step = 0; step < 3; step += 1) {
+          fireEvent.click(screen.getByLabelText('Next page'))
+        }
       })
-      expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+      expect(screen.getByText('Page 4 of 4')).toBeTruthy()
       expect(fetchSpy).not.toHaveBeenCalled()
 
       // A failed load keeps the last loaded page on screen.
@@ -529,13 +532,13 @@ describe('Dashboard', () => {
       expect(
         await screen.findByText("We couldn't load more shots. Try again."),
       ).toBeTruthy()
-      expect(screen.getByText('Page 2 of 2')).toBeTruthy()
-      expect(table().getByText('Coffee 10')).toBeTruthy()
+      expect(screen.getByText('Page 4 of 4')).toBeTruthy()
+      expect(table().getByText('Coffee 20')).toBeTruthy()
 
       fireEvent.click(screen.getByLabelText('Next page'))
-      expect(await screen.findByText('Page 3 of 3')).toBeTruthy()
+      expect(await screen.findByText('Page 5 of 5')).toBeTruthy()
       expect(table().getByText('Extra 1')).toBeTruthy()
-      expect(table().queryByText('Coffee 10')).toBeNull()
+      expect(table().queryByText('Coffee 20')).toBeNull()
       expect(fetchSpy).toHaveBeenCalledTimes(2)
       // The history is fully loaded, so Next has nowhere left to go.
       expect(
@@ -1403,9 +1406,16 @@ describe('Dashboard', () => {
       })
       const { rerender } = render(<DashboardContainer />, { wrapper: Wrapper })
       const table = within(screen.getByRole('table'))
+      // The detail is always mounted; its grid row is what opens it.
+      const detail = () =>
+        within(screen.getByRole('table'))
+          .getByText('Ethiopia Guji')
+          .closest('tr')!
+          .nextElementSibling!.querySelector('[class*="grid-rows-"]')!
       await act(async () => {
         fireEvent.click(table.getByText('Ethiopia Guji').closest('tr')!)
       })
+      expect(detail().className).toContain('grid-rows-[1fr]')
       expect(navigate).toHaveBeenCalledWith({
         search: { method: 'espresso' },
         replace: true,
@@ -1428,6 +1438,7 @@ describe('Dashboard', () => {
         })
       })
       expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+      expect(detail().className).toContain('grid-rows-[1fr]')
       expect(
         within(screen.getByRole('table')).getByText(/Niche Zero/),
       ).toBeTruthy()
@@ -1531,7 +1542,9 @@ describe('Dashboard', () => {
             }),
           )
     })
-    let search: { method?: DashboardMethod } = {}
+    // The local pages are reached with Espresso in the URL, so only the
+    // server-boundary Next below can choose it.
+    let search: { method?: DashboardMethod } = { method: 'espresso' }
     const searchSpy = vi
       .spyOn(Route, 'useSearch')
       .mockImplementation(() => search)
@@ -1569,6 +1582,11 @@ describe('Dashboard', () => {
       for (let step = 0; step < 3; step += 1) {
         fireEvent.click(screen.getByLabelText('Next page'))
       }
+      expect(screen.getByText('Page 4 of 4')).toBeTruthy()
+      expect(navigate).not.toHaveBeenCalled()
+      search = {}
+      rerender(<DashboardContainer />)
+      expect(screen.getByText('Page 4 of 4')).toBeTruthy()
       await act(async () => {
         fireEvent.click(screen.getByLabelText('Next page'))
       })

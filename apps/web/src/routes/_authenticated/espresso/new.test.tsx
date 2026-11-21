@@ -17,7 +17,11 @@ import {
   makeRecentShot,
 } from '@/test/factories'
 import { createTestProviders } from '@/test/providers'
-import { trpcErrorResponse, trpcSuccess } from '@/test/trpc-response'
+import {
+  trpcErrorResponse,
+  trpcStreamResponse,
+  trpcSuccess,
+} from '@/test/trpc-response'
 import { Route } from './new'
 
 const COFFEE = '00000000-0000-4000-8000-000000000001'
@@ -188,10 +192,7 @@ function batchResponse(
       return [String(index), [[{ result: { data } }]]]
     }),
   )
-  return new Response(JSON.stringify({ json: head }) + '\n', {
-    status: 200,
-    headers: { 'content-type': 'application/jsonl' },
-  })
+  return trpcStreamResponse(head)
 }
 
 function serveFromCache(
@@ -441,6 +442,51 @@ describe('NewEspressoShot form', () => {
       expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
         method: 'espresso',
       })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('does not go to Brews when the create lands after the form closed', async () => {
+    const providers = seeded()
+    const { Wrapper, fetchSpy } = providers
+    let answer: (response: Response) => void = () => {}
+    fetchSpy.mockImplementation(
+      serveFromCache(
+        providers,
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve
+          }),
+      ),
+    )
+    try {
+      const { unmount } = render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(1))
+
+      unmount()
+      await act(async () => {
+        answer(trpcSuccess())
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+      expect(mocks.navigate).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }
@@ -1320,6 +1366,14 @@ describe('NewEspressoShot form', () => {
       expect(screen.getByLabelText(/^Dose/)).toHaveProperty('value', '18')
       // A prefill is not an edit, so the save's error stays up.
       expect(screen.getByText('Brewing device is not espresso')).toBeTruthy()
+
+      // The refused save committed nothing, so the prefilled draft is a new
+      // save, not a retry under that save's key.
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy)).toHaveLength(2))
+      const keys = createKeys(fetchSpy)
+      expect(createInputs(fetchSpy)[1].roastDate).toBe('2026-05-01')
+      expect(keys[1]).not.toBe(keys[0])
     } finally {
       fetchSpy.mockRestore()
     }

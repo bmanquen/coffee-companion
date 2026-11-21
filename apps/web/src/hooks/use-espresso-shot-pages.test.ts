@@ -70,21 +70,24 @@ describe('espressoShotPageInput', () => {
 
 describe('useEspressoShotPages', () => {
   it('keeps the same empty items while the first page is pending', () => {
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockImplementation(() => new Promise(() => {}))
+    // Injected, so the batch tRPC sends after this test cannot reach another
+    // test's fetch.
+    const { queryClient, Wrapper } = createTestProviders({
+      fetch: () => new Promise<never>(() => {}),
+    })
+    const { result, rerender, unmount } = renderHook(
+      () => useEspressoShotPages(),
+      { wrapper: Wrapper },
+    )
     try {
-      const { Wrapper } = createTestProviders()
-      const { result, rerender } = renderHook(() => useEspressoShotPages(), {
-        wrapper: Wrapper,
-      })
       expect(result.current.items).toEqual([])
       expect(result.current.loading).toBe(true)
       const pendingItems = result.current.items
       rerender()
       expect(result.current.items).toBe(pendingItems)
     } finally {
-      fetchSpy.mockRestore()
+      unmount()
+      queryClient.clear()
     }
   })
 

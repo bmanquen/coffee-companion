@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { brewsLogLocation } from '@/components/brews/methods'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
@@ -59,6 +60,16 @@ function EditEspressoShot() {
   // server-side in espressoShot.update).
   const brewingDevice = useBrewingDeviceSelect(ESPRESSO_DEVICE_TYPE)
 
+  // A save that settles after the user left the form must not pull them
+  // back to Brews; it still refreshes the cached reads.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
   const updateShot = useMutation(
     trpc.espressoShot.update.mutationOptions({
       onSuccess: async () => {
@@ -69,7 +80,7 @@ function EditEspressoShot() {
           trpc.espressoShot.getById.queryOptions(shotId),
         )
         invalidateDeviceDialedInQueries(queryClient, trpc)
-        navigate(brewsLogLocation('espresso'))
+        if (mounted.current) navigate(brewsLogLocation('espresso'))
       },
     }),
   )
