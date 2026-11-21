@@ -251,7 +251,8 @@ function claimForCleanup(dir) {
   for (;;) {
     const held = claimRun(dir, `cleanup-${process.pid}`)
     if (!held) return null
-    if (pidAlive(held.pid)) return held
+    // EPERM is a live process this user cannot signal, not a stale claim.
+    if (lockPidMayBeLive(held.pid)) return held
     const aside = `${ownerPath(dir)}.stale-${process.pid}`
     try {
       renameSync(ownerPath(dir), aside)
@@ -265,7 +266,7 @@ function claimForCleanup(dir) {
     } catch {
       // Unreadable: not anyone's live claim.
     }
-    if (moved?.pid && pidAlive(moved.pid)) {
+    if (moved?.pid && lockPidMayBeLive(moved.pid)) {
       // Another cleanup took the stale claim over first; this moved its
       // fresh one. Put it back and stand aside.
       try {
@@ -286,7 +287,7 @@ function claimRunOrDie() {
   const held = claimRun(runDir, owner)
   if (!held) return
   die(
-    pidAlive(held.pid) || hasLiveRecordedPids(readState())
+    lockPidMayBeLive(held.pid) || hasLiveRecordedPids(readState())
       ? `Another verification run (owner ${held.owner ?? 'unknown'}) holds ${runDir}. ` +
           'Drive that one, or run `helpers/control cleanup` first. Do not double-drive.'
       : `A previous run left ${runDir} behind and nothing it started is running. ` +
@@ -4598,7 +4599,7 @@ function clearRunDir(keep = []) {
   // before it removed it; a live claimer's own is left alone.
   for (const name of existsSync(runDir) ? readdirSync(runDir) : []) {
     const claimer = /^owner\.json\.(?:stale-)?(\d+)/.exec(name)?.[1]
-    if (claimer && !pidAlive(Number(claimer))) {
+    if (claimer && !lockPidMayBeLive(Number(claimer))) {
       rmSync(join(runDir, name), { force: true })
     }
   }

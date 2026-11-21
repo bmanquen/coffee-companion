@@ -1795,6 +1795,23 @@ describe('unscoped cleanup and runs that start during it', () => {
     }
   })
 
+  it('leaves a claim whose process it may not signal', async () => {
+    const t = setup()
+    // pid 1 is alive, and an unprivileged signal to it fails with EPERM.
+    writeFileSync(
+      join(t.run, 'owner.json'),
+      JSON.stringify({ owner: 'other-user-launch', pid: 1 }),
+    )
+    try {
+      const a = await t.cleanup().exited
+      assert.notEqual(a.code, 0)
+      assert.match(a.stderr, /A launch \(pid 1,/)
+      assert.equal(readRunClaim(t.run)?.owner, 'other-user-launch')
+    } finally {
+      await t.done()
+    }
+  })
+
   it('takes over a stale claim for itself, so a second cleanup and a launch wait', async () => {
     const t = setup()
     const gone = spawnSync(process.execPath, ['-e', '']).pid
