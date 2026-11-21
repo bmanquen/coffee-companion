@@ -9,10 +9,7 @@ import {
   espressoShotIdempotencyKeys,
   espressoShots,
 } from '../db/schema'
-import {
-  ESPRESSO_DEVICE_TYPE,
-  encodeEspressoShotCursor,
-} from '../lib/espresso'
+import { ESPRESSO_DEVICE_TYPE, encodeEspressoShotCursor } from '../lib/espresso'
 import {
   UNKNOWN_UUID,
   callerFor,
@@ -170,7 +167,10 @@ beforeAll(async () => {
   const uniqOwner = uniqFor(USER_GEAR_OWNER)
   const [foreignCoffee, foreignGrinder] = await Promise.all([
     createCoffeeFor(asOwner, uniqOwner)(uniqOwner('Kenya')),
-    asOwner.grinder.create({ name: uniqOwner('Comandante'), brand: 'Comandante' }),
+    asOwner.grinder.create({
+      name: uniqOwner('Comandante'),
+      brand: 'Comandante',
+    }),
   ])
   foreignCoffeeId = foreignCoffee.id
   foreignGrinderId = foreignGrinder.id
@@ -223,7 +223,7 @@ describe('espressoShot.create', () => {
         yield: '36',
         time: 30,
         grindSetting: '1.5',
-      idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: crypto.randomUUID(),
       }),
     ).rejects.toThrow(/Espresso/)
   })
@@ -238,7 +238,7 @@ describe('espressoShot.create', () => {
         yield: '36',
         time: 30,
         grindSetting: '1.5',
-      idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: crypto.randomUUID(),
       }),
     ).rejects.toThrow(/not found/i)
   })
@@ -273,32 +273,29 @@ describe('espressoShot.create', () => {
     ).rejects.toThrow(/Grinder not found/)
   })
 
-  it('rejects a device the user cannot list, even one typed Espresso', async () => {
-    // Only a row from before lookup_name_guard can carry another user's
-    // private type named like the shared one, so the guard is off here.
-    const deviceId = await db.transaction(async (tx) => {
-      await tx.execute(sql`SET LOCAL session_replication_role = replica`)
-      const [type] = await tx
-        .insert(brewingDeviceTypes)
-        .values({ name: ESPRESSO_DEVICE_TYPE, userId: USER_B })
-        .returning({ id: brewingDeviceTypes.id })
-      const [device] = await tx
-        .insert(brewingDevices)
-        .values({
-          userId: USER_A,
-          name: uniq('Legacy machine'),
-          brand: 'Legacy',
-          typeId: type.id,
-        })
-        .returning({ id: brewingDevices.id })
-      return device.id
-    })
+  it('rejects a device the user cannot list', async () => {
+    // A device written with another user's private type before the type
+    // check; without the visibility filter its name check would refuse it
+    // as not Espresso instead.
+    const [type] = await db
+      .insert(brewingDeviceTypes)
+      .values({ name: uniq('Private type'), userId: USER_B })
+      .returning({ id: brewingDeviceTypes.id })
+    const [device] = await db
+      .insert(brewingDevices)
+      .values({
+        userId: USER_A,
+        name: uniq('Legacy machine'),
+        brand: 'Legacy',
+        typeId: type.id,
+      })
+      .returning({ id: brewingDevices.id })
     try {
       await expect(
         asA.espressoShot.create({
           coffeeId: coffeeAId,
           grinderId,
-          brewingDeviceId: deviceId,
+          brewingDeviceId: device.id,
           dose: '18',
           yield: '36',
           time: 30,
@@ -307,15 +304,10 @@ describe('espressoShot.create', () => {
         }),
       ).rejects.toThrow(/Brewing device not found/)
     } finally {
-      await db.delete(brewingDevices).where(eq(brewingDevices.id, deviceId))
+      await db.delete(brewingDevices).where(eq(brewingDevices.id, device.id))
       await db
         .delete(brewingDeviceTypes)
-        .where(
-          and(
-            eq(brewingDeviceTypes.name, ESPRESSO_DEVICE_TYPE),
-            eq(brewingDeviceTypes.userId, USER_B),
-          ),
-        )
+        .where(eq(brewingDeviceTypes.id, type.id))
     }
   })
 })
@@ -1162,9 +1154,10 @@ describe('espressoShot.create idempotency', () => {
       idempotencyKey,
     }
     const forA = await asA.espressoShot.create(shared)
-    const coffeeB = await createCoffeeFor(asB, uniqFor(USER_B))(
-      uniqFor(USER_B)('Other Guji'),
-    )
+    const coffeeB = await createCoffeeFor(
+      asB,
+      uniqFor(USER_B),
+    )(uniqFor(USER_B)('Other Guji'))
     const grinderB = await asB.grinder.create({
       name: uniqFor(USER_B)('Niche'),
       brand: 'Niche',
@@ -1183,7 +1176,9 @@ describe('espressoShot.create idempotency', () => {
     expect(forB.id).not.toBe(forA.id)
     expect(forB.userId).toBe(USER_B)
     expect((await asA.espressoShot.getById(forA.id)).id).toBe(forA.id)
-    await expect(asB.espressoShot.getById(forA.id)).rejects.toThrow(/not found/i)
+    await expect(asB.espressoShot.getById(forA.id)).rejects.toThrow(
+      /not found/i,
+    )
   })
 })
 
@@ -1277,9 +1272,9 @@ describe('espressoShot.getRecent', () => {
     expect(byText.items.map((shot) => shot.grindSetting)).toContain(
       'huila-grind',
     )
-    expect(byText.items.every((shot) => shot.grindSetting !== 'guji-grind')).toBe(
-      true,
-    )
+    expect(
+      byText.items.every((shot) => shot.grindSetting !== 'guji-grind'),
+    ).toBe(true)
   })
 
   it('finds getRecent shots by the ratio the log shows', async () => {
@@ -1392,10 +1387,7 @@ describe('espressoShot.getRecent', () => {
       q: token,
       dialedIn: true,
     })
-    expect(page1.items.map((shot) => shot.id)).toEqual([
-      created[2],
-      created[1],
-    ])
+    expect(page1.items.map((shot) => shot.id)).toEqual([created[2], created[1]])
     expect(page1.items.every((shot) => shot.isDialedIn)).toBe(true)
     expect(page1.total).toBe(3)
     expect(page1.nextCursor).toBeTruthy()
@@ -2068,7 +2060,7 @@ describe('espressoShot.getDialedIn', () => {
         yield: '36',
         time: 30,
         grindSetting: '1.5',
-      idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: crypto.randomUUID(),
       })
       await asA.dialedInBrew.set({
         brewingMethod: 'espresso',
@@ -2158,7 +2150,9 @@ describe('espresso_shot_idempotency_keys shot_id lookup', () => {
         WHERE shot_id = ${shot.id}
       `)
     })
-    const lookupText = lookupPlan.rows.map((row) => row['QUERY PLAN']).join('\n')
+    const lookupText = lookupPlan.rows
+      .map((row) => row['QUERY PLAN'])
+      .join('\n')
     expect(lookupText).toMatch(/Index Scan|Index Only Scan|Bitmap Index Scan/)
     // The table name contains "shot_id" too, so match the scan's index
     // condition rather than any mention of the column.
