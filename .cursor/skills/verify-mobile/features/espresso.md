@@ -13,7 +13,7 @@ A signed-in user logs an Espresso Shot from the home list: pick a Coffee, enter 
 - Open the app while signed in. The Espresso list is the home screen.
 - Choose `Log Shot`.
 - After save, the new Shot is the first row on that list.
-- The list loads the first 20 Shots. Scrolling to the end fetches the next page.
+- The list loads the first 20 Shots. Scrolling to the end fetches the next page. Scrolling to the end during a refresh does nothing, and the list may not fire again once it ends; then press `Load more` when it is enabled.
 - If a next-page request fails, the footer shows the error and `Try again`. Scrolling does not retry while that error shows; press `Try again`.
 
 ## Driving it with control

@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 import {
+  claimRun,
   parseAdbDevices,
   parseDumpsysVersionName,
   parseAvdName,
@@ -1717,6 +1718,54 @@ describe('cleanup of the run dir', () => {
   })
 })
 
+describe('unscoped cleanup and a launch that starts during it', () => {
+  it('holds the dir claimed until it has deleted everything', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-hold-'))
+    const bin = join(root, 'bin')
+    const run = join(root, 'run')
+    mkdirSync(bin)
+    mkdirSync(run)
+    // An adb on the recorded AVD whose reverse clearing takes a while, so
+    // the test can try to claim the dir mid-cleanup.
+    writeFileSync(
+      join(bin, 'adb'),
+      '#!/bin/sh\ncase "$*" in *"emu avd name"*) echo verify-pixel;; ' +
+        '*reverse*) sleep 2;; esac\nexit 0\n',
+      { mode: 0o755 },
+    )
+    writeFileSync(
+      join(run, 'state.json'),
+      JSON.stringify({
+        serial: DEVICE_SERIAL,
+        avdName: 'verify-pixel',
+        ownedPackage: false,
+        stylusHandwritingBefore: '1',
+      }),
+    )
+    const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+    delete env.VERIFY_OWNER
+    delete env.ANDROID_HOME
+    delete env.ANDROID_SDK_ROOT
+    env.PATH = `${bin}:${process.env.PATH}`
+    const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+    try {
+      const cleanup = spawn(process.execPath, [control, 'cleanup'], {
+        env,
+        stdio: 'ignore',
+      })
+      const exited = new Promise((resolve) => cleanup.on('exit', resolve))
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // A launch starting now finds the dir claimed by the cleanup.
+      const held = claimRun(run, 'late-launch')
+      assert.equal(held?.pid, cleanup.pid)
+      assert.equal(await exited, 0)
+      assert.equal(existsSync(run), false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('stopLaunchDevice', () => {
   const teardown = async (avd) => {
     const calls = []
@@ -1736,6 +1785,25 @@ describe('stopLaunchDevice', () => {
     )
     return calls
   }
+
+  it('reports a restore that ran, and not one skipped on another AVD', async () => {
+    const released = (avd) =>
+      stopLaunchDevice(
+        { serial: DEVICE_SERIAL, avdName: 'verify-pixel', emulatorPid: 4242 },
+        [],
+        {
+          avdProblem: () =>
+            recordedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => avd),
+          clearReverses: () => {},
+          restoreStylus: () => {},
+          killSerial: () => {},
+          signalPid: () => {},
+          restoreEnv: () => {},
+        },
+      )
+    assert.equal(await released('verify-pixel'), true)
+    assert.equal(await released('Pixel_7'), false)
+  })
 
   it('kills its own emulator through the serial', async () => {
     assert.deepEqual(await teardown('verify-pixel'), [
@@ -1820,6 +1888,25 @@ describe('connectedAvdProblem', () => {
     const write = launch.indexOf('ensureStylusHandwritingOff(DEVICE_SERIAL)')
     assert.ok(check >= 0 && reverse >= 0 && read >= 0 && write >= 0)
     assert.ok(check < reverse && check < read && check < write)
+    // On the boot path too: the booted emulator can exit while Metro starts.
+    assert.doesNotMatch(
+      launch.slice(launch.lastIndexOf('\n    if (', check), check),
+      /attachedEmulator/,
+    )
+  })
+
+  it('is rechecked by the RNTL launch once it holds the claim', () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'),
+      'utf8',
+    )
+    const launch = src.slice(
+      src.indexOf('async function cmdLaunch()'),
+      src.indexOf('spawnMetro(port)'),
+    )
+    const claim = launch.indexOf('claimRunOrDie()')
+    assert.ok(claim >= 0)
+    assert.ok(launch.indexOf('stylusRestoreOwed(', claim) > claim)
   })
 })
 

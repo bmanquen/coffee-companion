@@ -236,7 +236,7 @@ $control launch
 $control doctor
 # Drive writes under this launch's run ID and exits non-zero on failure, so
 # these checks never pass on an older run's proof.
-run=$(node -p 'require("./.cursor/skills/verify-mobile/.run/state.json").runId')
+run=$(node -p 'require(require("path").resolve(process.env.VERIFY_RUN_DIR || ".cursor/skills/verify-mobile/.run", "state.json")).runId')
 $control drive welcome
 $control drive sign-in
 $control drive espresso

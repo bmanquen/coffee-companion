@@ -156,15 +156,16 @@ const MOBILE_DOTENV_BACKUP = 'env.development.local.bak'
 const MOBILE_DOTENV_CREATED = 'env.development.local.created'
 // Everything the helper writes under the run dir. Cleanup deletes only these,
 // since VERIFY_RUN_DIR can name a directory that holds other files.
+// owner.json goes last, so no launch can claim the dir before the rest is gone.
 const RUN_DIR_ENTRIES = [
   'state.json',
-  'owner.json',
   'metro.log',
   'emulator.log',
   'expo-android.log',
   'maestro',
   MOBILE_DOTENV_BACKUP,
   MOBILE_DOTENV_CREATED,
+  'owner.json',
 ]
 
 function die(message, code = 1) {
@@ -2799,6 +2800,17 @@ async function cmdLaunch() {
   }
 
   claimRunOrDie()
+  // A device run's cleanup may have left a restore record during the port
+  // wait; with the claim held, check again before Metro's state replaces it.
+  const claimed = readState()
+  if (stylusRestoreOwed(claimed)) {
+    die(
+      `${claimed.serial} still owes AVD ${claimed.avdName} its ` +
+        `${STYLUS_HANDWRITING_SETTING}=${claimed.stylusHandwritingBefore}. ` +
+        `Run cleanup once that emulator is back, or delete ${runDir} to drop ` +
+        'the restore, before launching.',
+    )
+  }
   ensureDir(runDir)
   ensureDir(artifactsDir)
 
@@ -3310,6 +3322,7 @@ async function stopLaunchDevice(
   // A failed wait still leaves an APK this run installed. Cleanup uninstalls
   // only when ownedPackage is not false.
   let foreignAvd = null
+  let released = false
   if (plan.clearReverses) {
     try {
       foreignAvd = releaseRecordedDevice(partial, {
@@ -3318,6 +3331,7 @@ async function stopLaunchDevice(
         clearReverses,
         restoreStylus,
       })
+      released = foreignAvd == null
     } catch (error) {
       // .run/ keeps the stylus record, so cleanup tries the restore again.
       console.error(error.message)
@@ -3329,6 +3343,8 @@ async function stopLaunchDevice(
   })
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
   restoreEnv()
+  // True once the recorded device's setting is back, so the record can go.
+  return released
 }
 
 async function cmdLaunchDevice(opts = {}) {
@@ -3598,14 +3614,13 @@ async function cmdLaunchDevice(opts = {}) {
     console.error(
       `adb reverse tcp:${metroPort} and tcp:${webPort}; disable stylus handwriting; opening expo-development-client`,
     )
-    if (attachedEmulator) {
-      // Attaching falls back to the chosen AVD when the name cannot be read,
-      // so check the serial really is it before writing reverses or a value
-      // that cleanup could then never put back.
-      const avdProblem = recordedAvdProblem(DEVICE_SERIAL, avdName)
-      if (avdProblem) {
-        throw new Error(`Not changing ${DEVICE_SERIAL}: ${avdProblem}`)
-      }
+    // Attaching falls back to the chosen AVD when the name cannot be read,
+    // and a booted emulator can exit while Metro starts and leave the serial
+    // to another AVD, so check the serial really is it before writing
+    // reverses or a value that cleanup could then never put back.
+    const avdProblem = recordedAvdProblem(DEVICE_SERIAL, avdName)
+    if (avdProblem) {
+      throw new Error(`Not changing ${DEVICE_SERIAL}: ${avdProblem}`)
     }
     adbReverse(DEVICE_SERIAL, metroPort)
     adbReverse(DEVICE_SERIAL, webPort)
@@ -3692,7 +3707,11 @@ async function cmdLaunchDevice(opts = {}) {
       ),
     )
   } catch (error) {
-    await stopLaunchDevice(partial)
+    if (await stopLaunchDevice(partial)) {
+      // Restored: a later cleanup must not write that old value again.
+      const recorded = readState()
+      if (recorded) writeState({ ...recorded, stylusHandwritingBefore: undefined })
+    }
     die(error.message, error.exitCode)
   }
 }
@@ -4554,7 +4573,12 @@ async function cmdCleanup() {
     )
     return
   }
-  const claim = readRunClaim(runDir)
+  // Unscoped cleanup claims an unclaimed dir itself and holds that claim
+  // until it deletes it last, so a launch cannot claim the dir mid-cleanup
+  // and lose its files to it.
+  const claim = owner
+    ? null
+    : (claimRun(runDir, `cleanup-${process.pid}`) ?? readRunClaim(runDir))
   if (!owner && claim && pidAlive(claim.pid) && claim.pid !== process.pid) {
     // A launch claims the dir before it records anything to stop, so a
     // cleanup now could free the dir for a second launch mid-start.

@@ -74,10 +74,10 @@ appId: dev.offbyonelabs.coffeecompanion
     id: select-sheet-coffee
 - tapOn:
     id: select-option-00000000-0000-4000-8000-000000000001
+# The value id appears only once a value is chosen; the text is checked next.
 - extendedWaitUntil:
     visible:
       id: select-value-grinder
-      text: "Niche Zero"
     timeout: 15000
 - copyTextFrom:
     id: select-value-grinder
@@ -85,7 +85,6 @@ appId: dev.offbyonelabs.coffeecompanion
 - extendedWaitUntil:
     visible:
       id: select-value-brewing-device
-      text: "Linea Mini"
     timeout: 15000
 - copyTextFrom:
     id: select-value-brewing-device
