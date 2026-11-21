@@ -10,6 +10,7 @@ import {
   openSync,
   readdirSync,
   readFileSync,
+  rmdirSync,
   rmSync,
   writeFileSync,
   writeSync,
@@ -153,6 +154,18 @@ const BUNDLE_PATHS = [
 const MOBILE_DOTENV_LOCAL = '.env.development.local'
 const MOBILE_DOTENV_BACKUP = 'env.development.local.bak'
 const MOBILE_DOTENV_CREATED = 'env.development.local.created'
+// Everything the helper writes under the run dir. Cleanup deletes only these,
+// since VERIFY_RUN_DIR can name a directory that holds other files.
+const RUN_DIR_ENTRIES = [
+  'state.json',
+  'owner.json',
+  'metro.log',
+  'emulator.log',
+  'expo-android.log',
+  'maestro',
+  MOBILE_DOTENV_BACKUP,
+  MOBILE_DOTENV_CREATED,
+]
 
 function die(message, code = 1) {
   console.error(message)
@@ -3320,7 +3333,7 @@ async function stopLaunchDevice(
 
 async function cmdLaunchDevice(opts = {}) {
   const plannedFlow = `${opts.plannedFlow ?? ''}`.trim() || null
-  const existing = readState()
+  let existing = readState()
   if (hasLiveRecordedPids(existing)) {
     die(
       `A verification instance is already running. ` +
@@ -3339,6 +3352,9 @@ async function cmdLaunchDevice(opts = {}) {
     die(portBusyMessage(webPort, webFree.pids, 'web'))
   }
   claimRunOrDie()
+  // A cleanup during the port waits may have restored and dropped a kept
+  // stylus record; with the claim held, this read is the one to reuse.
+  existing = readState()
 
   const sdk = resolveSdkRoot()
   if (!sdk) {
@@ -3582,16 +3598,18 @@ async function cmdLaunchDevice(opts = {}) {
     console.error(
       `adb reverse tcp:${metroPort} and tcp:${webPort}; disable stylus handwriting; opening expo-development-client`,
     )
-    adbReverse(DEVICE_SERIAL, metroPort)
-    adbReverse(DEVICE_SERIAL, webPort)
     if (attachedEmulator) {
       // Attaching falls back to the chosen AVD when the name cannot be read,
-      // so check the serial really is it before recording or writing a value
+      // so check the serial really is it before writing reverses or a value
       // that cleanup could then never put back.
       const avdProblem = recordedAvdProblem(DEVICE_SERIAL, avdName)
       if (avdProblem) {
-        throw new Error(`Not changing stylus handwriting: ${avdProblem}`)
+        throw new Error(`Not changing ${DEVICE_SERIAL}: ${avdProblem}`)
       }
+    }
+    adbReverse(DEVICE_SERIAL, metroPort)
+    adbReverse(DEVICE_SERIAL, webPort)
+    if (attachedEmulator) {
       // A record a failed cleanup kept is the value from before any run
       // changed it; the setting may still read 0 from that run.
       partial.stylusHandwritingBefore =
@@ -4507,6 +4525,20 @@ function stopListenersOnOwnedVerifyPorts(
   return stopped
 }
 
+// Deletes what the helper wrote to the run dir, except keep, then the dir
+// itself only once nothing else is in it.
+function clearRunDir(keep = []) {
+  for (const name of RUN_DIR_ENTRIES) {
+    if (keep.includes(name)) continue
+    rmSync(join(runDir, name), { recursive: true, force: true })
+  }
+  try {
+    rmdirSync(runDir)
+  } catch {
+    // Missing, or holds files the helper did not write.
+  }
+}
+
 async function cmdCleanup() {
   const owner = process.env.VERIFY_OWNER
   if (owner && readRunClaim(runDir)?.owner !== owner) {
@@ -4521,6 +4553,17 @@ async function cmdCleanup() {
       ),
     )
     return
+  }
+  const claim = readRunClaim(runDir)
+  if (!owner && claim && pidAlive(claim.pid) && claim.pid !== process.pid) {
+    // A launch claims the dir before it records anything to stop, so a
+    // cleanup now could free the dir for a second launch mid-start.
+    die(
+      `A launch (pid ${claim.pid}, owner ${claim.owner ?? 'unknown'}) is still ` +
+        `starting in ${runDir}. Wait for it to exit, then run cleanup. If no ` +
+        `launch is running (that pid was reused), run cleanup as its owner: ` +
+        `VERIFY_OWNER=${claim.owner ?? '<owner>'} helpers/control cleanup.`,
+    )
   }
   const state = readState()
   const stopped = []
@@ -4572,19 +4615,16 @@ async function cmdCleanup() {
     // claim in place, so the same VERIFY_OWNER can retry and no other owner
     // can take the instance in between.
     writeState(stylusRestoreRecord(state))
-    for (const name of readdirSync(runDir)) {
-      if (name === basename(statePath)) continue
-      if (owner && name === basename(ownerPath(runDir))) continue
-      rmSync(join(runDir, name), { recursive: true, force: true })
-    }
+    clearRunDir([
+      basename(statePath),
+      ...(owner ? [basename(ownerPath(runDir))] : []),
+    ])
     die(
       `${restoreError.message}. Kept it in ${statePath}; run cleanup again ` +
         `once that emulator is back, or delete ${runDir} to drop it.`,
     )
   }
-  if (existsSync(runDir)) {
-    rmSync(runDir, { recursive: true, force: true })
-  }
+  clearRunDir()
 
   console.log(
     JSON.stringify(

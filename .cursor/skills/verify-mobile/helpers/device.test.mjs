@@ -1672,6 +1672,51 @@ describe('cleanup with a kept stylus record', () => {
   })
 })
 
+describe('cleanup of the run dir', () => {
+  it('waits out a starting launch, then deletes only what the helper wrote', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-rundir-'))
+    const run = join(root, 'run')
+    mkdirSync(run)
+    const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+    delete env.VERIFY_OWNER
+    const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+    const cleanup = () =>
+      spawnSync(process.execPath, [control, 'cleanup'], {
+        env,
+        encoding: 'utf8',
+        timeout: 60_000,
+      })
+    const claim = (pid) =>
+      writeFileSync(join(run, 'owner.json'), JSON.stringify({ owner: 'a', pid }))
+    try {
+      writeFileSync(join(run, 'notes.txt'), 'not ours')
+      writeFileSync(join(run, 'metro.log'), 'scratch')
+      // This test process stands in for a launch that has claimed the dir
+      // but not yet written state.json.
+      claim(process.pid)
+      const starting = cleanup()
+      assert.notEqual(starting.status, 0, starting.stdout)
+      assert.match(starting.stderr, /still starting/)
+      assert.match(starting.stderr, /VERIFY_OWNER=a helpers\/control cleanup/)
+      assert.equal(existsSync(join(run, 'owner.json')), true)
+
+      claim(spawnSync(process.execPath, ['-e', '']).pid)
+      const done = cleanup()
+      assert.equal(done.status, 0, done.stderr)
+      assert.equal(existsSync(join(run, 'owner.json')), false)
+      assert.equal(existsSync(join(run, 'metro.log')), false)
+      assert.equal(readFileSync(join(run, 'notes.txt'), 'utf8'), 'not ours')
+
+      rmSync(join(run, 'notes.txt'))
+      writeFileSync(join(run, 'metro.log'), 'scratch')
+      assert.equal(cleanup().status, 0)
+      assert.equal(existsSync(run), false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('stopLaunchDevice', () => {
   const teardown = async (avd) => {
     const calls = []
@@ -1763,17 +1808,18 @@ describe('connectedAvdProblem', () => {
     assert.ok(check < firstWrite)
   })
 
-  it('is checked before launch-device records or changes stylus handwriting', () => {
+  it('is checked before launch-device writes reverses or stylus handwriting', () => {
     const src = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'),
       'utf8',
     )
     const launch = src.slice(src.indexOf('async function cmdLaunchDevice'))
     const check = launch.indexOf('recordedAvdProblem(')
+    const reverse = launch.indexOf('adbReverse(DEVICE_SERIAL')
     const read = launch.indexOf('readStylusBaseline(DEVICE_SERIAL)')
     const write = launch.indexOf('ensureStylusHandwritingOff(DEVICE_SERIAL)')
-    assert.ok(check >= 0 && read >= 0 && write >= 0)
-    assert.ok(check < read && check < write)
+    assert.ok(check >= 0 && reverse >= 0 && read >= 0 && write >= 0)
+    assert.ok(check < reverse && check < read && check < write)
   })
 })
 
