@@ -1,4 +1,8 @@
-import { onlineManager, useQueryClient } from '@tanstack/react-query'
+import {
+  QueryClient,
+  onlineManager,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react-native'
 import { ESPRESSO_SHOT_PAGE_SIZE } from '@coffee-companion/api/lib/espresso'
 import { QueryProvider } from '../query'
@@ -476,6 +480,65 @@ describe('useEspressoCatalog', () => {
     expect(listCursors).toEqual([null])
   })
 
+  it('keeps a failed next page out of the history error while a save refreshes', async () => {
+    const PAGE = ESPRESSO_SHOT_PAGE_SIZE
+    const rows = Array.from({ length: PAGE }, (_, index) =>
+      shot({ id: `shot-${index + 1}`, coffeeName: `Shot ${index + 1}` }),
+    )
+    const saved = shot({ id: 'shot-saved', coffeeName: 'Saved' })
+    let release: (() => void) | null = null
+    let firstPages = 0
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      listShots: (cursor) => {
+        if (cursor) return Promise.reject(new Error('Network request failed'))
+        firstPages += 1
+        if (firstPages === 1) {
+          return Promise.resolve({
+            items: rows,
+            total: PAGE + 1,
+            nextCursor: `after:${rows[PAGE - 1].id}`,
+          })
+        }
+        // The read after the save waits until the test releases it.
+        return new Promise((resolve) => {
+          release = () =>
+            resolve({
+              items: [saved, ...rows],
+              total: PAGE + 1,
+              nextCursor: null,
+            })
+        })
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {},
+    }
+    const { result } = await renderCatalog(api)
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE),
+    )
+    await act(async () => {
+      result.current.loadMore()
+    })
+    await waitFor(() => expect(result.current.loadMoreError).not.toBeNull())
+
+    await act(async () => {
+      result.current.save(shotInput)
+    })
+    await waitFor(() => expect(release).not.toBeNull())
+    // Only Load more failed; the history itself has not.
+    expect(result.current.loadError).toBeNull()
+    expect(result.current.retrying).toBe(false)
+
+    await act(async () => {
+      release?.()
+    })
+    await waitFor(() =>
+      expect(result.current.catalog?.shots[0]?.id).toBe(saved.id),
+    )
+    expect(result.current.loadError).toBeNull()
+  })
+
   it('treats a Retry paused offline as running', async () => {
     const saved = shot({ id: 'shot-saved', coffeeName: 'Saved' })
     let rows = [shot({ id: 'shot-1', coffeeName: 'Shot 1' })]
@@ -509,6 +572,7 @@ describe('useEspressoCatalog', () => {
     await waitFor(() => expect(result.current.loadError).not.toBeNull())
     expect(result.current.retrying).toBe(false)
 
+    const readsBeforeRetry = reads
     onlineManager.setOnline(false)
     try {
       await act(async () => {
@@ -519,9 +583,17 @@ describe('useEspressoCatalog', () => {
       expect(result.current.retrying).toBe(true)
       expect(result.current.refreshing).toBe(true)
       const readsWhilePaused = reads
-      await act(async () => {
-        result.current.reload()
-      })
+      // A paused read runs nothing yet, so only a cancel would show a
+      // replacement being queued.
+      const cancel = jest.spyOn(QueryClient.prototype, 'cancelQueries')
+      try {
+        await act(async () => {
+          result.current.reload()
+        })
+        expect(cancel).not.toHaveBeenCalled()
+      } finally {
+        cancel.mockRestore()
+      }
       expect(reads).toBe(readsWhilePaused)
     } finally {
       onlineManager.setOnline(true)
@@ -529,6 +601,8 @@ describe('useEspressoCatalog', () => {
     await waitFor(() =>
       expect(result.current.catalog?.shots[0]?.id).toBe(saved.id),
     )
+    // The first Retry's read, run once on reconnect.
+    expect(reads).toBe(readsBeforeRetry + 1)
   })
 
   it('keeps Load more busy while the next page is paused offline', async () => {

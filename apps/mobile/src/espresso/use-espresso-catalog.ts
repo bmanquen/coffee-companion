@@ -27,6 +27,10 @@ const ESPRESSO_PREFILL_QUERY_KEY = 'espresso-prefill'
 export function useEspressoCatalog(api: EspressoApi, userId: string) {
   const queryClient = useQueryClient()
   const [saveError, setSaveError] = useState<string | null>(null)
+  // The error a Load more ended with. A later refresh keeps the query's error
+  // until it settles but clears the fetch direction, so only the error itself
+  // tells that it came from a next page.
+  const [nextPageError, setNextPageError] = useState<unknown>(null)
 
   const equipment = useQuery({
     queryKey: [ESPRESSO_EQUIPMENT_QUERY_KEY, userId],
@@ -76,7 +80,10 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
       (shots.isPending || shots.fetchStatus === 'paused' || historyReading))
 
   const equipmentFailed = equipment.isError && !equipment.data
-  const historyFailed = shots.isError && !shots.isFetchNextPageError
+  const historyFailed =
+    shots.isError &&
+    !shots.isFetchNextPageError &&
+    shots.error !== nextPageError
   const loadError = equipmentFailed
     ? apiErrorMessage(equipment.error, ERROR_LOAD_FAILED)
     : historyFailed
@@ -140,7 +147,9 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     ) {
       return
     }
-    void shots.fetchNextPage({ cancelRefetch: false })
+    void shots.fetchNextPage({ cancelRefetch: false }).then((next) => {
+      if (next.isFetchNextPageError) setNextPageError(next.error)
+    })
   }, [queryClient, shots, shotsOptions.queryKey])
 
   const createShot = useMutation({
