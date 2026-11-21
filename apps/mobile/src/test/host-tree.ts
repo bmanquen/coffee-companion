@@ -1,10 +1,13 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+// A React element (which links its owner Fiber) or a Fiber itself; a prop
+// that merely has one of these keys is ordinary data.
 function isGraphNode(value: object) {
   return (
     !Array.isArray(value) &&
-    ('_owner' in value || 'return' in value || 'stateNode' in value)
+    (('$$typeof' in value && '_owner' in value) ||
+      ('stateNode' in value && 'return' in value && 'tag' in value))
   )
 }
 

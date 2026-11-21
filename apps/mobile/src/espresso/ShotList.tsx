@@ -64,7 +64,7 @@ export function ShotList({
       contentContainerStyle={styles.content}
       data={rows}
       extraData={`${loading}:${failed}:${loadingMore}:${loadMoreError ?? ''}:${rows.length}:${hasMore}:${refreshing}`}
-      initialNumToRender={rows.length > 0 ? rows.length : ESPRESSO_SHOT_PAGE_SIZE}
+      initialNumToRender={ESPRESSO_SHOT_PAGE_SIZE}
       keyExtractor={(shot) => shot.id}
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.4}

@@ -283,6 +283,24 @@ async function pickSelect(label: string, optionId: string) {
   expect(screen.queryByTestId(selectSheetTestId(label))).toBeNull()
 }
 
+// Jest lays nothing out, so the shot list renders only its first page of
+// rows; a screen tall enough for every row lets it render the rest.
+async function showAllRows() {
+  const list = screen.getByTestId(SHOT_LIST_TEST_ID)
+  const size = { width: 400, height: 100_000 }
+  await fireEvent(list, 'layout', {
+    nativeEvent: { layout: { x: 0, y: 0, ...size } },
+  })
+  await fireEvent(list, 'contentSizeChange', size.width, size.height)
+  await fireEvent.scroll(list, {
+    nativeEvent: {
+      contentOffset: { x: 0, y: 0 },
+      contentSize: size,
+      layoutMeasurement: size,
+    },
+  })
+}
+
 async function pickCoffee() {
   await pickSelect(LABEL_COFFEE, COFFEE)
   expect(await screen.findByDisplayValue('2026-05-01')).toBeTruthy()
@@ -1353,6 +1371,8 @@ describe('log espresso shot', () => {
     expect(await screen.findByText('Coffee 0')).toBeTruthy()
 
     await press(LOAD_MORE_SHOTS)
+    await waitFor(() => expect(cursors).toHaveLength(2))
+    await showAllRows()
     expect(await screen.findByText('Coffee 24')).toBeTruthy()
     expect(cursors).toHaveLength(2)
     expect(screen.getByTestId(LOG_SHOT_TEST_ID)).toBeDisabled()
@@ -1537,6 +1557,7 @@ describe('log espresso shot', () => {
     await waitFor(() => expect(cursors).toContain(pageCursor('shot-19')))
     expect(cursors).not.toContain('shot-19')
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
+    await showAllRows()
     await waitFor(() =>
       expect(screen.getByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-20`)).toBeTruthy(),
     )
@@ -1544,18 +1565,47 @@ describe('log espresso shot', () => {
       expect(screen.getByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-${index}`)).toBeTruthy()
       expect(screen.getByText(`Coffee ${index}`)).toBeTruthy()
     }
+
+    // Back from the form, the list mounts again with both pages loaded, and
+    // still renders only one page up front.
+    await openForm()
+    await press(BACK)
+    expect(screen.getByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-0`)).toBeTruthy()
+    expect(screen.queryByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-20`)).toBeNull()
+    await showAllRows()
+    await waitFor(() =>
+      expect(screen.getByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-20`)).toBeTruthy(),
+    )
   })
 
   it('prefills from the coffee query even when that shot is not on the first page', async () => {
-    const older = seedShot({
-      id: 'shot-old',
-      grindSetting: '21',
-      roastDate: '2026-05-01',
-    })
+    // Twenty newer shots of another coffee fill page one; the chosen
+    // coffee's shot is the 21st, on page two.
+    const all = [
+      ...Array.from({ length: 20 }, (_, index) =>
+        seedShot({
+          id: `shot-b-${index}`,
+          coffeeId: COFFEE_B,
+          coffeeName: 'Colombia Huila',
+          grinderId: GRINDER_B,
+          roastDate: null,
+        }),
+      ),
+      seedShot({ id: 'shot-old' }),
+    ]
+    const cursors: Array<EspressoShotCursor | null | undefined> = []
+    const prefillFor: Array<string> = []
+    const paging = pagingFor(() => all)
     const api: EspressoApi = {
-      ...pagingFor(() => []),
-      load: () => Promise.resolve(catalog({ shots: [] })),
-      loadPrefill: () => Promise.resolve(older),
+      load: () => Promise.resolve(catalog({ shots: all.slice(0, 20) })),
+      listShots: (cursor) => {
+        cursors.push(cursor)
+        return paging.listShots(cursor)
+      },
+      loadPrefill: (coffeeId) => {
+        prefillFor.push(coffeeId)
+        return paging.loadPrefill(coffeeId)
+      },
       create: async () => {},
     }
     await render(<App auth={signedIn} espresso={api} />)
@@ -1567,6 +1617,9 @@ describe('log espresso shot', () => {
     expect(
       screen.getByLabelText(selectTriggerA11yLabel(LABEL_DEVICE, 'Linea Mini')),
     ).toBeTruthy()
+    expect(prefillFor).toEqual([COFFEE])
+    // The coffee's own lookup, not a walk through the history pages.
+    expect(cursors.filter((cursor) => cursor != null)).toEqual([])
   })
 
   it('clears the previous coffee’s roast date as soon as another coffee is chosen', async () => {
@@ -1789,18 +1842,20 @@ describe('log espresso shot', () => {
     })
     const created: Array<ShotCreate> = []
     const keys: Array<string> = []
-    let creates = 0
+    let failFirst: () => void = () => {}
+    const firstCreate = new Promise<void>((_, reject) => {
+      failFirst = () => reject(new Error('Network request failed'))
+    })
     const api: EspressoApi = {
       ...pagingFor(() => []),
       load: () => Promise.resolve(catalog({ shots: [] })),
       loadPrefill: () => pendingPrefill,
-      create: (input) =>
-        Promise.resolve().then(() => {
-          created.push(input)
-          keys.push(input.idempotencyKey)
-          creates += 1
-          if (creates === 1) throw new Error('Network request failed')
-        }),
+      create: (input) => {
+        created.push(input)
+        keys.push(input.idempotencyKey)
+        // The first save stays out until the stale prefill has landed.
+        return created.length === 1 ? firstCreate : Promise.resolve()
+      },
     }
     await render(<App auth={signedIn} espresso={api} />)
     await openForm()
@@ -1811,12 +1866,18 @@ describe('log espresso shot', () => {
     await press(LOG)
     expect(created).toHaveLength(1)
     expect(created[0].roastDate).toBeNull()
-    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
 
     await act(async () => {
       resolvePrefill(seedShot())
       await pendingPrefill
     })
+    expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
+
+    await act(async () => {
+      failFirst()
+      await firstCreate.catch(() => {})
+    })
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
     expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
 
     await press(LOG)
@@ -2741,6 +2802,7 @@ describe('log espresso shot', () => {
     )
     expect(screen.queryByText(ERROR_LOAD_MORE_FAILED)).toBeNull()
     expect(screen.queryByLabelText(LOADING_MORE_SHOTS)).toBeNull()
+    await showAllRows()
     await waitFor(() =>
       expect(screen.getByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-20`)).toBeTruthy(),
     )

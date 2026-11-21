@@ -14,6 +14,30 @@ describe('jsonSafe', () => {
     expect(parsed.right.props.style).toEqual(style)
   })
 
+  it('keeps a shared prop that only looks like a Fiber, and drops repeat Fibers', () => {
+    const metadata = { return: 'done' }
+    const fiber: Record<string, unknown> = {
+      tag: 5,
+      stateNode: null,
+      return: null,
+      memoizedProps: { label: 'fiber' },
+    }
+    const tree = {
+      left: { type: 'Text', props: { metadata, fiber } },
+      right: { type: 'Text', props: { metadata, fiber } },
+    }
+
+    const parsed = JSON.parse(jsonSafe(tree)) as {
+      left: { props: Record<string, unknown> }
+      right: { props: Record<string, unknown> }
+    }
+
+    expect(parsed.left.props.metadata).toEqual(metadata)
+    expect(parsed.right.props.metadata).toEqual(metadata)
+    expect(parsed.left.props.fiber).toEqual(fiber)
+    expect(parsed.right.props.fiber).toBeUndefined()
+  })
+
   it('serializes a cyclic tree without throwing', () => {
     const node: { type: string; children: Array<object> } = {
       type: 'View',
