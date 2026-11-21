@@ -2,14 +2,17 @@
 // Control CLI for Coffee Companion mobile verification. See SKILL.md.
 
 import { spawn, spawnSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import {
   copyFileSync,
   existsSync,
+  linkSync,
   mkdirSync,
   closeSync,
   openSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmdirSync,
   rmSync,
   writeFileSync,
@@ -218,19 +221,63 @@ export function readRunClaim(dir) {
   }
 }
 
-// Null when this call claimed the dir, else the claim already there.
+// Null when this call claimed the dir, else the claim already there. The
+// claim is written to a private file and linked into place, so owner.json
+// never exists without its owner and pid in it.
 export function claimRun(dir, owner) {
   ensureDir(dir)
+  const draft = `${ownerPath(dir)}.${process.pid}-${randomUUID()}`
+  writeFileSync(
+    draft,
+    `${JSON.stringify({ owner, pid: process.pid })}\n`,
+  )
   try {
-    writeFileSync(
-      ownerPath(dir),
-      `${JSON.stringify({ owner, pid: process.pid })}\n`,
-      { flag: 'wx' },
-    )
+    linkSync(draft, ownerPath(dir))
     return null
   } catch (error) {
     if (error.code !== 'EEXIST') throw error
     return readRunClaim(dir) ?? {}
+  } finally {
+    rmSync(draft, { force: true })
+  }
+}
+
+// Claims the dir for an unscoped cleanup, taking over a claim whose process
+// is gone. Null once this cleanup holds it, else the live claim in the way.
+// Launches only ever create owner.json, never replace it, so a stale claim
+// is moved aside to a private name (one rename wins) and checked to be the
+// one judged stale before this cleanup claims the dir.
+function claimForCleanup(dir) {
+  for (;;) {
+    const held = claimRun(dir, `cleanup-${process.pid}`)
+    if (!held) return null
+    if (pidAlive(held.pid)) return held
+    const aside = `${ownerPath(dir)}.stale-${process.pid}`
+    try {
+      renameSync(ownerPath(dir), aside)
+    } catch (error) {
+      if (error.code === 'ENOENT') continue
+      throw error
+    }
+    let moved = null
+    try {
+      moved = JSON.parse(readFileSync(aside, 'utf8'))
+    } catch {
+      // Unreadable: not anyone's live claim.
+    }
+    if (moved?.pid && pidAlive(moved.pid)) {
+      // Another cleanup took the stale claim over first; this moved its
+      // fresh one. Put it back and stand aside.
+      try {
+        linkSync(aside, ownerPath(dir))
+      } catch {
+        // shortcut: a third claimer got in during the few microseconds the
+        // claim was aside; both now think they hold the dir.
+      }
+      rmSync(aside, { force: true })
+      return moved
+    }
+    rmSync(aside, { force: true })
   }
 }
 
@@ -4547,6 +4594,14 @@ function stopListenersOnOwnedVerifyPorts(
 // Deletes what the helper wrote to the run dir, except keep, then the dir
 // itself only once nothing else is in it.
 function clearRunDir(keep = []) {
+  // A claim draft or a stale claim moved aside, left by a claimer killed
+  // before it removed it; a live claimer's own is left alone.
+  for (const name of existsSync(runDir) ? readdirSync(runDir) : []) {
+    const claimer = /^owner\.json\.(?:stale-)?(\d+)/.exec(name)?.[1]
+    if (claimer && !pidAlive(Number(claimer))) {
+      rmSync(join(runDir, name), { force: true })
+    }
+  }
   for (const name of RUN_DIR_ENTRIES) {
     if (keep.includes(name)) continue
     rmSync(join(runDir, name), { recursive: true, force: true })
@@ -4576,17 +4631,18 @@ async function cmdCleanup() {
   // Unscoped cleanup claims an unclaimed dir itself and holds that claim
   // until it deletes it last, so a launch cannot claim the dir mid-cleanup
   // and lose its files to it.
-  const claim = owner
-    ? null
-    : (claimRun(runDir, `cleanup-${process.pid}`) ?? readRunClaim(runDir))
-  if (!owner && claim && pidAlive(claim.pid) && claim.pid !== process.pid) {
+  const claim = owner ? null : claimForCleanup(runDir)
+  if (claim) {
     // A launch claims the dir before it records anything to stop, so a
     // cleanup now could free the dir for a second launch mid-start.
+    const who = `${claim.owner ?? ''}`.startsWith('cleanup-')
+      ? 'Another cleanup'
+      : 'A launch'
     die(
-      `A launch (pid ${claim.pid}, owner ${claim.owner ?? 'unknown'}) is still ` +
-        `starting in ${runDir}. Wait for it to exit, then run cleanup. If no ` +
-        `launch is running (that pid was reused), run cleanup as its owner: ` +
-        `VERIFY_OWNER=${claim.owner ?? '<owner>'} helpers/control cleanup.`,
+      `${who} (pid ${claim.pid}, owner ${claim.owner ?? 'unknown'}) is still ` +
+        `running in ${runDir}. Wait for it to exit, then run cleanup. If ` +
+        `nothing is running there (that pid was reused), run cleanup as its ` +
+        `owner: VERIFY_OWNER=${claim.owner ?? '<owner>'} helpers/control cleanup.`,
     )
   }
   const state = readState()

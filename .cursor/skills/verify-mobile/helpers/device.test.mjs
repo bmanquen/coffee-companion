@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 import {
   claimRun,
+  readRunClaim,
   parseAdbDevices,
   parseDumpsysVersionName,
   parseAvdName,
@@ -1697,7 +1698,7 @@ describe('cleanup of the run dir', () => {
       claim(process.pid)
       const starting = cleanup()
       assert.notEqual(starting.status, 0, starting.stdout)
-      assert.match(starting.stderr, /still starting/)
+      assert.match(starting.stderr, /A launch .* is still running/)
       assert.match(starting.stderr, /VERIFY_OWNER=a helpers\/control cleanup/)
       assert.equal(existsSync(join(run, 'owner.json')), true)
 
@@ -1718,19 +1719,21 @@ describe('cleanup of the run dir', () => {
   })
 })
 
-describe('unscoped cleanup and a launch that starts during it', () => {
-  it('holds the dir claimed until it has deleted everything', async () => {
+describe('unscoped cleanup and runs that start during it', () => {
+  const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+  // A run dir with a recorded stylus restore and an adb whose reverse
+  // clearing signals, then takes a while, so a test can act mid-cleanup.
+  const setup = () => {
     const root = mkdtempSync(join(tmpdir(), 'verify-hold-'))
     const bin = join(root, 'bin')
     const run = join(root, 'run')
+    const signal = join(root, 'reversing')
     mkdirSync(bin)
     mkdirSync(run)
-    // An adb on the recorded AVD whose reverse clearing takes a while, so
-    // the test can try to claim the dir mid-cleanup.
     writeFileSync(
       join(bin, 'adb'),
       '#!/bin/sh\ncase "$*" in *"emu avd name"*) echo verify-pixel;; ' +
-        '*reverse*) sleep 2;; esac\nexit 0\n',
+        `*reverse*) touch '${signal}'; sleep 2;; esac\nexit 0\n`,
       { mode: 0o755 },
     )
     writeFileSync(
@@ -1747,21 +1750,76 @@ describe('unscoped cleanup and a launch that starts during it', () => {
     delete env.ANDROID_HOME
     delete env.ANDROID_SDK_ROOT
     env.PATH = `${bin}:${process.env.PATH}`
-    const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
-    try {
-      const cleanup = spawn(process.execPath, [control, 'cleanup'], {
+    const children = []
+    const cleanup = () => {
+      const child = spawn(process.execPath, [control, 'cleanup'], {
         env,
-        stdio: 'ignore',
+        stdio: ['ignore', 'ignore', 'pipe'],
       })
-      const exited = new Promise((resolve) => cleanup.on('exit', resolve))
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      // A launch starting now finds the dir claimed by the cleanup.
-      const held = claimRun(run, 'late-launch')
-      assert.equal(held?.pid, cleanup.pid)
-      assert.equal(await exited, 0)
-      assert.equal(existsSync(run), false)
-    } finally {
+      let stderr = ''
+      child.stderr.on('data', (chunk) => (stderr += chunk))
+      const exited = new Promise((resolve) =>
+        child.on('exit', (code) => resolve({ code, stderr })),
+      )
+      children.push({ child, exited })
+      return { child, exited }
+    }
+    // Waits until a cleanup is clearing reverses, so it is past its claim.
+    const reversing = async () => {
+      for (let i = 0; i < 300 && !existsSync(signal); i++) {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+      assert.equal(existsSync(signal), true, 'cleanup never reached adb reverse')
+    }
+    const done = async () => {
+      for (const { child, exited } of children) {
+        if (child.exitCode == null) child.kill('SIGKILL')
+        await exited
+      }
       rmSync(root, { recursive: true, force: true })
+    }
+    return { run, cleanup, reversing, done }
+  }
+
+  it('holds an unclaimed dir until it has deleted everything', async () => {
+    const t = setup()
+    try {
+      const a = t.cleanup()
+      await t.reversing()
+      // A launch starting now finds the dir claimed by the cleanup.
+      assert.equal(claimRun(t.run, 'late-launch')?.pid, a.child.pid)
+      assert.equal((await a.exited).code, 0)
+      assert.equal(existsSync(t.run), false)
+    } finally {
+      await t.done()
+    }
+  })
+
+  it('takes over a stale claim for itself, so a second cleanup and a launch wait', async () => {
+    const t = setup()
+    const gone = spawnSync(process.execPath, ['-e', '']).pid
+    writeFileSync(
+      join(t.run, 'owner.json'),
+      JSON.stringify({ owner: 'dead-launch', pid: gone }),
+    )
+    // What claimers killed mid-claim leave: a draft, and a claim moved aside.
+    writeFileSync(join(t.run, `owner.json.${gone}-draft`), '{}')
+    writeFileSync(join(t.run, `owner.json.stale-${gone}`), '{}')
+    try {
+      const a = t.cleanup()
+      await t.reversing()
+      assert.equal(readRunClaim(t.run)?.pid, a.child.pid)
+      assert.equal(claimRun(t.run, 'late-launch')?.pid, a.child.pid)
+      const b = await t.cleanup().exited
+      assert.notEqual(b.code, 0)
+      assert.match(b.stderr, /Another cleanup .* is still running/)
+      // B left A's claim and the record in place.
+      assert.equal(readRunClaim(t.run)?.pid, a.child.pid)
+      assert.equal(existsSync(join(t.run, 'state.json')), true)
+      assert.equal((await a.exited).code, 0)
+      assert.equal(existsSync(t.run), false)
+    } finally {
+      await t.done()
     }
   })
 })
