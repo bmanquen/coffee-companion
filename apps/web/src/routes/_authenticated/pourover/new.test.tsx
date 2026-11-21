@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -229,6 +230,40 @@ describe('NewPouroverBrew form', () => {
         to: '/brews',
         search: { method: 'pourover' },
       })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('does not go to Brews when the create lands after the form closed', async () => {
+    mocks.navigate.mockClear()
+    let answer: (response: Response) => void = () => {}
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve
+        }),
+    )
+    try {
+      const { Wrapper } = seeded()
+      const { unmount } = render(<NewPouroverBrew />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fillRequiredRecipe({ brewMinutes: '2', brewSeconds: '45' })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+
+      unmount()
+      await act(async () => {
+        answer(trpcSuccess())
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+      // The save still counts; only the redirect is skipped.
+      expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
+        method: 'pourover',
+      })
+      expect(mocks.navigate).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }

@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { DeviceDialedInReference } from '@/components/brews/device-dialed-in-reference'
 import { brewsLogLocation } from '@/components/brews/methods'
 import { FormBanner } from '@/components/form/form-banner'
@@ -22,6 +22,7 @@ import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
+import { useMounted } from '@/hooks/use-mounted'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { refreshEspressoShotReads } from '@/hooks/use-espresso-shot-pages'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
@@ -152,13 +153,7 @@ export function NewEspressoShot() {
 
   // A save that settles after the user left the form must not pull them
   // back to Brews; it still refreshes the cached reads.
-  const mounted = useRef(false)
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  const mounted = useMounted()
 
   const createShot = useMutation(
     trpc.espressoShot.create.mutationOptions({
