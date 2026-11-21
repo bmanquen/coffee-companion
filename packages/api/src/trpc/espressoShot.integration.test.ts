@@ -22,6 +22,7 @@ import {
 } from '../../test/trpc'
 import {
   SHOT_IDEMPOTENCY_DELETED,
+  SHOT_REPLAY_CONFLICT,
   TRPC_BAD_REQUEST,
   TRPC_CONFLICT,
 } from './espressoShot'
@@ -622,7 +623,10 @@ describe('espressoShot.create idempotency', () => {
     expect(stored).toEqual([{ id: first.id }])
   })
 
-  it('returns one shot when two identical creates overlap', async () => {
+  it.each([
+    ['identical creates overlap', '18'],
+    ['creates with different doses overlap under one key', '19'],
+  ])('returns one shot when two %s', async (_, secondDose) => {
     const idempotencyKey = crypto.randomUUID()
     const grindSetting = `overlap-${idempotencyKey}`
     const input = {
@@ -661,7 +665,7 @@ describe('espressoShot.create idempotency', () => {
       const blockerPid = await Promise.race([coffeeLocked, holder])
       creates = Promise.allSettled([
         asA.espressoShot.create(input),
-        asA.espressoShot.create(input),
+        asA.espressoShot.create({ ...input, dose: secondDose }),
       ])
       let blocked = 0
       for (let i = 0; i < 200 && blocked < 2; i++) {
@@ -679,16 +683,9 @@ describe('espressoShot.create idempotency', () => {
       await Promise.allSettled([holder, creates])
     }
     const results = await creates
-    expect(results.map((result) => result.status)).toEqual([
-      'fulfilled',
-      'fulfilled',
-    ])
-    const [first, second] = results.map(
-      (result) => (result as PromiseFulfilledResult<{ id: string }>).value,
-    )
-    expect(second.id).toBe(first.id)
+    const won = results.filter((result) => result.status === 'fulfilled')
     const shots = await db
-      .select({ id: espressoShots.id })
+      .select({ id: espressoShots.id, dose: espressoShots.dose })
       .from(espressoShots)
       .where(
         and(
@@ -697,7 +694,24 @@ describe('espressoShot.create idempotency', () => {
         ),
       )
     expect(shots).toHaveLength(1)
-    expect(shots[0].id).toBe(first.id)
+    if (secondDose === input.dose) {
+      // The loser replays the winner's shot.
+      expect(won).toHaveLength(2)
+      for (const result of won) expect(result.value.id).toBe(shots[0].id)
+    } else {
+      // The loser lost the claim with a different request: a conflict, not
+      // the winner's shot.
+      expect(won).toHaveLength(1)
+      expect(won[0].value.id).toBe(shots[0].id)
+      const lost = results.find((result) => result.status === 'rejected')
+      expect(lost?.reason).toMatchObject({
+        code: TRPC_CONFLICT,
+        message: SHOT_REPLAY_CONFLICT,
+      })
+      const winnerDose =
+        results[0].status === 'fulfilled' ? input.dose : secondDose
+      expect(Number(shots[0].dose)).toBe(Number(winnerDose))
+    }
     const keys = await db
       .select({
         shotId: espressoShotIdempotencyKeys.shotId,
@@ -710,7 +724,7 @@ describe('espressoShot.create idempotency', () => {
         ),
       )
     expect(keys).toHaveLength(1)
-    expect(keys[0].shotId).toBe(first.id)
+    expect(keys[0].shotId).toBe(shots[0].id)
   })
 
   it('does not stamp again when a displacing shot is replayed', async () => {

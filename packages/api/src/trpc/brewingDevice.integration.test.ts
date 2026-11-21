@@ -1,4 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
+import { eq } from 'drizzle-orm'
+import { db } from '../db'
+import { brewingDevices } from '../db/schema'
 import {
   UNKNOWN_UUID,
   callerFor,
@@ -15,15 +18,19 @@ const USER_FREE = 'device-user-free'
 const USER_PAID = 'device-user-paid'
 // Hits the Free cap, then a Subscription — the upgrade path a paying user takes.
 const USER_UPGRADED = 'device-user-upgraded'
+// On Free, with devices hidden by another user's private type.
+const USER_LEGACY = 'device-user-legacy'
 const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
 const asFree = callerFor(USER_FREE)
 const asPaid = callerFor(USER_PAID)
 const asUpgraded = callerFor(USER_UPGRADED)
+const asLegacy = callerFor(USER_LEGACY)
+const uniqLegacy = uniqFor(USER_LEGACY)
 const uniq = uniqFor(USER_A)
 const uniqFree = uniqFor(USER_FREE)
 
-seedUsers([USER_A, USER_B, USER_FREE, USER_PAID, USER_UPGRADED])
+seedUsers([USER_A, USER_B, USER_FREE, USER_PAID, USER_UPGRADED, USER_LEGACY])
 
 let typeId: string
 let deviceAId: string
@@ -235,6 +242,41 @@ describe('brewingDevice plan limits', () => {
       typeId,
     })
     expect(renamed.id).toBe(first.id)
+  })
+
+  it('does not count devices hidden by another user’s private type', async () => {
+    const own = (
+      await asLegacy.brewingDeviceType.create({ name: uniqLegacy('Type') })
+    ).id
+    const devices = await Promise.all(
+      ['One', 'Two', 'Three'].map((name) =>
+        asLegacy.brewingDevice.create({
+          name: uniqLegacy(name),
+          brand: 'Brand',
+          typeId: own,
+        }),
+      ),
+    )
+    // Only rows written before writes checked the type can carry B's.
+    await db
+      .update(brewingDevices)
+      .set({ typeId })
+      .where(eq(brewingDevices.id, devices[0].id))
+    expect(await asLegacy.brewingDevice.list()).toHaveLength(2)
+
+    // The hidden one cannot be removed from the list, so it takes no slot.
+    await asLegacy.brewingDevice.create({
+      name: uniqLegacy('Fourth'),
+      brand: 'Brand',
+      typeId: own,
+    })
+    await expect(
+      asLegacy.brewingDevice.create({
+        name: uniqLegacy('Fifth'),
+        brand: 'Brand',
+        typeId: own,
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
 
   it('lets a granted paid Plan add devices past the Free limit', async () => {
