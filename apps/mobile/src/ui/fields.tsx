@@ -32,8 +32,13 @@ export function selectTriggerTestId(label: string) {
   return `select-trigger-${fieldSlug(label)}`
 }
 
+// Only a chosen value carries it, so a wait on the id alone waits for one.
 export function selectValueTestId(label: string) {
   return `select-value-${fieldSlug(label)}`
+}
+
+function selectPlaceholderTestId(label: string) {
+  return `select-placeholder-${fieldSlug(label)}`
 }
 
 export function selectSheetTestId(label: string) {
@@ -153,7 +158,11 @@ export function SelectField({
         style={styles.input}
       >
         <Text
-          testID={selectValueTestId(label)}
+          testID={
+            selected
+              ? selectValueTestId(label)
+              : selectPlaceholderTestId(label)
+          }
           style={selected ? styles.value : styles.placeholder}
         >
           {selectedText}

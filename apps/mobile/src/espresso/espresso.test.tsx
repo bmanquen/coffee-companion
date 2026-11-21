@@ -24,6 +24,7 @@ import {
   selectSheetTestId,
   selectTriggerA11yLabel,
   selectTriggerTestId,
+  selectValueTestId,
 } from '../ui/fields'
 import { ShotForm, consumeHardwareBack } from './ShotForm'
 import {
@@ -1610,10 +1611,13 @@ describe('log espresso shot', () => {
     }
     await render(<App auth={signedIn} espresso={api} />)
     await openForm()
+    // The Maestro flow waits on the value id alone, so a placeholder must not
+    // carry it.
+    expect(screen.queryByTestId(selectValueTestId(LABEL_GRINDER))).toBeNull()
     await pickCoffee()
-    expect(
-      screen.getByLabelText(selectTriggerA11yLabel(LABEL_GRINDER, 'Niche Zero')),
-    ).toBeTruthy()
+    expect(screen.getByTestId(selectValueTestId(LABEL_GRINDER))).toHaveTextContent(
+      'Niche Zero',
+    )
     expect(
       screen.getByLabelText(selectTriggerA11yLabel(LABEL_DEVICE, 'Linea Mini')),
     ).toBeTruthy()
@@ -2679,6 +2683,8 @@ describe('log espresso shot', () => {
       })
       await Promise.resolve()
     })
+    // Render every row, so a stale row past the first page would show.
+    await showAllRows()
     expect(screen.queryByText('Coffee 20')).toBeNull()
     expect(screen.getByText('Logged new')).toBeTruthy()
 

@@ -68,10 +68,10 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 async function renderCatalog(api: EspressoApi, userId = USER) {
-  return renderHook(
-    ({ id }: { id: string }) => useEspressoCatalog(api, id),
-    { wrapper, initialProps: { id: userId } },
-  )
+  return renderHook(({ id }: { id: string }) => useEspressoCatalog(api, id), {
+    wrapper,
+    initialProps: { id: userId },
+  })
 }
 
 describe('useEspressoCatalog', () => {
@@ -407,7 +407,7 @@ describe('useEspressoCatalog', () => {
 
   it('keeps every loaded page when the read after a save fails', async () => {
     const PAGE = ESPRESSO_SHOT_PAGE_SIZE
-    const listing = Array.from({ length: PAGE * 2 }, (_, index) =>
+    const listing = Array.from({ length: PAGE * 3 }, (_, index) =>
       shot({ id: `shot-${index + 1}`, coffeeName: `Shot ${index + 1}` }),
     )
     const saved = shot({ id: 'shot-saved', coffeeName: 'Saved' })
@@ -449,7 +449,8 @@ describe('useEspressoCatalog', () => {
     await waitFor(() =>
       expect(result.current.catalog?.shots).toHaveLength(PAGE * 2),
     )
-
+    // An end-reached handler from a render before the refresh failed.
+    const staleLoadMore = result.current.loadMore
     await act(async () => {
       result.current.save(shotInput)
     })
@@ -460,6 +461,7 @@ describe('useEspressoCatalog', () => {
     listCursors.length = 0
     await act(async () => {
       result.current.loadMore()
+      staleLoadMore()
     })
     expect(listCursors).toEqual([])
 
@@ -472,6 +474,61 @@ describe('useEspressoCatalog', () => {
     expect(result.current.loadError).toBeNull()
     expect(result.current.catalog?.shots).toHaveLength(PAGE)
     expect(listCursors).toEqual([null])
+  })
+
+  it('treats a Retry paused offline as running', async () => {
+    const saved = shot({ id: 'shot-saved', coffeeName: 'Saved' })
+    let rows = [shot({ id: 'shot-1', coffeeName: 'Shot 1' })]
+    let failNext = false
+    let reads = 0
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      listShots: () => {
+        reads += 1
+        if (failNext) {
+          failNext = false
+          return Promise.reject(new Error('Network request failed'))
+        }
+        return Promise.resolve({
+          items: rows,
+          total: rows.length,
+          nextCursor: null,
+        })
+      },
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {
+        rows = [saved, ...rows]
+        failNext = true
+      },
+    }
+    const { result } = await renderCatalog(api)
+    await waitFor(() => expect(result.current.catalog?.shots).toHaveLength(1))
+    await act(async () => {
+      result.current.save(shotInput)
+    })
+    await waitFor(() => expect(result.current.loadError).not.toBeNull())
+    expect(result.current.retrying).toBe(false)
+
+    onlineManager.setOnline(false)
+    try {
+      await act(async () => {
+        result.current.reload()
+      })
+      // The Retry waits for the connection: Try again and Load more are busy,
+      // and a second press does not queue the read again.
+      expect(result.current.retrying).toBe(true)
+      expect(result.current.refreshing).toBe(true)
+      const readsWhilePaused = reads
+      await act(async () => {
+        result.current.reload()
+      })
+      expect(reads).toBe(readsWhilePaused)
+    } finally {
+      onlineManager.setOnline(true)
+    }
+    await waitFor(() =>
+      expect(result.current.catalog?.shots[0]?.id).toBe(saved.id),
+    )
   })
 
   it('recovers a failed post-save read on reconnect while the cached page is still fresh', async () => {
@@ -797,10 +854,13 @@ describe('useEspressoCatalog', () => {
   })
 
   it('reports a save that fails while offline instead of staying busy', async () => {
-    const create = jest.fn(() => Promise.reject(new TypeError('Network request failed')))
+    const create = jest.fn(() =>
+      Promise.reject(new TypeError('Network request failed')),
+    )
     const api: EspressoApi = {
       load: () => Promise.resolve(catalog()),
-      listShots: () => Promise.resolve({ items: [shot()], total: 1, nextCursor: null }),
+      listShots: () =>
+        Promise.resolve({ items: [shot()], total: 1, nextCursor: null }),
       loadPrefill: () => Promise.resolve(null),
       create,
     }
@@ -813,7 +873,9 @@ describe('useEspressoCatalog', () => {
         result.current.save(shotInput)
         await Promise.resolve()
       })
-      await waitFor(() => expect(result.current.saveError).toBe(ERROR_SAVE_FAILED))
+      await waitFor(() =>
+        expect(result.current.saveError).toBe(ERROR_SAVE_FAILED),
+      )
       expect(result.current.busy).toBe(false)
       expect(create).toHaveBeenCalledTimes(1)
     } finally {

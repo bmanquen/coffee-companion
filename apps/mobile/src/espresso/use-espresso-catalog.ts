@@ -61,8 +61,10 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     ? { ...equipment.data, shots: items }
     : null
 
-  // A history read that is out, or paused offline, is not an empty history.
-  const historyReading = shots.isFetching && !shots.isFetchingNextPage
+  // A history read that is out, or paused offline, is not an empty history,
+  // and a paused one is still the read a Retry or Load more would join.
+  const historyReading =
+    shots.fetchStatus !== 'idle' && !shots.isFetchingNextPage
   const loading =
     equipment.isPending ||
     (items.length === 0 &&
@@ -82,7 +84,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
 
   // Retry stays available while any failed request is not already running
   // again; each one retries on its own.
-  const equipmentRetryable = equipmentFailed && !equipment.isFetching
+  const equipmentRetryable = equipmentFailed && equipment.fetchStatus === 'idle'
   const historyRetryable = historyFailed && !historyReading
   const retrying =
     (equipmentFailed || historyFailed) &&
@@ -117,18 +119,24 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
   }, [equipment, equipmentRetryable, historyRetryable, refreshFirstPage])
 
   const loadMore = useCallback(() => {
+    // Read the query as it is now, not as this render saw it: an end-reached
+    // event can arrive after a refresh failed and before that renders.
+    const state = queryClient.getQueryState(shotsOptions.queryKey)
     // After a failed refresh the cached pages are stale; paging on from them
     // would hide its Retry. A failed next page keeps its own footer retry.
+    const failedRefresh =
+      state?.status === 'error' &&
+      state.fetchMeta?.fetchMore?.direction !== 'forward'
     if (
-      shots.isFetchingNextPage ||
-      shots.isRefetching ||
-      shots.isRefetchError ||
+      !state ||
+      state.fetchStatus !== 'idle' ||
+      failedRefresh ||
       !shots.hasNextPage
     ) {
       return
     }
     void shots.fetchNextPage({ cancelRefetch: false })
-  }, [shots])
+  }, [queryClient, shots, shotsOptions.queryKey])
 
   const createShot = useMutation({
     mutationFn: (input: ShotCreate) => api.create(input),
@@ -184,7 +192,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     shots: shots.data ? items : null,
     // Not after a failed refresh: loadMore waits for the history Retry then.
     hasMore: shots.hasNextPage && !shots.isRefetchError,
-    refreshing: shots.isRefetching && !shots.isFetchingNextPage,
+    refreshing: historyReading && !shots.isPending,
     loading,
     loadingMore: shots.isFetchingNextPage,
     loadMoreError,
