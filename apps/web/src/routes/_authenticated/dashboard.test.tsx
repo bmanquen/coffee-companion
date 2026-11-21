@@ -546,41 +546,39 @@ describe('Dashboard', () => {
     }
   })
 
-  it('lands Next on the first loaded shot after a refresh shrinks the list', async () => {
-    const shots = Array.from({ length: 10 }, (_, i) =>
+  // A full first page whose background refresh failed, shown on its last
+  // table page, so Next refreshes before it pages on.
+  async function nextAfterFailedRefresh(
+    refreshed: (shots: Array<ReturnType<typeof makeRecentShot>>) => {
+      items: Array<ReturnType<typeof makeRecentShot>>
+      nextCursor: string | null
+    },
+    more: Array<ReturnType<typeof makeRecentShot>> = [],
+  ) {
+    // Tied shots run by descending id, as the API orders them.
+    const shots = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, i) =>
       makeRecentShot({
-        id: espressoShotFixtureId(i),
+        id: espressoShotFixtureId(1000 - i),
         coffeeId: `c${i}`,
         coffee: makeRecentCoffee({ id: `c${i}`, name: `Coffee ${i + 1}` }),
       }),
     )
-    const extra = Array.from({ length: 5 }, (_, i) =>
-      makeRecentShot({
-        id: `n${i}`,
-        coffeeId: `n${i}`,
-        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
-      }),
-    )
-    const kept = shots.slice(0, 8)
+    const page = refreshed(shots)
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       // A background refresh fails, leaving the cached pages stale.
       .mockRejectedValueOnce(new Error('Network request failed'))
-      // Next refreshes first: two shots were deleted elsewhere.
       .mockResolvedValueOnce(
-        trpcSuccess({
-          items: kept,
-          total: kept.length + extra.length,
-          nextCursor: espressoShotCursor(kept[kept.length - 1]),
-        }),
+        trpcSuccess({ ...page, total: page.items.length + more.length }),
       )
       .mockResolvedValueOnce(
         trpcSuccess({
-          items: extra,
-          total: kept.length + extra.length,
+          items: more,
+          total: page.items.length + more.length,
           nextCursor: null,
         }),
       )
+    // A failure before the spy is returned would leave fetch mocked.
     try {
       const { queryClient, trpc } = renderDashboard(
         'espresso',
@@ -591,7 +589,7 @@ describe('Dashboard', () => {
             providers.queryClient,
             providers.trpc,
             shots,
-            shots.length + extra.length,
+            shots.length + more.length,
             undefined,
             {},
             espressoShotCursor(shots[shots.length - 1]),
@@ -599,14 +597,14 @@ describe('Dashboard', () => {
           seedCoffees(
             providers.queryClient,
             providers.trpc,
-            coffeesFromShots([...shots, ...extra]),
+            coffeesFromShots([...shots, ...page.items, ...more]),
           )
         },
       )
-      await act(async () => {
+      for (let step = 0; step < 3; step += 1) {
         fireEvent.click(screen.getByLabelText('Next page'))
-      })
-      expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+      }
+      expect(screen.getByText('Page 4 of 4')).toBeTruthy()
       await act(async () => {
         await queryClient.refetchQueries(
           trpc.espressoShot.getRecent.infiniteQueryFilter(),
@@ -615,29 +613,80 @@ describe('Dashboard', () => {
       expect(
         await screen.findByText("We couldn't load your shots. Try again."),
       ).toBeTruthy()
-
       fireEvent.click(screen.getByLabelText('Next page'))
-      // 8 rows remain, so the first new shot is row 9, on page 2, not page 3.
-      expect(await screen.findByText('Page 2 of 3')).toBeTruthy()
+    } catch (error) {
+      fetchSpy.mockRestore()
+      throw error
+    }
+    return fetchSpy
+  }
+
+  const cursorOf = (call: Array<unknown>) => {
+    const input = new URL(String(call[0]), 'http://localhost').searchParams.get(
+      'input',
+    )
+    const parsed = JSON.parse(input ?? '{}') as Record<
+      string,
+      { json?: { cursor?: string } } | undefined
+    >
+    return parsed['0']?.json?.cursor
+  }
+
+  it('pages Next on from the boundary of the page a refresh returns', async () => {
+    // Two shots were deleted elsewhere, so the refreshed page ends two older
+    // shots further on.
+    const older = [0, 1].map((i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(900 - i),
+        coffeeId: `o${i}`,
+        coffee: makeRecentCoffee({ id: `o${i}`, name: `Older ${i + 1}` }),
+      }),
+    )
+    const extra = Array.from({ length: 5 }, (_, i) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(800 - i),
+        coffeeId: `n${i}`,
+        coffee: makeRecentCoffee({ id: `n${i}`, name: `Extra ${i + 1}` }),
+      }),
+    )
+    const fetchSpy = await nextAfterFailedRefresh(
+      (shots) => ({
+        items: [...shots.slice(2), ...older],
+        nextCursor: espressoShotCursor(older[1]),
+      }),
+      extra,
+    )
+    try {
+      // The first new shot is row 21, on page 5.
+      expect(await screen.findByText('Page 5 of 5')).toBeTruthy()
       expect(
         within(screen.getByRole('table')).getByText('Extra 1'),
       ).toBeTruthy()
       expect(fetchSpy).toHaveBeenCalledTimes(3)
       // The refresh starts over, and Next pages on from where it ended, not
-      // from the stale tenth row: the API reads strictly after the cursor.
-      const cursorOf = (call: Array<unknown>) => {
-        const input = new URL(String(call[0]), 'http://localhost').searchParams
-          .get('input')
-        const parsed = JSON.parse(input ?? '{}') as Record<
-          string,
-          { json?: { cursor?: string } } | undefined
-        >
-        return parsed['0']?.json?.cursor
-      }
+      // from the stale last row: the API reads strictly after the cursor.
       expect(cursorOf(fetchSpy.mock.calls[1])).toBeUndefined()
       expect(cursorOf(fetchSpy.mock.calls[2])).toBe(
-        espressoShotCursor(kept[kept.length - 1]),
+        espressoShotCursor(older[1]),
       )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('stops Next when a refresh returns a short final page', async () => {
+    // Twelve shots were deleted elsewhere: the history now ends at eight.
+    const fetchSpy = await nextAfterFailedRefresh((shots) => ({
+      items: shots.slice(0, 8),
+      nextCursor: null,
+    }))
+    try {
+      expect(await screen.findByText('Page 2 of 2')).toBeTruthy()
+      expect(
+        screen.getByLabelText<HTMLButtonElement>('Next page').disabled,
+      ).toBe(true)
+      // The refresh, and no continuation after it.
+      expect(fetchSpy).toHaveBeenCalledTimes(2)
     } finally {
       fetchSpy.mockRestore()
     }
@@ -1166,7 +1215,7 @@ describe('Dashboard', () => {
 
   it('retries a failed espresso load-more from the error', async () => {
     const extra = makeRecentShot({
-      id: 's-next',
+      id: espressoShotFixtureId(0),
       coffeeId: 'c-next',
       coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
     })
@@ -1180,9 +1229,11 @@ describe('Dashboard', () => {
           nextCursor: null,
         }),
       )
+    // Tied shots run by descending id, as the API orders them, so the extra
+    // shot sorts after the page's last one.
     const shots = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
       makeRecentShot({
-        id: espressoShotFixtureId(index),
+        id: espressoShotFixtureId(ESPRESSO_SHOT_PAGE_SIZE - index),
         coffeeId: `c${index}`,
         coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
       }),
@@ -1380,6 +1431,51 @@ describe('Dashboard', () => {
       expect(
         within(screen.getByRole('table')).getByText(/Niche Zero/),
       ).toBeTruthy()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
+    }
+  })
+
+  it('chooses Espresso when the user pages through its loaded shots', async () => {
+    let search: { method?: DashboardMethod } = {}
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockImplementation(() => search)
+    const navigate = vi.fn((options: { search: typeof search }) => {
+      search = options.search
+    })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(navigate as never)
+    try {
+      // More shots than one table page, all loaded: Next pages locally.
+      const shots = Array.from({ length: 6 }, (_, index) =>
+        makeRecentShot({
+          id: `shot-${index}`,
+          createdAt: new Date(Date.UTC(2026, 5, 3, 8, 0) - index * 60_000),
+        }),
+      )
+      const { Wrapper } = seed(shots, {
+        pourover: [
+          makePouroverBrew({
+            coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+            createdAt: new Date('2026-06-02T08:00:00.000Z'),
+          }),
+        ],
+      })
+      render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(await screen.findByText('Page 1 of 2')).toBeTruthy()
+      expect(navigate).not.toHaveBeenCalled()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+      })
+      expect(screen.getByText('Page 2 of 2')).toBeTruthy()
+      expect(navigate).toHaveBeenCalledWith({
+        search: { method: 'espresso' },
+        replace: true,
+      })
     } finally {
       searchSpy.mockRestore()
       navigateSpy.mockRestore()

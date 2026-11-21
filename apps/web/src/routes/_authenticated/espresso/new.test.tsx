@@ -569,6 +569,10 @@ describe('NewEspressoShot form', () => {
         throw new Error(SHOT_IDEMPOTENCY_DELETED)
       },
     },
+    {
+      reply: 'the deleted-key message under another code',
+      second: () => trpcErrorResponse('BAD_REQUEST', SHOT_IDEMPOTENCY_DELETED),
+    },
   ])("keeps the lost save's key after $reply", async ({ second }) => {
     const providers = seeded()
     const { Wrapper, fetchSpy } = providers

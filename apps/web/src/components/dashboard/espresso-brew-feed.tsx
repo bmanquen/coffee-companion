@@ -160,6 +160,7 @@ export function EspressoBrewFeed({ onChoose }: { onChoose?: () => void } = {}) {
       }}
       // An open shot must not vanish when a refresh moves recency elsewhere.
       onExpand={onChoose}
+      onPageChange={onChoose}
       stale={stale}
       hasMore={hasMore}
       loadMore={() => {

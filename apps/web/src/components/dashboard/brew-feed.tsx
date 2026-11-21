@@ -56,6 +56,7 @@ export function BrewFeed<T extends BrewRow>({
   loadingMore = false,
   loadMoreError,
   onExpand,
+  onPageChange,
 }: {
   title: string
   brews: Array<T>
@@ -84,6 +85,9 @@ export function BrewFeed<T extends BrewRow>({
   loadMoreError?: string | null
   // Runs when the user opens or closes a row's details.
   onExpand?: () => void
+  // Runs when the user pages with Next or Previous, not when a filter or a
+  // shrinking list moves the page.
+  onPageChange?: () => void
 }) {
   // TanStack Table's instance is a stable, mutable object the React Compiler
   // would otherwise over-memoize; opt this component out (mirrors DataTable).
@@ -202,6 +206,7 @@ export function BrewFeed<T extends BrewRow>({
       navGeneration.current += 1
       setPendingRowId(null)
       setPagination(updater)
+      onPageChange?.()
     },
     autoResetPageIndex: false,
     // By id, so a filter or refresh cannot move the open row to another brew.
