@@ -23,6 +23,16 @@ describe('formatBrewRatio', () => {
     expect(formatBrewRatio('18.0', '36.0')).toBe('1:2')
     // Past the 1000 decimals a quotient keeps, as the database accepts it.
     expect(formatBrewRatio(`18.${'0'.repeat(1001)}`, '36')).toBe('1:2')
+    // Past a double's range, as the database stores and divides them.
+    const huge = `1${'0'.repeat(309)}`
+    expect(formatBrewRatio(huge, huge)).toBe('1:1')
+    expect(formatBrewRatio('18', `36${'0'.repeat(309)}`)).toBe(
+      `1:2${'0'.repeat(309)}`,
+    )
+    // Text with no digit is still not a weight.
+    for (const text of ['.', '+', 'e5', '-.e1']) {
+      expect(formatBrewRatio(text, '36')).toBeNull()
+    }
   })
 
   it('is null when dose is missing', () => {

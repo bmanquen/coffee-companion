@@ -16,12 +16,16 @@ function parseWeight(
   if (value == null) return null
   const raw = typeof value === 'number' ? String(value) : value.trim()
   if (raw === '') return null
-  const n = Number(raw)
-  if (!Number.isFinite(n)) return null
-  // Other forms Number reads (such as 0x10) go through its plain text.
-  const text = DECIMAL_TEXT.test(raw) ? raw : String(n)
-  const [, sign, whole, fraction = '', exponent = '0'] =
-    DECIMAL_TEXT.exec(text)!
+  // Decimal text is read exactly, so a weight past a double's range still
+  // divides; other forms Number reads (such as 0x10) go through its text.
+  let match = /\d/.test(raw.split(/e/i)[0]) ? DECIMAL_TEXT.exec(raw) : null
+  if (!match) {
+    const n = Number(raw)
+    if (!Number.isFinite(n)) return null
+    match = DECIMAL_TEXT.exec(String(n))
+    if (!match) return null
+  }
+  const [, sign, whole, fraction = '', exponent = '0'] = match
   const scale = fraction.length - Number(exponent)
   if (Math.abs(scale) > MAX_INPUT_SCALE) return null
   let units = BigInt(whole + fraction || '0')

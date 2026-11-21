@@ -40,8 +40,10 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
         staleTime: ESPRESSO_COFFEES_STALE_TIME_MS,
       })
       .catch(() => {})
+    // Like the Brews loader: a warm cache keeps its pages rather than
+    // refetching every loaded one.
     void context.queryClient
-      .prefetchInfiniteQuery(espressoShotInfiniteOptions(context.trpc))
+      .ensureInfiniteQueryData(espressoShotInfiniteOptions(context.trpc))
       .catch(() => {})
     await Promise.all([
       context.queryClient.ensureQueryData(
@@ -119,9 +121,9 @@ export function DashboardContainer() {
     <Dashboard
       selectedMethod={selectedMethod}
       onSelectMethod={(next) => navigate({ search: { method: next } })}
-      // Filtering Espresso chooses it, so a late recency result cannot switch
-      // the feed away and drop the filter.
-      onFilterEspresso={
+      // Filtering or paging Espresso chooses it, so a late recency result
+      // cannot switch the feed away and drop the filter or the page.
+      onChooseEspresso={
         isDashboardMethod(method)
           ? undefined
           : () => navigate({ search: { method: 'espresso' }, replace: true })
@@ -141,13 +143,13 @@ export function DashboardContainer() {
 export function Dashboard({
   selectedMethod,
   onSelectMethod,
-  onFilterEspresso,
+  onChooseEspresso,
   feeds,
   now,
 }: {
   selectedMethod: DashboardMethod
   onSelectMethod: (method: DashboardMethod) => void
-  onFilterEspresso?: () => void
+  onChooseEspresso?: () => void
   feeds: Array<MethodFeed>
   now: Date
 }) {
@@ -162,7 +164,7 @@ export function Dashboard({
           now={now}
         />
         {selectedMethod === 'espresso' && (
-          <EspressoBrewFeed onFilter={onFilterEspresso} />
+          <EspressoBrewFeed onChoose={onChooseEspresso} />
         )}
         {selectedMethod === 'pourover' && <PouroverBrewFeed />}
         {selectedMethod === 'frenchpress' && <FrenchpressBrewFeed />}

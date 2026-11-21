@@ -126,6 +126,8 @@ export function NewEspressoShot() {
   const saveRejected = useRef(false)
   // The coffee of a save the API just reported deleted, if any.
   const savedKeyDeletedFor = useRef('')
+  // The prefill turn and recipe the form held when the last save was sent.
+  const submittedAt = useRef({ seq: 0, recipe: '' })
   // The gear and roast date of each save that may have committed, by coffee
   // and then by idempotency key, newest last, so a retry of any of them can
   // send what it first sent.
@@ -382,8 +384,15 @@ export function NewEspressoShot() {
     saveInterruptedLookup.current = false
     if (saveSucceeded.current || !prefillCoffeeId.current) return
     // The draft just sent is the one to save anew: an older lost save of
-    // its recipe waits for a reselection or an edit back to it.
-    if (savedKeyDeletedFor.current === prefillCoffeeId.current) return
+    // its recipe waits for a reselection or an edit back to it, unless one
+    // of those already happened while the save was out.
+    if (
+      savedKeyDeletedFor.current === prefillCoffeeId.current &&
+      submittedAt.current.seq === prefillSeq.current &&
+      submittedAt.current.recipe === recipeFingerprint(form.state.values)
+    ) {
+      return
+    }
     if (prefillQueued.current || resume) {
       loadPrefillFor(prefillCoffeeId.current)
     } else {
@@ -409,6 +418,10 @@ export function NewEspressoShot() {
           saveSucceeded.current = false
           saveRejected.current = false
           saveInterruptedLookup.current = pendingLookup.current != null
+          submittedAt.current = {
+            seq: prefillSeq.current,
+            recipe: recipeFingerprint(form.state.values),
+          }
           saveInFlight.current = true
           void form.handleSubmit().finally(() => {
             flushQueuedPrefill()

@@ -217,10 +217,14 @@ describe('DatePicker', () => {
 
   it('clears an optional date back to blank', async () => {
     render(<Harness value="2026-05-01" />)
+    const clear = screen.getByRole('button', { name: 'Clear Roast date' })
+    clear.focus()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Clear Roast date' }))
+      fireEvent.click(clear)
     })
     expect(screen.getByText('Pick a date')).toBeTruthy()
+    // Focus stays in the field rather than falling to the page.
+    expect(document.activeElement).toBe(screen.getByLabelText('Roast date'))
     expect(screen.getByTestId('stored-roast-date').textContent).toBe('null')
     expect(
       screen.queryByRole('button', { name: 'Clear Roast date' }),

@@ -1253,9 +1253,16 @@ describe('Dashboard', () => {
   })
 
   it('keeps loading the route when coffee.getAll and getRecent reject', async () => {
+    // The optional preloads stay pending until the loader has resolved, so
+    // the loader cannot be waiting on them.
+    let failRequests: () => void = () => {}
+    const requestsFail = new Promise<never>((_, reject) => {
+      failRequests = () => reject(new Error('Network request failed'))
+    })
+    requestsFail.catch(() => {})
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockRejectedValue(new Error('Network request failed'))
+      .mockImplementation(() => requestsFail)
     try {
       const { queryClient, trpc } = createTestProviders()
       queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
@@ -1269,6 +1276,10 @@ describe('Dashboard', () => {
           context: { queryClient, trpc },
         } as never),
       ).resolves.toBeUndefined()
+      expect(
+        queryClient.getQueryState(trpc.coffee.getAll.queryKey())?.fetchStatus,
+      ).toBe('fetching')
+      failRequests()
       await waitFor(() => {
         expect(queryClient.getQueryState(trpc.coffee.getAll.queryKey())?.status).toBe(
           'error',
@@ -1280,6 +1291,145 @@ describe('Dashboard', () => {
       })
     } finally {
       fetchSpy.mockRestore()
+    }
+  })
+
+  it('keeps loaded espresso pages from the loader instead of refetching them', async () => {
+    const fetchMock = vi.fn<typeof fetch>(() => new Promise<never>(() => {}))
+    const { queryClient, trpc } = createTestProviders({ fetch: fetchMock })
+    queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+    seedCoffees(queryClient, trpc, [makeCoffee()])
+    const older = makeRecentShot({ id: 's-older' })
+    // Two loaded pages, long stale.
+    queryClient.setQueryData(
+      espressoShotInfiniteOptions(trpc).queryKey,
+      {
+        pages: [
+          {
+            items: [makeRecentShot()],
+            total: 2,
+            nextCursor: espressoShotCursor(makeRecentShot()),
+          },
+          { items: [older], total: 2, nextCursor: null },
+        ],
+        pageParams: [null, espressoShotCursor(makeRecentShot())],
+      },
+      { updatedAt: 0 },
+    )
+    const loader = Route.options.loader
+    if (typeof loader !== 'function') throw new Error('no loader')
+    await loader({ context: { queryClient, trpc } } as never)
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps Espresso chosen while Next refreshes a feed whose refresh failed', async () => {
+    const pageOne = Array.from({ length: ESPRESSO_SHOT_PAGE_SIZE }, (_, index) =>
+      makeRecentShot({
+        id: espressoShotFixtureId(index),
+        coffee: makeRecentCoffee({ id: `c${index}`, name: `Coffee ${index}` }),
+        createdAt: new Date('2026-06-03T08:00:00.000Z'),
+      }),
+    )
+    // After the refresh every shot is older than the Pour Over brew, so
+    // recency alone would now pick Pour Over.
+    const refreshed = pageOne.map((shot) => ({
+      ...shot,
+      createdAt: new Date('2026-05-01T08:00:00.000Z'),
+    }))
+    const extra = makeRecentShot({
+      id: 's-next',
+      coffee: makeRecentCoffee({ id: 'c-next', name: 'Coffee extra' }),
+      createdAt: new Date('2026-04-01T08:00:00.000Z'),
+    })
+    let pageOneReads = 0
+    const fetchMock = vi.fn<typeof fetch>((input) => {
+      const url = new URL(String(input), 'http://localhost')
+      if (!url.pathname.includes('espressoShot.getRecent')) {
+        return Promise.reject(new Error('Network request failed'))
+      }
+      const batch = JSON.parse(url.searchParams.get('input') ?? '{}') as Record<
+        string,
+        { json?: { cursor?: string | null } }
+      >
+      if (batch['0'].json?.cursor) {
+        return Promise.resolve(
+          trpcSuccess({
+            items: [extra],
+            total: ESPRESSO_SHOT_PAGE_SIZE + 1,
+            nextCursor: null,
+          }),
+        )
+      }
+      pageOneReads += 1
+      return pageOneReads === 1
+        ? Promise.reject(new Error('Network request failed'))
+        : Promise.resolve(
+            trpcSuccess({
+              items: refreshed,
+              total: ESPRESSO_SHOT_PAGE_SIZE + 1,
+              nextCursor: espressoShotCursor(refreshed[refreshed.length - 1]),
+            }),
+          )
+    })
+    let search: { method?: DashboardMethod } = {}
+    const searchSpy = vi
+      .spyOn(Route, 'useSearch')
+      .mockImplementation(() => search)
+    const navigate = vi.fn((options: { search: typeof search }) => {
+      search = options.search
+    })
+    const navigateSpy = vi
+      .spyOn(Route, 'useNavigate')
+      .mockReturnValue(navigate as never)
+    try {
+      const { queryClient, trpc, Wrapper } = createTestProviders({
+        fetch: fetchMock,
+      })
+      seedEspressoShotPage(queryClient, trpc, pageOne, pageOne.length + 1)
+      seedCoffees(queryClient, trpc, coffeesFromShots(pageOne))
+      queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+        makePouroverBrew({
+          coffee: makeRecentCoffee({ name: 'Kenya AA' }),
+          createdAt: new Date('2026-06-02T08:00:00.000Z'),
+        }),
+      ])
+      queryClient.setQueryData(trpc.frenchpressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.aeropressBrew.getAll.queryKey(), [])
+      queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [])
+      const { rerender } = render(<DashboardContainer />, { wrapper: Wrapper })
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+
+      const shotKey = espressoShotInfiniteOptions(trpc).queryKey
+      await act(() => queryClient.invalidateQueries({ queryKey: shotKey }))
+      await waitFor(() =>
+        expect(queryClient.getQueryState(shotKey)?.status).toBe('error'),
+      )
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+
+      for (let step = 0; step < 3; step += 1) {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      }
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Next page'))
+      })
+      expect(navigate).toHaveBeenCalledWith({
+        search: { method: 'espresso' },
+        replace: true,
+      })
+      rerender(<DashboardContainer />)
+      expect(await screen.findByText('Page 5 of 5')).toBeTruthy()
+      expect(
+        within(screen.getByRole('table')).getByText('Coffee extra'),
+      ).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Espresso' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Pour Over' })).toBeNull()
+    } finally {
+      searchSpy.mockRestore()
+      navigateSpy.mockRestore()
     }
   })
 
@@ -1624,6 +1774,8 @@ describe('Dashboard', () => {
       await waitFor(() =>
         expect(queryClient.getQueryState(shotKey)?.status).toBe('error'),
       )
+      // Let the error's render settle before checking what it chose.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
       // The page already shown has no shots, so Pour Over stays chosen; a
       // failed refresh of it does not owe Espresso a retry.
       expect(screen.getByRole('button', { name: 'Pour Over' })).toBeTruthy()

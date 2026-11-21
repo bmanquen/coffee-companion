@@ -90,7 +90,11 @@ export function DatePicker({ label, showLabel = true }: DatePickerProps) {
             size="sm"
             className="self-start"
             aria-label={`Clear ${label}`}
-            onClick={() => field.handleChange(null)}
+            onClick={() => {
+              field.handleChange(null)
+              // This button goes away with the value; keep focus in the field.
+              document.getElementById(field.name)?.focus()
+            }}
           >
             Clear
           </Button>

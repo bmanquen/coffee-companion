@@ -58,9 +58,9 @@ const columns = [
   expanderColumn<EspressoShotWithRelations>(),
 ]
 
-// onFilter runs whenever the user changes a filter, which the dashboard takes
-// as choosing Espresso.
-export function EspressoBrewFeed({ onFilter }: { onFilter?: () => void } = {}) {
+// onChoose runs whenever the user changes a filter or pages on, which the
+// dashboard takes as choosing Espresso.
+export function EspressoBrewFeed({ onChoose }: { onChoose?: () => void } = {}) {
   const trpc = useTRPC()
   const coffeesQuery = useQuery({
     ...trpc.coffee.getAll.queryOptions(),
@@ -121,7 +121,7 @@ export function EspressoBrewFeed({ onFilter }: { onFilter?: () => void } = {}) {
         value: coffeeId,
         onChange: (next) => {
           setCoffeeId(next)
-          onFilter?.()
+          onChoose?.()
         },
       }}
       banner={
@@ -155,12 +155,17 @@ export function EspressoBrewFeed({ onFilter }: { onFilter?: () => void } = {}) {
         value: dialedInOnly,
         onChange: (next) => {
           setDialedInOnly(next)
-          onFilter?.()
+          onChoose?.()
         },
       }}
       stale={stale}
       hasMore={hasMore}
-      loadMore={loadMore}
+      loadMore={() => {
+        // Next may refresh the loaded pages first, and those could move
+        // recency to another method mid-load; choose Espresso before then.
+        onChoose?.()
+        return loadMore()
+      }}
       loadingMore={loadingMore}
       loadMoreError={loadMoreError}
       status={

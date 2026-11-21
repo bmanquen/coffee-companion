@@ -37,12 +37,13 @@ export function makeRecentShot(
   } = {},
 ): RecentShot {
   const { coffee, ...rest } = overrides
+  // One id for both, whichever of the two the test set.
+  const coffeeId = coffee?.id ?? rest.coffeeId ?? 'c1'
   return {
     id: 's1',
     sealed: false,
     sealedAt: null,
     userId: 'u1',
-    coffeeId: coffee?.id ?? 'c1',
     grinderId: 'g1',
     brewingDeviceId: 'd1',
     roastDate: null,
@@ -55,8 +56,9 @@ export function makeRecentShot(
     createdAt,
     updatedAt,
     coffee: {
-      ...makeRecentCoffee({ id: 'c1' }),
+      ...makeRecentCoffee(),
       ...coffee,
+      id: coffeeId,
       roaster: coffee?.roaster ?? null,
     },
     grinder: {
@@ -78,6 +80,7 @@ export function makeRecentShot(
       type: namedLookup('t1', 'Espresso'),
     },
     ...rest,
+    coffeeId,
   }
 }
 

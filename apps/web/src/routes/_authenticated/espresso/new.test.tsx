@@ -1518,6 +1518,11 @@ describe('NewEspressoShot form', () => {
           (call) => coffeeIdFromCall(call) === COFFEE,
         ),
       ).toHaveLength(1)
+      // The retry replayed May 1 under its own key, apart from May 2's.
+      const keys = createKeys(fetchSpy)
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      expect(keys[2]).toBe(keys[0])
+      expect(keys[1]).not.toBe(keys[0])
     } finally {
       fetchSpy.mockRestore()
     }
@@ -1616,6 +1621,142 @@ describe('NewEspressoShot form', () => {
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+
+  describe('while a retry that finds its shot deleted is out', () => {
+    // Fills the recipe; dose sets it apart.
+    const fillRecipe = (dose: string) => {
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: dose },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+    }
+    const pickCoffee = (id: string) =>
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: id },
+      })
+    const pickRoastDay = async (name: RegExp) => {
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText(/^Roast Date/))
+      })
+      fireEvent.click(await screen.findByRole('button', { name }))
+    }
+    // Every create fails as lost except the third, which waits for the test
+    // and then reports its shot deleted.
+    const serve = (fetchSpy: ReturnType<typeof seeded>['fetchSpy']) => {
+      let creates = 0
+      let answerThird: () => void = () => {}
+      const third = new Promise<Response>((resolve) => {
+        answerThird = () =>
+          resolve(trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED))
+      })
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isPrefillCall(call)) {
+          if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
+          return trpcSuccess(
+            makeRecentShot({
+              id: 'shot-1',
+              coffeeId: COFFEE,
+              grinderId: GRINDER,
+              brewingDeviceId: ESP_DEVICE,
+              roastDate: '2026-05-01',
+            }),
+          )
+        }
+        if (isCreateCall(call)) {
+          creates += 1
+          if (creates === 3) return third
+          throw new Error('Network request failed')
+        }
+        return trpcSuccess()
+      })
+      return { answerThird: () => act(async () => answerThird()) }
+    }
+    const logAndSettle = async (
+      fetchSpy: ReturnType<typeof seeded>['fetchSpy'],
+      count: number,
+    ) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      )
+    }
+
+    it('still loads a prefill for a coffee reselected meanwhile', async () => {
+      const { Wrapper, fetchSpy } = seeded()
+      const { answerThird } = serve(fetchSpy)
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        fillRecipe('18')
+        await logAndSettle(fetchSpy, 1)
+        await logAndSettle(fetchSpy, 2)
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(3))
+
+        pickCoffee(COFFEE_B)
+        pickCoffee(COFFEE)
+        await answerThird()
+        // The lost save is gone, so the reselection reads the latest shot.
+        await waitFor(() =>
+          expect(
+            prefillCalls(fetchSpy).filter(
+              (call) => coffeeIdFromCall(call) === COFFEE,
+            ),
+          ).toHaveLength(2),
+        )
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+
+    it("restores another lost save's roast date for a recipe edited meanwhile", async () => {
+      const { Wrapper, fetchSpy } = seeded()
+      const { answerThird } = serve(fetchSpy)
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        // Two lost saves: dose 18 from the May 2 bag, dose 19 from May 3.
+        fillRecipe('18')
+        await pickRoastDay(/May 2nd, 2026/)
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+        await logAndSettle(fetchSpy, 1)
+        fillRecipe('19')
+        await pickRoastDay(/May 3rd, 2026/)
+        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+        await logAndSettle(fetchSpy, 2)
+        // A reselection leaves the roast date to the saves, and editing back
+        // to dose 18 restores its May 2.
+        pickCoffee(COFFEE_B)
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+        fillRecipe('18')
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+
+        // The dose 18 retry is out when the recipe goes back to dose 19.
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(3))
+        fillRecipe('19')
+        await answerThird()
+        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
   })
 
   it("reuses a lost save's key after a note is typed and erased", async () => {
