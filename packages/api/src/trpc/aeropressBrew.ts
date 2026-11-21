@@ -79,32 +79,37 @@ export const aeropressBrewRouter = createTRPCRouter({
       z.object({ limit: z.number().min(1).max(50), offset: z.number().min(0) }),
     )
     .query(({ ctx, input }) =>
-      sealBrewPageWithDialedIn(ctx.session.user.id, ctx.shelf, async () => {
-        const [items, [{ total }]] = await Promise.all([
-          db.query.aeropressBrews.findMany({
-            where: {
-              userId: ctx.session.user.id,
-              ...onOwnCoffee(ctx.session.user.id),
-            },
-            orderBy: { createdAt: 'desc' },
-            with: withRelations(ctx.session.user.id),
-            limit: input.limit,
-            offset: input.offset,
-          }),
-          db
-            .select({ total: count() })
-            .from(aeropressBrews)
-            .innerJoin(
-              coffees,
-              and(
-                eq(coffees.id, aeropressBrews.coffeeId),
-                eq(coffees.userId, ctx.session.user.id),
-              ),
-            )
-            .where(eq(aeropressBrews.userId, ctx.session.user.id)),
-        ])
-        return { items, total }
-      }),
+      sealBrewPageWithDialedIn(ctx.session.user.id, ctx.shelf, () =>
+        // One snapshot, so an edit between the two reads cannot leave the
+        // total out of step with the page.
+        db.transaction(
+          async (tx) => {
+            const items = await tx.query.aeropressBrews.findMany({
+              where: {
+                userId: ctx.session.user.id,
+                ...onOwnCoffee(ctx.session.user.id),
+              },
+              orderBy: { createdAt: 'desc' },
+              with: withRelations(ctx.session.user.id),
+              limit: input.limit,
+              offset: input.offset,
+            })
+            const [{ total }] = await tx
+              .select({ total: count() })
+              .from(aeropressBrews)
+              .innerJoin(
+                coffees,
+                and(
+                  eq(coffees.id, aeropressBrews.coffeeId),
+                  eq(coffees.userId, ctx.session.user.id),
+                ),
+              )
+              .where(eq(aeropressBrews.userId, ctx.session.user.id))
+            return { items, total }
+          },
+          { isolationLevel: 'repeatable read', accessMode: 'read only' },
+        ),
+      ),
     ),
 
   // Dialed-in brews, most recent first. An optional limit caps the result;

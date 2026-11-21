@@ -212,11 +212,12 @@ function recentWhere(
         : []),
     )
     // Also the Coffee column's label, coffeeOptionLabel's `Coffee · Roaster`,
-    // with the same visible roaster.
+    // with the same visible roaster; a blank one shows no ` · `, and the
+    // NULL leaves the coffee name alone to match.
     const identityMatch = or(
       ilike(coffees.name, pattern),
       ilike(roasters.name, pattern),
-      sql`${coffees.name} || ' · ' || btrim(${roasters.name}, ${JS_TRIM_CHARS}) ILIKE ${pattern}`,
+      sql`${coffees.name} || ' · ' || NULLIF(btrim(${roasters.name}, ${JS_TRIM_CHARS}), '') ILIKE ${pattern}`,
     )
     const readable = settingsReadable(shelf)
     parts.push(

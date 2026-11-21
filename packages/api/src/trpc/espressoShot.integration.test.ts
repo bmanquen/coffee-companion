@@ -1411,6 +1411,31 @@ describe('espressoShot.getRecent', () => {
     expect(await search(`${coffee.name} · ${uniq('Other')}`)).toEqual([])
   })
 
+  it('adds no separator to the combined label for a blank roaster', async () => {
+    // coffeeOptionLabel shows only the coffee name for this roaster.
+    const roaster = await asA.roaster.create({ name: ' \t ' })
+    const coffee = await createCoffee(uniq('Blank roaster coffee'), {
+      roasterId: roaster.id,
+    })
+    const shot = await asA.espressoShot.create({
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    const search = async (q: string) =>
+      (await asA.espressoShot.getRecent({ limit: 50, q })).items.map(
+        (item) => item.id,
+      )
+
+    expect(await search(coffee.name)).toEqual([shot.id])
+    expect(await search(`${coffee.name} ·`)).toEqual([])
+  })
+
   it('hides and does not search another user’s private roaster', async () => {
     const coffee = await createCoffee(uniq('Leaky roaster coffee'))
     const secret = uniq('Secret roaster')

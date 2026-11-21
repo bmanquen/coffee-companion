@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import { db } from '../db'
 import { brewingDeviceTypes, espressoShots } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
@@ -393,7 +393,9 @@ describe('espressoShot.getLatestUnsealed', () => {
         yield: '38',
         time: 31,
         sealedAt: new Date(),
-        createdAt: new Date(Date.now() + 60_000),
+        // From the database's own clock, so the app clock cannot skew it
+        // behind the readable shot.
+        createdAt: sql`(SELECT ${espressoShots.createdAt} FROM ${espressoShots} WHERE ${espressoShots.id} = ${readable.id}) + interval '1 minute'`,
       })
       .returning({ id: espressoShots.id })
     try {
@@ -446,7 +448,8 @@ describe('the enumeration itself', () => {
       expect(
         reads.filter(
           (path) =>
-            !assertedEverywhere.has(path.split('.')[1]) && !assertedOn.has(path),
+            !assertedEverywhere.has(path.slice(method.length + 1)) &&
+            !assertedOn.has(path),
         ),
       ).toEqual([])
     }
