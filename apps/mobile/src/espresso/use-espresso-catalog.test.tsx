@@ -531,6 +531,49 @@ describe('useEspressoCatalog', () => {
     )
   })
 
+  it('keeps Load more busy while the next page is paused offline', async () => {
+    const PAGE = ESPRESSO_SHOT_PAGE_SIZE
+    const rows = Array.from({ length: PAGE + 1 }, (_, index) =>
+      shot({ id: `shot-${index + 1}`, coffeeName: `Shot ${index + 1}` }),
+    )
+    const api: EspressoApi = {
+      load: () => Promise.resolve(catalog({ shots: [] })),
+      listShots: (cursor) =>
+        Promise.resolve(
+          cursor
+            ? { items: rows.slice(PAGE), total: rows.length, nextCursor: null }
+            : {
+                items: rows.slice(0, PAGE),
+                total: rows.length,
+                nextCursor: `after:${rows[PAGE - 1].id}`,
+              },
+        ),
+      loadPrefill: () => Promise.resolve(null),
+      create: async () => {},
+    }
+    const { result } = await renderCatalog(api)
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE),
+    )
+
+    onlineManager.setOnline(false)
+    try {
+      await act(async () => {
+        result.current.loadMore()
+      })
+      // The page waits for the connection: the footer is busy, not a
+      // whole-history refresh.
+      expect(result.current.loadingMore).toBe(true)
+      expect(result.current.refreshing).toBe(false)
+    } finally {
+      onlineManager.setOnline(true)
+    }
+    await waitFor(() =>
+      expect(result.current.catalog?.shots).toHaveLength(PAGE + 1),
+    )
+    expect(result.current.loadingMore).toBe(false)
+  })
+
   it('recovers a failed post-save read on reconnect while the cached page is still fresh', async () => {
     const saved = shot({ id: 'shot-saved', coffeeName: 'Saved' })
     let rows = [shot({ id: 'shot-1', coffeeName: 'Shot 1' })]

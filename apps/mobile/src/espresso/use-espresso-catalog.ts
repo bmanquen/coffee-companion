@@ -61,10 +61,15 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     ? { ...equipment.data, shots: items }
     : null
 
+  // A next page paused offline is still the page Load more asked for, so the
+  // footer stays busy; isFetchingNextPage only counts one on the wire.
+  const pagingForward =
+    shots.fetchStatus !== 'idle' &&
+    queryClient.getQueryState(shotsOptions.queryKey)?.fetchMeta?.fetchMore
+      ?.direction === 'forward'
   // A history read that is out, or paused offline, is not an empty history,
   // and a paused one is still the read a Retry or Load more would join.
-  const historyReading =
-    shots.fetchStatus !== 'idle' && !shots.isFetchingNextPage
+  const historyReading = shots.fetchStatus !== 'idle' && !pagingForward
   const loading =
     equipment.isPending ||
     (items.length === 0 &&
@@ -194,7 +199,7 @@ export function useEspressoCatalog(api: EspressoApi, userId: string) {
     hasMore: shots.hasNextPage && !shots.isRefetchError,
     refreshing: historyReading && !shots.isPending,
     loading,
-    loadingMore: shots.isFetchingNextPage,
+    loadingMore: pagingForward,
     loadMoreError,
     loadError,
     retrying,

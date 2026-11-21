@@ -878,43 +878,51 @@ describe('log espresso shot', () => {
 
   it('wraps the recipe fields in padding keyboard avoidance', async () => {
     const keyboardListeners = jest.spyOn(Keyboard, 'addListener')
-    const { api } = fakeApi(catalog())
-    await render(<App auth={signedIn} espresso={api} />)
-    await openForm()
-    await fireEvent(screen.getByTestId(fieldTestId(LABEL_DOSE)), 'focus')
+    try {
+      const { api } = fakeApi(catalog())
+      await render(<App auth={signedIn} espresso={api} />)
+      await openForm()
+      await fireEvent(screen.getByTestId(fieldTestId(LABEL_DOSE)), 'focus')
 
-    // Enabled padding avoidance pads by the keyboard's overlap; whether the
-    // fields clear a real keyboard is a device check.
-    expect(
-      await raiseKeyboardOver(SHOT_FORM_KEYBOARD_TEST_ID, keyboardListeners),
-    ).toBe(300)
-    keyboardListeners.mockRestore()
-    expect(screen.getByTestId(fieldTestId(LABEL_TIME))).toBeTruthy()
-    expect(screen.getByTestId(fieldTestId(LABEL_GRIND))).toBeTruthy()
+      // Enabled padding avoidance pads by the keyboard's overlap; whether the
+      // fields clear a real keyboard is a device check.
+      expect(
+        await raiseKeyboardOver(SHOT_FORM_KEYBOARD_TEST_ID, keyboardListeners),
+      ).toBe(300)
+      expect(screen.getByTestId(fieldTestId(LABEL_TIME))).toBeTruthy()
+      expect(screen.getByTestId(fieldTestId(LABEL_GRIND))).toBeTruthy()
+    } finally {
+      keyboardListeners.mockRestore()
+    }
   })
 
   it('wraps the picker sheet in padding keyboard avoidance on iOS', async () => {
     const keyboardListeners = jest.spyOn(Keyboard, 'addListener')
-    const { api } = fakeApi(catalog())
-    const view = await render(<App auth={signedIn} espresso={api} />)
-    await openForm()
-    await fireEvent.press(screen.getByTestId(selectTriggerTestId(LABEL_COFFEE)))
+    try {
+      const { api } = fakeApi(catalog())
+      const view = await render(<App auth={signedIn} espresso={api} />)
+      await openForm()
+      await fireEvent.press(
+        screen.getByTestId(selectTriggerTestId(LABEL_COFFEE)),
+      )
 
-    const search = screen.getByTestId(selectSearchTestId(LABEL_COFFEE))
-    await fireEvent(search, 'focus')
+      const search = screen.getByTestId(selectSearchTestId(LABEL_COFFEE))
+      await fireEvent(search, 'focus')
 
-    // Jest runs as iOS; Android leaves the Modal's behavior unset.
-    expect(
-      await raiseKeyboardOver(
-        selectKeyboardTestId(LABEL_COFFEE),
-        keyboardListeners,
-      ),
-    ).toBe(300)
-    keyboardListeners.mockRestore()
-    expect(screen.getByTestId(selectSheetTestId(LABEL_COFFEE))).toBeTruthy()
+      // Jest runs as iOS; Android leaves the Modal's behavior unset.
+      expect(
+        await raiseKeyboardOver(
+          selectKeyboardTestId(LABEL_COFFEE),
+          keyboardListeners,
+        ),
+      ).toBe(300)
+      expect(screen.getByTestId(selectSheetTestId(LABEL_COFFEE))).toBeTruthy()
 
-    const pickerDest = process.env.VERIFY_MOBILE_PICKER_KEYBOARD_ARTIFACTS
-    if (pickerDest) writeHostTreeArtifacts(view, pickerDest)
+      const pickerDest = process.env.VERIFY_MOBILE_PICKER_KEYBOARD_ARTIFACTS
+      if (pickerDest) writeHostTreeArtifacts(view, pickerDest)
+    } finally {
+      keyboardListeners.mockRestore()
+    }
   })
 
   it('names the coffee trigger with the selected option', async () => {
@@ -1050,32 +1058,35 @@ describe('log espresso shot', () => {
   it('holds Log and hardware back until the parent renders busy', async () => {
     // busy stays false here, as it does between a press and the parent's render.
     const addListener = jest.spyOn(BackHandler, 'addEventListener')
-    const onSubmit = jest.fn()
-    const onBack = jest.fn()
-    await render(
-      <ShotForm
-        catalog={catalog()}
-        idempotencyKeys={new Map()}
-        busy={false}
-        error={null}
-        onBack={onBack}
-        onClearError={() => {}}
-        onSubmit={onSubmit}
-        loadPrefill={() => Promise.resolve(seedShot())}
-      />,
-    )
-    await pickCoffee()
-    await enterRecipe()
-    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
-    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
-    const backListener = addListener.mock.calls.at(-1)?.[1]
-    addListener.mockRestore()
+    try {
+      const onSubmit = jest.fn()
+      const onBack = jest.fn()
+      await render(
+        <ShotForm
+          catalog={catalog()}
+          idempotencyKeys={new Map()}
+          busy={false}
+          error={null}
+          onBack={onBack}
+          onClearError={() => {}}
+          onSubmit={onSubmit}
+          loadPrefill={() => Promise.resolve(seedShot())}
+        />,
+      )
+      await pickCoffee()
+      await enterRecipe()
+      await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
+      await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
+      const backListener = addListener.mock.calls.at(-1)?.[1]
 
-    expect(onSubmit).toHaveBeenCalledTimes(1)
-    expect(backListener?.({ type: 'hardwareBackPress', timeStamp: 0 })).toBe(
-      true,
-    )
-    expect(onBack).not.toHaveBeenCalled()
+      expect(onSubmit).toHaveBeenCalledTimes(1)
+      expect(backListener?.({ type: 'hardwareBackPress', timeStamp: 0 })).toBe(
+        true,
+      )
+      expect(onBack).not.toHaveBeenCalled()
+    } finally {
+      addListener.mockRestore()
+    }
   })
 
   it('does not go back on hardware back during save', () => {
