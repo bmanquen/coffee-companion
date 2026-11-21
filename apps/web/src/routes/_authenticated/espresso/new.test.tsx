@@ -447,9 +447,55 @@ describe('NewEspressoShot form', () => {
     }
   })
 
-  it('does not go to Brews when the create lands after the form closed', async () => {
+  it('sends no second create between a successful save and Brews opening', async () => {
     const providers = seeded()
     const { Wrapper, fetchSpy } = providers
+    fetchSpy.mockImplementation(serveFromCache(providers))
+    try {
+      render(<NewEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      expect(await screen.findByDisplayValue('Niche Zero')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '18' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Yield/), {
+        target: { value: '36' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Time/), {
+        target: { value: '30' },
+      })
+      fireEvent.change(screen.getByLabelText(/^Grind Setting/), {
+        target: { value: '1.5' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      // navigate is mocked, so the form stays up as it would until Brews
+      // renders.
+      await waitFor(() => expect(mocks.navigate).toHaveBeenCalled())
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: /Log/ })).toHaveProperty(
+          'disabled',
+          true,
+        ),
+      )
+
+      // Enter submits the form even past the button.
+      fireEvent.submit(
+        screen.getByRole('button', { name: /Log/ }).closest('form')!,
+      )
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+      expect(createCalls(fetchSpy)).toHaveLength(1)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('does not go to Brews when the create lands after the form closed', async () => {
+    const providers = seeded()
+    const { queryClient, Wrapper, fetchSpy } = providers
     let answer: (response: Response) => void = () => {}
     fetchSpy.mockImplementation(
       serveFromCache(
@@ -484,8 +530,16 @@ describe('NewEspressoShot form', () => {
       unmount()
       await act(async () => {
         answer(trpcSuccess())
-        await new Promise((resolve) => setTimeout(resolve, 50))
       })
+      // onSuccess has run once the mutation reads as succeeded.
+      await waitFor(() =>
+        expect(
+          queryClient
+            .getMutationCache()
+            .getAll()
+            .map((mutation) => mutation.state.status),
+        ).toContain('success'),
+      )
       expect(mocks.navigate).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
@@ -760,18 +814,20 @@ describe('NewEspressoShot form', () => {
         target: { value: '1.5' },
       })
 
+      // Waits for Log before each press: after the last, successful save
+      // it stays off until Brews opens.
       const logWithDose = async (dose: string, count: number) => {
-        fireEvent.change(screen.getByLabelText(/^Dose/), {
-          target: { value: dose },
-        })
-        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
-        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
         await waitFor(() =>
           expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
             'disabled',
             false,
           ),
         )
+        fireEvent.change(screen.getByLabelText(/^Dose/), {
+          target: { value: dose },
+        })
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy).length).toBe(count))
       }
       await logWithDose('18', 1)
       await logWithDose('22', 2)
@@ -1752,8 +1808,16 @@ describe('NewEspressoShot form', () => {
       expect(prefills).toBe(1)
       await logAndSettle(4)
       const keys = createKeys(fetchSpy)
-      expect(keys[3]).toBe(keys[0])
+      for (const key of keys) expect(key).toMatch(IDEMPOTENCY_KEY_PATTERN)
+      const inputs = createInputs(fetchSpy)
+      // The two lost saves, May 1 and May 2, under their own keys.
+      expect(inputs[0].roastDate).toBe('2026-05-01')
+      expect(inputs[1].roastDate).toBe('2026-05-02')
       expect(keys[1]).not.toBe(keys[0])
+      // The deleted-key reply answered May 2's replay, and the last Log
+      // replayed May 1, each exactly as first sent.
+      expect(inputs[2]).toEqual(inputs[1])
+      expect(inputs[3]).toEqual(inputs[0])
     } finally {
       fetchSpy.mockRestore()
     }

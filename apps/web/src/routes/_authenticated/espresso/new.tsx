@@ -439,10 +439,12 @@ export function NewEspressoShot() {
         onSubmit={(e) => {
           e.preventDefault()
           // A second submit would clear the in-flight flag when it returns,
-          // while the first save is still pending.
-          if (saveInFlight.current) return
-          saveSucceeded.current = false
+          // while the first save is still pending. After a save succeeded its
+          // keys are cleared, so another submit before Brews opens would
+          // save the shot twice.
+          if (saveInFlight.current || saveSucceeded.current) return
           saveRejected.current = false
+          savedKeyDeletedFor.current = ''
           saveInterruptedLookup.current = pendingLookup.current != null
           submittedAt.current = {
             seq: prefillSeq.current,
@@ -584,7 +586,7 @@ export function NewEspressoShot() {
         />
         <Button
           type="submit"
-          disabled={createShot.isPending}
+          disabled={createShot.isPending || createShot.isSuccess}
           aria-busy={createShot.isPending}
         >
           {createShot.isPending ? 'Logging…' : 'Log'}

@@ -245,20 +245,34 @@ describe('NewPouroverBrew form', () => {
         }),
     )
     try {
-      const { Wrapper } = seeded()
+      const { queryClient, Wrapper } = seeded()
       const { unmount } = render(<NewPouroverBrew />, { wrapper: Wrapper })
       fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
         target: { value: COFFEE },
       })
       fillRequiredRecipe({ brewMinutes: '2', brewSeconds: '45' })
       fireEvent.click(screen.getByRole('button', { name: 'Log' }))
-      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      await waitFor(() =>
+        expect(
+          fetchSpy.mock.calls.some(([url]) =>
+            String(url).includes('pouroverBrew.create'),
+          ),
+        ).toBe(true),
+      )
 
       unmount()
       await act(async () => {
         answer(trpcSuccess())
-        await new Promise((resolve) => setTimeout(resolve, 50))
       })
+      // onSuccess has run once the mutation reads as succeeded.
+      await waitFor(() =>
+        expect(
+          queryClient
+            .getMutationCache()
+            .getAll()
+            .map((mutation) => mutation.state.status),
+        ).toContain('success'),
+      )
       // The save still counts; only the redirect is skipped.
       expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
         method: 'pourover',

@@ -37,6 +37,9 @@ export const Route = createFileRoute('/_authenticated/espresso/$shotId/edit')({
       context.trpc.brewingDevice.list.queryOptions(),
     )
   },
+  // Another brew's edit is a new form, so a save on this one cannot
+  // redirect away from it.
+  remountDeps: ({ params }) => params,
   component: EditEspressoShot,
 })
 

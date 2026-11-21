@@ -175,19 +175,33 @@ describe('EditEspressoShot form', () => {
           : Promise.resolve(trpcSuccess()),
     )
     try {
-      const { Wrapper } = seeded()
+      const { queryClient, Wrapper } = seeded()
       const { unmount } = render(<EditEspressoShot />, { wrapper: Wrapper })
       fireEvent.change(screen.getByLabelText(/^Dose/), {
         target: { value: '19' },
       })
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-      await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+      await waitFor(() =>
+        expect(
+          fetchSpy.mock.calls.some(([url]) =>
+            String(url).includes('espressoShot.update'),
+          ),
+        ).toBe(true),
+      )
 
       unmount()
       await act(async () => {
         answer(trpcSuccess())
-        await new Promise((resolve) => setTimeout(resolve, 50))
       })
+      // onSuccess has run once the mutation reads as succeeded.
+      await waitFor(() =>
+        expect(
+          queryClient
+            .getMutationCache()
+            .getAll()
+            .map((mutation) => mutation.state.status),
+        ).toContain('success'),
+      )
       expect(mocks.navigate).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
