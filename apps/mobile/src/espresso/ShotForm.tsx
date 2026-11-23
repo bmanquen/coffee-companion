@@ -98,6 +98,14 @@ export function ShotForm({
   }, [draft])
 
   useEffect(() => {
+    // Unmount drops a prefill still out: it would key its draft in the map
+    // above, which outlives this form.
+    return () => {
+      prefillSeq.current += 1
+    }
+  }, [])
+
+  useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () =>
       // The ref covers a press whose busy render has not landed yet.
       consumeHardwareBack(busy || saveInFlight.current, onBack),

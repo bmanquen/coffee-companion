@@ -2038,6 +2038,51 @@ describe('log espresso shot', () => {
     })
   })
 
+  it('drops a prefill that lands after Back instead of keying its draft', async () => {
+    const keys = new Map<string, string>()
+    let answerA: (shot: ShotRow) => void = () => {}
+    const form = (error: string | null) => (
+      <ShotForm
+        catalog={catalog({
+          coffees: [
+            { id: COFFEE, name: 'Ethiopia Guji' },
+            { id: COFFEE_B, name: 'Colombia Huila' },
+          ],
+        })}
+        idempotencyKeys={keys}
+        busy={false}
+        error={error}
+        onBack={() => {}}
+        onClearError={() => {}}
+        onSubmit={() => {}}
+        loadPrefill={(coffeeId) =>
+          coffeeId === COFFEE
+            ? new Promise<ShotRow>((resolve) => {
+                answerA = resolve
+              })
+            : Promise.resolve(null)
+        }
+      />
+    )
+    const view = await render(form(null))
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    // A save whose response was lost keys this draft.
+    await press(LOG)
+    await view.rerender(form(ERROR_SAVE_FAILED))
+    expect(keys.size).toBe(1)
+
+    // Coffee A again: its lookup is out when the user goes Back.
+    await pickSelect(LABEL_COFFEE, COFFEE_B)
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await view.unmount()
+    await act(() => answerA(seedShot()))
+
+    expect(keys.size).toBe(1)
+  })
+
   it('prefills the coffee chosen during a pending save once the save fails', async () => {
     const loadIds: Array<string> = []
     const form = (
