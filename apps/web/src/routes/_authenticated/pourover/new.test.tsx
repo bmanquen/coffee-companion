@@ -235,6 +235,34 @@ describe('NewPouroverBrew form', () => {
     }
   })
 
+  it('sends no second create between a successful save and Brews opening', async () => {
+    mocks.navigate.mockClear()
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
+    try {
+      const { Wrapper } = seeded()
+      render(<NewPouroverBrew />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fillRequiredRecipe({ brewMinutes: '2', brewSeconds: '45' })
+      const log = screen.getByRole('button', { name: 'Log' })
+      fireEvent.click(log)
+      await waitFor(() => expect(mocks.navigate).toHaveBeenCalled())
+      // The mocked navigate never unmounts the form, like a slow /brews load.
+      expect((log as HTMLButtonElement).disabled).toBe(true)
+      fireEvent.submit(log.closest('form')!)
+      await act(async () => {})
+      const creates = fetchSpy.mock.calls.filter(([url]) =>
+        String(url).includes('pouroverBrew.create'),
+      )
+      expect(creates).toHaveLength(1)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   it('does not go to Brews when the create lands after the form closed', async () => {
     mocks.navigate.mockClear()
     let answer: (response: Response) => void = () => {}

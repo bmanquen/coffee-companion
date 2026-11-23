@@ -127,6 +127,9 @@ function NewFrenchpressBrew() {
         className="w-full max-w-md flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault()
+          // The saved brew's create has no idempotency key, so another
+          // submit before Brews opens would save it twice.
+          if (createBrew.isSuccess) return
           form.handleSubmit()
         }}
       >
@@ -224,7 +227,10 @@ function NewFrenchpressBrew() {
           reset={createBrew.reset}
           form={form}
         />
-        <Button type="submit" disabled={createBrew.isPending}>
+        <Button
+          type="submit"
+          disabled={createBrew.isPending || createBrew.isSuccess}
+        >
           Log
           <Plus />
         </Button>
