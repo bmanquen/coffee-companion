@@ -2078,7 +2078,7 @@ describe('NewEspressoShot form', () => {
     // May 2 and is held until the end; a read after it answers May 3.
     const reopenDuringSave = async (
       coffeeId: string,
-      settle: 'lost' | 'saved',
+      settle: 'lost' | 'saved' | 'deleted',
       frozenClock = false,
     ) => {
       // A frozen clock stamps the cache and the reopened read in one tick.
@@ -2105,7 +2105,11 @@ describe('NewEspressoShot form', () => {
               settled = true
               return settle === 'saved'
                 ? resolve(trpcSuccess())
-                : reject(new Error('Network request failed'))
+                : settle === 'deleted'
+                  ? resolve(
+                      trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED),
+                    )
+                  : reject(new Error('Network request failed'))
             }
           })
         }
@@ -2169,6 +2173,114 @@ describe('NewEspressoShot form', () => {
 
     it('reads afresh for another coffee when a save that may have committed is lost', () =>
       reopenDuringSave(COFFEE_B, 'lost'))
+
+    // The API answers deleted when the shot it inserted is deleted before
+    // its reply, so the insert may still have moved another Coffee.
+    it('reads afresh for another coffee when a saved shot is reported deleted', () =>
+      reopenDuringSave(COFFEE_B, 'deleted'))
+
+    // Form 1 logs a shot of A, lifting A over B, and is closed while the save
+    // is out; form 2 picks B and its lookup lands before the save settles.
+    // After it, B is off the Shelf and a fresh read finds nothing.
+    const landedBeforeSave = async (settle: 'lost' | 'saved') => {
+      const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
+      queryClient.removeQueries({
+        queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+          coffeeId: COFFEE_B,
+        }),
+      })
+      let settleSave: () => void = () => {}
+      let settled = false
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isCreateCall(call)) {
+          return new Promise<Response>((resolve, reject) => {
+            settleSave = () => {
+              settled = true
+              return settle === 'saved'
+                ? resolve(trpcSuccess())
+                : reject(new Error('Network request failed'))
+            }
+          })
+        }
+        return reply(call, (id) =>
+          id === COFFEE
+            ? shotOn(COFFEE, '2026-05-01')
+            : id === COFFEE_B && !settled
+              ? shotOn(COFFEE_B, '2026-05-02')
+              : null,
+        )
+      })
+      try {
+        const first = render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        fillRecipe('18')
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy)).toHaveLength(1))
+        first.unmount()
+
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE_B)
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+        await act(async () => settleSave())
+        await waitFor(() =>
+          expect(screen.queryByText('May 2nd, 2026')).toBeNull(),
+        )
+        expect(
+          screen.queryByText(/couldn't load this coffee's last shot/),
+        ).toBeNull()
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    }
+
+    it('reads again for a lookup that landed before a lost save settled', () =>
+      landedBeforeSave('lost'))
+
+    it('reads again for a lookup that landed before a save succeeded', () =>
+      landedBeforeSave('saved'))
+
+    it('reads again when another form’s save settles while this one is out', async () => {
+      const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
+      let refuse: () => void = () => {}
+      let pushedOff = false
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isCreateCall(call)) {
+          return new Promise<Response>((resolve) => {
+            refuse = () => resolve(trpcErrorResponse('BAD_REQUEST', 'Refused'))
+          })
+        }
+        return reply(call, (id) =>
+          id === COFFEE && !pushedOff ? shotOn(COFFEE, '2026-05-01') : null,
+        )
+      })
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        fillRecipe('18')
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy)).toHaveLength(1))
+
+        // Another form's save, under its own key, pushes A off the Shelf.
+        pushedOff = true
+        await act(async () => {
+          await queryClient
+            .getMutationCache()
+            .build(queryClient, {
+              mutationKey: trpc.espressoShot.create.mutationKey(),
+              mutationFn: () => Promise.resolve({}),
+            })
+            .execute({ idempotencyKey: 'another-form' })
+        })
+        await act(async () => refuse())
+        await waitFor(() =>
+          expect(screen.queryByText('May 1st, 2026')).toBeNull(),
+        )
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
 
     const isLookupOfA = (call: Array<unknown>) =>
       isPrefillCall(call) &&

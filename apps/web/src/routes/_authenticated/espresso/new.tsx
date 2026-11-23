@@ -8,6 +8,7 @@ import {
 } from '@coffee-companion/api/lib/espresso'
 import {
   isCancelledError,
+  matchMutation,
   useMutation,
   useQueryClient,
   useSuspenseQuery,
@@ -101,6 +102,16 @@ function rejectedBeforeSave(error: unknown) {
   return typeof status === 'number' && status >= 400 && status < 500
 }
 
+// The API answers deleted when it no longer finds the shot, even one this
+// request inserted, so the insert may still have committed.
+function keyDeletedError(error: unknown) {
+  return (
+    trpcErrorCode(error) === 'CONFLICT' &&
+    error instanceof Error &&
+    error.message === SHOT_IDEMPOTENCY_DELETED
+  )
+}
+
 type PrefillSource = {
   grinderId: string | null
   brewingDeviceId: string | null
@@ -118,6 +129,9 @@ export function NewEspressoShot() {
   const applyingPrefill = useRef(false)
   const saveGen = useRef(0)
   const saveInFlight = useRef(false)
+  // The key of this form's latest save, so its own settle is told apart from
+  // another form's.
+  const ownSaveKey = useRef('')
   const saveSucceeded = useRef(false)
   const prefillQueued = useRef(false)
   // The prefill lookup in flight, if any, with the selection turn it serves.
@@ -211,22 +225,20 @@ export function NewEspressoShot() {
         idempotencyKeys.current.set(fingerprint, idempotencyKey)
       }
       saveGen.current += 1
+      ownSaveKey.current = idempotencyKey
       const outcome = { keyDeleted: false, rejected: false }
       await submitFormMutation(
         form,
         (input: Parameters<typeof createShot.mutateAsync>[0]) =>
           createShot.mutateAsync(input).catch((error: unknown) => {
-            outcome.keyDeleted =
-              trpcErrorCode(error) === 'CONFLICT' &&
-              error instanceof Error &&
-              error.message === SHOT_IDEMPOTENCY_DELETED
+            outcome.keyDeleted = keyDeletedError(error)
             outcome.rejected = rejectedBeforeSave(error)
             throw error
           }),
         { ...value, idempotencyKey },
       )
       saveRejected.current = outcome.rejected
-      if (!outcome.rejected) {
+      if (!outcome.rejected || outcome.keyDeleted) {
         // A read from before a save that may have written is stale, and a
         // later lookup would join it rather than read afresh. Every Coffee's:
         // on a limited Plan the save can push another Coffee off the Shelf.
@@ -434,6 +446,37 @@ export function NewEspressoShot() {
     setPrefillError(false)
     loadPrefillFor(coffeeId)
   }
+
+  // Another form's save that may have committed can push this Coffee off the
+  // Shelf, so a prefill that already landed predates it: read it again, or
+  // once this form's own save settles. Its own saves settle through
+  // flushQueuedPrefill instead.
+  useEffect(
+    () =>
+      queryClient.getMutationCache().subscribe((event) => {
+        if (event.type !== 'updated') return
+        const { action } = event
+        const variables = event.mutation.state.variables as
+          { idempotencyKey?: string } | undefined
+        const mayHaveSaved =
+          action.type === 'success' ||
+          (action.type === 'error' &&
+            (!rejectedBeforeSave(action.error) ||
+              keyDeletedError(action.error)))
+        if (
+          mayHaveSaved &&
+          variables?.idempotencyKey !== ownSaveKey.current &&
+          prefillCoffeeId.current &&
+          matchMutation(
+            { mutationKey: trpc.espressoShot.create.mutationKey() },
+            event.mutation,
+          )
+        ) {
+          loadPrefillFor(prefillCoffeeId.current)
+        }
+      }),
+    [],
+  )
 
   // Restores the gear and roast date of the lost save whose recipe the form
   // now holds, if any, in fields not set by hand.
