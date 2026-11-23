@@ -592,7 +592,9 @@ describe('Dashboard', () => {
             providers.queryClient,
             providers.trpc,
             shots,
-            shots.length + more.length,
+            // The API sends a cursor only when another shot follows, even if
+            // it is deleted before the refresh.
+            shots.length + Math.max(more.length, 1),
             undefined,
             {},
             espressoShotCursor(shots[shots.length - 1]),

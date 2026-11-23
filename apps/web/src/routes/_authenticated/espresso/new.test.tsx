@@ -2074,8 +2074,8 @@ describe('NewEspressoShot form', () => {
     })
 
     // Form 1 logs a shot of A and is closed while the save is out; form 2
-    // picks coffeeId, whose lookup is held. The save then settles as settle
-    // says, and form 2's reads answer May 3.
+    // picks coffeeId. Its read from before the save settles answers the stale
+    // May 2 and is held until the end; a read after it answers May 3.
     const reopenDuringSave = async (
       coffeeId: string,
       settle: 'lost' | 'saved',
@@ -2095,28 +2095,29 @@ describe('NewEspressoShot form', () => {
         })
       }
       let settleSave: () => void = () => {}
-      // Form 2's reads of coffeeId wait until released, a retry included.
       const held: Array<() => void> = []
-      let released = false
+      let settled = false
       let form2 = false
       fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
         if (isCreateCall(call)) {
           return new Promise<Response>((resolve, reject) => {
-            settleSave = () =>
-              settle === 'saved'
+            settleSave = () => {
+              settled = true
+              return settle === 'saved'
                 ? resolve(trpcSuccess())
                 : reject(new Error('Network request failed'))
+            }
           })
         }
         const carries = decodeURIComponent(String(call[0])).includes(coffeeId)
         const response = reply(call, (id) =>
           id === coffeeId && form2 && carries
-            ? shotOn(coffeeId, '2026-05-03')
+            ? shotOn(coffeeId, settled ? '2026-05-03' : '2026-05-02')
             : id === COFFEE
               ? shotOn(COFFEE, '2026-05-01')
               : null,
         )
-        if (!form2 || !carries || released) return response
+        if (!form2 || !carries || settled) return response
         return new Promise<Response>((resolve) => {
           held.push(() => resolve(response))
         })
@@ -2141,13 +2142,13 @@ describe('NewEspressoShot form', () => {
           ).toBeGreaterThan(coffeeId === COFFEE ? 1 : 0),
         )
         await act(async () => settleSave())
-        await act(async () => {
-          released = true
-          held.forEach((release) => release())
-        })
-
         expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+        // The read from before the save answers late; it must not land.
+        await act(async () => held.forEach((release) => release()))
+        await act(async () => {})
+        expect(screen.getByText('May 3rd, 2026')).toBeTruthy()
         expect(screen.queryByText('May 1st, 2026')).toBeNull()
+        expect(screen.queryByText('May 2nd, 2026')).toBeNull()
         expect(
           screen.queryByText(/couldn't load this coffee's last shot/),
         ).toBeNull()
@@ -2166,64 +2167,74 @@ describe('NewEspressoShot form', () => {
     it('keeps another form’s lookup for another coffee when a save succeeds', () =>
       reopenDuringSave(COFFEE_B, 'saved'))
 
-    it('keeps another form’s lookup for another coffee when a save is lost', async () => {
-      const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
-      // Nothing cached for B, as on a first visit.
-      queryClient.removeQueries({
-        queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
-          coffeeId: COFFEE_B,
-        }),
-      })
-      let loseSave: () => void = () => {}
-      let answerB: () => void = () => {}
-      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
-        if (isCreateCall(call)) {
-          return new Promise<Response>((_, reject) => {
-            loseSave = () => reject(new Error('Network request failed'))
-          })
-        }
-        const response = reply(call, (coffeeId) =>
-          coffeeId === COFFEE_B
-            ? shotOn(COFFEE_B, '2026-05-03')
-            : coffeeId === COFFEE
-              ? shotOn(COFFEE, '2026-05-01')
-              : null,
+    it('reads afresh for another coffee when a save that may have committed is lost', () =>
+      reopenDuringSave(COFFEE_B, 'lost'))
+
+    const isLookupOfA = (call: Array<unknown>) =>
+      isPrefillCall(call) &&
+      decodeURIComponent(String(call[0])).includes(COFFEE)
+    const cancelLookups = (
+      queryClient: ReturnType<typeof seeded>['queryClient'],
+      trpc: ReturnType<typeof seeded>['trpc'],
+    ) =>
+      act(async () => {
+        await queryClient.cancelQueries(
+          trpc.espressoShot.getLatestUnsealed.queryFilter(),
         )
-        if (!decodeURIComponent(String(call[0])).includes(COFFEE_B)) {
-          return response
-        }
-        return new Promise<Response>((resolve) => {
-          answerB = () => resolve(response)
-        })
+      })
+
+    it('reports a lookup that saves keep cancelling rather than apply the cache', async () => {
+      // Coffee A's cache says May 1; its reads never answer, and other forms'
+      // saves cancel each one.
+      const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
+      let reads = 0
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (!isLookupOfA(call)) return reply(call, () => null)
+        reads += 1
+        return new Promise<Response>(() => {})
       })
       try {
-        // Form 1 logs a shot of A, and the user leaves while it is out.
-        const first = render(<NewEspressoShot />, { wrapper: Wrapper })
-        pickCoffee(COFFEE)
-        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
-        fillRecipe('18')
-        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
-        await waitFor(() => expect(createCalls(fetchSpy)).toHaveLength(1))
-        first.unmount()
-
-        // Form 2 picks B; A's save is lost while B's lookup is out.
         render(<NewEspressoShot />, { wrapper: Wrapper })
-        pickCoffee(COFFEE_B)
-        await waitFor(() =>
-          expect(
-            fetchSpy.mock.calls.some((c) =>
-              decodeURIComponent(String(c[0])).includes(COFFEE_B),
-            ),
-          ).toBe(true),
-        )
-        await act(async () => loseSave())
-        await act(async () => answerB())
-
-        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+        pickCoffee(COFFEE)
+        for (let read = 1; read <= 6; read++) {
+          await waitFor(() => expect(reads).toBe(read))
+          await cancelLookups(queryClient, trpc)
+        }
         expect(
-          screen.queryByText(/couldn't load this coffee's last shot/),
-        ).toBeNull()
+          await screen.findByText(/couldn't load this coffee's last shot/),
+        ).toBeTruthy()
+        expect(screen.queryByText('May 1st, 2026')).toBeNull()
+        expect(reads).toBe(6)
       } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+
+    it('reads afresh when the clock moves back while a save cancels the lookup', async () => {
+      // Coffee A's cache says May 1, stamped now; the server says May 3.
+      const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
+      let reads = 0
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (!isLookupOfA(call)) return reply(call, () => null)
+        reads += 1
+        if (reads === 1) return new Promise<Response>(() => {})
+        return reply(call, (id) =>
+          id === COFFEE ? shotOn(COFFEE, '2026-05-03') : null,
+        )
+      })
+      const earlier = Date.now() - 60_000
+      const clock = vi.spyOn(Date, 'now')
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        await waitFor(() => expect(reads).toBe(1))
+        // The cache's stamp is now in the future, so it looks fresh.
+        clock.mockReturnValue(earlier)
+        await cancelLookups(queryClient, trpc)
+        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+        expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      } finally {
+        clock.mockRestore()
         fetchSpy.mockRestore()
       }
     })

@@ -228,13 +228,11 @@ export function NewEspressoShot() {
       saveRejected.current = outcome.rejected
       if (!outcome.rejected) {
         // A read from before a save that may have written is stale, and a
-        // later lookup would join it rather than read afresh.
-        // Only this coffee's: another form's lookup for another coffee
-        // reads a latest shot this save cannot change.
+        // later lookup would join it rather than read afresh. Every Coffee's:
+        // on a limited Plan the save can push another Coffee off the Shelf.
+        // A lookup whose read this cancels reads again.
         void queryClient.cancelQueries(
-          trpc.espressoShot.getLatestUnsealed.queryFilter({
-            coffeeId: value.coffeeId,
-          }),
+          trpc.espressoShot.getLatestUnsealed.queryFilter(),
         )
       }
       savedKeyDeletedFor.current = outcome.keyDeleted ? value.coffeeId : ''
@@ -383,24 +381,23 @@ export function NewEspressoShot() {
       startedSaveGen === saveGen.current
     const fetchLatest = () => queryClient.fetchQuery(options)
     const state = () => queryClient.getQueryState(options.queryKey)
-    // Each retry answers a save's cancel, so a few cover any real sequence;
-    // the cap stops a loop the guards below cannot see (a cache stamped ahead
-    // of the clock while another read of it is out), which would spin in
-    // microtasks and freeze the page.
+    // Each retry answers a save's cancel; a lookup cancelled more often than
+    // that ends with the couldn't-load error rather than the cache.
     const read = (retries = 5): ReturnType<typeof fetchLatest> => {
       const again = () => (retries > 0 ? read(retries - 1) : null)
       const before = state()?.dataUpdateCount ?? 0
-      const pending = fetchLatest()
-      // No read went out when the cache counts as fresh (a clock that moved
-      // back), and then an unchanged count is not a cancel.
-      const fetched = state()?.fetchStatus !== 'idle'
-      return pending.then(
+      // Stale whatever the clock says, so the cache is never served in place
+      // of a read: a clock that moved back can stamp it in the future.
+      void queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        refetchType: 'none',
+      })
+      return fetchLatest().then(
         (latest) =>
-          (stillCurrent() &&
-            fetched &&
-            state()?.dataUpdateCount === before &&
-            again()) ||
-          latest,
+          !stillCurrent() || state()?.dataUpdateCount !== before
+            ? latest
+            : (again() ??
+              Promise.reject(new Error('Prefill read kept being cancelled'))),
         (error: unknown) =>
           (stillCurrent() && isCancelledError(error) && again()) ||
           Promise.reject(error),
