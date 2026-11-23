@@ -83,6 +83,7 @@ import {
   stopRecordedEmulator,
   stylusRestoreRecord,
   keptStylusBaseline,
+  launchPartial,
   stopLaunchDevice,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
@@ -1694,17 +1695,24 @@ describe('drive-device after a failed launch', () => {
       { mode: 0o755 },
     )
     writeFileSync(join(bin, 'maestro'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
-    // What a launch that failed after its stylus restore leaves behind: an
-    // owned package and no baseline.
-    writeFileSync(
-      join(run, 'state.json'),
-      JSON.stringify({
-        runId: 'run-1',
-        serial: DEVICE_SERIAL,
+    // What an attached launch that failed after its stylus restore leaves
+    // behind: its partial record, as persisted, with an owned package and no
+    // baseline.
+    const partial = {
+      ...launchPartial({
         avdName: 'verify-pixel',
         attachedEmulator: true,
-        ownedPackage: true,
+        keptStylus: null,
       }),
+      ownedPackage: true,
+    }
+    writeFileSync(
+      join(run, 'state.json'),
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(partial).filter(([, value]) => value != null),
+        ),
+      ),
     )
     const env = {
       ...process.env,

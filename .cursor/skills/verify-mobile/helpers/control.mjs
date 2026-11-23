@@ -3320,6 +3320,24 @@ function keptStylusBaseline(existing, serial, avdName) {
   return existing.stylusHandwritingBefore
 }
 
+// What launch-device records before its first step. A failed launch leaves
+// it behind, so it must carry what drive-device and cleanup read.
+function launchPartial({ avdName, attachedEmulator, keptStylus }) {
+  return {
+    serial: DEVICE_SERIAL,
+    androidPackage: ANDROID_PACKAGE,
+    avdName,
+    attachedEmulator,
+    emulatorPid: null,
+    metroPid: null,
+    webPid: null,
+    expoPid: null,
+    ownedPackage: !attachedEmulator,
+    // A kept value also holds when this run boots that AVD again.
+    stylusHandwritingBefore: keptStylus ?? undefined,
+  }
+}
+
 function stylusRestoreRecord(state) {
   return {
     serial: state.serial,
@@ -3533,18 +3551,7 @@ async function cmdLaunchDevice(opts = {}) {
     )
   }
   const attachedEmulator = attachment.action === 'attach'
-  const partial = {
-    serial: DEVICE_SERIAL,
-    androidPackage: ANDROID_PACKAGE,
-    avdName,
-    emulatorPid: null,
-    metroPid: null,
-    webPid: null,
-    expoPid: null,
-    ownedPackage: !attachedEmulator,
-    // A kept value also holds when this run boots that AVD again.
-    stylusHandwritingBefore: keptStylus ?? undefined,
-  }
+  const partial = launchPartial({ avdName, attachedEmulator, keptStylus })
 
   try {
     const emulatorLog = join(runDir, 'emulator.log')
@@ -4796,6 +4803,7 @@ export {
   stylusRestoreRecord,
   stylusRestoreOwed,
   keptStylusBaseline,
+  launchPartial,
   stopLaunchDevice,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
