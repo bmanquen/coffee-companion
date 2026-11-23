@@ -472,6 +472,7 @@ export function NewEspressoShot() {
             event.mutation,
           )
         ) {
+          setPrefillError(false)
           loadPrefillFor(prefillCoffeeId.current)
         }
       }),

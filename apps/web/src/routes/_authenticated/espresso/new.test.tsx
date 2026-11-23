@@ -2282,6 +2282,43 @@ describe('NewEspressoShot form', () => {
       }
     })
 
+    it('clears the lookup error when another form’s save brings a re-read', async () => {
+      const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
+      let failing = true
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (failing && isPrefillCall(call)) {
+          throw new Error('Network request failed')
+        }
+        return reply(call, (id) =>
+          id === COFFEE ? shotOn(COFFEE, '2026-05-01') : null,
+        )
+      })
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(
+          await screen.findByText(/couldn't load this coffee's last shot/),
+        ).toBeTruthy()
+
+        failing = false
+        await act(async () => {
+          await queryClient
+            .getMutationCache()
+            .build(queryClient, {
+              mutationKey: trpc.espressoShot.create.mutationKey(),
+              mutationFn: () => Promise.resolve({}),
+            })
+            .execute({ idempotencyKey: 'another-form' })
+        })
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        expect(
+          screen.queryByText(/couldn't load this coffee's last shot/),
+        ).toBeNull()
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+
     const isLookupOfA = (call: Array<unknown>) =>
       isPrefillCall(call) &&
       decodeURIComponent(String(call[0])).includes(COFFEE)
