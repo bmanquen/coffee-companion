@@ -15,6 +15,7 @@ import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
+import { useMounted } from '@/hooks/use-mounted'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { useTRPC } from '@/integrations/trpc/react'
@@ -80,6 +81,9 @@ function NewFrenchpressBrew() {
   // again server-side in frenchpressBrew.create).
   const brewingDevice = useBrewingDeviceSelect(FRENCH_PRESS_DEVICE_TYPE)
 
+  // A save that settles after the user left the form must not navigate.
+  const mounted = useMounted()
+
   const createBrew = useMutation(
     trpc.frenchpressBrew.create.mutationOptions({
       onSuccess: () => {
@@ -87,7 +91,7 @@ function NewFrenchpressBrew() {
           trpc.frenchpressBrew.getAll.queryOptions(),
         )
         track('brew_logged', { method: 'frenchpress' })
-        navigate(brewsLogLocation('frenchpress'))
+        if (mounted.current) navigate(brewsLogLocation('frenchpress'))
       },
     }),
   )
