@@ -629,9 +629,12 @@ describe('stamping before a create', () => {
       creating = asRace.espressoShot.create(shot(latest))
       const deadline = Date.now() + 5_000
       for (;;) {
+        // The stamp's UPDATE: the create's INSERT would wait on this lock too.
         const waiting = await db.$client.query<{ n: number }>(
-          `select count(*)::int as n from pg_locks
-           where relation = 'espresso_shots'::regclass and not granted`,
+          `select count(*)::int as n
+           from pg_locks l join pg_stat_activity a using (pid)
+           where l.relation = 'espresso_shots'::regclass and not l.granted
+             and a.query ilike 'update "espresso_shots"%'`,
         )
         if (waiting.rows[0].n > 0) break
         if (Date.now() > deadline) throw new Error('Stamp never waited')
@@ -658,7 +661,7 @@ describe('stamping before a create', () => {
     }
   })
 
-  it('retries when another request stamps the same fallen shot first', async () => {
+  it('retries on a fresh Shelf when another request stamps a fallen shot first', async () => {
     const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
     const device = await asRetry.brewingDevice.create({
       name: uniqRetry('Linea Mini'),
@@ -683,10 +686,11 @@ describe('stamping before a create', () => {
     const fallen = await asRetry.espressoShot.create(
       shot((await createRetryCoffee(uniqRetry('Fallen'))).id),
     )
+    const outranking: Array<string> = []
     let latest = ''
     for (let i = 0; i < 5; i++) {
       latest = (await createRetryCoffee(uniqRetry(`Outranking ${i}`))).id
-      await asRetry.espressoShot.create(shot(latest))
+      outranking.push((await asRetry.espressoShot.create(shot(latest))).id)
     }
     // Unstamped again, so two stamps race for it.
     await db
@@ -694,8 +698,9 @@ describe('stamping before a create', () => {
       .set({ sealedAt: null })
       .where(eq(espressoShots.id, fallen.id))
 
-    // Another connection stamps the fallen shot and holds the row while the
-    // create's stamp, already past its Shelf read, waits to write it.
+    // Another connection stamps the fallen shot and adds a Coffee, pushing
+    // the oldest brewed one off, and holds both while the create's stamp,
+    // already past its Shelf read, waits to write the fallen shot.
     const other = await db.$client.connect()
     let creating: Promise<unknown> | undefined
     const stamp = new Date('2026-01-02T03:04:05Z')
@@ -708,6 +713,10 @@ describe('stamping before a create', () => {
         'update espresso_shots set sealed_at = $1 where id = $2',
         [stamp, fallen.id],
       )
+      await other.query('insert into coffees (user_id, name) values ($1, $2)', [
+        RETRY,
+        uniqRetry('Newest'),
+      ])
       creating = asRetry.espressoShot.create(shot(latest))
       const deadline = Date.now() + 5_000
       for (;;) {
@@ -729,6 +738,12 @@ describe('stamping before a create', () => {
         .from(espressoShots)
         .where(eq(espressoShots.id, fallen.id))
       expect(row.sealedAt).toEqual(stamp)
+      // Only a stamp that read the Shelf again sees this one fall off.
+      const [pushedOff] = await db
+        .select({ sealedAt: espressoShots.sealedAt })
+        .from(espressoShots)
+        .where(eq(espressoShots.id, outranking[0]))
+      expect(pushedOff.sealedAt).not.toBeNull()
     } finally {
       await other.query('rollback').catch(() => {})
       other.release()
