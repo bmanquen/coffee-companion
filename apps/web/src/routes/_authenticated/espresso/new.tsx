@@ -374,26 +374,36 @@ export function NewEspressoShot() {
     }
     // A save, in this form or another, cancels a read that may predate it,
     // and a cancelled read settles with the cache from before it started (or
-    // fails when there was none), so read again rather than apply that. Only
+    // fails when there was none), so read again rather than apply that. The
+    // cancel reverts dataUpdateCount too, so an unchanged count marks it. Only
     // while this lookup is still an open form's: otherwise nothing uses it.
     const stillCurrent = () =>
       mounted.current &&
       seq === prefillSeq.current &&
       startedSaveGen === saveGen.current
     const fetchLatest = () => queryClient.fetchQuery(options)
-    const read = (): ReturnType<typeof fetchLatest> => {
-      const startedAt = Date.now()
-      return fetchLatest().then(
+    const state = () => queryClient.getQueryState(options.queryKey)
+    // Each retry answers a save's cancel, so a few cover any real sequence;
+    // the cap stops a loop the guards below cannot see (a cache stamped ahead
+    // of the clock while another read of it is out), which would spin in
+    // microtasks and freeze the page.
+    const read = (retries = 5): ReturnType<typeof fetchLatest> => {
+      const again = () => (retries > 0 ? read(retries - 1) : null)
+      const before = state()?.dataUpdateCount ?? 0
+      const pending = fetchLatest()
+      // No read went out when the cache counts as fresh (a clock that moved
+      // back), and then an unchanged count is not a cancel.
+      const fetched = state()?.fetchStatus !== 'idle'
+      return pending.then(
         (latest) =>
-          stillCurrent() &&
-          (queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? 0) <
-            startedAt
-            ? read()
-            : latest,
+          (stillCurrent() &&
+            fetched &&
+            state()?.dataUpdateCount === before &&
+            again()) ||
+          latest,
         (error: unknown) =>
-          stillCurrent() && isCancelledError(error)
-            ? read()
-            : Promise.reject(error),
+          (stillCurrent() && isCancelledError(error) && again()) ||
+          Promise.reject(error),
       )
     }
     void read()

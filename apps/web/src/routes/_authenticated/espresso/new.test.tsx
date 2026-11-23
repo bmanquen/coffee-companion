@@ -2079,7 +2079,12 @@ describe('NewEspressoShot form', () => {
     const reopenDuringSave = async (
       coffeeId: string,
       settle: 'lost' | 'saved',
+      frozenClock = false,
     ) => {
+      // A frozen clock stamps the cache and the reopened read in one tick.
+      const clock = frozenClock
+        ? vi.spyOn(Date, 'now').mockReturnValue(Date.now())
+        : null
       const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
       if (coffeeId === COFFEE_B) {
         // Nothing cached for B, as on a first visit.
@@ -2148,11 +2153,15 @@ describe('NewEspressoShot form', () => {
         ).toBeNull()
       } finally {
         fetchSpy.mockRestore()
+        clock?.mockRestore()
       }
     }
 
     it('reads afresh in a form reopened on the same coffee while a save was out', () =>
       reopenDuringSave(COFFEE, 'lost'))
+
+    it('reads afresh when the cancelled read and the cache share a clock tick', () =>
+      reopenDuringSave(COFFEE, 'lost', true))
 
     it('keeps another form’s lookup for another coffee when a save succeeds', () =>
       reopenDuringSave(COFFEE_B, 'saved'))
