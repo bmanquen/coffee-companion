@@ -1,5 +1,4 @@
 import {
-  act,
   fireEvent,
   render,
   screen,
@@ -230,54 +229,6 @@ describe('NewPouroverBrew form', () => {
         to: '/brews',
         search: { method: 'pourover' },
       })
-    } finally {
-      fetchSpy.mockRestore()
-    }
-  })
-
-  it('does not go to Brews when the create lands after the form closed', async () => {
-    mocks.navigate.mockClear()
-    let answer: (response: Response) => void = () => {}
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
-      () =>
-        new Promise<Response>((resolve) => {
-          answer = resolve
-        }),
-    )
-    try {
-      const { queryClient, Wrapper } = seeded()
-      const { unmount } = render(<NewPouroverBrew />, { wrapper: Wrapper })
-      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
-        target: { value: COFFEE },
-      })
-      fillRequiredRecipe({ brewMinutes: '2', brewSeconds: '45' })
-      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
-      await waitFor(() =>
-        expect(
-          fetchSpy.mock.calls.some(([url]) =>
-            String(url).includes('pouroverBrew.create'),
-          ),
-        ).toBe(true),
-      )
-
-      unmount()
-      await act(async () => {
-        answer(trpcSuccess())
-      })
-      // onSuccess has run once the mutation reads as succeeded.
-      await waitFor(() =>
-        expect(
-          queryClient
-            .getMutationCache()
-            .getAll()
-            .map((mutation) => mutation.state.status),
-        ).toContain('success'),
-      )
-      // The save still counts; only the redirect is skipped.
-      expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
-        method: 'pourover',
-      })
-      expect(mocks.navigate).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }

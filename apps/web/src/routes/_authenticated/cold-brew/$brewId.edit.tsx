@@ -14,7 +14,6 @@ import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
-import { useMounted } from '@/hooks/use-mounted'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
@@ -37,9 +36,6 @@ export const Route = createFileRoute('/_authenticated/cold-brew/$brewId/edit')({
       context.trpc.brewingDevice.list.queryOptions(),
     )
   },
-  // Another brew's edit is a new form, so a save on this one cannot
-  // redirect away from it.
-  remountDeps: ({ params }) => params,
   component: EditColdBrewBrew,
 })
 
@@ -63,9 +59,6 @@ function EditColdBrewBrew() {
   // server-side in coldBrewBrew.update).
   const brewingDevice = useBrewingDeviceSelect(COLD_BREW_DEVICE_TYPE)
 
-  // A save that settles after the user left the form must not navigate.
-  const mounted = useMounted()
-
   const updateBrew = useMutation(
     trpc.coldBrewBrew.update.mutationOptions({
       onSuccess: () => {
@@ -74,7 +67,7 @@ function EditColdBrewBrew() {
           trpc.coldBrewBrew.getById.queryOptions(brewId),
         )
         invalidateDeviceDialedInQueries(queryClient, trpc)
-        if (mounted.current) navigate(brewsLogLocation('coldbrew'))
+        navigate(brewsLogLocation('coldbrew'))
       },
     }),
   )
