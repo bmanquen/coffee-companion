@@ -1674,6 +1674,71 @@ describe('cleanup with a kept stylus record', () => {
   })
 })
 
+describe('drive-device after a failed launch', () => {
+  it('does not turn stylus handwriting off before refusing the device', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-drive-'))
+    const bin = join(root, 'bin')
+    const run = join(root, '.run')
+    mkdirSync(bin)
+    mkdirSync(run)
+    const log = join(root, 'adb.log')
+    // An adb on the recorded AVD that logs every command and answers the
+    // stylus read with 1, the user's setting a failed launch put back.
+    writeFileSync(
+      join(bin, 'adb'),
+      `#!/bin/sh\necho "$*" >> ${log}\n` +
+        'case "$*" in\n' +
+        '  *"emu avd name"*) printf "verify-pixel\\nOK\\n";;\n' +
+        '  *"settings get"*) echo 1;;\n' +
+        'esac\nexit 0\n',
+      { mode: 0o755 },
+    )
+    writeFileSync(join(bin, 'maestro'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+    // What a launch that failed after its stylus restore leaves behind: an
+    // owned package and no baseline.
+    writeFileSync(
+      join(run, 'state.json'),
+      JSON.stringify({
+        runId: 'run-1',
+        serial: DEVICE_SERIAL,
+        avdName: 'verify-pixel',
+        attachedEmulator: true,
+        ownedPackage: true,
+      }),
+    )
+    const env = {
+      ...process.env,
+      HOME: root,
+      VERIFY_RUN_DIR: run,
+      VERIFY_MAESTRO: join(bin, 'maestro'),
+      PATH: `${bin}:${process.env.PATH}`,
+    }
+    delete env.VERIFY_OWNER
+    delete env.ANDROID_HOME
+    delete env.ANDROID_SDK_ROOT
+    const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [control, 'drive-device', 'sign-in-and-out'],
+        { env, encoding: 'utf8', timeout: 60_000 },
+      )
+      assert.notEqual(result.status, 0, result.stdout)
+      const state = JSON.parse(readFileSync(join(run, 'state.json'), 'utf8'))
+      const wroteStylus = readFileSync(log, 'utf8').includes(
+        'settings put secure stylus_handwriting_enabled 0',
+      )
+      // Either nothing changed the setting, or the change can be undone.
+      assert.ok(
+        !wroteStylus || state.stylusHandwritingBefore === '1',
+        `stylus turned off with baseline ${state.stylusHandwritingBefore}`,
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('cleanup of the run dir', () => {
   it('waits out a starting launch, then deletes only what the helper wrote', () => {
     const root = mkdtempSync(join(tmpdir(), 'verify-rundir-'))
@@ -1722,18 +1787,20 @@ describe('cleanup of the run dir', () => {
 describe('unscoped cleanup and runs that start during it', () => {
   const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
   // A run dir with a recorded stylus restore and an adb whose reverse
-  // clearing signals, then takes a while, so a test can act mid-cleanup.
+  // clearing signals, then waits for release(), so a test acts mid-cleanup.
   const setup = () => {
     const root = mkdtempSync(join(tmpdir(), 'verify-hold-'))
     const bin = join(root, 'bin')
     const run = join(root, 'run')
     const signal = join(root, 'reversing')
+    const gate = join(root, 'released')
     mkdirSync(bin)
     mkdirSync(run)
     writeFileSync(
       join(bin, 'adb'),
       '#!/bin/sh\ncase "$*" in *"emu avd name"*) echo verify-pixel;; ' +
-        `*reverse*) touch '${signal}'; sleep 2;; esac\nexit 0\n`,
+        `*reverse*) touch '${signal}'; ` +
+        `while [ ! -e '${gate}' ]; do sleep 0.05; done;; esac\nexit 0\n`,
       { mode: 0o755 },
     )
     writeFileSync(
@@ -1771,14 +1838,16 @@ describe('unscoped cleanup and runs that start during it', () => {
       }
       assert.equal(existsSync(signal), true, 'cleanup never reached adb reverse')
     }
+    const release = () => writeFileSync(gate, '')
     const done = async () => {
+      release()
       for (const { child, exited } of children) {
         if (child.exitCode == null) child.kill('SIGKILL')
         await exited
       }
       rmSync(root, { recursive: true, force: true })
     }
-    return { run, cleanup, reversing, done }
+    return { run, cleanup, reversing, release, done }
   }
 
   it('holds an unclaimed dir until it has deleted everything', async () => {
@@ -1788,6 +1857,7 @@ describe('unscoped cleanup and runs that start during it', () => {
       await t.reversing()
       // A launch starting now finds the dir claimed by the cleanup.
       assert.equal(claimRun(t.run, 'late-launch')?.pid, a.child.pid)
+      t.release()
       assert.equal((await a.exited).code, 0)
       assert.equal(existsSync(t.run), false)
     } finally {
@@ -1833,6 +1903,7 @@ describe('unscoped cleanup and runs that start during it', () => {
       // B left A's claim and the record in place.
       assert.equal(readRunClaim(t.run)?.pid, a.child.pid)
       assert.equal(existsSync(join(t.run, 'state.json')), true)
+      t.release()
       assert.equal((await a.exited).code, 0)
       assert.equal(existsSync(t.run), false)
     } finally {

@@ -3817,6 +3817,15 @@ async function cmdDriveDevice(flow) {
     )
   }
   ensureAdbReverses(state.serial, driveDeviceReversePorts(state))
+  // The readiness check needs handwriting off, so it is written first. A
+  // failed launch's teardown put the setting back and dropped its record, so
+  // read it again before the write, or cleanup could not undo it.
+  if (state.attachedEmulator && state.stylusHandwritingBefore === undefined) {
+    writeState({
+      ...state,
+      stylusHandwritingBefore: readStylusBaseline(state.serial),
+    })
+  }
   ensureStylusHandwritingOff(state.serial)
   await requireDrivableDevice(state)
   const dest = join(artifactsDir, state.runId, flow)
