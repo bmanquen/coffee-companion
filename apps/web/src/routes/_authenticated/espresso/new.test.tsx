@@ -1931,6 +1931,47 @@ describe('NewEspressoShot form', () => {
       }
     })
 
+    // Answers each operation of a batched request: a latest-shot lookup with
+    // latestFor(coffeeId), anything else empty.
+    const reply = (
+      call: Array<unknown>,
+      latestFor: (coffeeId: string | undefined) => unknown,
+    ) => {
+      const url = new URL(String(call[0]), 'http://localhost')
+      const procedures = decodeURIComponent(
+        url.pathname.split('/').pop() ?? '',
+      ).split(',')
+      const inputs = JSON.parse(
+        url.searchParams.get('input') ?? '{}',
+      ) as Record<string, { json?: { coffeeId?: string } } | undefined>
+      return trpcStreamResponse(
+        Object.fromEntries(
+          procedures.map((procedure, index) => [
+            String(index),
+            [
+              [
+                {
+                  result: {
+                    data: procedure.endsWith('getLatestUnsealed')
+                      ? latestFor(inputs[index]?.json?.coffeeId)
+                      : {},
+                  },
+                },
+              ],
+            ],
+          ]),
+        ),
+      )
+    }
+    const shotOn = (coffeeId: string, roastDate: string) =>
+      makeRecentShot({
+        id: `shot-${coffeeId}-${roastDate}`,
+        coffeeId,
+        grinderId: GRINDER,
+        brewingDeviceId: ESP_DEVICE,
+        roastDate,
+      })
+
     it('reads afresh for a coffee reselected after a deleted save', async () => {
       const { Wrapper, fetchSpy } = seeded()
       const replies = [
@@ -1944,32 +1985,12 @@ describe('NewEspressoShot form', () => {
       // until the end; later reads say May 3. Batched lookups each get a slot.
       fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
         if (isCreateCall(call)) return replies[creates++]()
-        const url = new URL(String(call[0]), 'http://localhost')
-        const procedures = decodeURIComponent(
-          url.pathname.split('/').pop() ?? '',
-        ).split(',')
-        const inputs = JSON.parse(
-          url.searchParams.get('input') ?? '{}',
-        ) as Record<string, { json?: { coffeeId?: string } } | undefined>
         const before = lookups
-        const head = Object.fromEntries(
-          procedures.map((procedure, index) => {
-            const lookup = procedure.endsWith('getLatestUnsealed')
-            let data: unknown = lookup ? null : {}
-            if (lookup && inputs[index]?.json?.coffeeId === COFFEE) {
-              lookups += 1
-              data = makeRecentShot({
-                id: 'shot-1',
-                coffeeId: COFFEE,
-                grinderId: GRINDER,
-                brewingDeviceId: ESP_DEVICE,
-                roastDate: lookups === 1 ? '2026-05-01' : '2026-05-03',
-              })
-            }
-            return [String(index), [[{ result: { data } }]]]
-          }),
-        )
-        const response = trpcStreamResponse(head)
+        const response = reply(call, (coffeeId) => {
+          if (coffeeId !== COFFEE) return null
+          lookups += 1
+          return shotOn(COFFEE, lookups === 1 ? '2026-05-01' : '2026-05-03')
+        })
         // Hold only the request that carried Coffee A's first lookup.
         if (before > 0 || lookups === 0) return response
         return new Promise<Response>((resolve) => {
@@ -2048,6 +2069,122 @@ describe('NewEspressoShot form', () => {
         expect(screen.queryByText('May 1st, 2026')).toBeNull()
         expect(screen.getByText('May 2nd, 2026')).toBeTruthy()
       } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+
+    it('keeps another form’s lookup for another coffee when a save is lost', async () => {
+      const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
+      // Nothing cached for B, as on a first visit.
+      queryClient.removeQueries({
+        queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+          coffeeId: COFFEE_B,
+        }),
+      })
+      let loseSave: () => void = () => {}
+      let answerB: () => void = () => {}
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isCreateCall(call)) {
+          return new Promise<Response>((_, reject) => {
+            loseSave = () => reject(new Error('Network request failed'))
+          })
+        }
+        const response = reply(call, (coffeeId) =>
+          coffeeId === COFFEE_B
+            ? shotOn(COFFEE_B, '2026-05-03')
+            : coffeeId === COFFEE
+              ? shotOn(COFFEE, '2026-05-01')
+              : null,
+        )
+        if (!decodeURIComponent(String(call[0])).includes(COFFEE_B)) {
+          return response
+        }
+        return new Promise<Response>((resolve) => {
+          answerB = () => resolve(response)
+        })
+      })
+      try {
+        // Form 1 logs a shot of A, and the user leaves while it is out.
+        const first = render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        fillRecipe('18')
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy)).toHaveLength(1))
+        first.unmount()
+
+        // Form 2 picks B; A's save is lost while B's lookup is out.
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE_B)
+        await waitFor(() =>
+          expect(
+            fetchSpy.mock.calls.some((c) =>
+              decodeURIComponent(String(c[0])).includes(COFFEE_B),
+            ),
+          ).toBe(true),
+        )
+        await act(async () => loseSave())
+        await act(async () => answerB())
+
+        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+        expect(
+          screen.queryByText(/couldn't load this coffee's last shot/),
+        ).toBeNull()
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+
+    it('keeps the draft when a refused Log follows a lookup for another coffee', async () => {
+      const { Wrapper, fetchSpy } = seeded()
+      const replies = [
+        () => Promise.reject(new Error('Network request failed')),
+        () => Promise.reject(new Error('Network request failed')),
+        () => trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED),
+        () => trpcErrorResponse('BAD_REQUEST', 'Refused'),
+      ]
+      let creates = 0
+      const releases: Array<() => void> = []
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isCreateCall(call)) return replies[creates++]()
+        const response = reply(call, (coffeeId) =>
+          coffeeId === COFFEE_B ? shotOn(COFFEE_B, '2026-05-01') : null,
+        )
+        // A's lookups never answer while the test runs.
+        if (!decodeURIComponent(String(call[0])).includes(COFFEE)) {
+          return response
+        }
+        return new Promise<Response>((resolve) => {
+          releases.push(() => resolve(response))
+        })
+      })
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        // A's lookup is still out when the user switches to B.
+        pickCoffee(COFFEE)
+        await waitFor(() => expect(releases).toHaveLength(1))
+        pickCoffee(COFFEE_B)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        fillRecipe('18')
+        // A lost May 1 save of B, then May 2's is lost and reported deleted.
+        await logAndSettle(fetchSpy, 1)
+        await pickRoastDay(/May 2nd, 2026/)
+        await logAndSettle(fetchSpy, 2)
+        // A reselection leaves the roast date to the saves: May 2, the
+        // newest. It starts another lookup of A, which stays out.
+        pickCoffee(COFFEE)
+        pickCoffee(COFFEE_B)
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+        await logAndSettle(fetchSpy, 3)
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+
+        // The untouched May 2 draft is refused; May 1 must not come back.
+        await logAndSettle(fetchSpy, 4)
+        await act(async () => {})
+        expect(screen.queryByText('May 1st, 2026')).toBeNull()
+        expect(screen.getByText('May 2nd, 2026')).toBeTruthy()
+      } finally {
+        releases.forEach((release) => release())
         fetchSpy.mockRestore()
       }
     })

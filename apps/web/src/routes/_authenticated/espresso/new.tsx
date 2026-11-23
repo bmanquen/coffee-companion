@@ -119,9 +119,10 @@ export function NewEspressoShot() {
   const saveInFlight = useRef(false)
   const saveSucceeded = useRef(false)
   const prefillQueued = useRef(false)
-  // The prefill lookup in flight, if any. A save drops its result, so when
-  // that save is then refused outright the lookup is started again.
-  const pendingLookup = useRef<object | null>(null)
+  // The prefill lookup in flight, if any, with the selection turn it serves.
+  // A save drops its result, so when that save is then refused outright the
+  // lookup is started again.
+  const pendingLookup = useRef<{ seq: number } | null>(null)
   const saveInterruptedLookup = useRef(false)
   const saveRejected = useRef(false)
   // The coffee of a save the API just reported deleted, if any.
@@ -227,8 +228,12 @@ export function NewEspressoShot() {
       if (!outcome.rejected) {
         // A read from before a save that may have written is stale, and a
         // later lookup would join it rather than read afresh.
+        // Only this coffee's: another form's lookup for another coffee
+        // reads a latest shot this save cannot change.
         void queryClient.cancelQueries(
-          trpc.espressoShot.getLatestUnsealed.queryFilter(),
+          trpc.espressoShot.getLatestUnsealed.queryFilter({
+            coffeeId: value.coffeeId,
+          }),
         )
       }
       savedKeyDeletedFor.current = outcome.keyDeleted ? value.coffeeId : ''
@@ -360,7 +365,7 @@ export function NewEspressoShot() {
       applyPrefill(coffeeId, seq, unresolved, startedSaveGen)
       return
     }
-    const lookup = {}
+    const lookup = { seq }
     pendingLookup.current = lookup
     void queryClient
       .fetchQuery({
@@ -460,7 +465,10 @@ export function NewEspressoShot() {
           if (saveInFlight.current || saveSucceeded.current) return
           saveRejected.current = false
           savedKeyDeletedFor.current = ''
-          saveInterruptedLookup.current = pendingLookup.current != null
+          // Only a lookup for the current selection; one left from an
+          // earlier coffee is not this draft's to resume.
+          saveInterruptedLookup.current =
+            pendingLookup.current?.seq === prefillSeq.current
           submittedAt.current = {
             seq: prefillSeq.current,
             recipe: recipeFingerprint(form.state.values),
