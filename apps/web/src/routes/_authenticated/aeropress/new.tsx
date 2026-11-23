@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { insertAeropressBrewSchema } from '@coffee-companion/api/db/zod'
 import { AEROPRESS_DEVICE_TYPE } from '@coffee-companion/api/lib/aeropress'
 import {
@@ -81,10 +82,13 @@ function NewAeropressBrew() {
 
   // A save that settles after the user left the form must not navigate.
   const mounted = useMounted()
+  // Set before the save settles, so a submit racing the re-render sees it.
+  const saveSucceeded = useRef(false)
 
   const createBrew = useMutation(
     trpc.aeropressBrew.create.mutationOptions({
       onSuccess: () => {
+        saveSucceeded.current = true
         queryClient.invalidateQueries(trpc.aeropressBrew.getAll.queryOptions())
         track('brew_logged', { method: 'aeropress' })
         if (mounted.current) navigate(brewsLogLocation('aeropress'))
@@ -124,7 +128,7 @@ function NewAeropressBrew() {
           e.preventDefault()
           // The saved brew's create has no idempotency key, so another
           // submit before Brews opens would save it twice.
-          if (createBrew.isSuccess) return
+          if (saveSucceeded.current) return
           form.handleSubmit()
         }}
       >

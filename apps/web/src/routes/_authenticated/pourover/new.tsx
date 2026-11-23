@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { insertPouroverBrewSchema } from '@coffee-companion/api/db/zod'
 import { POUR_OVER_DEVICE_TYPE } from '@coffee-companion/api/lib/pourover'
 import {
@@ -81,10 +82,13 @@ function NewPouroverBrew() {
 
   // A save that settles after the user left the form must not navigate.
   const mounted = useMounted()
+  // Set before the save settles, so a submit racing the re-render sees it.
+  const saveSucceeded = useRef(false)
 
   const createBrew = useMutation(
     trpc.pouroverBrew.create.mutationOptions({
       onSuccess: () => {
+        saveSucceeded.current = true
         queryClient.invalidateQueries(trpc.pouroverBrew.getAll.queryOptions())
         track('brew_logged', { method: 'pourover' })
         if (mounted.current) navigate(brewsLogLocation('pourover'))
@@ -125,7 +129,7 @@ function NewPouroverBrew() {
           e.preventDefault()
           // The saved brew's create has no idempotency key, so another
           // submit before Brews opens would save it twice.
-          if (createBrew.isSuccess) return
+          if (saveSucceeded.current) return
           form.handleSubmit()
         }}
       >

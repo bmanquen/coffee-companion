@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { insertColdBrewBrewSchema } from '@coffee-companion/api/db/zod'
 import { COLD_BREW_DEVICE_TYPE } from '@coffee-companion/api/lib/cold-brew'
 import {
@@ -63,10 +64,13 @@ function NewColdBrewBrew() {
 
   // A save that settles after the user left the form must not navigate.
   const mounted = useMounted()
+  // Set before the save settles, so a submit racing the re-render sees it.
+  const saveSucceeded = useRef(false)
 
   const createBrew = useMutation(
     trpc.coldBrewBrew.create.mutationOptions({
       onSuccess: () => {
+        saveSucceeded.current = true
         queryClient.invalidateQueries(trpc.coldBrewBrew.getAll.queryOptions())
         track('brew_logged', { method: 'coldbrew' })
         if (mounted.current) navigate(brewsLogLocation('coldbrew'))
@@ -106,7 +110,7 @@ function NewColdBrewBrew() {
           e.preventDefault()
           // The saved brew's create has no idempotency key, so another
           // submit before Brews opens would save it twice.
-          if (createBrew.isSuccess) return
+          if (saveSucceeded.current) return
           form.handleSubmit()
         }}
       >

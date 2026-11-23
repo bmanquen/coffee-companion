@@ -6,6 +6,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
+import { notifyManager } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
@@ -247,17 +248,27 @@ describe('NewPouroverBrew form', () => {
         target: { value: COFFEE },
       })
       fillRequiredRecipe({ brewMinutes: '2', brewSeconds: '45' })
+      // Hold TanStack's batched re-renders, so the form still renders the
+      // pre-success state when the second submit arrives.
+      const held: Array<() => void> = []
+      notifyManager.setScheduler((cb) => held.push(cb))
       const log = screen.getByRole('button', { name: 'Log' })
-      fireEvent.click(log)
-      await waitFor(() => expect(mocks.navigate).toHaveBeenCalled())
-      // The mocked navigate never unmounts the form, like a slow /brews load.
-      expect((log as HTMLButtonElement).disabled).toBe(true)
-      fireEvent.submit(log.closest('form')!)
-      await act(async () => {})
+      try {
+        fireEvent.click(log)
+        // The mocked navigate never unmounts the form, like a slow /brews load.
+        await waitFor(() => expect(mocks.navigate).toHaveBeenCalled())
+        await act(async () => {})
+        fireEvent.submit(log.closest('form')!)
+        await act(async () => {})
+      } finally {
+        notifyManager.setScheduler((cb) => setTimeout(cb, 0))
+        await act(async () => held.forEach((cb) => cb()))
+      }
       const creates = fetchSpy.mock.calls.filter(([url]) =>
         String(url).includes('pouroverBrew.create'),
       )
       expect(creates).toHaveLength(1)
+      expect((log as HTMLButtonElement).disabled).toBe(true)
     } finally {
       fetchSpy.mockRestore()
     }

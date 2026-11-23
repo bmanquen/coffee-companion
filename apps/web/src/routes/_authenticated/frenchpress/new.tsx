@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { insertFrenchpressBrewSchema } from '@coffee-companion/api/db/zod'
 import { FRENCH_PRESS_DEVICE_TYPE } from '@coffee-companion/api/lib/frenchpress'
 import {
@@ -83,10 +84,13 @@ function NewFrenchpressBrew() {
 
   // A save that settles after the user left the form must not navigate.
   const mounted = useMounted()
+  // Set before the save settles, so a submit racing the re-render sees it.
+  const saveSucceeded = useRef(false)
 
   const createBrew = useMutation(
     trpc.frenchpressBrew.create.mutationOptions({
       onSuccess: () => {
+        saveSucceeded.current = true
         queryClient.invalidateQueries(
           trpc.frenchpressBrew.getAll.queryOptions(),
         )
@@ -129,7 +133,7 @@ function NewFrenchpressBrew() {
           e.preventDefault()
           // The saved brew's create has no idempotency key, so another
           // submit before Brews opens would save it twice.
-          if (createBrew.isSuccess) return
+          if (saveSucceeded.current) return
           form.handleSubmit()
         }}
       >
