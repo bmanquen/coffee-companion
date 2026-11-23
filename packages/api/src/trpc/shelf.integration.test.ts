@@ -43,7 +43,19 @@ const asBatch = callerFor(BATCH)
 const uniqBatch = uniqFor(BATCH)
 const createBatchCoffee = createCoffeeFor(asBatch, uniqBatch)
 
-seedUsers([USER, PROMOTED, SNAPSHOT, BATCH], types.cleanup)
+// A fifth for the stamp race test.
+const RACE = 'shelf-race-user'
+const asRace = callerFor(RACE)
+const uniqRace = uniqFor(RACE)
+const createRaceCoffee = createCoffeeFor(asRace, uniqRace)
+
+// A sixth for the stamp-retry test.
+const RETRY = 'shelf-retry-user'
+const asRetry = callerFor(RETRY)
+const uniqRetry = uniqFor(RETRY)
+const createRetryCoffee = createCoffeeFor(asRetry, uniqRetry)
+
+seedUsers([USER, PROMOTED, SNAPSHOT, BATCH, RACE, RETRY], types.cleanup)
 
 let grinderId: string
 let deviceId: string
@@ -574,5 +586,153 @@ describe('espressoShot.create', () => {
 
     expect(created.sealed).toBe(false)
     expect(created.dose).toBe('18')
+  })
+})
+
+describe('stamping before a create', () => {
+  it('does not Seal a shot another request saves after the Shelf was read', async () => {
+    const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
+    const device = await asRace.brewingDevice.create({
+      name: uniqRace('Linea Mini'),
+      brand: 'La Marzocco',
+      typeId,
+    })
+    const grinder = await asRace.grinder.create({
+      name: uniqRace('Niche Zero'),
+      brand: 'Niche',
+    })
+    const shot = (coffeeId: string) => ({
+      coffeeId,
+      grinderId: grinder.id,
+      brewingDeviceId: device.id,
+      dose: '18',
+      yield: '36',
+      time: 28,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    // Added first and outranked by five brewed Coffees: off the Free Shelf.
+    const returning = (await createRaceCoffee(uniqRace('Returning'))).id
+    let latest = ''
+    for (let i = 0; i < 5; i++) {
+      latest = (await createRaceCoffee(uniqRace(`Coffee ${i}`))).id
+      await asRace.espressoShot.create(shot(latest))
+    }
+
+    // Another connection lets the create read the Shelf but holds its stamp's
+    // write to espresso_shots, then saves a shot on the off-Shelf Coffee.
+    const other = await db.$client.connect()
+    let creating: Promise<unknown> | undefined
+    try {
+      await other.query('begin')
+      await other.query('lock table espresso_shots in exclusive mode')
+      creating = asRace.espressoShot.create(shot(latest))
+      const deadline = Date.now() + 5_000
+      for (;;) {
+        const waiting = await db.$client.query<{ n: number }>(
+          `select count(*)::int as n from pg_locks
+           where relation = 'espresso_shots'::regclass and not granted`,
+        )
+        if (waiting.rows[0].n > 0) break
+        if (Date.now() > deadline) throw new Error('Stamp never waited')
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+      const saved = await other.query<{ id: string }>(
+        `insert into espresso_shots
+           (user_id, coffee_id, grinder_id, brewing_device_id, dose, yield)
+         values ($1, $2, $3, $4, '18', '36') returning id`,
+        [RACE, returning, grinder.id, device.id],
+      )
+      await other.query('commit')
+      await creating
+
+      const [row] = await db
+        .select({ sealedAt: espressoShots.sealedAt })
+        .from(espressoShots)
+        .where(eq(espressoShots.id, saved.rows[0].id))
+      expect(row.sealedAt).toBeNull()
+    } finally {
+      await other.query('rollback').catch(() => {})
+      other.release()
+      await creating?.catch(() => {})
+    }
+  })
+
+  it('retries when another request stamps the same fallen shot first', async () => {
+    const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
+    const device = await asRetry.brewingDevice.create({
+      name: uniqRetry('Linea Mini'),
+      brand: 'La Marzocco',
+      typeId,
+    })
+    const grinder = await asRetry.grinder.create({
+      name: uniqRetry('Niche Zero'),
+      brand: 'Niche',
+    })
+    const shot = (coffeeId: string) => ({
+      coffeeId,
+      grinderId: grinder.id,
+      brewingDeviceId: device.id,
+      dose: '18',
+      yield: '36',
+      time: 28,
+      grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
+    })
+    // Brewed, then outranked by five brewed Coffees: off the Free Shelf.
+    const fallen = await asRetry.espressoShot.create(
+      shot((await createRetryCoffee(uniqRetry('Fallen'))).id),
+    )
+    let latest = ''
+    for (let i = 0; i < 5; i++) {
+      latest = (await createRetryCoffee(uniqRetry(`Outranking ${i}`))).id
+      await asRetry.espressoShot.create(shot(latest))
+    }
+    // Unstamped again, so two stamps race for it.
+    await db
+      .update(espressoShots)
+      .set({ sealedAt: null })
+      .where(eq(espressoShots.id, fallen.id))
+
+    // Another connection stamps the fallen shot and holds the row while the
+    // create's stamp, already past its Shelf read, waits to write it.
+    const other = await db.$client.connect()
+    let creating: Promise<unknown> | undefined
+    const stamp = new Date('2026-01-02T03:04:05Z')
+    try {
+      await other.query('begin')
+      const xid = await other.query<{ xid: string }>(
+        'select pg_current_xact_id()::text as xid',
+      )
+      await other.query(
+        'update espresso_shots set sealed_at = $1 where id = $2',
+        [stamp, fallen.id],
+      )
+      creating = asRetry.espressoShot.create(shot(latest))
+      const deadline = Date.now() + 5_000
+      for (;;) {
+        const waiting = await db.$client.query<{ n: number }>(
+          `select count(*)::int as n from pg_locks
+           where locktype = 'transactionid' and not granted
+             and transactionid::text = $1`,
+          [xid.rows[0].xid],
+        )
+        if (waiting.rows[0].n > 0) break
+        if (Date.now() > deadline) throw new Error('Stamp never waited')
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+      await other.query('commit')
+      await creating
+
+      const [row] = await db
+        .select({ sealedAt: espressoShots.sealedAt })
+        .from(espressoShots)
+        .where(eq(espressoShots.id, fallen.id))
+      expect(row.sealedAt).toEqual(stamp)
+    } finally {
+      await other.query('rollback').catch(() => {})
+      other.release()
+      await creating?.catch(() => {})
+    }
   })
 })

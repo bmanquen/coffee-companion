@@ -152,10 +152,12 @@ describe('coffee.create', () => {
       .insert(roastLevels)
       .values({ name: uniq('Shared level') })
       .returning()
+    let ownId: string | undefined
     try {
       const own = await createCoffee(uniq('Own lookups'), {
         roastLevelId: shared.id,
       })
+      ownId = own.id
 
       const all = await asA.coffee.getAll()
       const listed = all.find((c) => c.id === coffee.id)
@@ -171,8 +173,13 @@ describe('coffee.create', () => {
         expect.objectContaining({ id: shared.id }),
       )
     } finally {
-      await db.delete(coffees).where(eq(coffees.roastLevelId, shared.id))
-      await db.delete(roastLevels).where(eq(roastLevels.id, shared.id))
+      // Only this test's Coffee: another session's may use the shared level,
+      // and then the level stays rather than take that Coffee with it.
+      if (ownId) await db.delete(coffees).where(eq(coffees.id, ownId))
+      await db
+        .delete(roastLevels)
+        .where(eq(roastLevels.id, shared.id))
+        .catch(() => {})
     }
   })
 

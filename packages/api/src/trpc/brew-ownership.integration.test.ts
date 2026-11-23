@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { db } from '../db'
 import {
   aeropressBrews,
@@ -37,7 +37,11 @@ async function deviceType(name: string) {
   const existing = await db
     .select()
     .from(brewingDeviceTypes)
-    .where(eq(brewingDeviceTypes.name, name))
+    // Shared only: another user's private type of that name is not one the
+    // owner can put a device on.
+    .where(
+      and(eq(brewingDeviceTypes.name, name), isNull(brewingDeviceTypes.userId)),
+    )
   if (existing[0]) return existing[0].id
   const [row] = await db.insert(brewingDeviceTypes).values({ name }).returning()
   createdTypeIds.push(row.id)
