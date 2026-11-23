@@ -1829,6 +1829,40 @@ describe('espressoShot.getLatestUnsealed', () => {
     expect(found).toBeNull()
   })
 
+  it('skips a newer legacy shot of another user on the caller’s coffee', async () => {
+    // B's coffee, so only the shot's owner, not the coffee's, can tell the
+    // two shots apart.
+    const coffee = await createCoffeeFor(
+      asB,
+      uniqFor(USER_B),
+    )(uniqFor(USER_B)('Shared Legacy Coffee'))
+    const [own] = await db
+      .insert(espressoShots)
+      .values({
+        userId: USER_B,
+        coffeeId: coffee.id,
+        grinderId,
+        brewingDeviceId: espressoDeviceId,
+        dose: '18',
+        yield: '36',
+        createdAt: daysAgo(2),
+      })
+      .returning()
+    await db.insert(espressoShots).values({
+      userId: USER_A,
+      coffeeId: coffee.id,
+      grinderId,
+      brewingDeviceId: espressoDeviceId,
+      dose: '19',
+      yield: '38',
+      createdAt: daysAgo(1),
+    })
+    const found = await asB.espressoShot.getLatestUnsealed({
+      coffeeId: coffee.id,
+    })
+    expect(found?.id).toBe(own.id)
+  })
+
   it('returns the latest readable shot even behind newer sealed shots', async () => {
     const coffee = await createCoffee(uniq('Sealed Prefill Coffee'))
     const readable = await asA.espressoShot.create({
