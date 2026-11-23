@@ -2073,6 +2073,90 @@ describe('NewEspressoShot form', () => {
       }
     })
 
+    // Form 1 logs a shot of A and is closed while the save is out; form 2
+    // picks coffeeId, whose lookup is held. The save then settles as settle
+    // says, and form 2's reads answer May 3.
+    const reopenDuringSave = async (
+      coffeeId: string,
+      settle: 'lost' | 'saved',
+    ) => {
+      const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
+      if (coffeeId === COFFEE_B) {
+        // Nothing cached for B, as on a first visit.
+        queryClient.removeQueries({
+          queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+            coffeeId: COFFEE_B,
+          }),
+        })
+      }
+      let settleSave: () => void = () => {}
+      // Form 2's reads of coffeeId wait until released, a retry included.
+      const held: Array<() => void> = []
+      let released = false
+      let form2 = false
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isCreateCall(call)) {
+          return new Promise<Response>((resolve, reject) => {
+            settleSave = () =>
+              settle === 'saved'
+                ? resolve(trpcSuccess())
+                : reject(new Error('Network request failed'))
+          })
+        }
+        const carries = decodeURIComponent(String(call[0])).includes(coffeeId)
+        const response = reply(call, (id) =>
+          id === coffeeId && form2 && carries
+            ? shotOn(coffeeId, '2026-05-03')
+            : id === COFFEE
+              ? shotOn(COFFEE, '2026-05-01')
+              : null,
+        )
+        if (!form2 || !carries || released) return response
+        return new Promise<Response>((resolve) => {
+          held.push(() => resolve(response))
+        })
+      })
+      try {
+        const first = render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        fillRecipe('18')
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy)).toHaveLength(1))
+        first.unmount()
+
+        form2 = true
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(coffeeId)
+        await waitFor(() =>
+          expect(
+            fetchSpy.mock.calls.filter((c) =>
+              decodeURIComponent(String(c[0])).includes(coffeeId),
+            ).length,
+          ).toBeGreaterThan(coffeeId === COFFEE ? 1 : 0),
+        )
+        await act(async () => settleSave())
+        await act(async () => {
+          released = true
+          held.forEach((release) => release())
+        })
+
+        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+        expect(screen.queryByText('May 1st, 2026')).toBeNull()
+        expect(
+          screen.queryByText(/couldn't load this coffee's last shot/),
+        ).toBeNull()
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    }
+
+    it('reads afresh in a form reopened on the same coffee while a save was out', () =>
+      reopenDuringSave(COFFEE, 'lost'))
+
+    it('keeps another form’s lookup for another coffee when a save succeeds', () =>
+      reopenDuringSave(COFFEE_B, 'saved'))
+
     it('keeps another form’s lookup for another coffee when a save is lost', async () => {
       const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
       // Nothing cached for B, as on a first visit.

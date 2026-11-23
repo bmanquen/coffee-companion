@@ -7,6 +7,7 @@ import {
   normalizeDecimal,
 } from '@coffee-companion/api/lib/espresso'
 import {
+  isCancelledError,
   useMutation,
   useQueryClient,
   useSuspenseQuery,
@@ -367,11 +368,35 @@ export function NewEspressoShot() {
     }
     const lookup = { seq }
     pendingLookup.current = lookup
-    void queryClient
-      .fetchQuery({
-        ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId }),
-        staleTime: 0,
-      })
+    const options = {
+      ...trpc.espressoShot.getLatestUnsealed.queryOptions({ coffeeId }),
+      staleTime: 0,
+    }
+    // A save, in this form or another, cancels a read that may predate it,
+    // and a cancelled read settles with the cache from before it started (or
+    // fails when there was none), so read again rather than apply that. Only
+    // while this lookup is still an open form's: otherwise nothing uses it.
+    const stillCurrent = () =>
+      mounted.current &&
+      seq === prefillSeq.current &&
+      startedSaveGen === saveGen.current
+    const fetchLatest = () => queryClient.fetchQuery(options)
+    const read = (): ReturnType<typeof fetchLatest> => {
+      const startedAt = Date.now()
+      return fetchLatest().then(
+        (latest) =>
+          stillCurrent() &&
+          (queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? 0) <
+            startedAt
+            ? read()
+            : latest,
+        (error: unknown) =>
+          stillCurrent() && isCancelledError(error)
+            ? read()
+            : Promise.reject(error),
+      )
+    }
+    void read()
       .finally(() => {
         if (pendingLookup.current === lookup) pendingLookup.current = null
       })
