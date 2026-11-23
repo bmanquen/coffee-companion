@@ -1851,8 +1851,13 @@ describe('NewEspressoShot form', () => {
     }
     // Every create fails as lost except the third, which waits for the test
     // and then reports its shot deleted.
-    const serve = (fetchSpy: ReturnType<typeof seeded>['fetchSpy']) => {
+    // Coffee A's lookups after the first return laterRoastDate.
+    const serve = (
+      fetchSpy: ReturnType<typeof seeded>['fetchSpy'],
+      laterRoastDate = '2026-05-01',
+    ) => {
       let creates = 0
+      let lookups = 0
       let answerThird: () => void = () => {}
       const third = new Promise<Response>((resolve) => {
         answerThird = () =>
@@ -1861,13 +1866,14 @@ describe('NewEspressoShot form', () => {
       fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
         if (isPrefillCall(call)) {
           if (coffeeIdFromCall(call) !== COFFEE) return trpcSuccess(null)
+          lookups += 1
           return trpcSuccess(
             makeRecentShot({
               id: 'shot-1',
               coffeeId: COFFEE,
               grinderId: GRINDER,
               brewingDeviceId: ESP_DEVICE,
-              roastDate: '2026-05-01',
+              roastDate: lookups === 1 ? '2026-05-01' : laterRoastDate,
             }),
           )
         }
@@ -1896,7 +1902,7 @@ describe('NewEspressoShot form', () => {
 
     it('still loads a prefill for a coffee reselected meanwhile', async () => {
       const { Wrapper, fetchSpy } = seeded()
-      const { answerThird } = serve(fetchSpy)
+      const { answerThird } = serve(fetchSpy, '2026-05-04')
       try {
         render(<NewEspressoShot />, { wrapper: Wrapper })
         pickCoffee(COFFEE)
@@ -1918,6 +1924,129 @@ describe('NewEspressoShot form', () => {
             ),
           ).toHaveLength(2),
         )
+        // And fills the form from it.
+        expect(await screen.findByText('May 4th, 2026')).toBeTruthy()
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+
+    it('reads afresh for a coffee reselected after a deleted save', async () => {
+      const { Wrapper, fetchSpy } = seeded()
+      const replies = [
+        () => Promise.reject(new Error('Network request failed')),
+        () => trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED),
+      ]
+      let creates = 0
+      let lookups = 0
+      let releaseFirst: () => void = () => {}
+      // Coffee A's first read, from before the saves, says May 1 and is held
+      // until the end; later reads say May 3. Batched lookups each get a slot.
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isCreateCall(call)) return replies[creates++]()
+        const url = new URL(String(call[0]), 'http://localhost')
+        const procedures = decodeURIComponent(
+          url.pathname.split('/').pop() ?? '',
+        ).split(',')
+        const inputs = JSON.parse(
+          url.searchParams.get('input') ?? '{}',
+        ) as Record<string, { json?: { coffeeId?: string } } | undefined>
+        const before = lookups
+        const head = Object.fromEntries(
+          procedures.map((procedure, index) => {
+            const lookup = procedure.endsWith('getLatestUnsealed')
+            let data: unknown = lookup ? null : {}
+            if (lookup && inputs[index]?.json?.coffeeId === COFFEE) {
+              lookups += 1
+              data = makeRecentShot({
+                id: 'shot-1',
+                coffeeId: COFFEE,
+                grinderId: GRINDER,
+                brewingDeviceId: ESP_DEVICE,
+                roastDate: lookups === 1 ? '2026-05-01' : '2026-05-03',
+              })
+            }
+            return [String(index), [[{ result: { data } }]]]
+          }),
+        )
+        const response = trpcStreamResponse(head)
+        // Hold only the request that carried Coffee A's first lookup.
+        if (before > 0 || lookups === 0) return response
+        return new Promise<Response>((resolve) => {
+          releaseFirst = () => resolve(response)
+        })
+      })
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        fireEvent.change(screen.getByRole('combobox', { name: 'Grinder' }), {
+          target: { value: GRINDER },
+        })
+        fireEvent.change(
+          screen.getByRole('combobox', { name: 'Brewing Device' }),
+          { target: { value: ESP_DEVICE } },
+        )
+        fillRecipe('18')
+        await logAndSettle(fetchSpy, 1)
+        await logAndSettle(fetchSpy, 2)
+
+        pickCoffee(COFFEE_B)
+        pickCoffee(COFFEE)
+        await act(async () => releaseFirst())
+        expect(await screen.findByText('May 3rd, 2026')).toBeTruthy()
+        expect(screen.queryByText('May 1st, 2026')).toBeNull()
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+
+    it('keeps the draft after a deleted save when the next Log is refused', async () => {
+      const { Wrapper, fetchSpy } = seeded()
+      const replies = [
+        () => Promise.reject(new Error('Network request failed')),
+        () => Promise.reject(new Error('Network request failed')),
+        () => trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED),
+        () => trpcErrorResponse('BAD_REQUEST', 'Refused'),
+      ]
+      let creates = 0
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isPrefillCall(call)) {
+          return trpcSuccess(
+            coffeeIdFromCall(call) === COFFEE
+              ? makeRecentShot({
+                  id: 'shot-1',
+                  coffeeId: COFFEE,
+                  grinderId: GRINDER,
+                  brewingDeviceId: ESP_DEVICE,
+                  roastDate: '2026-05-01',
+                })
+              : null,
+          )
+        }
+        if (isCreateCall(call)) return replies[creates++]()
+        return trpcSuccess()
+      })
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        fillRecipe('18')
+        // A lost May 1 save, then May 2's save is lost and reported deleted.
+        await logAndSettle(fetchSpy, 1)
+        await pickRoastDay(/May 2nd, 2026/)
+        await logAndSettle(fetchSpy, 2)
+        // A reselection leaves the roast date to the saves: May 2, the newest.
+        pickCoffee(COFFEE_B)
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+        await logAndSettle(fetchSpy, 3)
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+
+        // The untouched May 2 draft is refused; May 1 must not come back.
+        await logAndSettle(fetchSpy, 4)
+        await act(async () => {})
+        expect(screen.queryByText('May 1st, 2026')).toBeNull()
+        expect(screen.getByText('May 2nd, 2026')).toBeTruthy()
       } finally {
         fetchSpy.mockRestore()
       }

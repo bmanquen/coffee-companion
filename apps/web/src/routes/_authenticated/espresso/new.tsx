@@ -224,6 +224,13 @@ export function NewEspressoShot() {
         { ...value, idempotencyKey },
       )
       saveRejected.current = outcome.rejected
+      if (!outcome.rejected) {
+        // A read from before a save that may have written is stale, and a
+        // later lookup would join it rather than read afresh.
+        void queryClient.cancelQueries(
+          trpc.espressoShot.getLatestUnsealed.queryFilter(),
+        )
+      }
       savedKeyDeletedFor.current = outcome.keyDeleted ? value.coffeeId : ''
       const forgetKey = () => {
         for (const [draft, key] of idempotencyKeys.current) {
@@ -426,7 +433,10 @@ export function NewEspressoShot() {
     }
     if (prefillQueued.current || resume) {
       loadPrefillFor(prefillCoffeeId.current)
-    } else {
+    } else if (
+      // Only an edit made while the save was out; the draft just sent stays.
+      submittedAt.current.recipe !== recipeFingerprint(form.state.values)
+    ) {
       restoreMatchingSave()
     }
   }
