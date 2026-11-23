@@ -201,6 +201,59 @@ describe('BrewFeed', () => {
     expect(screen.getByText(/^Page 1 of 2/)).toBeTruthy()
   })
 
+  it('stays on page 1 when a Next load settles just before a filter change', async () => {
+    const shot = (id: string, coffeeId: string, name: string) =>
+      makeRecentShot({
+        id,
+        coffeeId,
+        coffee: makeRecentCoffee({ id: coffeeId, name }),
+      })
+    const ethiopia = Array.from({ length: SHOTS_PER_COFFEE }, (_, index) =>
+      shot(`e${index}`, 'c1', 'Ethiopia Guji'),
+    )
+    const kenya = Array.from({ length: SHOTS_PER_COFFEE }, (_, index) =>
+      shot(`k${index}`, 'c2', 'Kenya AA'),
+    )
+    let settleLoad: (firstId: string | null) => void = () => {}
+    const loadMore = vi.fn(
+      () =>
+        new Promise<string | null>((resolve) => {
+          settleLoad = resolve
+        }),
+    )
+    const feed = (brews: Array<ReturnType<typeof makeRecentShot>>) => (
+      <BrewFeed
+        title="Espresso"
+        brews={brews}
+        columns={columns}
+        renderDetails={() => null}
+        newTo="/espresso/new"
+        logLabel="Log Shot"
+        emptyMessage="No espresso shots yet."
+        emptyLinkLabel="Log your first shot"
+        pageSize={BREW_FEED_PAGE_SIZE}
+        hasMore
+        loadMore={loadMore}
+      />
+    )
+    const { rerender } = render(feed([...ethiopia, ...kenya]))
+    fireEvent.click(screen.getByLabelText('Next page'))
+    fireEvent.click(screen.getByLabelText('Next page'))
+    fireEvent.click(screen.getByLabelText('Next page'))
+    expect(loadMore).toHaveBeenCalledTimes(1)
+    // The page lands before loadMore resolves, as with the real query.
+    rerender(feed([...ethiopia, ...kenya, shot('e6', 'c1', 'Ethiopia Guji')]))
+
+    fireEvent.click(screen.getByText('All coffees'))
+    await act(async () => {
+      settleLoad('e6')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      // The user picks the filter before React renders the settled load.
+      fireEvent.click(screen.getByRole('option', { name: 'Ethiopia Guji' }))
+    })
+    expect(screen.getByText(/^Page 1 of 2/)).toBeTruthy()
+  })
+
   it('keeps an opened brew open only for that brew when a filter moves rows', () => {
     renderFeed({
       // Details stay mounted (hidden) for closed rows, so name only open ones.
