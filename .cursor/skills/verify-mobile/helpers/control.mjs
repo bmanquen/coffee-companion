@@ -3378,14 +3378,14 @@ function launchPartial({ avdName, attachedEmulator, keptStylus }) {
   }
 }
 
-// What a failed launch keeps once teardown released the device: its stylus
-// value is back and its reverses are gone, so a later cleanup must not write
-// that value again or remove mappings the developer adds on those ports.
-function releasedLaunchState(state) {
+// What a failed launch keeps once teardown removed its reverses: a later
+// cleanup must not remove mappings the developer adds on those ports, nor
+// write a stylus value that is already back. A failed restore keeps its value.
+function releasedLaunchState(state, stylusRestored) {
   return {
     ...state,
-    stylusHandwritingBefore: undefined,
     reversedPorts: undefined,
+    ...(stylusRestored ? { stylusHandwritingBefore: undefined } : {}),
   }
 }
 
@@ -3440,12 +3440,17 @@ async function stopLaunchDevice(
   // only when ownedPackage is not false.
   let foreignAvd = null
   let released = false
+  let reversesCleared = false
   if (plan.clearReverses) {
     try {
       foreignAvd = releaseRecordedDevice(partial, {
         uninstallOwned: false,
         avdProblem,
-        clearReverses,
+        clearReverses: () => {
+          if (clearReverses) clearReverses()
+          else adbRemoveReverses(partial.serial, partial.reversedPorts)
+          reversesCleared = true
+        },
         restoreStylus,
       })
       released = foreignAvd == null
@@ -3460,8 +3465,8 @@ async function stopLaunchDevice(
   })
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
   restoreEnv()
-  // True once the recorded device's setting is back, so the record can go.
-  return released
+  // released: the recorded device's setting is back, so that record can go.
+  return { released, reversesCleared }
 }
 
 async function cmdLaunchDevice(opts = {}) {
@@ -3813,9 +3818,12 @@ async function cmdLaunchDevice(opts = {}) {
       ),
     )
   } catch (error) {
-    if (await stopLaunchDevice(partial)) {
+    const teardown = await stopLaunchDevice(partial)
+    if (teardown.reversesCleared) {
       const recorded = readState()
-      if (recorded) writeState(releasedLaunchState(recorded))
+      if (recorded) {
+        writeState(releasedLaunchState(recorded, teardown.released))
+      }
     }
     die(error.message, error.exitCode)
   }

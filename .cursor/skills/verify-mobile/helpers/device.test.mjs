@@ -1585,19 +1585,41 @@ describe('releasedLaunchState', () => {
   it('drops the restored stylus value and the removed reverses', () => {
     const kept = JSON.parse(
       JSON.stringify(
-        releasedLaunchState({
-          serial: DEVICE_SERIAL,
-          avdName: 'verify-pixel',
-          ownedPackage: false,
-          stylusHandwritingBefore: '1',
-          reversedPorts: [8081, 3910],
-        }),
+        releasedLaunchState(
+          {
+            serial: DEVICE_SERIAL,
+            avdName: 'verify-pixel',
+            ownedPackage: false,
+            stylusHandwritingBefore: '1',
+            reversedPorts: [8081, 3910],
+          },
+          true,
+        ),
       ),
     )
     assert.deepEqual(kept, {
       serial: DEVICE_SERIAL,
       avdName: 'verify-pixel',
       ownedPackage: false,
+    })
+  })
+
+  it('keeps a stylus value whose restore failed, but not the removed reverses', () => {
+    const kept = JSON.parse(
+      JSON.stringify(
+        releasedLaunchState(
+          {
+            serial: DEVICE_SERIAL,
+            stylusHandwritingBefore: '1',
+            reversedPorts: [8081],
+          },
+          false,
+        ),
+      ),
+    )
+    assert.deepEqual(kept, {
+      serial: DEVICE_SERIAL,
+      stylusHandwritingBefore: '1',
     })
   })
 })
@@ -2112,8 +2134,8 @@ describe('stopLaunchDevice', () => {
     return calls
   }
 
-  it('reports a restore that ran, and not one skipped on another AVD', async () => {
-    const released = (avd) =>
+  it('reports what it released, apart from a failed stylus restore', async () => {
+    const released = (avd, restoreStylus = () => {}) =>
       stopLaunchDevice(
         { serial: DEVICE_SERIAL, avdName: 'verify-pixel', emulatorPid: 4242 },
         [],
@@ -2121,14 +2143,27 @@ describe('stopLaunchDevice', () => {
           avdProblem: () =>
             recordedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => avd),
           clearReverses: () => {},
-          restoreStylus: () => {},
+          restoreStylus,
           killSerial: () => {},
           signalPid: () => {},
           restoreEnv: () => {},
         },
       )
-    assert.equal(await released('verify-pixel'), true)
-    assert.equal(await released('Pixel_7'), false)
+    assert.deepEqual(await released('verify-pixel'), {
+      released: true,
+      reversesCleared: true,
+    })
+    assert.deepEqual(await released('Pixel_7'), {
+      released: false,
+      reversesCleared: false,
+    })
+    // The reverses are already gone when the restore fails.
+    assert.deepEqual(
+      await released('verify-pixel', () => {
+        throw new Error('restore failed')
+      }),
+      { released: false, reversesCleared: true },
+    )
   })
 
   it('kills its own emulator through the serial', async () => {
