@@ -369,6 +369,8 @@ describe('concurrent Shelf-changing writes', () => {
       moveB2 = as.espressoShot.update({ ...b2, coffeeId: c2.id } as never)
       await waitForLockWaiters(1)
       moveB0 = as.espressoShot.update({ ...b0, coffeeId: c0.id } as never)
+      // It can be refused while the test still awaits moveB2 or the release.
+      moveB0.catch(() => {})
       await waitForLockWaiters(2)
       await toC2.release()
       await moveB2
