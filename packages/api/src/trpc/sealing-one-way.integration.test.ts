@@ -37,10 +37,11 @@ const deviceTypeOf: Record<Method, string> = {
 }
 
 const USERS = {
+  coffee: 'sealing-one-way-coffee',
   grinder: 'sealing-one-way-grinder',
   brewingDevice: 'sealing-one-way-device',
   ...Object.fromEntries(methods.map((m) => [m, `sealing-one-way-${m}`])),
-} as Record<'grinder' | 'brewingDevice' | Method, string>
+} as Record<'coffee' | 'grinder' | 'brewingDevice' | Method, string>
 
 const types = deviceTypes()
 seedUsers(Object.values(USERS), types.cleanup)
@@ -164,6 +165,55 @@ async function scenario(userId: string, filler: Method) {
 
   return { as, x, fillerGrinder, fillerDevice, fillerBrews, expectXSealed }
 }
+
+// An unbrewed Coffee ranks by its createdAt, so moving it back in time must
+// not hand its slot to a fallen Coffee. Needs its own fixture: the Coffee has
+// to sit above X before the Plan lapses.
+it('a forged Coffee createdAt keeps Sealed Brews Sealed', async () => {
+  const as = callerFor(USERS.coffee)
+  const uniq = uniqFor(USERS.coffee)
+  const createCoffee = createCoffeeFor(as, uniq)
+  await grantPlan(USERS.coffee, 'pro', { reason: 'sealing one-way fixture' })
+  const grinder = await as.grinder.create({ name: uniq('G'), brand: 'x' })
+  const device = await as.brewingDevice.create({
+    name: uniq('D'),
+    brand: 'x',
+    typeId: await types.findOrCreate(ESPRESSO_DEVICE_TYPE),
+  })
+  const shot = (coffeeId: string) =>
+    as.espressoShot.create({
+      coffeeId,
+      grinderId: grinder.id,
+      brewingDeviceId: device.id,
+      dose: '18',
+      yield: '36',
+      time: 30,
+      grindSetting: '18',
+      notes: 'withheld notes',
+      idempotencyKey: crypto.randomUUID(),
+    })
+  const x = await shot((await createCoffee(uniq('X'))).id)
+  for (let i = 0; i < 4; i++) await shot((await createCoffee(uniq(`C${i}`))).id)
+  // Unbrewed and newest: the fifth Shelf slot, one above X.
+  const unbrewed = await createCoffee(uniq('U'))
+  await expireGrants(USERS.coffee)
+  const sealed = { sealed: true, notes: null }
+  const read = async () => {
+    const brew = await as.espressoShot.getById(x.id)
+    return { sealed: brew.sealed, notes: brew.notes }
+  }
+  expect(await read()).toEqual(sealed)
+
+  await as.coffee.update({
+    id: unbrewed.id,
+    name: unbrewed.name,
+    roasterId: unbrewed.roasterId!,
+    roastLevelId: unbrewed.roastLevelId!,
+    createdAt: new Date('2000-01-01T00:00:00Z'),
+  } as never)
+
+  expect(await read()).toEqual(sealed)
+})
 
 describe('deleting gear keeps Sealed Brews Sealed', () => {
   it('a grinder', async () => {
