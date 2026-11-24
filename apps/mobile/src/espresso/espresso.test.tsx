@@ -1521,6 +1521,48 @@ describe('log espresso shot', () => {
     expect(sent[1]).toEqual(sent[0])
   })
 
+  it('gives a refilled draft no save sent its own key', async () => {
+    const sent: Array<ShotCreate> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog()),
+      loadPrefill: () => Promise.resolve(null),
+      create: (input) =>
+        Promise.resolve().then(() => {
+          sent.push(input)
+          throw new Error('Network request failed')
+        }),
+    }
+    const dose = (value: string) =>
+      fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), value)
+    const roastDate = (value: string) =>
+      fireEvent.changeText(screen.getByLabelText(LABEL_ROAST_DATE), value)
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    // Lost saves: A at 18 g with no roast date, then B at 19 g on May 3.
+    await press(LOG)
+    await dose('19')
+    await roastDate('2026-05-03')
+    await press(LOG)
+    // Back to A's draft; picking the coffee again fills B's roast date.
+    await dose('18')
+    await roastDate('')
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await act(async () => {})
+    expect(screen.getByDisplayValue('2026-05-03')).toBeTruthy()
+
+    // A draft no save sent replays neither key: under A's the API refuses it.
+    await press(LOG)
+    expect(sent).toHaveLength(3)
+    expect(sent[2].roastDate).toBe('2026-05-03')
+    expect(sent[2].idempotencyKey).not.toBe(sent[0].idempotencyKey)
+    expect(sent[2].idempotencyKey).not.toBe(sent[1].idempotencyKey)
+  })
+
   it('saves a new shot on the next Log after its key turns out deleted', async () => {
     const keys: Array<string> = []
     const { api, created } = fakeApi(catalog(), {

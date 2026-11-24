@@ -176,19 +176,8 @@ export function ShotForm({
     }
     // A queued edit has already cleared its own error, so the committed draft suffices here.
     const filled = fill(draftRef.current)
-    // A prefill is not an edit: a lost save must replay under its first key.
-    const before = parseShotDraft(draftRef.current)
-    const after = parseShotDraft(filled)
-    // Another coffee in the committed draft means the coffee was changed, which
-    // is an edit, so its key must not carry over.
-    const priorKey =
-      before.ok && before.value.coffeeId === coffeeId
-        ? idempotencyKeys.get(draftFingerprint(before.value))
-        : undefined
-    const fingerprint = after.ok ? draftFingerprint(after.value) : undefined
-    if (priorKey && fingerprint && !idempotencyKeys.has(fingerprint)) {
-      idempotencyKeys.set(fingerprint, priorKey)
-    }
+    // No key carries over: a lost save is refilled from its own record, so a
+    // draft that changes here is one no save sent, and gets its own key.
     setDraft(fill)
     setFieldErrors((current) => {
       const updated = { ...current }
