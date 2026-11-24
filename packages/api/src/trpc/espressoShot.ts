@@ -29,7 +29,7 @@ import {
   normalizeDecimal,
 } from '../lib/espresso'
 import { PG_FOREIGN_KEY_VIOLATION, pgErrorIn } from '../lib/pg-error'
-import { isSealed, loadShelf, withStampedShelf } from '../lib/shelf'
+import { loadShelf, sealedNow, withStampedShelf } from '../lib/shelf'
 import {
   onOwnCoffee,
   ownGear,
@@ -631,34 +631,35 @@ export const espressoShotRouter = createTRPCRouter({
       const { id, ...data } = input
       await assertOwnEspressoGear(data, ctx.session.user.id)
 
-      // A Sealed shot reaches the form with its settings withheld, so saving it
-      // would write those blanks over what is stored. Nothing is ever deleted
-      // (ADR-0004), so the edit is refused instead.
-      const existing = await db.query.espressoShots.findFirst({
-        where: { id, userId: ctx.session.user.id },
-      })
-      if (existing && isSealed(existing, await ctx.shelf())) {
+      // Every edit stamps, not only a move, so a stale read of the Brew's
+      // Coffee cannot skip the stamp (ADR-0004). A Sealed Brew reaches the
+      // form with its settings withheld, so saving it would write those blanks
+      // over what is stored; it is refused under the lock, since a write
+      // queued ahead of this one can Seal it, and by returning rather than
+      // throwing, so the stamps commit.
+      const updated = await withStampedShelf(
+        ctx.session.user.id,
+        ctx.plan,
+        async (tx, shelf) =>
+          (await sealedNow(tx, espressoShots, id, ctx.session.user.id, shelf))
+            ? null
+            : tx
+                .update(espressoShots)
+                .set(data)
+                .where(
+                  and(
+                    eq(espressoShots.id, id),
+                    eq(espressoShots.userId, ctx.session.user.id),
+                  ),
+                )
+                .returning(),
+      )
+      if (updated === null) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message:
-            'This Brew is Sealed. Subscribe to read and edit it again.',
+          message: 'This Brew is Sealed. Subscribe to read and edit it again.',
         })
       }
-
-      // Every edit stamps, not only a move: the Coffee read above may be
-      // stale by the time this write holds the lock (ADR-0004).
-      const updated = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
-        tx
-          .update(espressoShots)
-          .set(data)
-          .where(
-            and(
-              eq(espressoShots.id, id),
-              eq(espressoShots.userId, ctx.session.user.id),
-            ),
-          )
-          .returning(),
-      )
       if (updated.length === 0) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Shot not found' })
       }

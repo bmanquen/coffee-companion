@@ -41,7 +41,9 @@ Consequences to understand before changing anything here:
 - **Those writes run one at a time per user.** Each stamps and writes in one transaction
   under a per-user lock (`withStampedShelf`). Two that both stamped before either wrote
   could reopen a Brew that either order alone would Seal, and a database snapshot does not
-  catch it when they touch different rows.
+  catch it when they touch different rows. An edit checks whether its Brew is Sealed
+  there too, under the lock, because a write queued ahead of it can Seal it; the refusal
+  still commits the stamps.
 - **Nothing is ever deleted.** Sealed Brews are retained in full and reopen the instant
   a user upgrades. Data export must ignore Plan state entirely — GDPR Art. 15/20 give
   users a right to their own data whether or not they are paying.

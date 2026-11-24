@@ -139,7 +139,7 @@ export function shelfLoader(
 export async function withStampedShelf<T>(
   userId: string,
   plan: PlanId,
-  write: (tx: ShelfTx) => Promise<T>,
+  write: (tx: ShelfTx, shelf: Shelf) => Promise<T>,
 ): Promise<T> {
   const client = await db.$client.connect()
   let broken = false
@@ -159,8 +159,7 @@ export async function withStampedShelf<T>(
       try {
         return await locked.transaction(
           async (tx) => {
-            await stampFallen(tx, userId, plan)
-            return write(tx)
+            return write(tx, await stampFallen(tx, userId, plan))
           },
           { isolationLevel: 'repeatable read' },
         )
@@ -185,12 +184,16 @@ export async function withStampedShelf<T>(
 
 export type ShelfTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
-async function stampFallen(tx: ShelfTx, userId: string, plan: PlanId) {
+async function stampFallen(
+  tx: ShelfTx,
+  userId: string,
+  plan: PlanId,
+): Promise<Shelf> {
   // Deliberately a fresh Shelf rather than the request's: several Brews can be
   // logged in one request, and stamping against a Shelf an earlier one has
   // already reordered would leave a fallen Coffee's Brews unstamped.
   const shelf = await loadShelf(userId, plan, tx)
-  if (shelf === null) return
+  if (shelf === null) return null
   const onShelf = [...shelf]
   const stamp = new Date()
 
@@ -209,6 +212,23 @@ async function stampFallen(tx: ShelfTx, userId: string, plan: PlanId) {
         ),
       )
   }
+  return shelf
+}
+
+// Whether a Brew is Sealed as a write inside withStampedShelf sees it. An edit
+// checks here, under the lock, because a write queued ahead of it can Seal it.
+export async function sealedNow(
+  tx: ShelfTx,
+  table: (typeof brewTables)[number],
+  id: string,
+  userId: string,
+  shelf: Shelf,
+): Promise<boolean> {
+  const rows = await tx
+    .select({ sealedAt: table.sealedAt, coffeeId: table.coffeeId })
+    .from(table)
+    .where(and(eq(table.id, id), eq(table.userId, userId)))
+  return rows.length > 0 && isSealed(rows[0], shelf)
 }
 
 // Withheld when the Shelf is limited and the Brew either carries a stamp or

@@ -43,8 +43,12 @@ const USERS = {
   grinder: 'sealing-one-way-grinder',
   brewingDevice: 'sealing-one-way-device',
   race: 'sealing-one-way-race',
+  sealedWhileWaiting: 'sealing-one-way-sealed-while-waiting',
   ...Object.fromEntries(methods.map((m) => [m, `sealing-one-way-${m}`])),
-} as Record<'grinder' | 'brewingDevice' | 'race' | Method, string>
+} as Record<
+  'grinder' | 'brewingDevice' | 'race' | 'sealedWhileWaiting' | Method,
+  string
+>
 
 const types = deviceTypes()
 seedUsers(Object.values(USERS), types.cleanup)
@@ -304,21 +308,96 @@ describe('concurrent Shelf-changing writes', () => {
     const toC2 = holdCoffeeRow(c2.id)
     const toC0 = holdCoffeeRow(c0.id)
     await Promise.all([toC2.locked, toC0.locked])
-    const moveB2 = as.espressoShot.update({ ...b2, coffeeId: c2.id } as never)
-    await waitForLockWaiters(1)
-    const moveB0 = as.espressoShot.update({ ...b0, coffeeId: c0.id } as never)
-    await waitForLockWaiters(2)
-    await toC2.release()
-    await moveB2
-    await toC0.release()
-    await moveB0
+    let moveB2: Promise<unknown> | undefined
+    let moveB0: Promise<unknown> | undefined
+    try {
+      moveB2 = as.espressoShot.update({ ...b2, coffeeId: c2.id } as never)
+      await waitForLockWaiters(1)
+      moveB0 = as.espressoShot.update({ ...b0, coffeeId: c0.id } as never)
+      await waitForLockWaiters(2)
+      await toC2.release()
+      await moveB2
+      await toC0.release()
+      // b2's move pushed c1 off and stamped b0, so editing b0 is refused.
+      await expect(moveB0).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    } finally {
+      // A failed run must not leave a row held for the user cleanup to wait on.
+      await Promise.all([toC2.release(), toC0.release()])
+      await Promise.allSettled([moveB2, moveB0])
+    }
 
-    // Serially, moving b2 empties c1 off the Shelf, so b0 is stamped before
-    // it moves; moving b0 first drops c0 off again, so it is stamped then.
+    // Serially, moving b2 empties c1 off the Shelf, so b0 is stamped (and
+    // its move refused); moving b0 first drops c0 off again, stamping it then.
     const after = await read(b0.id)
     expect({ sealed: after.sealed, notes: after.notes }).toEqual({
       sealed: true,
       notes: null,
     })
+  })
+
+  it('refuse an edit to a Brew Sealed while it waited, and keep the stamp', async () => {
+    const userId = USERS.sealedWhileWaiting
+    const as = callerFor(userId)
+    const uniq = uniqFor(userId)
+    const createCoffee = createCoffeeFor(as, uniq)
+    await grantPlan(userId, 'pro', { reason: 'sealed while waiting fixture' })
+    const grinder = await as.grinder.create({ name: uniq('G'), brand: 'x' })
+    const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
+    const device = await as.brewingDevice.create({
+      name: uniq('D'),
+      brand: 'x',
+      typeId,
+    })
+    const shot = async (coffeeId: string) =>
+      as.espressoShot.create({
+        coffeeId,
+        grinderId: grinder.id,
+        brewingDeviceId: device.id,
+        grindSetting: '18',
+        dose: '18',
+        yield: '36',
+        time: 30,
+        notes: 'withheld notes',
+        idempotencyKey: crypto.randomUUID(),
+      })
+    // Five brewed Coffees fill the Free Shelf; the edited Brew's is the oldest.
+    const edited = await shot((await createCoffee(uniq('edited'))).id)
+    for (let i = 0; i < 4; i++) await shot((await createCoffee(uniq(`c${i}`))).id)
+    await expireGrants(userId)
+    expect((await as.espressoShot.getById(edited.id)).sealed).toBe(false)
+
+    // Another request holds the user's Shelf lock while the edit queues behind
+    // it, and adds a Coffee that pushes the edited Brew's Coffee off.
+    const holder = await db.$client.connect()
+    let editing: Promise<unknown> | undefined
+    try {
+      await holder.query('select pg_advisory_lock(hashtextextended($1, 0))', [
+        userId,
+      ])
+      editing = as.espressoShot.update({
+        ...edited,
+        notes: 'overwritten',
+      } as never)
+      editing.catch(() => {})
+      await waitForLockWaiters(1)
+      await createCoffee(uniq('newest'))
+      await holder.query('select pg_advisory_unlock(hashtextextended($1, 0))', [
+        userId,
+      ])
+      await expect(editing).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    } finally {
+      await holder
+        .query('select pg_advisory_unlock_all()')
+        .catch(() => {})
+      holder.release()
+      await editing?.catch(() => {})
+    }
+
+    const [row] = await db
+      .select({ notes: espressoShots.notes, sealedAt: espressoShots.sealedAt })
+      .from(espressoShots)
+      .where(eq(espressoShots.id, edited.id))
+    expect(row.notes).toBe('withheld notes')
+    expect(row.sealedAt).not.toBeNull()
   })
 })
