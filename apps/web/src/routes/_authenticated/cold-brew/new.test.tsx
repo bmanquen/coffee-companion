@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -213,6 +214,17 @@ describe('NewColdBrewBrew form', () => {
         to: '/brews',
         search: { method: 'coldbrew' },
       })
+
+      // Enter after the save (the button is not the only way to submit) must
+      // not create the brew again; Log stays disabled.
+      const log = screen.getByRole<HTMLButtonElement>('button', { name: 'Log' })
+      fireEvent.submit(log.closest('form')!)
+      await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+      const creates = fetchSpy.mock.calls.filter(([calledUrl]) =>
+        String(calledUrl).includes('coldBrewBrew.create'),
+      )
+      expect(creates).toHaveLength(1)
+      expect(log.disabled).toBe(true)
     } finally {
       fetchSpy.mockRestore()
     }

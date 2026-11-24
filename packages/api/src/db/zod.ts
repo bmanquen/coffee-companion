@@ -96,7 +96,9 @@ export const coffeeOriginInputSchema = z.object({
 export const insertCoffeeSchema = createInsertSchema(coffees, {
   name: (schema) => schema.min(1, 'Enter a name'),
 })
-  .omit({ id: true, userId: true })
+  // Timestamps are server-owned: createdAt ranks an unbrewed Coffee on the
+  // Shelf (ADR-0004), so a forged one could hand a fallen Coffee its slot back.
+  .omit({ id: true, userId: true, createdAt: true, updatedAt: true })
   .extend({
     roasterId: z.uuid('Select a roaster'),
     roastLevelId: z.uuid('Select a roast level'),
@@ -111,7 +113,7 @@ export type CoffeeOriginInput = z.infer<typeof coffeeOriginInputSchema>
 export const insertGrinderSchema = createInsertSchema(grinders, {
   name: (schema) => schema.min(1, 'Enter a name'),
   brand: (schema) => schema.min(1, 'Enter a brand'),
-}).omit({ id: true, userId: true })
+}).omit({ id: true, userId: true, createdAt: true, updatedAt: true })
 export const selectGrinderSchema = createSelectSchema(grinders)
 export type InsertGrinder = z.infer<typeof insertGrinderSchema>
 export type Grinder = z.infer<typeof selectGrinderSchema>
@@ -135,7 +137,7 @@ export const insertBrewingDeviceSchema = createInsertSchema(brewingDevices, {
   name: (schema) => schema.min(1, 'Enter a name'),
   brand: (schema) => schema.min(1, 'Enter a brand'),
   typeId: () => z.uuid('Select a type'),
-}).omit({ id: true, userId: true })
+}).omit({ id: true, userId: true, createdAt: true, updatedAt: true })
 export const selectBrewingDeviceSchema = createSelectSchema(brewingDevices)
 export type InsertBrewingDevice = z.infer<typeof insertBrewingDeviceSchema>
 export type BrewingDevice = z.infer<typeof selectBrewingDeviceSchema>
@@ -245,9 +247,13 @@ export const insertAeropressBrewSchema = createInsertSchema(aeropressBrews, {
   brewingDeviceId: () => z.uuid('Select a brewing device'),
   methodId: () => z.uuid('Select a method'),
 })
+  // Timestamps are server-owned, as for espresso shots.
   .omit({
     id: true,
     userId: true,
+    createdAt: true,
+    updatedAt: true,
+    sealedAt: true,
   })
   .extend({
     dose: decimalString(),
@@ -278,9 +284,13 @@ export const insertPouroverBrewSchema = createInsertSchema(pouroverBrews, {
   brewingDeviceId: () => z.uuid('Select a brewing device'),
   methodId: () => z.uuid('Select a method'),
 })
+  // Timestamps are server-owned, as for espresso shots.
   .omit({
     id: true,
     userId: true,
+    createdAt: true,
+    updatedAt: true,
+    sealedAt: true,
   })
   .extend({
     dose: decimalString(),
@@ -321,9 +331,13 @@ export const insertFrenchpressBrewSchema = createInsertSchema(
     methodId: () => z.uuid('Select a method'),
   },
 )
+  // Timestamps are server-owned, as for espresso shots.
   .omit({
     id: true,
     userId: true,
+    createdAt: true,
+    updatedAt: true,
+    sealedAt: true,
   })
   .extend({
     dose: decimalString(),
@@ -351,9 +365,13 @@ export const insertColdBrewBrewSchema = createInsertSchema(coldBrewBrews, {
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
 })
+  // Timestamps are server-owned, as for espresso shots.
   .omit({
     id: true,
     userId: true,
+    createdAt: true,
+    updatedAt: true,
+    sealedAt: true,
   })
   .extend({
     dose: decimalString(),

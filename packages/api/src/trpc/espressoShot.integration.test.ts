@@ -681,7 +681,8 @@ describe('espressoShot.create idempotency', () => {
       grindSetting,
       idempotencyKey,
     }
-    // Holding the coffee makes both shot inserts wait on its foreign key, so
+    // Holding the coffee makes the first shot insert wait on its foreign key,
+    // and the second create waits behind it for the user's Shelf lock, so
     // both creates have missed the key before either can claim it.
     let release: () => void = () => {}
     const released = new Promise<void>((resolve) => {
@@ -713,8 +714,10 @@ describe('espressoShot.create idempotency', () => {
       for (let i = 0; i < 200 && blocked < 2; i++) {
         const waiting = await db.execute<{ n: number }>(
           sql`SELECT count(*)::int AS n FROM pg_stat_activity
-              WHERE ${blockerPid} = ANY(pg_blocking_pids(pid))
-                AND query ILIKE 'insert into "espresso_shots"%'`,
+              WHERE (${blockerPid} = ANY(pg_blocking_pids(pid))
+                  AND query ILIKE 'insert into "espresso_shots"%')
+                 OR (wait_event_type = 'Lock'
+                  AND query ILIKE 'select pg_advisory_lock%')`,
         )
         blocked = waiting.rows[0].n
         if (blocked < 2) await new Promise((resolve) => setTimeout(resolve, 25))
