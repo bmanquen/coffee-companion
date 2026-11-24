@@ -46,16 +46,16 @@
     "./test/database": "./test/database.ts"
   },
   "dependencies": {
-    "@better-auth/expo": "1.7.25",
-    "@better-auth/stripe": "1.7.25",
-    "@trpc/server": "^11.28.2",
-    "better-auth": "^1.7.25",
-    "jose": "^6.2.17",
+    "@better-auth/expo": "1.7.27",
+    "@better-auth/stripe": "1.7.27",
+    "@trpc/server": "^11.29.5",
+    "better-auth": "^1.7.27",
+    "jose": "^6.2.18",
     "dotenv": "^18.0.10",
     "drizzle-orm": "1.0.0-rc.5",
     "drizzle-zod": "^0.8.3",
     "pg": "^8.23.1",
-    "resend": "^6.38.1",
+    "resend": "^6.39.0",
     "stripe": "^22.4.0",
     "superjson": "^2.2.6",
     "zod": "^4.6.7"
