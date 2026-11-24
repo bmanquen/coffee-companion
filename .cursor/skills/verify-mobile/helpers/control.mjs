@@ -1424,8 +1424,16 @@ function driveDeviceReversePorts(state = {}) {
   ]
 }
 
-function ensureAdbReverses(serial, ports, reverse = adbReverse) {
-  for (const port of ports) reverse(serial, port)
+// Records each port just before reversing it, so cleanup removes every
+// mapping this run wrote and none it never reached.
+function addAdbReverses(record, ports, persist, reverse = adbReverse) {
+  for (const port of ports) {
+    if (!record.reversedPorts?.includes(port)) {
+      record.reversedPorts = [...(record.reversedPorts ?? []), port]
+      persist(record)
+    }
+    reverse(record.serial, port)
+  }
 }
 
 // Gboard's first text-keyboard focus opens a stylus handwriting sheet on
@@ -3709,11 +3717,7 @@ async function cmdLaunchDevice(opts = {}) {
     if (avdProblem) {
       throw new Error(`Not changing ${DEVICE_SERIAL}: ${avdProblem}`)
     }
-    // Recorded first, so a failure between the two still removes the first.
-    partial.reversedPorts = [metroPort, webPort]
-    persistLaunchPartial(partial)
-    adbReverse(DEVICE_SERIAL, metroPort)
-    adbReverse(DEVICE_SERIAL, webPort)
+    addAdbReverses(partial, [metroPort, webPort], persistLaunchPartial)
     if (attachedEmulator) {
       // A record a failed cleanup kept is the value from before any run
       // changed it; the setting may still read 0 from that run.
@@ -3859,7 +3863,7 @@ async function cmdDriveDevice(flow) {
       EXIT_NOT_DRIVABLE,
     )
   }
-  ensureAdbReverses(state.serial, driveDeviceReversePorts(state))
+  addAdbReverses(state, driveDeviceReversePorts(state), writeState)
   // The readiness check needs handwriting off, so it is written first. A
   // failed launch's teardown put the setting back and dropped its record, so
   // read it again before the write, or cleanup could not undo it.
@@ -4826,7 +4830,7 @@ export {
   quoteForAdbShell,
   adbReverseArgs,
   driveDeviceReversePorts,
-  ensureAdbReverses,
+  addAdbReverses,
   STYLUS_HANDWRITING_SETTING,
   stylusHandwritingProblem,
   ensureStylusHandwritingOff,

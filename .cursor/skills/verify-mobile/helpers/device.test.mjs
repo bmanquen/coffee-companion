@@ -72,7 +72,7 @@ import {
   quoteForAdbShell,
   adbReverseArgs,
   driveDeviceReversePorts,
-  ensureAdbReverses,
+  addAdbReverses,
   STYLUS_HANDWRITING_SETTING,
   stylusHandwritingProblem,
   ensureStylusHandwritingOff,
@@ -1375,14 +1375,34 @@ describe('driveDeviceReversePorts', () => {
       8081,
       3910,
     ])
+  })
+})
+
+describe('addAdbReverses', () => {
+  it('records each port before reversing it, and none it never reached', () => {
+    const record = { serial: DEVICE_SERIAL, reversedPorts: [8081] }
+    const persisted = []
     const reversed = []
-    ensureAdbReverses(DEVICE_SERIAL, [8081, 3910], (serial, port) => {
-      reversed.push([serial, port])
-    })
+    assert.throws(
+      () =>
+        addAdbReverses(
+          record,
+          [8081, 3910, 8082],
+          (r) => persisted.push([...r.reversedPorts]),
+          (serial, port) => {
+            reversed.push([serial, port])
+            if (port === 3910) throw new Error('adb reverse tcp:3910 failed')
+          },
+        ),
+      /tcp:3910 failed/,
+    )
     assert.deepEqual(reversed, [
       [DEVICE_SERIAL, 8081],
       [DEVICE_SERIAL, 3910],
     ])
+    // 8081 was already recorded; 8082 was never reversed, so never recorded.
+    assert.deepEqual(persisted, [[8081, 3910]])
+    assert.deepEqual(record.reversedPorts, [8081, 3910])
   })
 })
 
@@ -1742,6 +1762,12 @@ describe('drive-device after a failed launch', () => {
         !wroteStylus || state.stylusHandwritingBefore === '1',
         `stylus turned off with baseline ${state.stylusHandwritingBefore}`,
       )
+      // Cleanup removes only recorded reverses, so each one drive added is.
+      const reversed = [
+        ...readFileSync(log, 'utf8').matchAll(/reverse tcp:(\d+) tcp:/g),
+      ].map((match) => Number(match[1]))
+      assert.ok(reversed.length > 0, 'drive-device never reversed a port')
+      assert.deepEqual(state.reversedPorts, reversed)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -2136,7 +2162,7 @@ describe('connectedAvdProblem', () => {
     )
     const drive = src.slice(src.indexOf('async function cmdDriveDevice'))
     const check = drive.indexOf('recordedAvdProblem(')
-    const firstWrite = drive.indexOf('ensureAdbReverses(state.serial')
+    const firstWrite = drive.indexOf('addAdbReverses(state')
     assert.ok(check >= 0 && firstWrite >= 0)
     assert.ok(check < firstWrite)
   })
@@ -2148,7 +2174,7 @@ describe('connectedAvdProblem', () => {
     )
     const launch = src.slice(src.indexOf('async function cmdLaunchDevice'))
     const check = launch.indexOf('recordedAvdProblem(')
-    const reverse = launch.indexOf('adbReverse(DEVICE_SERIAL')
+    const reverse = launch.indexOf('addAdbReverses(partial')
     const read = launch.indexOf('readStylusBaseline(DEVICE_SERIAL)')
     const write = launch.indexOf('ensureStylusHandwritingOff(DEVICE_SERIAL)')
     assert.ok(check >= 0 && reverse >= 0 && read >= 0 && write >= 0)
