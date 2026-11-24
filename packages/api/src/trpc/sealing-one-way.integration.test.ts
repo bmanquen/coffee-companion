@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { eq, sql } from 'drizzle-orm'
+import { db } from '../db'
+import { espressoShots } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
 import { COLD_BREW_DEVICE_TYPE } from '../lib/cold-brew'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
@@ -39,8 +42,9 @@ const deviceTypeOf: Record<Method, string> = {
 const USERS = {
   grinder: 'sealing-one-way-grinder',
   brewingDevice: 'sealing-one-way-device',
+  race: 'sealing-one-way-race',
   ...Object.fromEntries(methods.map((m) => [m, `sealing-one-way-${m}`])),
-} as Record<'grinder' | 'brewingDevice' | Method, string>
+} as Record<'grinder' | 'brewingDevice' | 'race' | Method, string>
 
 const types = deviceTypes()
 seedUsers(Object.values(USERS), types.cleanup)
@@ -204,3 +208,112 @@ describe.each(methods)(
     })
   },
 )
+
+// Holds a Coffee row so a write whose foreign key checks it waits after its
+// stamp: the test then decides the order the writes land in.
+function holdCoffeeRow(coffeeId: string) {
+  let release!: () => void
+  const released = new Promise<void>((resolve) => (release = resolve))
+  let ready!: () => void
+  const locked = new Promise<void>((resolve) => (ready = resolve))
+  const done = db.transaction(async (tx) => {
+    await tx.execute(sql`select 1 from coffees where id = ${coffeeId} for update`)
+    ready()
+    await released
+  })
+  return {
+    locked,
+    release: async () => {
+      release()
+      await done
+    },
+  }
+}
+
+async function waitForLockWaiters(count: number) {
+  for (let attempt = 0; attempt < 400; attempt++) {
+    const { rows } = await db.execute<{ waiting: number }>(sql`
+      select count(*)::int as waiting from pg_stat_activity
+      where datname = current_database() and wait_event_type = 'Lock'
+    `)
+    if (rows[0].waiting >= count) return
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+  throw new Error(`fewer than ${count} requests waiting on a lock`)
+}
+
+describe('concurrent Shelf-changing writes', () => {
+  // Found by an exhaustive model of the Shelf. Two moves that each stamp
+  // before either writes stamp nothing and touch different rows, so their
+  // snapshots never conflict, yet together they reopen a Brew that every
+  // serial order Seals. Only serializing the writes closes it.
+  it('Seal what one at a time would Seal', async () => {
+    const userId = USERS.race
+    const as = callerFor(userId)
+    const uniq = uniqFor(userId)
+    const createCoffee = createCoffeeFor(as, uniq)
+    await grantPlan(userId, 'pro', { reason: 'shelf race fixture' })
+    const grinder = await as.grinder.create({ name: uniq('G'), brand: 'x' })
+    const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
+    const device = await as.brewingDevice.create({
+      name: uniq('D'),
+      brand: 'x',
+      typeId,
+    })
+    const shot = (coffeeId: string) =>
+      as.espressoShot.create({
+        coffeeId,
+        grinderId: grinder.id,
+        brewingDeviceId: device.id,
+        grindSetting: '18',
+        dose: '18',
+        yield: '36',
+        time: 30,
+        notes: 'withheld notes',
+        idempotencyKey: crypto.randomUUID(),
+      })
+
+    const c0 = await createCoffee(uniq('c0'))
+    const c2 = await createCoffee(uniq('c2'))
+    const c1 = await createCoffee(uniq('c1'))
+    const b0 = await shot(c1.id)
+    const b1 = await shot(c0.id)
+    const b2 = await shot(c1.id)
+    await shot(c2.id)
+    // Three Coffees brewed last hold the top of the Shelf, leaving two slots
+    // for c0, c1 and c2: c2 and c1 hold them, and c0 has fallen off.
+    for (let i = 0; i < 3; i++) await shot((await createCoffee(uniq(`top${i}`))).id)
+    await expireGrants(userId)
+    // Stamped, as the write that pushed c0 off would have left it.
+    await db
+      .update(espressoShots)
+      .set({ sealedAt: new Date() })
+      .where(eq(espressoShots.id, b1.id))
+
+    const read = (id: string) => as.espressoShot.getById(id)
+    expect((await read(b1.id)).sealed).toBe(true)
+    expect((await read(b0.id)).sealed).toBe(false)
+
+    // Move b2 to c2 and b0 to c0 at once. Each holds at its Coffee's row
+    // until released, b2's move first.
+    const toC2 = holdCoffeeRow(c2.id)
+    const toC0 = holdCoffeeRow(c0.id)
+    await Promise.all([toC2.locked, toC0.locked])
+    const moveB2 = as.espressoShot.update({ ...b2, coffeeId: c2.id } as never)
+    await waitForLockWaiters(1)
+    const moveB0 = as.espressoShot.update({ ...b0, coffeeId: c0.id } as never)
+    await waitForLockWaiters(2)
+    await toC2.release()
+    await moveB2
+    await toC0.release()
+    await moveB0
+
+    // Serially, moving b2 empties c1 off the Shelf, so b0 is stamped before
+    // it moves; moving b0 first drops c0 off again, so it is stamped then.
+    const after = await read(b0.id)
+    expect({ sealed: after.sealed, notes: after.notes }).toEqual({
+      sealed: true,
+      notes: null,
+    })
+  })
+})

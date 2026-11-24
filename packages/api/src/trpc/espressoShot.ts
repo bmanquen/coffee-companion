@@ -29,7 +29,7 @@ import {
   normalizeDecimal,
 } from '../lib/espresso'
 import { PG_FOREIGN_KEY_VIOLATION, pgErrorIn } from '../lib/pg-error'
-import { isSealed, loadShelf, stampFallenBrews } from '../lib/shelf'
+import { isSealed, loadShelf, withStampedShelf } from '../lib/shelf'
 import {
   onOwnCoffee,
   ownGear,
@@ -41,7 +41,7 @@ import type {
   EspressoShotCursorKey,
 } from '../lib/espresso'
 import type { PlanId } from '../lib/plan'
-import type { Shelf } from '../lib/shelf'
+import type { Shelf, ShelfTx } from '../lib/shelf'
 
 export const TRPC_BAD_REQUEST = 'BAD_REQUEST' as const
 export const TRPC_CONFLICT = 'CONFLICT' as const
@@ -397,12 +397,15 @@ function throwIfKeyDeleted<T>(value: T | null | undefined): asserts value is T {
 
 async function insertShotWithKey(
   userId: string,
+  plan: PlanId,
   input: z.infer<typeof insertEspressoShotSchema> & { idempotencyKey: string },
 ) {
   const { idempotencyKey, ...shot } = input
   let claimedId: string | null
   try {
-    claimedId = await claimShot(userId, idempotencyKey, shot)
+    claimedId = await withStampedShelf(userId, plan, (tx) =>
+      claimShot(tx, userId, idempotencyKey, shot),
+    )
   } catch (error) {
     // An overlapping request with this key may have saved the shot and its
     // gear been deleted since: replay that key (deleted, here) rather than
@@ -426,33 +429,32 @@ async function insertShotWithKey(
 
 // Inserts the shot and claims its key together; null when another request
 // already holds the key.
-function claimShot(
+async function claimShot(
+  tx: ShelfTx,
   userId: string,
   idempotencyKey: string,
   shot: z.infer<typeof insertEspressoShotSchema>,
 ) {
-  return db.transaction(async (tx) => {
-    const inserted = await tx
-      .insert(espressoShots)
-      .values({ ...shot, userId })
-      .returning({ id: espressoShots.id })
-    const shotId = inserted[0].id
-    const claimed = await tx
-      .insert(espressoShotIdempotencyKeys)
-      .values({
-        userId,
-        idempotencyKey,
-        shotId,
-        requestFingerprint: replayFingerprint(shot),
-      })
-      .onConflictDoNothing()
-      .returning({
-        shotId: espressoShotIdempotencyKeys.shotId,
-      })
-    if (claimed.length > 0) return shotId
-    await tx.delete(espressoShots).where(eq(espressoShots.id, shotId))
-    return null
-  })
+  const inserted = await tx
+    .insert(espressoShots)
+    .values({ ...shot, userId })
+    .returning({ id: espressoShots.id })
+  const shotId = inserted[0].id
+  const claimed = await tx
+    .insert(espressoShotIdempotencyKeys)
+    .values({
+      userId,
+      idempotencyKey,
+      shotId,
+      requestFingerprint: replayFingerprint(shot),
+    })
+    .onConflictDoNothing()
+    .returning({
+      shotId: espressoShotIdempotencyKeys.shotId,
+    })
+  if (claimed.length > 0) return shotId
+  await tx.delete(espressoShots).where(eq(espressoShots.id, shotId))
+  return null
 }
 
 // A retry of the request that claimed the key gets the shot as it is now, even
@@ -597,8 +599,7 @@ export const espressoShotRouter = createTRPCRouter({
       if (keyRow) {
         shotId = await replayShotId(userId, keyRow, input)
       } else {
-        await stampFallenBrews(userId, ctx.plan)
-        shotId = await insertShotWithKey(userId, input)
+        shotId = await insertShotWithKey(userId, ctx.plan, input)
       }
 
       // A fresh Shelf, not the request's (another read in the same batch may
@@ -644,22 +645,20 @@ export const espressoShotRouter = createTRPCRouter({
         })
       }
 
-      // Moving a Brew lifts its new Coffee up the Shelf, so stamp first
-      // (ADR-0004), or that Coffee's Sealed Brews would read again.
-      if (existing && existing.coffeeId !== data.coffeeId) {
-        await stampFallenBrews(ctx.session.user.id, ctx.plan)
-      }
-
-      const updated = await db
-        .update(espressoShots)
-        .set(data)
-        .where(
-          and(
-            eq(espressoShots.id, id),
-            eq(espressoShots.userId, ctx.session.user.id),
-          ),
-        )
-        .returning()
+      // Every edit stamps, not only a move: the Coffee read above may be
+      // stale by the time this write holds the lock (ADR-0004).
+      const updated = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
+        tx
+          .update(espressoShots)
+          .set(data)
+          .where(
+            and(
+              eq(espressoShots.id, id),
+              eq(espressoShots.userId, ctx.session.user.id),
+            ),
+          )
+          .returning(),
+      )
       if (updated.length === 0) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Shot not found' })
       }
@@ -669,17 +668,17 @@ export const espressoShotRouter = createTRPCRouter({
   delete: authedProcedure
     .input(uuidInput())
     .mutation(async ({ ctx, input }) => {
-      await stampFallenBrews(ctx.session.user.id, ctx.plan)
-
-      const deleted = await db
-        .delete(espressoShots)
-        .where(
-          and(
-            eq(espressoShots.id, input),
-            eq(espressoShots.userId, ctx.session.user.id),
-          ),
-        )
-        .returning()
+      const deleted = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
+        tx
+          .delete(espressoShots)
+          .where(
+            and(
+              eq(espressoShots.id, input),
+              eq(espressoShots.userId, ctx.session.user.id),
+            ),
+          )
+          .returning(),
+      )
       if (deleted.length === 0) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Shot not found' })
       }

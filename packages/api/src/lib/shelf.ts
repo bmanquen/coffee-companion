@@ -1,4 +1,5 @@
 import { and, eq, isNull, notInArray, sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/node-postgres'
 import { db } from '../db'
 import {
   aeropressBrews,
@@ -9,6 +10,7 @@ import {
   frenchpressBrews,
   grinders,
   pouroverBrews,
+  relations,
 } from '../db/schema'
 import { PG_SERIALIZATION_FAILURE, pgErrorIn } from './pg-error'
 import { shelfSizes } from './plan'
@@ -118,7 +120,7 @@ export function shelfLoader(
 // Shelf with nothing written; the stamp is what keeps it withheld once that
 // Coffee comes back (ADR-0004).
 //
-// So this must run before anything that can hand a Coffee its slot back, always
+// So it must run before anything that can hand a Coffee its slot back, always
 // against the Shelf as it stands *before* that happens. Three things can:
 //
 //   - logging a Brew, which lifts its Coffee to the top of the Shelf;
@@ -130,53 +132,82 @@ export function shelfLoader(
 // Adding a Coffee only ever displaces, so it needs no stamp: what it pushes off
 // is withheld by the Shelf alone until something above is removed. Reads never
 // stamp at all.
-export async function stampFallenBrews(
+//
+// Each of those writes runs as `write`, in the stamp's transaction and under a
+// per-user lock, so two of them cannot both stamp before either writes: that
+// interleaving reopens Brews every serial order would Seal.
+export async function withStampedShelf<T>(
   userId: string,
   plan: PlanId,
-): Promise<void> {
+  write: (tx: ShelfTx) => Promise<T>,
+): Promise<T> {
+  const client = await db.$client.connect()
+  let broken = false
+  try {
+    // A session lock taken before BEGIN, so the snapshot below starts after
+    // the previous holder committed. A transaction lock would be taken inside
+    // the snapshot and miss that commit.
+    await client.query('select pg_advisory_lock(hashtextextended($1, 0))', [
+      userId,
+    ])
+    const locked = drizzle({ client, relations })
+    // The Shelf, the stamps and the write from one snapshot, so a Brew saved
+    // outside the lock after this Shelf read is not stamped. A concurrent
+    // stamp of the same row aborts this one; the retry finds it stamped
+    // already.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await locked.transaction(
+          async (tx) => {
+            await stampFallen(tx, userId, plan)
+            return write(tx)
+          },
+          { isolationLevel: 'repeatable read' },
+        )
+      } catch (error) {
+        if (attempt >= 3 || !pgErrorIn(error, PG_SERIALIZATION_FAILURE)) {
+          throw error
+        }
+      }
+    }
+  } finally {
+    try {
+      await client.query('select pg_advisory_unlock(hashtextextended($1, 0))', [
+        userId,
+      ])
+    } catch {
+      // Dropping the connection ends its session, which releases the lock.
+      broken = true
+    }
+    client.release(broken)
+  }
+}
+
+export type ShelfTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+async function stampFallen(tx: ShelfTx, userId: string, plan: PlanId) {
   // Deliberately a fresh Shelf rather than the request's: several Brews can be
   // logged in one request, and stamping against a Shelf an earlier one has
   // already reordered would leave a fallen Coffee's Brews unstamped.
-  if (shelfSizes[plan] === null) return
-  // The Shelf and the stamps from one snapshot, so a Brew another request
-  // saves after this Shelf read, lifting its Coffee back on, is not stamped.
-  // A concurrent stamp of the same row aborts this one; the retry finds it
-  // stamped already.
-  for (let attempt = 1; ; attempt++) {
-    try {
-      await db.transaction(
-        async (tx) => {
-          const shelf = await loadShelf(userId, plan, tx)
-          if (shelf === null) return
-          const onShelf = [...shelf]
-          const stamp = new Date()
+  const shelf = await loadShelf(userId, plan, tx)
+  if (shelf === null) return
+  const onShelf = [...shelf]
+  const stamp = new Date()
 
-          // Idempotent: only unstamped Brews are touched, so a Brew Sealed
-          // earlier keeps its original stamp.
-          for (const table of brewTables) {
-            await tx
-              .update(table)
-              .set({ sealedAt: stamp })
-              .where(
-                and(
-                  eq(table.userId, userId),
-                  isNull(table.sealedAt),
-                  // An empty Shelf means every Coffee has fallen off it.
-                  onShelf.length
-                    ? notInArray(table.coffeeId, onShelf)
-                    : undefined,
-                ),
-              )
-          }
-        },
-        { isolationLevel: 'repeatable read' },
+  // Idempotent: only unstamped Brews are touched, so a Brew Sealed earlier
+  // keeps its original stamp.
+  for (const table of brewTables) {
+    await tx
+      .update(table)
+      .set({ sealedAt: stamp })
+      .where(
+        and(
+          eq(table.userId, userId),
+          isNull(table.sealedAt),
+          // An empty Shelf means every Coffee has fallen off it.
+          onShelf.length ? notInArray(table.coffeeId, onShelf) : undefined,
+        ),
       )
-      return
-    } catch (error) {
-      if (attempt >= 3 || !pgErrorIn(error, PG_SERIALIZATION_FAILURE)) {
-        throw error
-      }
-    }
   }
 }
 

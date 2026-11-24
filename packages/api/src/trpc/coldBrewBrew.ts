@@ -11,7 +11,7 @@ import {
   sealBrewWithDialedIn,
   sealBrewsWithDialedIn,
 } from '../lib/dialed-in-brew'
-import { isSealed, stampFallenBrews } from '../lib/shelf'
+import { isSealed, withStampedShelf } from '../lib/shelf'
 import {
   assertOwnCoffeeAndGrinder,
   onOwnCoffee,
@@ -121,12 +121,12 @@ export const coldBrewBrewRouter = createTRPCRouter({
       await assertColdBrewDevice(input.brewingDeviceId, ctx.session.user.id)
       await assertOwnCoffeeAndGrinder(input, ctx.session.user.id)
 
-      await stampFallenBrews(ctx.session.user.id, ctx.plan)
-
-      const [brew] = await db
-        .insert(coldBrewBrews)
-        .values({ ...input, userId: ctx.session.user.id })
-        .returning()
+      const [brew] = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
+        tx
+          .insert(coldBrewBrews)
+          .values({ ...input, userId: ctx.session.user.id })
+          .returning(),
+      )
       return brew
     }),
 
@@ -149,22 +149,20 @@ export const coldBrewBrewRouter = createTRPCRouter({
       await assertColdBrewDevice(data.brewingDeviceId, ctx.session.user.id)
       await assertOwnCoffeeAndGrinder(data, ctx.session.user.id)
 
-      // Moving a Brew lifts its new Coffee up the Shelf, so stamp first
-      // (ADR-0004), or that Coffee's Sealed Brews would read again.
-      if (existing && existing.coffeeId !== data.coffeeId) {
-        await stampFallenBrews(ctx.session.user.id, ctx.plan)
-      }
-
-      const updated = await db
-        .update(coldBrewBrews)
-        .set(data)
-        .where(
-          and(
-            eq(coldBrewBrews.id, id),
-            eq(coldBrewBrews.userId, ctx.session.user.id),
-          ),
-        )
-        .returning()
+      // Every edit stamps, not only a move: the Coffee read above may be
+      // stale by the time this write holds the lock (ADR-0004).
+      const updated = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
+        tx
+          .update(coldBrewBrews)
+          .set(data)
+          .where(
+            and(
+              eq(coldBrewBrews.id, id),
+              eq(coldBrewBrews.userId, ctx.session.user.id),
+            ),
+          )
+          .returning(),
+      )
       if (updated.length === 0) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
       }
@@ -172,17 +170,17 @@ export const coldBrewBrewRouter = createTRPCRouter({
     }),
 
   delete: authedProcedure.input(z.uuid()).mutation(async ({ ctx, input }) => {
-    await stampFallenBrews(ctx.session.user.id, ctx.plan)
-
-    const deleted = await db
-      .delete(coldBrewBrews)
-      .where(
-        and(
-          eq(coldBrewBrews.id, input),
-          eq(coldBrewBrews.userId, ctx.session.user.id),
-        ),
-      )
-      .returning()
+    const deleted = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
+      tx
+        .delete(coldBrewBrews)
+        .where(
+          and(
+            eq(coldBrewBrews.id, input),
+            eq(coldBrewBrews.userId, ctx.session.user.id),
+          ),
+        )
+        .returning(),
+    )
     if (deleted.length === 0) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
     }

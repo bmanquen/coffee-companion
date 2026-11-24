@@ -10,7 +10,7 @@ import {
   visibleDeviceType,
 } from '../lib/brew-ownership'
 import { isPgUniqueViolation } from '../lib/pg-error'
-import { countBrewsUsing, stampFallenBrews } from '../lib/shelf'
+import { countBrewsUsing, withStampedShelf } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 function rethrowUniqueDeviceConflict(err: unknown): never {
@@ -132,17 +132,17 @@ export const brewingDeviceRouter = createTRPCRouter({
     .input(z.uuid())
     .mutation(async ({ ctx, input }) => {
       // Its Brews go with it, which can promote a fallen Coffee (ADR-0004).
-      await stampFallenBrews(ctx.session.user.id, ctx.plan)
-
-      const deleted = await db
-        .delete(brewingDevices)
-        .where(
-          and(
-            eq(brewingDevices.id, input),
-            eq(brewingDevices.userId, ctx.session.user.id),
-          ),
-        )
-        .returning()
+      const deleted = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
+        tx
+          .delete(brewingDevices)
+          .where(
+            and(
+              eq(brewingDevices.id, input),
+              eq(brewingDevices.userId, ctx.session.user.id),
+            ),
+          )
+          .returning(),
+      )
       if (deleted.length === 0) {
         throw new TRPCError({
           code: 'NOT_FOUND',

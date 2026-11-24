@@ -12,7 +12,7 @@ import {
 import { insertCoffeeSchema } from '../db/zod'
 import { coffeeIdsWithDialedIn } from '../lib/dialed-in-brew'
 import { isPgUniqueViolation } from '../lib/pg-error'
-import { countBrewsUsing, stampFallenBrews } from '../lib/shelf'
+import { countBrewsUsing, withStampedShelf } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 import type { CoffeeOriginInput, InsertCoffee } from '../db/zod'
 
@@ -301,14 +301,14 @@ export const coffeeRouter = createTRPCRouter({
   delete: authedProcedure
     .input(z.uuid())
     .mutation(async ({ ctx, input }) => {
-      await stampFallenBrews(ctx.session.user.id, ctx.plan)
-
-      const deleted = await db
-        .delete(coffees)
-        .where(
-          and(eq(coffees.id, input), eq(coffees.userId, ctx.session.user.id)),
-        )
-        .returning()
+      const deleted = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
+        tx
+          .delete(coffees)
+          .where(
+            and(eq(coffees.id, input), eq(coffees.userId, ctx.session.user.id)),
+          )
+          .returning(),
+      )
       if (deleted.length === 0) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
       }
