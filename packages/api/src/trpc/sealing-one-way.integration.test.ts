@@ -200,6 +200,11 @@ describe.each(methods)(
       } as never)
       // The moved Brew itself was readable and stays readable.
       expect(updated).toMatchObject({ id: moved.id, coffeeId: x.id })
+      const readable = await as[method].getById(moved.id)
+      expect({ sealed: readable.sealed, notes: readable.notes }).toEqual({
+        sealed: false,
+        notes: 'withheld notes',
+      })
       await expectXSealed()
     })
   },
