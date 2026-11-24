@@ -33,8 +33,9 @@ Consequences to understand before changing anything here:
   restore the leak this replaced.
 - **The stamp is written only where a Coffee could regain its slot.** Its one job is
   keeping a Brew withheld after its Coffee returns to the Shelf, so it is written before
-  logging a Brew (which lifts a Coffee to the top) and before deleting a Coffee or a Brew
-  (which drops whatever was ranked by it and promotes what sat beneath). Adding a Coffee
+  logging a Brew or moving one to another Coffee (which lifts a Coffee to the top) and
+  before deleting a Coffee, a Brew, or a grinder or brewing device whose Brews cascade with
+  it (which drops whatever was ranked by it and promotes what sat beneath). Adding a Coffee
   only displaces, so it needs no stamp. Miss one of these and Sealing stops being one-way:
   a Free user could reopen withheld Brews by deleting whatever displaced them.
 - **Nothing is ever deleted.** Sealed Brews are retained in full and reopen the instant

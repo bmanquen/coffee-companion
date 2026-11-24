@@ -6,7 +6,7 @@ import { grinders } from '../db/schema'
 import { insertGrinderSchema } from '../db/zod'
 import { assertRoomForAnother } from '../lib/allowance'
 import { isPgUniqueViolation } from '../lib/pg-error'
-import { countBrewsUsing } from '../lib/shelf'
+import { countBrewsUsing, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 function rethrowUniqueGrinderConflict(err: unknown): never {
@@ -91,6 +91,9 @@ export const grinderRouter = createTRPCRouter({
   delete: authedProcedure
     .input(z.uuid())
     .mutation(async ({ ctx, input }) => {
+      // Its Brews go with it, which can promote a fallen Coffee (ADR-0004).
+      await stampFallenBrews(ctx.session.user.id, ctx.plan)
+
       const deleted = await db
         .delete(grinders)
         .where(
