@@ -102,6 +102,9 @@ function Home({
         <Pressable
           accessibilityRole="button"
           testID={SIGN_OUT_TEST_ID}
+          // Like Back, it would leave the form while a save is out.
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
           onPress={onSignOut}
         >
           <Text>{SIGN_OUT}</Text>

@@ -16,6 +16,7 @@ import { TRPC_CONFLICT } from '../api-error'
 import { App } from '../App'
 import { SignedInHome } from '../auth/SignedInHome'
 import { writeHostTreeArtifacts } from '../test/host-tree'
+import { SIGN_OUT_TEST_ID } from '../welcome'
 import {
   fieldTestId,
   selectKeyboardTestId,
@@ -855,6 +856,7 @@ describe('log espresso shot', () => {
         shots: [],
       }),
     )
+    const loadPrefill = jest.spyOn(api, 'loadPrefill')
     await render(<App auth={signedIn} espresso={api} />)
     await openForm()
     await fireEvent.press(screen.getByTestId(selectTriggerTestId(LABEL_COFFEE)))
@@ -874,6 +876,10 @@ describe('log espresso shot', () => {
 
     expect(screen.queryByTestId(selectOptionTestId(sey))).toBeNull()
     expect(screen.getByTestId(selectOptionTestId(heart))).toBeTruthy()
+
+    // The option named Heart selects Heart's coffee.
+    await fireEvent.press(screen.getByLabelText('Ethiopia Guji · Heart'))
+    expect(loadPrefill).toHaveBeenLastCalledWith(heart)
   })
 
   it('wraps the recipe fields in padding keyboard avoidance', async () => {
@@ -1053,6 +1059,23 @@ describe('log espresso shot', () => {
 
     expect(await screen.findByTestId(SHOT_LIST_TEST_ID)).toBeTruthy()
     expect(screen.getByText(LOGGED_RECIPE)).toBeTruthy()
+  })
+
+  it('does not sign out while a save is pending', async () => {
+    const signOut = jest.fn(async () => {})
+    const api: EspressoApi = {
+      ...fakeApi(catalog()).api,
+      create: () => new Promise<void>(() => {}),
+    }
+    await render(<App auth={{ ...signedIn, signOut }} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await fireEvent.press(screen.getByTestId(LOG_TEST_ID))
+
+    expect(screen.getByTestId(SIGN_OUT_TEST_ID)).toBeDisabled()
+    await fireEvent.press(screen.getByTestId(SIGN_OUT_TEST_ID))
+    expect(signOut).not.toHaveBeenCalled()
   })
 
   it('holds Log and hardware back until the parent renders busy', async () => {
