@@ -54,6 +54,11 @@ export function consumeHardwareBack(busy: boolean, onBack: () => void) {
   return true
 }
 
+export type PrefillSource = Pick<
+  ShotRow,
+  'grinderId' | 'brewingDeviceId' | 'roastDate'
+>
+
 function draftFingerprint(input: Omit<ShotCreate, 'idempotencyKey'>) {
   return JSON.stringify({
     ...input,
@@ -71,6 +76,7 @@ export function ShotForm({
   onSubmit,
   loadPrefill,
   idempotencyKeys,
+  unresolvedSaves,
 }: {
   catalog: EspressoCatalog
   busy: boolean
@@ -81,6 +87,9 @@ export function ShotForm({
   loadPrefill: (coffeeId: string) => Promise<ShotRow | null>
   // Owned above the form so a save whose response was lost replays after Back.
   idempotencyKeys: Map<string, string>
+  // Per coffee, the gear and roast date of saves that may have committed,
+  // by key, newest last.
+  unresolvedSaves: Map<string, Map<string, PrefillSource>>
 }) {
   const [draft, setDraft] = useState<ShotDraft>(emptyShotDraft)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -136,7 +145,7 @@ export function ShotForm({
   const applyPrefill = (
     coffeeId: string,
     seq: number,
-    latest: ShotRow | null,
+    latest: PrefillSource | null,
     startedSaveGen: number,
   ) => {
     if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {
@@ -209,7 +218,15 @@ export function ShotForm({
     prefillQueued.current = false
     const seq = prefillSeq.current
     const startedSaveGen = saveGen.current
-    void loadPrefill(coffeeId).then(
+    // After a save whose response was lost, its retry must send the same
+    // payload, so fill what was submitted instead of any shot read since.
+    const unresolved = [...(unresolvedSaves.get(coffeeId)?.values() ?? [])].at(
+      -1,
+    )
+    const read = unresolved
+      ? Promise.resolve(unresolved)
+      : loadPrefill(coffeeId)
+    void read.then(
       (latest) => applyPrefill(coffeeId, seq, latest, startedSaveGen),
       () => {
         if (seq !== prefillSeq.current || coffeeId !== prefillCoffeeId.current) {

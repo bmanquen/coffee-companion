@@ -1,7 +1,7 @@
 import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
 import { useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { apiErrorMessage } from '../api-error'
+import { apiErrorMessage, mayHaveCommitted } from '../api-error'
 import { ShotForm } from '../espresso/ShotForm'
 import { ShotList } from '../espresso/ShotList'
 import { TRYING_AGAIN, TRY_AGAIN } from '../espresso/copy'
@@ -17,6 +17,7 @@ import {
   welcomeMessage,
 } from '../welcome'
 import { SIGN_OUT } from './copy'
+import type { PrefillSource } from '../espresso/ShotForm'
 import type { EspressoApi } from '../espresso/types'
 
 type Screen = 'list' | 'form'
@@ -65,6 +66,7 @@ function Home({
 }) {
   const [screen, setScreen] = useState<Screen>('list')
   const idempotencyKeys = useRef(new Map<string, string>())
+  const unresolvedSaves = useRef(new Map<string, Map<string, PrefillSource>>())
   const {
     catalog,
     shots,
@@ -133,17 +135,20 @@ function Home({
           error={saveError}
           loadPrefill={loadPrefill}
           idempotencyKeys={idempotencyKeys.current}
+          unresolvedSaves={unresolvedSaves.current}
           onBack={() => {
             clearSaveError()
             setScreen('list')
           }}
           onClearError={clearSaveError}
           onSubmit={(input) => {
+            const saves = unresolvedSaves.current
             const forgetKey = () => {
               const keys = idempotencyKeys.current
               for (const [draft, key] of keys) {
                 if (key === input.idempotencyKey) keys.delete(draft)
               }
+              saves.get(input.coffeeId)?.delete(input.idempotencyKey)
             }
             save(
               input,
@@ -155,6 +160,16 @@ function Home({
               (error) => {
                 if (apiErrorMessage(error, '') === SHOT_IDEMPOTENCY_DELETED) {
                   forgetKey()
+                } else if (mayHaveCommitted(error)) {
+                  // Its retry must replay it, so later prefills fill this.
+                  const forCoffee = saves.get(input.coffeeId) ?? new Map()
+                  forCoffee.delete(input.idempotencyKey)
+                  forCoffee.set(input.idempotencyKey, {
+                    grinderId: input.grinderId,
+                    brewingDeviceId: input.brewingDeviceId,
+                    roastDate: input.roastDate,
+                  })
+                  saves.set(input.coffeeId, forCoffee)
                 }
               },
             )
