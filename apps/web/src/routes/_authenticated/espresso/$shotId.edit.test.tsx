@@ -1,10 +1,12 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from '@testing-library/react'
+import { QueryObserver } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
@@ -158,6 +160,125 @@ describe('EditEspressoShot form', () => {
         }),
       )
     } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('does not go to Brews when the update lands after the form closed', async () => {
+    mocks.navigate.mockClear()
+    let answer: (response: Response) => void = () => {}
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input) =>
+        String(input).includes('espressoShot.update')
+          ? new Promise<Response>((resolve) => {
+              answer = resolve
+            })
+          : Promise.resolve(trpcSuccess()),
+      )
+    try {
+      const { queryClient, Wrapper } = seeded()
+      const { unmount } = render(<EditEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '19' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() =>
+        expect(
+          fetchSpy.mock.calls.some(([url]) =>
+            String(url).includes('espressoShot.update'),
+          ),
+        ).toBe(true),
+      )
+
+      unmount()
+      await act(async () => {
+        answer(trpcSuccess())
+      })
+      // onSuccess has run once the mutation reads as succeeded.
+      await waitFor(() =>
+        expect(
+          queryClient
+            .getMutationCache()
+            .getAll()
+            .map((mutation) => mutation.state.status),
+        ).toContain('success'),
+      )
+      expect(mocks.navigate).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('reopens on the saved values while the shot history still refreshes', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((input) =>
+      // Other reads fail and keep their cached data.
+      String(input).includes('espressoShot.update')
+        ? Promise.resolve(trpcSuccess())
+        : String(input).includes('espressoShot.getById')
+          ? Promise.resolve(
+              trpcSuccess(
+                makeRecentShot({
+                  id: SHOT,
+                  coffeeId: COFFEE,
+                  grinderId: GRINDER,
+                  brewingDeviceId: ESP_DEVICE,
+                  dose: '19',
+                  yield: '36',
+                  roastDate: '2026-05-01',
+                }),
+              ),
+            )
+          : Promise.reject(new Error('Network request failed')),
+    )
+    // A shown latest-shot read the save refreshes, held until the end.
+    const { queryClient, trpc, Wrapper } = seeded()
+    let release: () => void = () => {}
+    const history = new QueryObserver(queryClient, {
+      queryKey: trpc.espressoShot.getLatestUnsealed.queryKey({
+        coffeeId: COFFEE,
+      }),
+      queryFn: () =>
+        new Promise<null>((resolve) => {
+          release = () => resolve(null)
+        }),
+    })
+    const unsubscribe = history.subscribe(() => {})
+    try {
+      await act(async () => release())
+      const first = render(<EditEspressoShot />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByLabelText(/^Dose/), {
+        target: { value: '19' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() =>
+        expect(
+          fetchSpy.mock.calls.some(([url]) =>
+            String(url).includes('espressoShot.update'),
+          ),
+        ).toBe(true),
+      )
+      // The save has landed; its refresh waits on the held history read.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+
+      // Back and in again before the history read lands.
+      first.unmount()
+      render(<EditEspressoShot />, { wrapper: Wrapper })
+      expect(screen.getByLabelText<HTMLInputElement>(/^Dose/).value).toBe('19')
+    } finally {
+      await act(async () => release())
+      // Let the save's refresh finish here, not in the next test.
+      await waitFor(() =>
+        expect(
+          queryClient
+            .getMutationCache()
+            .getAll()
+            .map((mutation) => mutation.state.status),
+        ).toContain('success'),
+      )
+      unsubscribe()
       fetchSpy.mockRestore()
     }
   })

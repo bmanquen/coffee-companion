@@ -1,3 +1,4 @@
+import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
 import { describe, expect, it, vi } from 'vitest'
 import {
   applyMutationError,
@@ -65,6 +66,9 @@ describe('formLevelMessage', () => {
     expect(formLevelMessage(trpcError('NOT_FOUND', 'Coffee not found'))).toBe(
       'Coffee not found',
     )
+    expect(
+      formLevelMessage(trpcError('CONFLICT', SHOT_IDEMPOTENCY_DELETED)),
+    ).toBe(SHOT_IDEMPOTENCY_DELETED)
   })
 })
 

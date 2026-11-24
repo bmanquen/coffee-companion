@@ -19,11 +19,19 @@ function invalidateMethodFeed(
   brewingMethod: BrewingMethod,
 ) {
   switch (brewingMethod) {
-    case 'espresso':
-      queryClient.invalidateQueries(trpc.espressoShot.getAll.queryFilter())
-      queryClient.invalidateQueries(trpc.espressoShot.getRecent.queryFilter())
+    case 'espresso': {
+      // A toggle changes membership, not the gear and roast date a form
+      // prefills from, so only the history pages cancel a read in flight.
+      const pages = trpc.espressoShot.getRecent.infiniteQueryFilter()
+      void queryClient
+        .cancelQueries(pages)
+        .then(() => queryClient.invalidateQueries(pages))
+      queryClient.invalidateQueries(
+        trpc.espressoShot.getLatestUnsealed.queryFilter(),
+      )
       queryClient.invalidateQueries(trpc.espressoShot.getDialedIn.queryFilter())
       return
+    }
     case 'aeropress':
       queryClient.invalidateQueries(trpc.aeropressBrew.getAll.queryFilter())
       queryClient.invalidateQueries(trpc.aeropressBrew.getRecent.queryFilter())

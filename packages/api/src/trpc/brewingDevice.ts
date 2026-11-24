@@ -5,6 +5,10 @@ import { db } from '../db'
 import { brewingDevices } from '../db/schema'
 import { insertBrewingDeviceSchema } from '../db/zod'
 import { assertRoomForAnother } from '../lib/allowance'
+import {
+  assertVisibleDeviceType,
+  visibleDeviceType,
+} from '../lib/brew-ownership'
 import { isPgUniqueViolation } from '../lib/pg-error'
 import { countBrewsUsing } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
@@ -22,7 +26,12 @@ function rethrowUniqueDeviceConflict(err: unknown): never {
 export const brewingDeviceRouter = createTRPCRouter({
   list: authedProcedure.query(async ({ ctx }) => {
     return db.query.brewingDevices.findMany({
-      where: { userId: ctx.session.user.id },
+      // A device written with another user's private type, before create
+      // checked it, is left out rather than listed without its type.
+      where: {
+        userId: ctx.session.user.id,
+        type: visibleDeviceType(ctx.session.user.id),
+      },
       orderBy: { name: 'asc' },
       with: { type: true },
     })
@@ -49,6 +58,7 @@ export const brewingDeviceRouter = createTRPCRouter({
         'brewingDevices',
         ctx.session.user.id,
       )
+      await assertVisibleDeviceType(input.typeId, ctx.session.user.id)
 
       try {
         const [device] = await db
@@ -65,6 +75,28 @@ export const brewingDeviceRouter = createTRPCRouter({
     .input(insertBrewingDeviceSchema.extend({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
+      const userId = ctx.session.user.id
+      await assertVisibleDeviceType(data.typeId, userId)
+      // A hidden device takes no Free slot, so giving it a visible type adds
+      // one, and must fit the allowance like a create.
+      const listed = await db.query.brewingDevices.findFirst({
+        columns: { id: true },
+        where: { id, userId, type: visibleDeviceType(userId) },
+      })
+      if (!listed) {
+        // A wrong id is not found, whatever the allowance says.
+        const owned = await db.query.brewingDevices.findFirst({
+          columns: { id: true },
+          where: { id, userId },
+        })
+        if (!owned) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Brewing device not found',
+          })
+        }
+        await assertRoomForAnother(ctx.plan, 'brewingDevices', userId)
+      }
       try {
         const updated = await db
           .update(brewingDevices)

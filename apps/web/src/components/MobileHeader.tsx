@@ -1,13 +1,16 @@
 import { Link } from '@tanstack/react-router'
-import { useSignOut } from '@/hooks/use-sign-out'
+import { useState } from 'react'
 import { authClient } from '@/lib/auth-client'
+import { SIGN_OUT_FAILED, useSignOut } from '@/hooks/use-sign-out'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 export default function MobileHeader() {
   const { data: session } = authClient.useSession()
-  const handleSignOut = useSignOut()
+  const signOut = useSignOut()
+  const [signOutError, setSignOutError] = useState<string | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
 
   const handleSignIn = () => {
     authClient.signIn.social({ provider: 'google' })
@@ -45,9 +48,24 @@ export default function MobileHeader() {
               <Button variant="outline" asChild>
                 <Link to="/account">Account</Link>
               </Button>
-              <Button variant="outline" onClick={handleSignOut}>
+              <Button
+                variant="outline"
+                // One attempt at a time, so an earlier failure cannot show while a
+                // later attempt is still pending.
+                disabled={signingOut}
+                onClick={() => {
+                  setSigningOut(true)
+                  setSignOutError(null)
+                  void signOut()
+                    .catch(() => {
+                      setSignOutError(SIGN_OUT_FAILED)
+                    })
+                    .finally(() => setSigningOut(false))
+                }}
+              >
                 Sign Out
               </Button>
+              {signOutError ? <p role="alert">{signOutError}</p> : null}
             </div>
           </PopoverContent>
         </Popover>

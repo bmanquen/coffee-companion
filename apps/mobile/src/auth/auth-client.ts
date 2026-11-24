@@ -85,3 +85,8 @@ export function clearClientSession() {
     refetch: current.refetch,
   })
 }
+
+// expoClient's getCookie reads SecureStore, so it resolves asynchronously.
+export function getSessionCookie(): Promise<string> {
+  return authClient.getCookie()
+}

@@ -3,9 +3,11 @@ import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import {
   brewingDeviceTypes,
+  coffees,
   coldBrewBrews,
   countries,
   espressoShots,
+  roastLevels,
 } from '../db/schema'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
 import {
@@ -117,6 +119,68 @@ describe('coffee.create', () => {
         origins: [{ countryId: country.id, processId: hidden.id }],
       }),
     ).rejects.toThrow(/process not found/i)
+  })
+
+  it('rejects another user’s private roaster', async () => {
+    const hidden = await asB.roaster.create({ name: uniq('Secret roaster') })
+    await expect(
+      createCoffee(uniq('Stolen roaster'), { roasterId: hidden.id }),
+    ).rejects.toThrow(/roaster not found/i)
+  })
+
+  it('rejects another user’s private roast level', async () => {
+    const hidden = await asB.roastLevel.create({ name: uniq('Secret level') })
+    await expect(
+      createCoffee(uniq('Stolen level'), { roastLevelId: hidden.id }),
+    ).rejects.toThrow(/roast level not found/i)
+  })
+
+  it('lists a legacy coffee without another user’s private roaster or level', async () => {
+    const coffee = await createCoffee(uniq('Legacy lookups'))
+    const [roaster, level] = await Promise.all([
+      asB.roaster.create({ name: uniq('Secret roaster') }),
+      asB.roastLevel.create({ name: uniq('Secret level') }),
+    ])
+    // Only a row written before the coffee router checked lookups can do this.
+    await db
+      .update(coffees)
+      .set({ roasterId: roaster.id, roastLevelId: level.id })
+      .where(eq(coffees.id, coffee.id))
+
+    // A shared (userId null) level does not cascade with the test users.
+    const [shared] = await db
+      .insert(roastLevels)
+      .values({ name: uniq('Shared level') })
+      .returning()
+    let ownId: string | undefined
+    try {
+      const own = await createCoffee(uniq('Own lookups'), {
+        roastLevelId: shared.id,
+      })
+      ownId = own.id
+
+      const all = await asA.coffee.getAll()
+      const listed = all.find((c) => c.id === coffee.id)
+      expect(listed).toBeDefined()
+      expect(listed?.roaster).toBeNull()
+      expect(listed?.roastLevel).toBeNull()
+      // The user's own roaster and a shared level still come through.
+      const visible = all.find((c) => c.id === own.id)
+      expect(visible?.roaster).toEqual(
+        expect.objectContaining({ id: own.roasterId }),
+      )
+      expect(visible?.roastLevel).toEqual(
+        expect.objectContaining({ id: shared.id }),
+      )
+    } finally {
+      // Only this test's Coffee: another session's may use the shared level,
+      // and then the level stays rather than take that Coffee with it.
+      if (ownId) await db.delete(coffees).where(eq(coffees.id, ownId))
+      await db
+        .delete(roastLevels)
+        .where(eq(roastLevels.id, shared.id))
+        .catch(() => {})
+    }
   })
 
   it('stores multiple origin countries on a blend, one region each', async () => {
@@ -299,6 +363,19 @@ describe('coffee.update', () => {
     expect(new Date(updated.updatedAt).getTime()).toBeGreaterThanOrEqual(
       new Date(updated.createdAt).getTime(),
     )
+  })
+
+  it('rejects moving a coffee onto another user’s private roaster', async () => {
+    const created = await createCoffee(uniq('Moved roaster'))
+    const hidden = await asB.roaster.create({ name: uniq('Secret target') })
+    await expect(
+      asA.coffee.update({
+        id: created.id,
+        name: created.name,
+        roasterId: hidden.id,
+        roastLevelId: created.roastLevelId!,
+      }),
+    ).rejects.toThrow(/roaster not found/i)
   })
 
   it('keeps stored origins when origins are omitted', async () => {
@@ -578,6 +655,7 @@ describe('coffee.getAll dialed-in', () => {
       yield: '36',
       time: 30,
       grindSetting: '1.5',
+      idempotencyKey: crypto.randomUUID(),
     })
 
     await asA.dialedInBrew.set({

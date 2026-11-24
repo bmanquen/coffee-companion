@@ -1,12 +1,24 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 import {
+  claimRun,
+  readRunClaim,
   parseAdbDevices,
   parseDumpsysVersionName,
   parseAvdName,
@@ -61,6 +73,19 @@ import {
   adbReverseArgs,
   driveDeviceReversePorts,
   ensureAdbReverses,
+  STYLUS_HANDWRITING_SETTING,
+  stylusHandwritingProblem,
+  ensureStylusHandwritingOff,
+  restoreStylusHandwriting,
+  connectedAvdProblem,
+  recordedAvdProblem,
+  readStylusBaseline,
+  releaseRecordedDevice,
+  stopRecordedEmulator,
+  stylusRestoreRecord,
+  keptStylusBaseline,
+  launchPartial,
+  stopLaunchDevice,
   adbOpenDevClientArgs,
   adbShellHttpGetArgs,
   adbShellCookieGetCommands,
@@ -1361,6 +1386,738 @@ describe('driveDeviceReversePorts', () => {
   })
 })
 
+describe('stylus handwriting setting', () => {
+  it('is a problem unless the setting reads 0', () => {
+    assert.equal(stylusHandwritingProblem('0\n'), null)
+    assert.match(stylusHandwritingProblem('1'), /stylus_handwriting_enabled=1/)
+    assert.match(stylusHandwritingProblem('null'), /stylus_handwriting_enabled=unset/)
+    assert.match(stylusHandwritingProblem(''), /stylus_handwriting_enabled=unset/)
+  })
+
+  it('puts 0 then fails closed if the emulator still reports it on', () => {
+    const puts = []
+    ensureStylusHandwritingOff(DEVICE_SERIAL, {
+      put: (serial) => puts.push(serial),
+      get: () => '0',
+    })
+    assert.deepEqual(puts, [DEVICE_SERIAL])
+    assert.throws(
+      () =>
+        ensureStylusHandwritingOff(DEVICE_SERIAL, {
+          put: () => {},
+          get: () => '1',
+        }),
+      new RegExp(`${STYLUS_HANDWRITING_SETTING}=1`),
+    )
+  })
+
+  it('puts back what an attached emulator had before launch', () => {
+    const restored = (before) => {
+      const calls = []
+      restoreStylusHandwriting(DEVICE_SERIAL, before, {
+        run: (args) => {
+          calls.push(args)
+          return { status: 0 }
+        },
+      })
+      return calls
+    }
+    assert.deepEqual(restored('1'), [
+      ['put', 'secure', STYLUS_HANDWRITING_SETTING, '1'],
+    ])
+    assert.deepEqual(restored('null'), [
+      ['delete', 'secure', STYLUS_HANDWRITING_SETTING],
+    ])
+    // Already off, or never read (an emulator this run booted): no write.
+    assert.deepEqual(restored('0'), [])
+    assert.deepEqual(restored(undefined), [])
+  })
+
+  it('throws when the write fails, so cleanup keeps the value', () => {
+    assert.throws(
+      () =>
+        restoreStylusHandwriting(DEVICE_SERIAL, '1', {
+          run: () => ({ status: 1, stderr: 'error: closed' }),
+        }),
+      /Could not restore stylus_handwriting_enabled=1/,
+    )
+  })
+})
+
+describe('releaseRecordedDevice', () => {
+  const release = (avd, opts = {}) => {
+    const calls = []
+    const problem = releaseRecordedDevice(
+      { serial: DEVICE_SERIAL, avdName: 'verify-pixel', ...opts.state },
+      {
+        uninstallOwned: opts.uninstallOwned ?? true,
+        avdProblem: () =>
+          recordedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => avd),
+        uninstall: () => calls.push('uninstall'),
+        clearReverses: () => calls.push('reverses'),
+        restoreStylus: () => calls.push('stylus'),
+      },
+    )
+    return { calls, problem }
+  }
+
+  it('releases the recorded emulator', () => {
+    assert.deepEqual(release('verify-pixel'), {
+      calls: ['uninstall', 'reverses', 'stylus'],
+      problem: null,
+    })
+    // Failed-launch teardown never uninstalls.
+    assert.deepEqual(release('verify-pixel', { uninstallOwned: false }).calls, [
+      'reverses',
+      'stylus',
+    ])
+  })
+
+  it('reports a failed stylus restore after the other writes', () => {
+    const calls = []
+    assert.throws(
+      () =>
+        releaseRecordedDevice(
+          { serial: DEVICE_SERIAL, avdName: 'verify-pixel' },
+          {
+            uninstallOwned: true,
+            avdProblem: () => null,
+            uninstall: () => calls.push('uninstall'),
+            clearReverses: () => calls.push('reverses'),
+            restoreStylus: () => {
+              throw new Error('restore failed')
+            },
+          },
+        ),
+      /restore failed/,
+    )
+    assert.deepEqual(calls, ['uninstall', 'reverses'])
+  })
+
+  it('writes nothing to another AVD now on the serial, or an unknown one', () => {
+    assert.deepEqual(release('Pixel_7'), {
+      calls: [],
+      problem: `${DEVICE_SERIAL} is AVD Pixel_7, not verify-pixel`,
+    })
+    assert.deepEqual(release(null), {
+      calls: [],
+      problem: `could not read the AVD name on ${DEVICE_SERIAL}`,
+    })
+    assert.deepEqual(release('verify-pixel', { state: { serial: null } }), {
+      calls: [],
+      problem: null,
+    })
+  })
+})
+
+describe('stopRecordedEmulator', () => {
+  const state = {
+    serial: DEVICE_SERIAL,
+    emulatorPid: 4242,
+    avdName: 'verify-pixel',
+  }
+  const stop = async (recorded, foreignAvd) => {
+    const calls = []
+    const killed = await stopRecordedEmulator(recorded, foreignAvd, [], {
+      killSerial: ({ serial, pid }) => calls.push(['emu kill', serial, pid]),
+      signalPid: (pid) => calls.push(['signal', pid]),
+    })
+    return { calls, killed }
+  }
+
+  it('kills the recorded emulator through its serial', async () => {
+    assert.deepEqual(await stop(state, null), {
+      calls: [['emu kill', DEVICE_SERIAL, 4242]],
+      killed: DEVICE_SERIAL,
+    })
+  })
+
+  it('only signals its pid when the serial is another or an unknown AVD', async () => {
+    assert.deepEqual(await stop(state, 'could not read the AVD name'), {
+      calls: [['signal', 4242]],
+      killed: null,
+    })
+  })
+
+  it('leaves an emulator this run did not start alone', async () => {
+    assert.deepEqual(await stop({ serial: DEVICE_SERIAL }, null), {
+      calls: [],
+      killed: null,
+    })
+  })
+})
+
+describe('stylusRestoreRecord', () => {
+  it('keeps only what another cleanup needs to restore the setting', () => {
+    assert.deepEqual(
+      stylusRestoreRecord({
+        serial: DEVICE_SERIAL,
+        avdName: 'Pixel_7',
+        ownedPackage: true,
+        emulatorPid: 4242,
+        metroPid: 4343,
+        stylusHandwritingBefore: '1',
+      }),
+      {
+        serial: DEVICE_SERIAL,
+        avdName: 'Pixel_7',
+        // Nothing to uninstall or stop next time.
+        ownedPackage: false,
+        stylusHandwritingBefore: '1',
+      },
+    )
+  })
+})
+
+describe('keptStylusBaseline', () => {
+  const kept = {
+    serial: DEVICE_SERIAL,
+    avdName: 'verify-pixel',
+    stylusHandwritingBefore: '1',
+  }
+
+  it('reuses a kept value only for the AVD it was read from', () => {
+    assert.equal(keptStylusBaseline(kept, DEVICE_SERIAL, 'verify-pixel'), '1')
+    assert.throws(
+      () => keptStylusBaseline(kept, DEVICE_SERIAL, 'Pixel_7'),
+      /still owes AVD verify-pixel its stylus_handwriting_enabled=1/,
+    )
+  })
+
+  it('has nothing to reuse without an owed record', () => {
+    assert.equal(keptStylusBaseline(null, DEVICE_SERIAL, 'Pixel_7'), null)
+    assert.equal(
+      keptStylusBaseline(
+        { ...kept, stylusHandwritingBefore: '0' },
+        DEVICE_SERIAL,
+        'Pixel_7',
+      ),
+      null,
+    )
+  })
+})
+
+describe('cleanup with a kept stylus record', () => {
+  it('keeps the record when the AVD name cannot be read on retry', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-stylus-'))
+    const bin = join(root, 'bin')
+    const run = join(root, '.run')
+    mkdirSync(bin)
+    mkdirSync(run)
+    // An adb that reaches the serial but cannot read its AVD name.
+    writeFileSync(
+      join(bin, 'adb'),
+      '#!/bin/sh\ncase "$*" in *"emu avd name"*) exit 1;; esac\nexit 0\n',
+      { mode: 0o755 },
+    )
+    const record = {
+      serial: DEVICE_SERIAL,
+      avdName: 'verify-pixel',
+      ownedPackage: false,
+      stylusHandwritingBefore: '1',
+    }
+    writeFileSync(join(run, 'state.json'), JSON.stringify(record))
+    const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+    // Unscoped: an inherited owner would make cleanup skip.
+    delete env.VERIFY_OWNER
+    delete env.ANDROID_HOME
+    delete env.ANDROID_SDK_ROOT
+    env.PATH = `${bin}:${process.env.PATH}`
+    const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+    const cli = (command, owner) =>
+      spawnSync(process.execPath, [control, command], {
+        env: owner ? { ...env, VERIFY_OWNER: owner } : env,
+        encoding: 'utf8',
+        timeout: 60_000,
+      })
+    const kept = () => JSON.parse(readFileSync(join(run, 'state.json'), 'utf8'))
+    try {
+      const result = cli('cleanup')
+      assert.notEqual(result.status, 0, result.stdout)
+      assert.match(result.stderr, /Could not restore stylus_handwriting_enabled=1/)
+      assert.deepEqual(kept(), record)
+
+      // A plain launch would overwrite the record with Metro's state.
+      const launch = cli('launch')
+      assert.notEqual(launch.status, 0, launch.stdout)
+      assert.match(launch.stderr, /still owes AVD verify-pixel/)
+      assert.deepEqual(kept(), record)
+
+      // An owner-scoped cleanup keeps its claim, so that owner can retry and
+      // another owner still cannot take the instance.
+      writeFileSync(
+        join(run, 'owner.json'),
+        JSON.stringify({ owner: 'run-a', pid: 1 }),
+      )
+      // A second name for the claim file, so a delete and rewrite (which a
+      // launch could claim in between) shows up as a different file.
+      linkSync(join(run, 'owner.json'), join(root, 'claim-link'))
+      writeFileSync(join(run, 'metro.log'), 'scratch')
+      const scoped = cli('cleanup', 'run-a')
+      assert.notEqual(scoped.status, 0, scoped.stdout)
+      assert.equal(
+        JSON.parse(readFileSync(join(run, 'owner.json'), 'utf8')).owner,
+        'run-a',
+      )
+      assert.equal(
+        statSync(join(run, 'owner.json')).ino,
+        statSync(join(root, 'claim-link')).ino,
+      )
+      assert.equal(existsSync(join(run, 'metro.log')), false)
+      const other = cli('cleanup', 'run-b')
+      assert.equal(other.status, 0, other.stderr)
+      assert.match(other.stdout, /not claimed by VERIFY_OWNER run-b/)
+      assert.deepEqual(kept(), record)
+      const retry = cli('cleanup', 'run-a')
+      assert.match(retry.stderr, /Could not restore stylus_handwriting_enabled=1/)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('drive-device after a failed launch', () => {
+  it('does not turn stylus handwriting off before refusing the device', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-drive-'))
+    const bin = join(root, 'bin')
+    const run = join(root, '.run')
+    mkdirSync(bin)
+    mkdirSync(run)
+    const log = join(root, 'adb.log')
+    // An adb on the recorded AVD that logs every command and answers the
+    // stylus read with 1, the user's setting a failed launch put back.
+    writeFileSync(
+      join(bin, 'adb'),
+      `#!/bin/sh\necho "$*" >> ${log}\n` +
+        'case "$*" in\n' +
+        '  *"emu avd name"*) printf "verify-pixel\\nOK\\n";;\n' +
+        '  *"settings get"*) echo 1;;\n' +
+        'esac\nexit 0\n',
+      { mode: 0o755 },
+    )
+    writeFileSync(join(bin, 'maestro'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+    // What an attached launch that failed after its stylus restore leaves
+    // behind: its partial record, as persisted, with an owned package and no
+    // baseline.
+    const partial = {
+      ...launchPartial({
+        avdName: 'verify-pixel',
+        attachedEmulator: true,
+        keptStylus: null,
+      }),
+      ownedPackage: true,
+    }
+    writeFileSync(
+      join(run, 'state.json'),
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(partial).filter(([, value]) => value != null),
+        ),
+      ),
+    )
+    const env = {
+      ...process.env,
+      HOME: root,
+      VERIFY_RUN_DIR: run,
+      VERIFY_MAESTRO: join(bin, 'maestro'),
+      PATH: `${bin}:${process.env.PATH}`,
+    }
+    delete env.VERIFY_OWNER
+    delete env.ANDROID_HOME
+    delete env.ANDROID_SDK_ROOT
+    const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [control, 'drive-device', 'sign-in-and-out'],
+        { env, encoding: 'utf8', timeout: 60_000 },
+      )
+      assert.notEqual(result.status, 0, result.stdout)
+      const state = JSON.parse(readFileSync(join(run, 'state.json'), 'utf8'))
+      const wroteStylus = readFileSync(log, 'utf8').includes(
+        'settings put secure stylus_handwriting_enabled 0',
+      )
+      // Either nothing changed the setting, or the change can be undone.
+      assert.ok(
+        !wroteStylus || state.stylusHandwritingBefore === '1',
+        `stylus turned off with baseline ${state.stylusHandwritingBefore}`,
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('cleanup of the run dir', () => {
+  it('waits out a starting launch, then deletes only what the helper wrote', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-rundir-'))
+    const run = join(root, 'run')
+    mkdirSync(run)
+    const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+    delete env.VERIFY_OWNER
+    const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+    const cleanup = () =>
+      spawnSync(process.execPath, [control, 'cleanup'], {
+        env,
+        encoding: 'utf8',
+        timeout: 60_000,
+      })
+    const claim = (pid) =>
+      writeFileSync(join(run, 'owner.json'), JSON.stringify({ owner: 'a', pid }))
+    try {
+      writeFileSync(join(run, 'notes.txt'), 'not ours')
+      writeFileSync(join(run, 'metro.log'), 'scratch')
+      // This test process stands in for a launch that has claimed the dir
+      // but not yet written state.json.
+      claim(process.pid)
+      const starting = cleanup()
+      assert.notEqual(starting.status, 0, starting.stdout)
+      assert.match(starting.stderr, /A launch .* is still running/)
+      assert.match(starting.stderr, /VERIFY_OWNER=a helpers\/control cleanup/)
+      assert.equal(existsSync(join(run, 'owner.json')), true)
+
+      claim(spawnSync(process.execPath, ['-e', '']).pid)
+      const done = cleanup()
+      assert.equal(done.status, 0, done.stderr)
+      assert.equal(existsSync(join(run, 'owner.json')), false)
+      assert.equal(existsSync(join(run, 'metro.log')), false)
+      assert.equal(readFileSync(join(run, 'notes.txt'), 'utf8'), 'not ours')
+
+      rmSync(join(run, 'notes.txt'))
+      writeFileSync(join(run, 'metro.log'), 'scratch')
+      assert.equal(cleanup().status, 0)
+      assert.equal(existsSync(run), false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('unscoped cleanup and a claim it cannot read', () => {
+  it('leaves the run alone instead of taking it over', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-unreadable-'))
+    const bin = join(root, 'bin')
+    const run = join(root, 'run')
+    mkdirSync(bin)
+    mkdirSync(run)
+    writeFileSync(join(bin, 'adb'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+    const state = JSON.stringify({
+      serial: DEVICE_SERIAL,
+      avdName: 'verify-pixel',
+      ownedPackage: false,
+    })
+    writeFileSync(join(run, 'state.json'), state)
+    // A live launch's claim that this read fails on.
+    const launch = spawn('sleep', ['30'])
+    const claim = join(run, 'owner.json')
+    writeFileSync(claim, JSON.stringify({ owner: 'live', pid: launch.pid }))
+    chmodSync(claim, 0o000)
+    const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+    delete env.VERIFY_OWNER
+    delete env.ANDROID_HOME
+    delete env.ANDROID_SDK_ROOT
+    env.PATH = `${bin}:${process.env.PATH}`
+    const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+    try {
+      const result = spawnSync(process.execPath, [control, 'cleanup'], {
+        env,
+        encoding: 'utf8',
+        timeout: 60_000,
+      })
+      assert.notEqual(result.status, 0, result.stderr)
+      assert.equal(readFileSync(join(run, 'state.json'), 'utf8'), state)
+      assert.equal(existsSync(claim), true)
+    } finally {
+      launch.kill('SIGKILL')
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('unscoped cleanup and runs that start during it', () => {
+  const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+  // A run dir with a recorded stylus restore and an adb whose reverse
+  // clearing signals, then waits for release(), so a test acts mid-cleanup.
+  const setup = () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-hold-'))
+    const bin = join(root, 'bin')
+    const run = join(root, 'run')
+    const signal = join(root, 'reversing')
+    const gate = join(root, 'released')
+    mkdirSync(bin)
+    mkdirSync(run)
+    writeFileSync(
+      join(bin, 'adb'),
+      '#!/bin/sh\ncase "$*" in *"emu avd name"*) echo verify-pixel;; ' +
+        `*reverse*) touch '${signal}'; ` +
+        `while [ ! -e '${gate}' ]; do sleep 0.05; done;; esac\nexit 0\n`,
+      { mode: 0o755 },
+    )
+    writeFileSync(
+      join(run, 'state.json'),
+      JSON.stringify({
+        serial: DEVICE_SERIAL,
+        avdName: 'verify-pixel',
+        ownedPackage: false,
+        stylusHandwritingBefore: '1',
+      }),
+    )
+    const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+    delete env.VERIFY_OWNER
+    delete env.ANDROID_HOME
+    delete env.ANDROID_SDK_ROOT
+    env.PATH = `${bin}:${process.env.PATH}`
+    const children = []
+    const cleanup = () => {
+      const child = spawn(process.execPath, [control, 'cleanup'], {
+        env,
+        stdio: ['ignore', 'ignore', 'pipe'],
+      })
+      let stderr = ''
+      child.stderr.on('data', (chunk) => (stderr += chunk))
+      const exited = new Promise((resolve) =>
+        child.on('exit', (code) => resolve({ code, stderr })),
+      )
+      children.push({ child, exited })
+      return { child, exited }
+    }
+    // Waits until a cleanup is clearing reverses, so it is past its claim.
+    const reversing = async () => {
+      for (let i = 0; i < 300 && !existsSync(signal); i++) {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+      assert.equal(existsSync(signal), true, 'cleanup never reached adb reverse')
+    }
+    const release = () => writeFileSync(gate, '')
+    // For a cleanup that should refuse: one that wrongly gets past its claim
+    // waits at the gate, so fail rather than hang, and let done() reap it.
+    const refused = (exited) =>
+      Promise.race([
+        exited,
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('cleanup did not refuse in time')),
+            20_000,
+          ).unref(),
+        ),
+      ])
+    const done = async () => {
+      release()
+      for (const { child, exited } of children) {
+        if (child.exitCode == null) child.kill('SIGKILL')
+        await exited
+      }
+      rmSync(root, { recursive: true, force: true })
+    }
+    return { run, cleanup, reversing, release, refused, done }
+  }
+
+  it('holds an unclaimed dir until it has deleted everything', async () => {
+    const t = setup()
+    try {
+      const a = t.cleanup()
+      await t.reversing()
+      // A launch starting now finds the dir claimed by the cleanup.
+      assert.equal(claimRun(t.run, 'late-launch')?.pid, a.child.pid)
+      t.release()
+      assert.equal((await a.exited).code, 0)
+      assert.equal(existsSync(t.run), false)
+    } finally {
+      await t.done()
+    }
+  })
+
+  it('leaves a claim whose process it may not signal', async () => {
+    const t = setup()
+    // pid 1 is alive, and an unprivileged signal to it fails with EPERM.
+    writeFileSync(
+      join(t.run, 'owner.json'),
+      JSON.stringify({ owner: 'other-user-launch', pid: 1 }),
+    )
+    try {
+      const a = await t.refused(t.cleanup().exited)
+      assert.notEqual(a.code, 0)
+      assert.match(a.stderr, /A launch \(pid 1,/)
+      assert.equal(readRunClaim(t.run)?.owner, 'other-user-launch')
+    } finally {
+      await t.done()
+    }
+  })
+
+  it('takes over a stale claim for itself, so a second cleanup and a launch wait', async () => {
+    const t = setup()
+    const gone = spawnSync(process.execPath, ['-e', '']).pid
+    writeFileSync(
+      join(t.run, 'owner.json'),
+      JSON.stringify({ owner: 'dead-launch', pid: gone }),
+    )
+    // What claimers killed mid-claim leave: a draft, and a claim moved aside.
+    writeFileSync(join(t.run, `owner.json.${gone}-draft`), '{}')
+    writeFileSync(join(t.run, `owner.json.stale-${gone}`), '{}')
+    try {
+      const a = t.cleanup()
+      await t.reversing()
+      assert.equal(readRunClaim(t.run)?.pid, a.child.pid)
+      assert.equal(claimRun(t.run, 'late-launch')?.pid, a.child.pid)
+      const b = await t.refused(t.cleanup().exited)
+      assert.notEqual(b.code, 0)
+      assert.match(b.stderr, /Another cleanup .* is still running/)
+      // B left A's claim and the record in place.
+      assert.equal(readRunClaim(t.run)?.pid, a.child.pid)
+      assert.equal(existsSync(join(t.run, 'state.json')), true)
+      t.release()
+      assert.equal((await a.exited).code, 0)
+      assert.equal(existsSync(t.run), false)
+    } finally {
+      await t.done()
+    }
+  })
+})
+
+describe('stopLaunchDevice', () => {
+  const teardown = async (avd) => {
+    const calls = []
+    await stopLaunchDevice(
+      { serial: DEVICE_SERIAL, avdName: 'verify-pixel', emulatorPid: 4242 },
+      [],
+      {
+        avdProblem: () =>
+          recordedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => avd),
+        clearReverses: () => calls.push(['reverses']),
+        restoreStylus: () => calls.push(['stylus']),
+        killSerial: ({ serial }) => calls.push(['emu kill', serial]),
+        signalPid: (pid) => calls.push(['signal', pid]),
+        // The real one would copy a backup over apps/mobile's env file.
+        restoreEnv: () => {},
+      },
+    )
+    return calls
+  }
+
+  it('reports a restore that ran, and not one skipped on another AVD', async () => {
+    const released = (avd) =>
+      stopLaunchDevice(
+        { serial: DEVICE_SERIAL, avdName: 'verify-pixel', emulatorPid: 4242 },
+        [],
+        {
+          avdProblem: () =>
+            recordedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => avd),
+          clearReverses: () => {},
+          restoreStylus: () => {},
+          killSerial: () => {},
+          signalPid: () => {},
+          restoreEnv: () => {},
+        },
+      )
+    assert.equal(await released('verify-pixel'), true)
+    assert.equal(await released('Pixel_7'), false)
+  })
+
+  it('kills its own emulator through the serial', async () => {
+    assert.deepEqual(await teardown('verify-pixel'), [
+      ['reverses'],
+      ['stylus'],
+      ['emu kill', DEVICE_SERIAL],
+    ])
+  })
+
+  it('only signals its pid when another or an unknown AVD holds the serial', async () => {
+    assert.deepEqual(await teardown('Pixel_7'), [['signal', 4242]])
+    assert.deepEqual(await teardown(null), [['signal', 4242]])
+  })
+})
+
+describe('readStylusBaseline', () => {
+  it('returns the value read, unset included', () => {
+    const read = (stdout) => () => ({ status: 0, stdout })
+    assert.equal(readStylusBaseline(DEVICE_SERIAL, { read: read('1\n') }), '1')
+    assert.equal(
+      readStylusBaseline(DEVICE_SERIAL, { read: read('null') }),
+      'null',
+    )
+  })
+
+  it('throws, so launch writes nothing, when the read fails', () => {
+    assert.throws(
+      () =>
+        readStylusBaseline(DEVICE_SERIAL, {
+          read: () => ({ status: 1, stdout: '', stderr: 'error: closed' }),
+        }),
+      /Could not read stylus_handwriting_enabled/,
+    )
+    assert.throws(
+      () =>
+        readStylusBaseline(DEVICE_SERIAL, {
+          read: () => ({ status: 0, stdout: '' }),
+        }),
+      /left unchanged/,
+    )
+  })
+})
+
+describe('connectedAvdProblem', () => {
+  it('names a different AVD on the recorded serial', () => {
+    assert.equal(
+      connectedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => 'verify-pixel'),
+      null,
+    )
+    assert.equal(
+      connectedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => 'Pixel_7'),
+      `${DEVICE_SERIAL} is AVD Pixel_7, not verify-pixel`,
+    )
+    // An unreadable name is left to the readiness check.
+    assert.equal(
+      connectedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => null),
+      null,
+    )
+  })
+
+  it('is checked before drive-device writes to the device', () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'),
+      'utf8',
+    )
+    const drive = src.slice(src.indexOf('async function cmdDriveDevice'))
+    const check = drive.indexOf('recordedAvdProblem(')
+    const firstWrite = drive.indexOf('ensureAdbReverses(state.serial')
+    assert.ok(check >= 0 && firstWrite >= 0)
+    assert.ok(check < firstWrite)
+  })
+
+  it('is checked before launch-device writes reverses or stylus handwriting', () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'),
+      'utf8',
+    )
+    const launch = src.slice(src.indexOf('async function cmdLaunchDevice'))
+    const check = launch.indexOf('recordedAvdProblem(')
+    const reverse = launch.indexOf('adbReverse(DEVICE_SERIAL')
+    const read = launch.indexOf('readStylusBaseline(DEVICE_SERIAL)')
+    const write = launch.indexOf('ensureStylusHandwritingOff(DEVICE_SERIAL)')
+    assert.ok(check >= 0 && reverse >= 0 && read >= 0 && write >= 0)
+    assert.ok(check < reverse && check < read && check < write)
+    // On the boot path too: the booted emulator can exit while Metro starts.
+    assert.doesNotMatch(
+      launch.slice(launch.lastIndexOf('\n    if (', check), check),
+      /attachedEmulator/,
+    )
+  })
+
+  it('is rechecked by the RNTL launch once it holds the claim', () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'control.mjs'),
+      'utf8',
+    )
+    const launch = src.slice(
+      src.indexOf('async function cmdLaunch()'),
+      src.indexOf('spawnMetro(port)'),
+    )
+    const claim = launch.indexOf('claimRunOrDie()')
+    assert.ok(claim >= 0)
+    assert.ok(launch.indexOf('stylusRestoreOwed(', claim) > claim)
+  })
+})
+
 describe('quoteForAdbShell', () => {
   it('single-quotes so device sh does not split on &', () => {
     assert.equal(quoteForAdbShell('a&b'), "'a&b'")
@@ -1944,6 +2701,7 @@ describe('verify-mobile usage defaults', () => {
     assert.match(usage, /VERIFY_PORT \(default 3910\)/)
     assert.match(usage, /refuse clearState when ownedPackage is false/)
     assert.match(usage, /refuse a clearState flow on an attached preexisting install before Expo/)
+    assert.match(usage, /disable stylus handwriting/)
     assert.doesNotMatch(usage, /VERIFY_AVD=Pixel_7/)
   })
 
@@ -1974,6 +2732,13 @@ describe('verify-mobile usage defaults', () => {
     assert.match(text, /launchApp. without .clearState/)
     assert.match(text, /session restore/)
     assert.match(text, /as soon as the process is spawned/)
+  })
+
+  it('documents stylus handwriting is disabled on the emulator', () => {
+    const text = skill()
+    assert.match(text, /stylus_handwriting_enabled/)
+    assert.match(controlSrc(), /ensureStylusHandwritingOff\(DEVICE_SERIAL\)/)
+    assert.match(controlSrc(), /ensureStylusHandwritingOff\(state\.serial\)/)
   })
 
   it('documents Homebrew trees are skipped and a named-parent Studio SDK is accepted', () => {
@@ -3120,6 +3885,30 @@ describe('deviceReadyProblems', () => {
     assert.ok(problems.some((problem) => /developer menu is covering/.test(problem)))
   })
 
+  it('flags stylus handwriting left on', () => {
+    const problems = deviceReadyProblems({
+      reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
+      requiredPorts: [8081, 3910],
+      checkedDeviceMetro: true,
+      deviceStatusBody: 'packager-status:running',
+      ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
+      stylusHandwritingEnabled: '1',
+    })
+    assert.ok(problems.some((problem) => /stylus handwriting is on/.test(problem)))
+  })
+
+  it('is empty when stylus handwriting is off', () => {
+    const problems = deviceReadyProblems({
+      reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
+      requiredPorts: [8081, 3910],
+      checkedDeviceMetro: true,
+      deviceStatusBody: 'packager-status:running',
+      ui: parseUiDump(`<node content-desc="${SIGN_IN_TEST_ID}"/>`),
+      stylusHandwritingEnabled: '0',
+    })
+    assert.deepEqual(problems, [])
+  })
+
   it('flags the first-run developer-menu sheet as covering the app', () => {
     const problems = deviceReadyProblems({
       reverseList: 'UsbFfs tcp:8081 tcp:8081\nhost-16 tcp:3910 tcp:3910\n',
@@ -3172,6 +3961,41 @@ describe('maestroDeviceArgs', () => {
     assert.equal(args[envAt + 1], `EXPO_DEV_CLIENT_URL=${url}`)
     assert.ok(args.includes('--device'))
     assert.ok(args.includes(DEVICE_SERIAL))
+  })
+})
+
+describe('log-espresso flow', () => {
+  const flow = () =>
+    readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../flows/log-espresso.yaml'),
+      'utf8',
+    )
+
+  function fillVisibleField(id, value) {
+    return new RegExp(
+      `scrollUntilVisible:\\n\\s+element:\\n\\s+id: ${id}\\n\\s+visibilityPercentage: 100\\n\\s+centerElement: true\\n- tapOn:\\n\\s+id: ${id}\\n- inputText: "${value}"\\n- copyTextFrom:\\n\\s+id: ${id}\\n- assertTrue: \\$\\{maestro\\.copiedText == "${value}"\\}\\n- assertVisible:\\n\\s+id: shot-form`,
+    )
+  }
+
+  it('scrolls each recipe field into view without hideKeyboard', () => {
+    const yaml = flow()
+    assert.doesNotMatch(yaml, /hideKeyboard/)
+    assert.match(yaml, fillVisibleField('field-dose-g', '18'))
+    assert.match(yaml, fillVisibleField('field-yield-g', '36'))
+    assert.match(yaml, fillVisibleField('field-time-s', '30'))
+    assert.match(yaml, fillVisibleField('field-grind-setting', '7'))
+    assert.match(
+      yaml,
+      /scrollUntilVisible:\n\s+element:\n\s+id: shot-form-log\n\s+visibilityPercentage: 100\n\s+centerElement: true\n- assertVisible:\n\s+id: shot-form\n- tapOn:\n\s+id: shot-form-log/,
+    )
+  })
+
+  it('still requires the new shot as the first summary row', () => {
+    const yaml = flow()
+    assert.match(
+      yaml,
+      /id: shot-summary\n\s+index: 0\n- assertTrue: \$\{maestro\.copiedText == "Grind 7 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"\}/,
+    )
   })
 })
 

@@ -10,6 +10,7 @@ import {
   grinders,
   pouroverBrews,
 } from '../db/schema'
+import { PG_SERIALIZATION_FAILURE, pgErrorIn } from './pg-error'
 import { shelfSizes } from './plan'
 import type { PlanId } from './plan'
 
@@ -67,6 +68,7 @@ export interface SealableBrew {
 async function shelfCoffeeIds(
   userId: string,
   size: number,
+  executor: Pick<typeof db, 'execute'>,
 ): Promise<Array<string>> {
   const everyBrew = sql.join(
     brewTables.map(
@@ -79,7 +81,7 @@ async function shelfCoffeeIds(
     sql` union all `,
   )
 
-  const rows = await db.execute<{ id: string }>(sql`
+  const rows = await executor.execute<{ id: string }>(sql`
     select c.id
     from coffees c
     left join (${everyBrew}) b on b.coffee_id = c.id
@@ -91,10 +93,15 @@ async function shelfCoffeeIds(
   return rows.rows.map((row) => row.id)
 }
 
-export async function loadShelf(userId: string, plan: PlanId): Promise<Shelf> {
+// Pass a transaction to read the Shelf in the same snapshot as the Brews.
+export async function loadShelf(
+  userId: string,
+  plan: PlanId,
+  executor: Pick<typeof db, 'execute'> = db,
+): Promise<Shelf> {
   const size = shelfSizes[plan]
   if (size === null) return null
-  return new Set(await shelfCoffeeIds(userId, size))
+  return new Set(await shelfCoffeeIds(userId, size, executor))
 }
 
 // Resolves the Shelf on first use and shares it thereafter. A request that
@@ -128,29 +135,47 @@ export async function stampFallenBrews(
   // Deliberately a fresh Shelf rather than the request's: several Brews can be
   // logged in one request, and stamping against a Shelf an earlier one has
   // already reordered would leave a fallen Coffee's Brews unstamped.
-  const shelf = await loadShelf(userId, plan)
-  if (shelf === null) return
+  if (shelfSizes[plan] === null) return
+  // The Shelf and the stamps from one snapshot, so a Brew another request
+  // saves after this Shelf read, lifting its Coffee back on, is not stamped.
+  // A concurrent stamp of the same row aborts this one; the retry finds it
+  // stamped already.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await db.transaction(
+        async (tx) => {
+          const shelf = await loadShelf(userId, plan, tx)
+          if (shelf === null) return
+          const onShelf = [...shelf]
+          const stamp = new Date()
 
-  const onShelf = [...shelf]
-  const stamp = new Date()
-
-  // Idempotent: only unstamped Brews are touched, so a Brew Sealed earlier
-  // keeps its original stamp.
-  await Promise.all(
-    brewTables.map((table) =>
-      db
-        .update(table)
-        .set({ sealedAt: stamp })
-        .where(
-          and(
-            eq(table.userId, userId),
-            isNull(table.sealedAt),
-            // An empty Shelf means every Coffee has fallen off it.
-            onShelf.length ? notInArray(table.coffeeId, onShelf) : undefined,
-          ),
-        ),
-    ),
-  )
+          // Idempotent: only unstamped Brews are touched, so a Brew Sealed
+          // earlier keeps its original stamp.
+          for (const table of brewTables) {
+            await tx
+              .update(table)
+              .set({ sealedAt: stamp })
+              .where(
+                and(
+                  eq(table.userId, userId),
+                  isNull(table.sealedAt),
+                  // An empty Shelf means every Coffee has fallen off it.
+                  onShelf.length
+                    ? notInArray(table.coffeeId, onShelf)
+                    : undefined,
+                ),
+              )
+          }
+        },
+        { isolationLevel: 'repeatable read' },
+      )
+      return
+    } catch (error) {
+      if (attempt >= 3 || !pgErrorIn(error, PG_SERIALIZATION_FAILURE)) {
+        throw error
+      }
+    }
+  }
 }
 
 // Withheld when the Shelf is limited and the Brew either carries a stamp or
@@ -241,14 +266,20 @@ export async function sealBrews<T extends SealableBrew>(
   return brews.map((brew) => withSealing(brew, resolved))
 }
 
-export async function sealBrewPage<T extends SealableBrew>(
+export async function sealBrewPage<
+  TPage extends { items: Array<SealableBrew>; total: number },
+>(
   shelf: () => Promise<Shelf>,
-  load: () => Promise<{ items: Array<T>; total: number }>,
-): Promise<{ items: Array<Sealable<T>>; total: number }> {
+  load: () => Promise<TPage>,
+): Promise<
+  Omit<TPage, 'items'> & { items: Array<Sealable<TPage['items'][number]>> }
+> {
   const [page, resolved] = await Promise.all([load(), shelf()])
   return {
-    items: page.items.map((brew) => withSealing(brew, resolved)),
-    total: page.total,
+    ...page,
+    items: page.items.map((brew) => withSealing(brew, resolved)) as Array<
+      Sealable<TPage['items'][number]>
+    >,
   }
 }
 

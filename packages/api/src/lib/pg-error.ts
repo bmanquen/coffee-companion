@@ -1,4 +1,6 @@
 export const PG_UNIQUE_VIOLATION = '23505'
+export const PG_FOREIGN_KEY_VIOLATION = '23503'
+export const PG_SERIALIZATION_FAILURE = '40001'
 
 type PgErrorFields = { code: string; detail?: string }
 

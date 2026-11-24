@@ -5,6 +5,7 @@ import { brewingDeviceTypes, dialedInBrews } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
 import {
   dropStaleMembership,
+  stampDialedIn,
   writeDialedInMembership,
 } from '../lib/dialed-in-brew'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
@@ -100,6 +101,7 @@ async function logShot(
     yield: '36',
     time: 30,
     grindSetting,
+      idempotencyKey: crypto.randomUUID(),
   })
 }
 
@@ -149,6 +151,25 @@ describe('dialedInBrew.set / get / unset', () => {
     expect(found[0]?.outputGrams).toBe('36')
     expect(found[0]?.grindSetting).toBe('1.5')
     expect(found[0]?.sealed).toBe(false)
+  })
+
+  it('stamps a history longer than Postgres allows bind parameters', async () => {
+    const shot = await logShot(espressoDeviceAId, '1.5')
+    await asA.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: espressoDeviceAId,
+      brewId: shot.id,
+    })
+    // An unpaged getAll passes every brew; past 65535 ids, one bind
+    // parameter per id fails the query.
+    const others = Array.from({ length: 70_000 }, () => ({
+      id: crypto.randomUUID(),
+    }))
+    const stamped = await stampDialedIn(USER_A, [...others, { id: shot.id }])
+    expect(stamped).toHaveLength(70_001)
+    expect(
+      stamped.filter((brew) => brew.isDialedIn).map((brew) => brew.id),
+    ).toEqual([shot.id])
   })
 
   it('replaces the current brew when a second is marked for the same triple', async () => {

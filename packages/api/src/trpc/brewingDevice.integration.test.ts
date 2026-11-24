@@ -1,4 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
+import { eq } from 'drizzle-orm'
+import { db } from '../db'
+import { brewingDevices } from '../db/schema'
 import {
   UNKNOWN_UUID,
   callerFor,
@@ -15,15 +18,19 @@ const USER_FREE = 'device-user-free'
 const USER_PAID = 'device-user-paid'
 // Hits the Free cap, then a Subscription — the upgrade path a paying user takes.
 const USER_UPGRADED = 'device-user-upgraded'
+// On Free, with devices hidden by another user's private type.
+const USER_LEGACY = 'device-user-legacy'
 const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
 const asFree = callerFor(USER_FREE)
 const asPaid = callerFor(USER_PAID)
 const asUpgraded = callerFor(USER_UPGRADED)
+const asLegacy = callerFor(USER_LEGACY)
+const uniqLegacy = uniqFor(USER_LEGACY)
 const uniq = uniqFor(USER_A)
 const uniqFree = uniqFor(USER_FREE)
 
-seedUsers([USER_A, USER_B, USER_FREE, USER_PAID, USER_UPGRADED])
+seedUsers([USER_A, USER_B, USER_FREE, USER_PAID, USER_UPGRADED, USER_LEGACY])
 
 let typeId: string
 let deviceAId: string
@@ -67,6 +74,33 @@ describe('brewingDevice', () => {
     expect(device.userId).toBe(USER_A)
     const list = await asA.brewingDevice.list()
     expect(list.some((d) => d.id === device.id)).toBe(true)
+  })
+})
+
+describe('brewingDevice type visibility', () => {
+  it('refuses another user’s private type on create and update', async () => {
+    const theirType = await asB.brewingDeviceType.create({
+      name: uniqFor(USER_B)('Private type'),
+    })
+    await expect(
+      asA.brewingDevice.create({
+        name: uniq('With their type'),
+        brand: 'Brand',
+        typeId: theirType.id,
+      }),
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Brewing device type not found',
+    })
+    await expect(
+      asA.brewingDevice.update({
+        id: deviceAId,
+        name: uniq('Owned by A'),
+        brand: 'Brand',
+        typeId: theirType.id,
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    expect((await asA.brewingDevice.getById(deviceAId)).typeId).toBe(typeId)
   })
 })
 
@@ -171,6 +205,10 @@ describe('brewingDevice.delete', () => {
 
 describe('brewingDevice plan limits', () => {
   it('allows three brewing devices on Free and refuses the fourth', async () => {
+    // A type of their own: another user's private type is refused.
+    const typeId = (
+      await asFree.brewingDeviceType.create({ name: uniqFree('Type') })
+    ).id
     const first = await asFree.brewingDevice.create({
       name: uniqFree('One'),
       brand: 'Brand',
@@ -206,9 +244,69 @@ describe('brewingDevice plan limits', () => {
     expect(renamed.id).toBe(first.id)
   })
 
+  it('does not count devices hidden by another user’s private type', async () => {
+    const own = (
+      await asLegacy.brewingDeviceType.create({ name: uniqLegacy('Type') })
+    ).id
+    const devices = await Promise.all(
+      ['One', 'Two', 'Three'].map((name) =>
+        asLegacy.brewingDevice.create({
+          name: uniqLegacy(name),
+          brand: 'Brand',
+          typeId: own,
+        }),
+      ),
+    )
+    // Only rows written before writes checked the type can carry B's.
+    await db
+      .update(brewingDevices)
+      .set({ typeId })
+      .where(eq(brewingDevices.id, devices[0].id))
+    expect(await asLegacy.brewingDevice.list()).toHaveLength(2)
+
+    // The hidden one cannot be removed from the list, so it takes no slot.
+    await asLegacy.brewingDevice.create({
+      name: uniqLegacy('Fourth'),
+      brand: 'Brand',
+      typeId: own,
+    })
+    await expect(
+      asLegacy.brewingDevice.create({
+        name: uniqLegacy('Fifth'),
+        brand: 'Brand',
+        typeId: own,
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+
+    // Giving the hidden one a visible type adds a slot, so at the cap it is
+    // refused, while an ordinary edit at the cap still saves.
+    const repair = {
+      id: devices[0].id,
+      name: devices[0].name,
+      brand: 'Brand',
+      typeId: own,
+    }
+    await expect(asLegacy.brewingDevice.update(repair)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    })
+    await asLegacy.brewingDevice.update({
+      id: devices[1].id,
+      name: uniqLegacy('Renamed'),
+      brand: 'Brand',
+      typeId: own,
+    })
+    // Below the cap the repair goes through.
+    await asLegacy.brewingDevice.delete(devices[2].id)
+    await asLegacy.brewingDevice.update(repair)
+    expect(await asLegacy.brewingDevice.list()).toHaveLength(3)
+  })
+
   it('lets a granted paid Plan add devices past the Free limit', async () => {
     const uniqPaid = uniqFor(USER_PAID)
     await grantPlan(USER_PAID, 'pro')
+    const typeId = (
+      await asPaid.brewingDeviceType.create({ name: uniqPaid('Type') })
+    ).id
 
     for (const label of ['One', 'Two', 'Three', 'Four']) {
       await asPaid.brewingDevice.create({
@@ -223,6 +321,9 @@ describe('brewingDevice plan limits', () => {
 
   it('lets a Subscription add devices after Free had already hit the cap', async () => {
     const uniqUpgraded = uniqFor(USER_UPGRADED)
+    const typeId = (
+      await asUpgraded.brewingDeviceType.create({ name: uniqUpgraded('Type') })
+    ).id
     for (const label of ['One', 'Two', 'Three']) {
       await asUpgraded.brewingDevice.create({
         name: uniqUpgraded(label),

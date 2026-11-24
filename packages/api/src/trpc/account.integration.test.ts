@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '../db'
-import { brewingDeviceTypes } from '../db/schema'
+import { brewingDeviceTypes, espressoShots } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
 import { COLD_BREW_DEVICE_TYPE } from '../lib/cold-brew'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
@@ -116,6 +116,7 @@ beforeAll(async () => {
       dose: '17',
       yield: '34',
       time: 30,
+      idempotencyKey: crypto.randomUUID(),
     })
   ).id
   sealedBrewIds.aeropressBrew = (
@@ -173,6 +174,7 @@ beforeAll(async () => {
       yield: '36',
       time: 30,
       grindSetting: '18',
+      idempotencyKey: crypto.randomUUID(),
     })
   }
 
@@ -202,6 +204,7 @@ beforeAll(async () => {
       yield: '44',
       time: 28,
       grindSetting: 'other-grind',
+      idempotencyKey: crypto.randomUUID(),
     })
   ).id
 })
@@ -218,7 +221,7 @@ describe('account.export', () => {
   })
 
   it('includes a Free user’s Sealed Brews in full, for every method', async () => {
-    const espressoFeed = await asUser.espressoShot.getAll()
+    const espressoFeed = (await asUser.espressoShot.getRecent({ limit: 50 })).items
     const sealedOnFeed = espressoFeed.find(
       (shot) => shot.id === sealedId('espressoShot'),
     )
@@ -287,15 +290,20 @@ describe('account.export', () => {
   })
 
   it('omits another user’s Coffee or grinder nested on an owned Brew', async () => {
-    const shot = await asUser.espressoShot.create({
-      coffeeId: otherCoffeeId,
-      grinderId: otherGrinderId,
-      brewingDeviceId: userEspressoDeviceId,
-      dose: '20',
-      yield: '40',
-      time: 25,
-      grindSetting: 'cross-user',
-    })
+    // The API now refuses this; rows saved before it did can still exist.
+    const [shot] = await db
+      .insert(espressoShots)
+      .values({
+        userId: USER,
+        coffeeId: otherCoffeeId,
+        grinderId: otherGrinderId,
+        brewingDeviceId: userEspressoDeviceId,
+        dose: '20',
+        yield: '40',
+        time: 25,
+        grindSetting: 'cross-user',
+      })
+      .returning()
 
     const exported = await asUser.account.export()
     const brew = exported.brews.espresso.find((row) => row.id === shot.id)

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '../db'
-import { brewingDeviceTypes } from '../db/schema'
+import { brewingDeviceTypes, espressoShots } from '../db/schema'
 import { AEROPRESS_DEVICE_TYPE } from '../lib/aeropress'
 import { COLD_BREW_DEVICE_TYPE } from '../lib/cold-brew'
 import { ESPRESSO_DEVICE_TYPE } from '../lib/espresso'
@@ -31,7 +31,10 @@ async function findOrCreateDeviceType(name: string): Promise<string> {
   const existing = await db
     .select()
     .from(brewingDeviceTypes)
-    .where(eq(brewingDeviceTypes.name, name))
+    // A shared type only: another user's private one fails the visibility check.
+    .where(
+      and(eq(brewingDeviceTypes.name, name), isNull(brewingDeviceTypes.userId)),
+    )
   if (existing[0]) return existing[0].id
   const [row] = await db.insert(brewingDeviceTypes).values({ name }).returning()
   createdTypeIds.push(row.id)
@@ -107,6 +110,7 @@ beforeAll(async () => {
       dose: '18',
       yield: '36',
       time: 30,
+      idempotencyKey: crypto.randomUUID(),
     })
   ).id
   sealedBrewIds.aeropressBrew = (
@@ -195,6 +199,7 @@ beforeAll(async () => {
       yield: '36',
       time: 30,
       grindSetting: '18',
+      idempotencyKey: crypto.randomUUID(),
     })
   }
 
@@ -215,6 +220,7 @@ beforeAll(async () => {
       brewingDeviceId: espressoDevice,
       yield: '42',
       time: 28,
+      idempotencyKey: crypto.randomUUID(),
     })
   ).id
   readableBrewIds.aeropressBrew = (
@@ -299,19 +305,42 @@ const readableId = (method: MethodKey) => {
   return id
 }
 
+async function historyItems(method: MethodKey) {
+  switch (method) {
+    case 'espressoShot':
+      return (await asUser.espressoShot.getRecent({ limit: 50 }))
+        .items
+    case 'aeropressBrew':
+      return asUser.aeropressBrew.getAll()
+    case 'pouroverBrew':
+      return asUser.pouroverBrew.getAll()
+    case 'frenchpressBrew':
+      return asUser.frenchpressBrew.getAll()
+    case 'coldBrewBrew':
+      return asUser.coldBrewBrew.getAll()
+  }
+}
+
 describe.each(methods)('%s feeds', (method) => {
   const feedFor = () => asUser[method]
 
-  it('withholds a Sealed brew from getAll', async () => {
-    const all = await feedFor().getAll()
-    const brew = all.find((row) => row.id === sealedId(method))
+  // Espresso's history is getRecent, checked below; the others still have getAll.
+  it.skipIf(method === 'espressoShot')(
+    'withholds a Sealed brew from the history feed',
+    async () => {
+      const all = await historyItems(method)
+      const brew = all.find((row) => row.id === sealedId(method))
 
-    expect(brew?.sealed).toBe(true)
-    expect(brew?.dose).toBe(null)
-  })
+      expect(brew?.sealed).toBe(true)
+      expect(brew?.dose).toBe(null)
+    },
+  )
 
   it('withholds a Sealed brew from getRecent', async () => {
-    const { items } = await feedFor().getRecent({ limit: 50, offset: 0 })
+    const { items } =
+      method === 'espressoShot'
+        ? await asUser.espressoShot.getRecent({ limit: 50 })
+        : await asUser[method].getRecent({ limit: 50, offset: 0 })
     const brew = items.find((row) => row.id === sealedId(method))
 
     expect(brew?.sealed).toBe(true)
@@ -340,8 +369,56 @@ describe.each(methods)('%s feeds', (method) => {
   })
 })
 
+describe('espressoShot.getLatestUnsealed', () => {
+  it('does not return a Sealed shot', async () => {
+    const sealed = await asUser.espressoShot.getById(sealedId('espressoShot'))
+    const found = await asUser.espressoShot.getLatestUnsealed({
+      coffeeId: sealed.coffeeId,
+    })
+    expect(found).toBeNull()
+  })
+
+  it('skips a newer stamped shot on a Coffee still on the Shelf', async () => {
+    // Off the Shelf, the Shelf guard alone returns null, so this needs a
+    // Coffee on it to show the sealedAt filter at work.
+    const readable = await asUser.espressoShot.getById(
+      readableId('espressoShot'),
+    )
+    const [stamped] = await db
+      .insert(espressoShots)
+      .values({
+        userId: USER,
+        coffeeId: readable.coffeeId,
+        grinderId: readable.grinderId!,
+        brewingDeviceId: readable.brewingDeviceId!,
+        grindSetting: 'stamped',
+        dose: '19',
+        yield: '38',
+        time: 31,
+        sealedAt: new Date(),
+        // From the database's own clock, so the app clock cannot skew it
+        // behind the readable shot.
+        createdAt: sql`(SELECT ${espressoShots.createdAt} FROM ${espressoShots} WHERE ${espressoShots.id} = ${readable.id}) + interval '1 minute'`,
+      })
+      .returning({ id: espressoShots.id })
+    try {
+      const found = await asUser.espressoShot.getLatestUnsealed({
+        coffeeId: readable.coffeeId,
+      })
+      expect(found?.id).toBe(readable.id)
+      expect(found?.sealed).toBe(false)
+    } finally {
+      await db.delete(espressoShots).where(eq(espressoShots.id, stamped.id))
+    }
+  })
+})
+
 describe('the enumeration itself', () => {
-  const paths = Object.keys(trpcRouter._def.procedures)
+  const procedures = trpcRouter._def.procedures as unknown as Record<
+    string,
+    { _def: { type: string } }
+  >
+  const paths = Object.keys(procedures)
 
   it('covers every router that owns Brews', () => {
     const owners = new Set(
@@ -354,15 +431,30 @@ describe('the enumeration itself', () => {
   })
 
   it('covers every read each of those routers exposes', () => {
-    const asserted = new Set(['getAll', 'getRecent', 'getById', 'getDialedIn'])
+    // Reads with Sealing tests on every Brew router, and reads tested on one
+    // router only, named in full so another router's copy still fails.
+    const assertedEverywhere = new Set(['getRecent', 'getById', 'getDialedIn'])
+    const assertedOn = new Set([
+      'espressoShot.getLatestUnsealed',
+      'aeropressBrew.getAll',
+      'pouroverBrew.getAll',
+      'frenchpressBrew.getAll',
+      'coldBrewBrew.getAll',
+    ])
 
     for (const method of methods) {
+      // Every query, whatever its name; mutations are checked elsewhere.
       const reads = paths
         .filter((path) => path.startsWith(`${method}.`))
-        .map((path) => path.split('.')[1])
-        .filter((name) => name.startsWith('get'))
+        .filter((path) => procedures[path]._def.type === 'query')
 
-      expect(reads.filter((name) => !asserted.has(name))).toEqual([])
+      expect(
+        reads.filter(
+          (path) =>
+            !assertedEverywhere.has(path.slice(method.length + 1)) &&
+            !assertedOn.has(path),
+        ),
+      ).toEqual([])
     }
   })
 })

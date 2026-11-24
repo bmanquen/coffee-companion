@@ -35,6 +35,30 @@ describe('insertEspressoShotSchema', () => {
     ).toBe(true)
   })
 
+  it('rejects a negative time and accepts zero', () => {
+    expect(
+      insertEspressoShotSchema.safeParse({ ...valid, time: -10 }).success,
+    ).toBe(false)
+    expect(
+      insertEspressoShotSchema.safeParse({ ...valid, time: '-10' }).success,
+    ).toBe(false)
+    expect(
+      insertEspressoShotSchema.safeParse({ ...valid, time: 0 }).success,
+    ).toBe(true)
+  })
+
+  it('refuses a time too large for its 32-bit column', () => {
+    const parse = (time: number | string) =>
+      insertEspressoShotSchema.safeParse({ ...valid, time })
+    expect(parse(2147483647).success).toBe(true)
+    expect(parse('2147483647').success).toBe(true)
+    for (const time of [2147483648, '2147483648']) {
+      const result = parse(time)
+      expect(result.success).toBe(false)
+      expect(result.error?.issues[0]?.message).toBe('Enter a smaller number')
+    }
+  })
+
   it('keeps roast date as a YYYY-MM-DD string', () => {
     const parsed = insertEspressoShotSchema.parse({
       ...valid,
@@ -135,6 +159,19 @@ describe('insertEspressoShotSchema', () => {
       insertEspressoShotSchema.safeParse({ ...valid, coffeeId: 'not-a-uuid' })
         .success,
     ).toBe(false)
+  })
+
+  it('lowercases relation ids', () => {
+    const mixed = 'ABCDEFAB-CDEF-4000-8000-0000000000AA'
+    const parsed = insertEspressoShotSchema.parse({
+      ...valid,
+      coffeeId: mixed,
+      grinderId: mixed,
+      brewingDeviceId: mixed,
+    })
+    expect(parsed.coffeeId).toBe(mixed.toLowerCase())
+    expect(parsed.grinderId).toBe(mixed.toLowerCase())
+    expect(parsed.brewingDeviceId).toBe(mixed.toLowerCase())
   })
 })
 
@@ -248,6 +285,28 @@ describe('insertPouroverBrewSchema', () => {
     ).toBe('2026-05-01')
     expect(
       insertPouroverBrewSchema.safeParse({ ...valid, brewTime: null }).success,
+    ).toBe(false)
+  })
+
+  it('keeps accepting a stored negative water temperature but not a negative brew time', () => {
+    for (const waterTemp of [-4, '-4']) {
+      expect(
+        insertPouroverBrewSchema.parse({ ...valid, waterTemp }).waterTemp,
+      ).toBe(-4)
+    }
+    for (const brewTime of [-1, '-1']) {
+      expect(
+        insertPouroverBrewSchema.safeParse({ ...valid, brewTime }).success,
+      ).toBe(false)
+    }
+    // Still within the 32-bit column.
+    expect(
+      insertPouroverBrewSchema.safeParse({ ...valid, waterTemp: -2147483648 })
+        .success,
+    ).toBe(true)
+    expect(
+      insertPouroverBrewSchema.safeParse({ ...valid, waterTemp: '-2147483649' })
+        .success,
     ).toBe(false)
   })
 })

@@ -54,6 +54,9 @@ jobs:
       - name: API unit tests
         run: pnpm --filter @coffee-companion/api test
 
+      - name: Brew-display unit tests
+        run: pnpm --filter @coffee-companion/brew-display test
+
       - name: Mobile unit tests
         run: pnpm --filter @coffee-companion/mobile test
 

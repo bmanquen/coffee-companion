@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router'
 import { Bean, Coffee, Home, Menu, UserRound, Wrench } from 'lucide-react'
-import { useSignOut } from '@/hooks/use-sign-out'
+import { useState } from 'react'
 import { authClient } from '@/lib/auth-client'
+import { SIGN_OUT_FAILED, useSignOut } from '@/hooks/use-sign-out'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Button } from './ui/button'
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet'
@@ -13,7 +14,9 @@ interface NavigationProps {
 
 export default function Navigation({ open, setOpen }: NavigationProps) {
   const { data: session } = authClient.useSession()
-  const handleSignOut = useSignOut()
+  const signOut = useSignOut()
+  const [signOutError, setSignOutError] = useState<string | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
 
   const handleSignIn = () => {
     authClient.signIn.social({ provider: 'google' })
@@ -85,24 +88,41 @@ export default function Navigation({ open, setOpen }: NavigationProps) {
             </>
           )}
           {session ? (
-            <div className="flex justify-between items-center gap-2 mt-auto mb-4">
-              <Link
-                className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-primary/40"
-                to="/account"
-                onClick={() => setOpen(false)}
-              >
-                <Avatar>
-                  {session.user.image ? (
-                    <AvatarImage src={session.user.image} />
-                  ) : null}
-                  <AvatarFallback>{initial}</AvatarFallback>
-                </Avatar>
-                {session.user.name}
-              </Link>
-              <Button variant="outline" onClick={handleSignOut}>
-                Sign Out
-              </Button>
-            </div>
+            <>
+              <div className="flex justify-between items-center gap-2 mt-auto mb-4">
+                <Link
+                  className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-primary/40"
+                  to="/account"
+                  onClick={() => setOpen(false)}
+                >
+                  <Avatar>
+                    {session.user.image ? (
+                      <AvatarImage src={session.user.image} />
+                    ) : null}
+                    <AvatarFallback>{initial}</AvatarFallback>
+                  </Avatar>
+                  {session.user.name}
+                </Link>
+                <Button
+                  variant="outline"
+                  // One attempt at a time, so an earlier failure cannot show while a
+                  // later attempt is still pending.
+                  disabled={signingOut}
+                  onClick={() => {
+                    setSigningOut(true)
+                    setSignOutError(null)
+                    void signOut()
+                      .catch(() => {
+                        setSignOutError(SIGN_OUT_FAILED)
+                      })
+                      .finally(() => setSigningOut(false))
+                  }}
+                >
+                  Sign Out
+                </Button>
+              </div>
+              {signOutError ? <p role="alert">{signOutError}</p> : null}
+            </>
           ) : (
             <Button className="mt-auto mb-4" onClick={handleSignIn}>
               Sign in with Google

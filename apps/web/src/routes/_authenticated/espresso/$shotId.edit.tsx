@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Check } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { brewsLogLocation } from '@/components/brews/methods'
 import { MutationErrorNotices } from '@/components/form/mutation-error-notices'
 import { H1 } from '@/components/typography/h1'
@@ -16,6 +17,7 @@ import { useAppForm } from '@/hooks/form'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
+import { refreshEspressoShotReads } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 import { submitFormMutation } from '@/lib/form-error'
 import type { InsertEspressoShot } from '@coffee-companion/api/db/zod'
@@ -35,6 +37,9 @@ export const Route = createFileRoute('/_authenticated/espresso/$shotId/edit')({
       context.trpc.brewingDevice.list.queryOptions(),
     )
   },
+  // Another brew's edit is a new form, so a save on this one cannot
+  // redirect away from it.
+  remountDeps: ({ params }) => params,
   component: EditEspressoShot,
 })
 
@@ -58,15 +63,29 @@ function EditEspressoShot() {
   // server-side in espressoShot.update).
   const brewingDevice = useBrewingDeviceSelect(ESPRESSO_DEVICE_TYPE)
 
+  // A save that settles after the user left the form must not pull them
+  // back to Brews; it still refreshes the cached reads.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
   const updateShot = useMutation(
     trpc.espressoShot.update.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.espressoShot.getAll.queryOptions())
-        queryClient.invalidateQueries(
+      onSuccess: async () => {
+        // First, so a form reopened while the history refreshes loads the
+        // saved shot.
+        void queryClient.invalidateQueries(
           trpc.espressoShot.getById.queryOptions(shotId),
         )
+        // An in-flight page or prefill lookup would write its pre-edit
+        // snapshot back after the invalidation.
+        await refreshEspressoShotReads(queryClient, trpc)
         invalidateDeviceDialedInQueries(queryClient, trpc)
-        navigate(brewsLogLocation('espresso'))
+        if (mounted.current) navigate(brewsLogLocation('espresso'))
       },
     }),
   )

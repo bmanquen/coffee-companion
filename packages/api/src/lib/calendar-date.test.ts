@@ -3,6 +3,7 @@ import {
   calendarDateFromLocalDate,
   calendarDateSchema,
   calendarDaysUntil,
+  isCalendarDate,
   localDateFromCalendarDate,
 } from './calendar-date'
 
@@ -23,6 +24,15 @@ describe('calendarDateSchema', () => {
     expect(
       calendarDateSchema.safeParse('2026-05-01T00:00:00.000Z').success,
     ).toBe(false)
+  })
+
+  it('rejects a day that does not exist on the calendar', () => {
+    expect(isCalendarDate('2026-02-30')).toBe(false)
+    expect(isCalendarDate('2026-02-29')).toBe(false)
+    expect(isCalendarDate('2026-04-31')).toBe(false)
+    expect(isCalendarDate('2026-13-45')).toBe(false)
+    expect(isCalendarDate('2024-02-29')).toBe(true)
+    expect(isCalendarDate('2026-05-01')).toBe(true)
   })
 })
 

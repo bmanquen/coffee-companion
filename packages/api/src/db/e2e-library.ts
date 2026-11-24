@@ -6,6 +6,11 @@
 // database access so a browser test can address a Coffee by its position
 // relative to the Shelf without importing the seed.
 
+// Ethiopia Guji is the extra Coffee on the granted identity (not in the shared
+// library). Its id is pinned so the mobile Maestro flow can tap the picker
+// option by testID.
+export const E2E_ETHIOPIA_GUJI_ID = '00000000-0000-4000-8000-000000000001'
+
 export const E2E_LIBRARY = [
   {
     name: 'Kenya Nyeri',
