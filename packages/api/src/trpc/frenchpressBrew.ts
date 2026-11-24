@@ -188,6 +188,12 @@ export const frenchpressBrewRouter = createTRPCRouter({
       await assertOwnCoffeeAndGrinder(data, ctx.session.user.id)
       await assertFrenchPressMethod(data.methodId, ctx.session.user.id)
 
+      // Moving a Brew lifts its new Coffee up the Shelf, so stamp first
+      // (ADR-0004), or that Coffee's Sealed Brews would read again.
+      if (existing && existing.coffeeId !== data.coffeeId) {
+        await stampFallenBrews(ctx.session.user.id, ctx.plan)
+      }
+
       const updated = await db
         .update(frenchpressBrews)
         .set(data)
