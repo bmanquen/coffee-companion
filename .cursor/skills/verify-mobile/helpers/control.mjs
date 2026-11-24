@@ -1424,15 +1424,15 @@ function driveDeviceReversePorts(state = {}) {
   ]
 }
 
-// Records each port just before reversing it, so cleanup removes every
-// mapping this run wrote and none it never reached.
+// Records each port once its reverse succeeds, so cleanup removes only
+// mappings this run wrote: a failed reverse may have left the developer's.
 function addAdbReverses(record, ports, persist, reverse = adbReverse) {
   for (const port of ports) {
+    reverse(record.serial, port)
     if (!record.reversedPorts?.includes(port)) {
       record.reversedPorts = [...(record.reversedPorts ?? []), port]
       persist(record)
     }
-    reverse(record.serial, port)
   }
 }
 
@@ -3378,6 +3378,17 @@ function launchPartial({ avdName, attachedEmulator, keptStylus }) {
   }
 }
 
+// What a failed launch keeps once teardown released the device: its stylus
+// value is back and its reverses are gone, so a later cleanup must not write
+// that value again or remove mappings the developer adds on those ports.
+function releasedLaunchState(state) {
+  return {
+    ...state,
+    stylusHandwritingBefore: undefined,
+    reversedPorts: undefined,
+  }
+}
+
 function stylusRestoreRecord(state) {
   return {
     serial: state.serial,
@@ -3803,9 +3814,8 @@ async function cmdLaunchDevice(opts = {}) {
     )
   } catch (error) {
     if (await stopLaunchDevice(partial)) {
-      // Restored: a later cleanup must not write that old value again.
       const recorded = readState()
-      if (recorded) writeState({ ...recorded, stylusHandwritingBefore: undefined })
+      if (recorded) writeState(releasedLaunchState(recorded))
     }
     die(error.message, error.exitCode)
   }
@@ -4841,6 +4851,7 @@ export {
   releaseRecordedDevice,
   stopRecordedEmulator,
   stylusRestoreRecord,
+  releasedLaunchState,
   stylusRestoreOwed,
   keptStylusBaseline,
   launchPartial,

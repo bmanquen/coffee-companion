@@ -83,6 +83,7 @@ import {
   releaseRecordedDevice,
   stopRecordedEmulator,
   stylusRestoreRecord,
+  releasedLaunchState,
   keptStylusBaseline,
   launchPartial,
   stopLaunchDevice,
@@ -1379,8 +1380,8 @@ describe('driveDeviceReversePorts', () => {
 })
 
 describe('addAdbReverses', () => {
-  it('records each port before reversing it, and none it never reached', () => {
-    const record = { serial: DEVICE_SERIAL, reversedPorts: [8081] }
+  it('records each port once its reverse succeeds, and none that failed', () => {
+    const record = { serial: DEVICE_SERIAL, reversedPorts: [] }
     const persisted = []
     const reversed = []
     assert.throws(
@@ -1400,9 +1401,22 @@ describe('addAdbReverses', () => {
       [DEVICE_SERIAL, 8081],
       [DEVICE_SERIAL, 3910],
     ])
-    // 8081 was already recorded; 8082 was never reversed, so never recorded.
-    assert.deepEqual(persisted, [[8081, 3910]])
-    assert.deepEqual(record.reversedPorts, [8081, 3910])
+    // 3910 failed and 8082 was never tried: cleanup removes neither.
+    assert.deepEqual(persisted, [[8081]])
+    assert.deepEqual(record.reversedPorts, [8081])
+  })
+
+  it('does not record a port twice', () => {
+    const record = { serial: DEVICE_SERIAL, reversedPorts: [8081] }
+    const persisted = []
+    addAdbReverses(
+      record,
+      [8081],
+      (r) => persisted.push(r),
+      () => {},
+    )
+    assert.deepEqual(record.reversedPorts, [8081])
+    assert.deepEqual(persisted, [])
   })
 })
 
@@ -1563,6 +1577,27 @@ describe('stopRecordedEmulator', () => {
     assert.deepEqual(await stop({ serial: DEVICE_SERIAL }, null), {
       calls: [],
       killed: null,
+    })
+  })
+})
+
+describe('releasedLaunchState', () => {
+  it('drops the restored stylus value and the removed reverses', () => {
+    const kept = JSON.parse(
+      JSON.stringify(
+        releasedLaunchState({
+          serial: DEVICE_SERIAL,
+          avdName: 'verify-pixel',
+          ownedPackage: false,
+          stylusHandwritingBefore: '1',
+          reversedPorts: [8081, 3910],
+        }),
+      ),
+    )
+    assert.deepEqual(kept, {
+      serial: DEVICE_SERIAL,
+      avdName: 'verify-pixel',
+      ownedPackage: false,
     })
   })
 })
