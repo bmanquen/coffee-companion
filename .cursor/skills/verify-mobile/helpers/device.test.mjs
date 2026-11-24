@@ -72,7 +72,7 @@ import {
   quoteForAdbShell,
   adbReverseArgs,
   driveDeviceReversePorts,
-  ensureAdbReverses,
+  addAdbReverses,
   STYLUS_HANDWRITING_SETTING,
   stylusHandwritingProblem,
   ensureStylusHandwritingOff,
@@ -83,6 +83,7 @@ import {
   releaseRecordedDevice,
   stopRecordedEmulator,
   stylusRestoreRecord,
+  releasedLaunchState,
   keptStylusBaseline,
   launchPartial,
   stopLaunchDevice,
@@ -1375,14 +1376,47 @@ describe('driveDeviceReversePorts', () => {
       8081,
       3910,
     ])
+  })
+})
+
+describe('addAdbReverses', () => {
+  it('records each port once its reverse succeeds, and none that failed', () => {
+    const record = { serial: DEVICE_SERIAL, reversedPorts: [] }
+    const persisted = []
     const reversed = []
-    ensureAdbReverses(DEVICE_SERIAL, [8081, 3910], (serial, port) => {
-      reversed.push([serial, port])
-    })
+    assert.throws(
+      () =>
+        addAdbReverses(
+          record,
+          [8081, 3910, 8082],
+          (r) => persisted.push([...r.reversedPorts]),
+          (serial, port) => {
+            reversed.push([serial, port])
+            if (port === 3910) throw new Error('adb reverse tcp:3910 failed')
+          },
+        ),
+      /tcp:3910 failed/,
+    )
     assert.deepEqual(reversed, [
       [DEVICE_SERIAL, 8081],
       [DEVICE_SERIAL, 3910],
     ])
+    // 3910 failed and 8082 was never tried: cleanup removes neither.
+    assert.deepEqual(persisted, [[8081]])
+    assert.deepEqual(record.reversedPorts, [8081])
+  })
+
+  it('does not record a port twice', () => {
+    const record = { serial: DEVICE_SERIAL, reversedPorts: [8081] }
+    const persisted = []
+    addAdbReverses(
+      record,
+      [8081],
+      (r) => persisted.push(r),
+      () => {},
+    )
+    assert.deepEqual(record.reversedPorts, [8081])
+    assert.deepEqual(persisted, [])
   })
 })
 
@@ -1543,6 +1577,49 @@ describe('stopRecordedEmulator', () => {
     assert.deepEqual(await stop({ serial: DEVICE_SERIAL }, null), {
       calls: [],
       killed: null,
+    })
+  })
+})
+
+describe('releasedLaunchState', () => {
+  it('drops the restored stylus value and the removed reverses', () => {
+    const kept = JSON.parse(
+      JSON.stringify(
+        releasedLaunchState(
+          {
+            serial: DEVICE_SERIAL,
+            avdName: 'verify-pixel',
+            ownedPackage: false,
+            stylusHandwritingBefore: '1',
+            reversedPorts: [8081, 3910],
+          },
+          true,
+        ),
+      ),
+    )
+    assert.deepEqual(kept, {
+      serial: DEVICE_SERIAL,
+      avdName: 'verify-pixel',
+      ownedPackage: false,
+    })
+  })
+
+  it('keeps a stylus value whose restore failed, but not the removed reverses', () => {
+    const kept = JSON.parse(
+      JSON.stringify(
+        releasedLaunchState(
+          {
+            serial: DEVICE_SERIAL,
+            stylusHandwritingBefore: '1',
+            reversedPorts: [8081],
+          },
+          false,
+        ),
+      ),
+    )
+    assert.deepEqual(kept, {
+      serial: DEVICE_SERIAL,
+      stylusHandwritingBefore: '1',
     })
   })
 })
@@ -1742,6 +1819,12 @@ describe('drive-device after a failed launch', () => {
         !wroteStylus || state.stylusHandwritingBefore === '1',
         `stylus turned off with baseline ${state.stylusHandwritingBefore}`,
       )
+      // Cleanup removes only recorded reverses, so each one drive added is.
+      const reversed = [
+        ...readFileSync(log, 'utf8').matchAll(/reverse tcp:(\d+) tcp:/g),
+      ].map((match) => Number(match[1]))
+      assert.ok(reversed.length > 0, 'drive-device never reversed a port')
+      assert.deepEqual(state.reversedPorts, reversed)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -1834,6 +1917,62 @@ describe('unscoped cleanup and a claim it cannot read', () => {
   })
 })
 
+describe('cleanup adb reverse', () => {
+  const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+  // Runs cleanup on a recorded attached emulator and returns its adb calls.
+  const reverseCalls = (state) => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-reverse-'))
+    try {
+      const bin = join(root, 'bin')
+      const run = join(root, 'run')
+      const log = join(root, 'adb.log')
+      mkdirSync(bin)
+      mkdirSync(run)
+      writeFileSync(
+        join(bin, 'adb'),
+        `#!/bin/sh\necho "$*" >> '${log}'\n` +
+          'case "$*" in *"emu avd name"*) echo verify-pixel;; esac\nexit 0\n',
+        { mode: 0o755 },
+      )
+      writeFileSync(
+        join(run, 'state.json'),
+        JSON.stringify({
+          serial: DEVICE_SERIAL,
+          avdName: 'verify-pixel',
+          ownedPackage: false,
+          ...state,
+        }),
+      )
+      const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+      delete env.VERIFY_OWNER
+      delete env.ANDROID_HOME
+      delete env.ANDROID_SDK_ROOT
+      env.PATH = `${bin}:${process.env.PATH}`
+      const result = spawnSync(process.execPath, [control, 'cleanup'], {
+        env,
+        encoding: 'utf8',
+      })
+      assert.equal(result.status, 0, result.stderr)
+      return readFileSync(log, 'utf8')
+        .split('\n')
+        .filter((line) => line.includes('reverse'))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  it('removes only the ports the run reversed, so the developer keeps theirs', () => {
+    assert.deepEqual(reverseCalls({ reversedPorts: [8081, 3910] }), [
+      `-s ${DEVICE_SERIAL} reverse --remove tcp:8081`,
+      `-s ${DEVICE_SERIAL} reverse --remove tcp:3910`,
+    ])
+  })
+
+  it('removes none when the run reversed none', () => {
+    assert.deepEqual(reverseCalls({ reversedPorts: [] }), [])
+  })
+})
+
 describe('unscoped cleanup and runs that start during it', () => {
   const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
   // A run dir with a recorded stylus restore and an adb whose reverse
@@ -1860,6 +1999,7 @@ describe('unscoped cleanup and runs that start during it', () => {
         avdName: 'verify-pixel',
         ownedPackage: false,
         stylusHandwritingBefore: '1',
+        reversedPorts: [8081],
       }),
     )
     const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
@@ -1994,8 +2134,8 @@ describe('stopLaunchDevice', () => {
     return calls
   }
 
-  it('reports a restore that ran, and not one skipped on another AVD', async () => {
-    const released = (avd) =>
+  it('reports what it released, apart from a failed stylus restore', async () => {
+    const released = (avd, restoreStylus = () => {}) =>
       stopLaunchDevice(
         { serial: DEVICE_SERIAL, avdName: 'verify-pixel', emulatorPid: 4242 },
         [],
@@ -2003,14 +2143,27 @@ describe('stopLaunchDevice', () => {
           avdProblem: () =>
             recordedAvdProblem(DEVICE_SERIAL, 'verify-pixel', () => avd),
           clearReverses: () => {},
-          restoreStylus: () => {},
+          restoreStylus,
           killSerial: () => {},
           signalPid: () => {},
           restoreEnv: () => {},
         },
       )
-    assert.equal(await released('verify-pixel'), true)
-    assert.equal(await released('Pixel_7'), false)
+    assert.deepEqual(await released('verify-pixel'), {
+      released: true,
+      reversesCleared: true,
+    })
+    assert.deepEqual(await released('Pixel_7'), {
+      released: false,
+      reversesCleared: false,
+    })
+    // The reverses are already gone when the restore fails.
+    assert.deepEqual(
+      await released('verify-pixel', () => {
+        throw new Error('restore failed')
+      }),
+      { released: false, reversesCleared: true },
+    )
   })
 
   it('kills its own emulator through the serial', async () => {
@@ -2079,7 +2232,7 @@ describe('connectedAvdProblem', () => {
     )
     const drive = src.slice(src.indexOf('async function cmdDriveDevice'))
     const check = drive.indexOf('recordedAvdProblem(')
-    const firstWrite = drive.indexOf('ensureAdbReverses(state.serial')
+    const firstWrite = drive.indexOf('addAdbReverses(state')
     assert.ok(check >= 0 && firstWrite >= 0)
     assert.ok(check < firstWrite)
   })
@@ -2091,7 +2244,7 @@ describe('connectedAvdProblem', () => {
     )
     const launch = src.slice(src.indexOf('async function cmdLaunchDevice'))
     const check = launch.indexOf('recordedAvdProblem(')
-    const reverse = launch.indexOf('adbReverse(DEVICE_SERIAL')
+    const reverse = launch.indexOf('addAdbReverses(partial')
     const read = launch.indexOf('readStylusBaseline(DEVICE_SERIAL)')
     const write = launch.indexOf('ensureStylusHandwritingOff(DEVICE_SERIAL)')
     assert.ok(check >= 0 && reverse >= 0 && read >= 0 && write >= 0)
