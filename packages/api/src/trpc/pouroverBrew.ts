@@ -219,7 +219,7 @@ export const pouroverBrewRouter = createTRPCRouter({
             eq(pouroverBrews.userId, ctx.session.user.id),
           ),
         )
-        .returning(),
+        .returning({ id: pouroverBrews.id }),
     )
     if (deleted.length === 0) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })

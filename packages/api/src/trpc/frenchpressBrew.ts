@@ -222,7 +222,7 @@ export const frenchpressBrewRouter = createTRPCRouter({
             eq(frenchpressBrews.userId, ctx.session.user.id),
           ),
         )
-        .returning(),
+        .returning({ id: frenchpressBrews.id }),
     )
     if (deleted.length === 0) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })

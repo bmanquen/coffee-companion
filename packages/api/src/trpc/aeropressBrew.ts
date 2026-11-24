@@ -219,7 +219,7 @@ export const aeropressBrewRouter = createTRPCRouter({
             eq(aeropressBrews.userId, ctx.session.user.id),
           ),
         )
-        .returning(),
+        .returning({ id: aeropressBrews.id }),
     )
     if (deleted.length === 0) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })

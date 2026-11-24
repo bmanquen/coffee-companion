@@ -678,7 +678,7 @@ export const espressoShotRouter = createTRPCRouter({
               eq(espressoShots.userId, ctx.session.user.id),
             ),
           )
-          .returning(),
+          .returning({ id: espressoShots.id }),
       )
       if (deleted.length === 0) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Shot not found' })

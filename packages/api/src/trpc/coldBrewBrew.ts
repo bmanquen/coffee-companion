@@ -183,7 +183,7 @@ export const coldBrewBrewRouter = createTRPCRouter({
             eq(coldBrewBrews.userId, ctx.session.user.id),
           ),
         )
-        .returning(),
+        .returning({ id: coldBrewBrews.id }),
     )
     if (deleted.length === 0) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
