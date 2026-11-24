@@ -1,10 +1,12 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from '@testing-library/react'
+import { notifyManager } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import { useFieldContext } from '@/hooks/form-context'
 import { createTestProviders } from '@/test/providers'
@@ -229,6 +231,92 @@ describe('NewPouroverBrew form', () => {
         to: '/brews',
         search: { method: 'pourover' },
       })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('sends no second create between a successful save and Brews opening', async () => {
+    mocks.navigate.mockClear()
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(trpcSuccess())
+    try {
+      const { Wrapper } = seeded()
+      render(<NewPouroverBrew />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fillRequiredRecipe({ brewMinutes: '2', brewSeconds: '45' })
+      // Hold TanStack's batched re-renders, so the form still renders the
+      // pre-success state when the second submit arrives.
+      const held: Array<() => void> = []
+      notifyManager.setScheduler((cb) => held.push(cb))
+      const log = screen.getByRole('button', { name: 'Log' })
+      try {
+        fireEvent.click(log)
+        // The mocked navigate never unmounts the form, like a slow /brews load.
+        await waitFor(() => expect(mocks.navigate).toHaveBeenCalled())
+        await act(async () => {})
+        fireEvent.submit(log.closest('form')!)
+        await act(async () => {})
+      } finally {
+        notifyManager.setScheduler((cb) => setTimeout(cb, 0))
+        await act(async () => held.forEach((cb) => cb()))
+      }
+      const creates = fetchSpy.mock.calls.filter(([url]) =>
+        String(url).includes('pouroverBrew.create'),
+      )
+      expect(creates).toHaveLength(1)
+      expect((log as HTMLButtonElement).disabled).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('does not go to Brews when the create lands after the form closed', async () => {
+    mocks.navigate.mockClear()
+    let answer: (response: Response) => void = () => {}
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve
+        }),
+    )
+    try {
+      const { queryClient, Wrapper } = seeded()
+      const { unmount } = render(<NewPouroverBrew />, { wrapper: Wrapper })
+      fireEvent.change(screen.getByRole('combobox', { name: 'Coffee' }), {
+        target: { value: COFFEE },
+      })
+      fillRequiredRecipe({ brewMinutes: '2', brewSeconds: '45' })
+      fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+      await waitFor(() =>
+        expect(
+          fetchSpy.mock.calls.some(([url]) =>
+            String(url).includes('pouroverBrew.create'),
+          ),
+        ).toBe(true),
+      )
+
+      unmount()
+      await act(async () => {
+        answer(trpcSuccess())
+      })
+      // onSuccess has run once the mutation reads as succeeded.
+      await waitFor(() =>
+        expect(
+          queryClient
+            .getMutationCache()
+            .getAll()
+            .map((mutation) => mutation.state.status),
+        ).toContain('success'),
+      )
+      // The save still counts; only the redirect is skipped.
+      expect(mocks.track).toHaveBeenCalledWith('brew_logged', {
+        method: 'pourover',
+      })
+      expect(mocks.navigate).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }
