@@ -245,9 +245,13 @@ export const insertAeropressBrewSchema = createInsertSchema(aeropressBrews, {
   brewingDeviceId: () => z.uuid('Select a brewing device'),
   methodId: () => z.uuid('Select a method'),
 })
+  // Timestamps are server-owned, as for espresso shots.
   .omit({
     id: true,
     userId: true,
+    createdAt: true,
+    updatedAt: true,
+    sealedAt: true,
   })
   .extend({
     dose: decimalString(),
@@ -278,9 +282,13 @@ export const insertPouroverBrewSchema = createInsertSchema(pouroverBrews, {
   brewingDeviceId: () => z.uuid('Select a brewing device'),
   methodId: () => z.uuid('Select a method'),
 })
+  // Timestamps are server-owned, as for espresso shots.
   .omit({
     id: true,
     userId: true,
+    createdAt: true,
+    updatedAt: true,
+    sealedAt: true,
   })
   .extend({
     dose: decimalString(),
@@ -321,9 +329,13 @@ export const insertFrenchpressBrewSchema = createInsertSchema(
     methodId: () => z.uuid('Select a method'),
   },
 )
+  // Timestamps are server-owned, as for espresso shots.
   .omit({
     id: true,
     userId: true,
+    createdAt: true,
+    updatedAt: true,
+    sealedAt: true,
   })
   .extend({
     dose: decimalString(),
@@ -351,9 +363,13 @@ export const insertColdBrewBrewSchema = createInsertSchema(coldBrewBrews, {
   grinderId: () => z.uuid('Select a grinder'),
   brewingDeviceId: () => z.uuid('Select a brewing device'),
 })
+  // Timestamps are server-owned, as for espresso shots.
   .omit({
     id: true,
     userId: true,
+    createdAt: true,
+    updatedAt: true,
+    sealedAt: true,
   })
   .extend({
     dose: decimalString(),
