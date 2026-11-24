@@ -1834,6 +1834,62 @@ describe('unscoped cleanup and a claim it cannot read', () => {
   })
 })
 
+describe('cleanup adb reverse', () => {
+  const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+  // Runs cleanup on a recorded attached emulator and returns its adb calls.
+  const reverseCalls = (state) => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-reverse-'))
+    try {
+      const bin = join(root, 'bin')
+      const run = join(root, 'run')
+      const log = join(root, 'adb.log')
+      mkdirSync(bin)
+      mkdirSync(run)
+      writeFileSync(
+        join(bin, 'adb'),
+        `#!/bin/sh\necho "$*" >> '${log}'\n` +
+          'case "$*" in *"emu avd name"*) echo verify-pixel;; esac\nexit 0\n',
+        { mode: 0o755 },
+      )
+      writeFileSync(
+        join(run, 'state.json'),
+        JSON.stringify({
+          serial: DEVICE_SERIAL,
+          avdName: 'verify-pixel',
+          ownedPackage: false,
+          ...state,
+        }),
+      )
+      const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+      delete env.VERIFY_OWNER
+      delete env.ANDROID_HOME
+      delete env.ANDROID_SDK_ROOT
+      env.PATH = `${bin}:${process.env.PATH}`
+      const result = spawnSync(process.execPath, [control, 'cleanup'], {
+        env,
+        encoding: 'utf8',
+      })
+      assert.equal(result.status, 0, result.stderr)
+      return readFileSync(log, 'utf8')
+        .split('\n')
+        .filter((line) => line.includes('reverse'))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  it('removes only the ports the run reversed, so the developer keeps theirs', () => {
+    assert.deepEqual(reverseCalls({ reversedPorts: [8081, 3910] }), [
+      `-s ${DEVICE_SERIAL} reverse --remove tcp:8081`,
+      `-s ${DEVICE_SERIAL} reverse --remove tcp:3910`,
+    ])
+  })
+
+  it('removes none when the run reversed none', () => {
+    assert.deepEqual(reverseCalls({ reversedPorts: [] }), [])
+  })
+})
+
 describe('unscoped cleanup and runs that start during it', () => {
   const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
   // A run dir with a recorded stylus restore and an adb whose reverse
@@ -1860,6 +1916,7 @@ describe('unscoped cleanup and runs that start during it', () => {
         avdName: 'verify-pixel',
         ownedPackage: false,
         stylusHandwritingBefore: '1',
+        reversedPorts: [8081],
       }),
     )
     const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }

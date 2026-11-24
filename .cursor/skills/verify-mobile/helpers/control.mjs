@@ -1574,7 +1574,7 @@ function releaseRecordedDevice(
     avdProblem = () =>
       recordedAvdProblem(state.serial, state.avdName ?? chosenAvdName()),
     uninstall = () => uninstallPackage(state.serial, state.androidPackage),
-    clearReverses = () => adbClearReverses(state.serial),
+    clearReverses = () => adbRemoveReverses(state.serial, state.reversedPorts),
     restoreStylus = () =>
       restoreStylusHandwriting(state.serial, state.stylusHandwritingBefore),
   } = {},
@@ -3092,10 +3092,14 @@ function adbReverse(serial, port) {
   }
 }
 
-function adbClearReverses(serial) {
-  runCapture(adbBin(), ['-s', serial, 'reverse', '--remove-all'], {
-    allowFail: true,
-  })
+// Only the mappings this run added: an attached emulator can hold the
+// developer's own reverses.
+function adbRemoveReverses(serial, ports = []) {
+  for (const port of ports) {
+    runCapture(adbBin(), ['-s', serial, 'reverse', '--remove', `tcp:${port}`], {
+      allowFail: true,
+    })
+  }
 }
 
 function adbReverseList(serial) {
@@ -3359,6 +3363,8 @@ function launchPartial({ avdName, attachedEmulator, keptStylus }) {
     webPid: null,
     expoPid: null,
     ownedPackage: !attachedEmulator,
+    // Overwrites an earlier run's ports: none of this run's are written yet.
+    reversedPorts: [],
     // A kept value also holds when this run boots that AVD again.
     stylusHandwritingBefore: keptStylus ?? undefined,
   }
@@ -3703,6 +3709,9 @@ async function cmdLaunchDevice(opts = {}) {
     if (avdProblem) {
       throw new Error(`Not changing ${DEVICE_SERIAL}: ${avdProblem}`)
     }
+    // Recorded first, so a failure between the two still removes the first.
+    partial.reversedPorts = [metroPort, webPort]
+    persistLaunchPartial(partial)
     adbReverse(DEVICE_SERIAL, metroPort)
     adbReverse(DEVICE_SERIAL, webPort)
     if (attachedEmulator) {
@@ -3725,6 +3734,7 @@ async function cmdLaunchDevice(opts = {}) {
       attachedEmulator,
       ownedPackage: partial.ownedPackage,
       stylusHandwritingBefore: partial.stylusHandwritingBefore,
+      reversedPorts: partial.reversedPorts,
       androidPackage: ANDROID_PACKAGE,
       emulatorPid,
       metroPid: metro.metroPid,
