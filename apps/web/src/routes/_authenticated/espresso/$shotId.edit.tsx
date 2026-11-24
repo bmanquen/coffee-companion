@@ -76,12 +76,14 @@ function EditEspressoShot() {
   const updateShot = useMutation(
     trpc.espressoShot.update.mutationOptions({
       onSuccess: async () => {
+        // First, so a form reopened while the history refreshes loads the
+        // saved shot.
+        void queryClient.invalidateQueries(
+          trpc.espressoShot.getById.queryOptions(shotId),
+        )
         // An in-flight page or prefill lookup would write its pre-edit
         // snapshot back after the invalidation.
         await refreshEspressoShotReads(queryClient, trpc)
-        queryClient.invalidateQueries(
-          trpc.espressoShot.getById.queryOptions(shotId),
-        )
         invalidateDeviceDialedInQueries(queryClient, trpc)
         if (mounted.current) navigate(brewsLogLocation('espresso'))
       },

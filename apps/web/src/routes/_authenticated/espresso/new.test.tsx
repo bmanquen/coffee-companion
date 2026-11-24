@@ -2073,6 +2073,116 @@ describe('NewEspressoShot form', () => {
       }
     })
 
+    it('keeps the draft when another form saves during a deleted reply and the next Log is refused', async () => {
+      const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
+      let answerDeleted: () => void = () => {}
+      const replies = [
+        () => Promise.reject(new Error('Network request failed')),
+        () => Promise.reject(new Error('Network request failed')),
+        () =>
+          new Promise<Response>((resolve) => {
+            answerDeleted = () =>
+              resolve(trpcErrorResponse('CONFLICT', SHOT_IDEMPOTENCY_DELETED))
+          }),
+        () => trpcErrorResponse('BAD_REQUEST', 'Refused'),
+      ]
+      let creates = 0
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isCreateCall(call)) return replies[creates++]()
+        return reply(call, (id) =>
+          id === COFFEE ? shotOn(COFFEE, '2026-05-01') : null,
+        )
+      })
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        fillRecipe('18')
+        // A lost May 1 save, then May 2's save is lost.
+        await logAndSettle(fetchSpy, 1)
+        await pickRoastDay(/May 2nd, 2026/)
+        await logAndSettle(fetchSpy, 2)
+        pickCoffee(COFFEE_B)
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+
+        // May 2's retry is out when another form's save settles; then it is
+        // reported deleted.
+        fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+        await waitFor(() => expect(createCalls(fetchSpy)).toHaveLength(3))
+        await act(async () => {
+          await queryClient
+            .getMutationCache()
+            .build(queryClient, {
+              mutationKey: trpc.espressoShot.create.mutationKey(),
+              mutationFn: () => Promise.resolve({}),
+            })
+            .execute({ idempotencyKey: 'another-form' })
+        })
+        await act(async () => answerDeleted())
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Log' })).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        )
+        expect(screen.getByText('May 2nd, 2026')).toBeTruthy()
+
+        // The untouched May 2 draft is refused; May 1 must not come back.
+        await logAndSettle(fetchSpy, 4)
+        await act(async () => {})
+        expect(screen.queryByText('May 1st, 2026')).toBeNull()
+        expect(screen.getByText('May 2nd, 2026')).toBeTruthy()
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+
+    it('keeps an edited draft’s roast date when another form’s save brings a re-read', async () => {
+      const { Wrapper, fetchSpy, queryClient, trpc } = seeded()
+      fetchSpy.mockImplementation(async (...call: Array<unknown>) => {
+        if (isCreateCall(call)) throw new Error('Network request failed')
+        return reply(call, (id) =>
+          id === COFFEE ? shotOn(COFFEE, '2026-05-01') : null,
+        )
+      })
+      const dose = (value: string) =>
+        fireEvent.change(screen.getByLabelText(/^Dose/), { target: { value } })
+      try {
+        render(<NewEspressoShot />, { wrapper: Wrapper })
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        fillRecipe('18')
+        // Lost saves: 18 g on May 1, then 22 g on May 2.
+        await logAndSettle(fetchSpy, 1)
+        dose('22')
+        await pickRoastDay(/May 2nd, 2026/)
+        await logAndSettle(fetchSpy, 2)
+        pickCoffee(COFFEE_B)
+        pickCoffee(COFFEE)
+        expect(await screen.findByText('May 2nd, 2026')).toBeTruthy()
+        // Back to 18 g restores May 1; 20 g matches no save and keeps it.
+        dose('18')
+        expect(await screen.findByText('May 1st, 2026')).toBeTruthy()
+        dose('20')
+
+        await act(async () => {
+          await queryClient
+            .getMutationCache()
+            .build(queryClient, {
+              mutationKey: trpc.espressoShot.create.mutationKey(),
+              mutationFn: () => Promise.resolve({}),
+            })
+            .execute({ idempotencyKey: 'another-form' })
+        })
+        await act(async () => {})
+        expect(screen.getByText('May 1st, 2026')).toBeTruthy()
+        expect(screen.queryByText('May 2nd, 2026')).toBeNull()
+      } finally {
+        fetchSpy.mockRestore()
+      }
+    })
+
     // Form 1 logs a shot of A and is closed while the save is out; form 2
     // picks coffeeId. Its read from before the save settles answers the stale
     // May 2 and is held until the end; a read after it answers May 3.

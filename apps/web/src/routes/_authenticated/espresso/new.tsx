@@ -450,7 +450,8 @@ export function NewEspressoShot() {
   // Another form's save that may have committed can push this Coffee off the
   // Shelf, so a prefill that already landed predates it: read it again, or
   // once this form's own save settles. Its own saves settle through
-  // flushQueuedPrefill instead.
+  // flushQueuedPrefill instead. Not while lost saves of this Coffee decide
+  // the fields: only a reselection or a recipe edit picks among them.
   useEffect(
     () =>
       queryClient.getMutationCache().subscribe((event) => {
@@ -467,6 +468,7 @@ export function NewEspressoShot() {
           mayHaveSaved &&
           variables?.idempotencyKey !== ownSaveKey.current &&
           prefillCoffeeId.current &&
+          !unresolvedSaves.current.get(prefillCoffeeId.current)?.size &&
           matchMutation(
             { mutationKey: trpc.espressoShot.create.mutationKey() },
             event.mutation,
