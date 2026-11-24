@@ -119,11 +119,13 @@ export function shelfLoader(
 // Coffee comes back (ADR-0004).
 //
 // So this must run before anything that can hand a Coffee its slot back, always
-// against the Shelf as it stands *before* that happens. Two things can:
+// against the Shelf as it stands *before* that happens. Three things can:
 //
 //   - logging a Brew, which lifts its Coffee to the top of the Shelf;
-//   - deleting a Coffee or a Brew, which drops whatever was ranked by it and
-//     promotes what sat beneath.
+//   - moving a Brew to another Coffee, which lifts that Coffee the same way;
+//   - deleting a Coffee, a Brew, or a grinder or brewing device (whose Brews
+//     cascade with it), which drops whatever was ranked by them and promotes
+//     what sat beneath.
 //
 // Adding a Coffee only ever displaces, so it needs no stamp: what it pushes off
 // is withheld by the Shelf alone until something above is removed. Reads never

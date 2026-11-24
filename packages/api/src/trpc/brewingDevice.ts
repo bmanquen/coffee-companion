@@ -10,7 +10,7 @@ import {
   visibleDeviceType,
 } from '../lib/brew-ownership'
 import { isPgUniqueViolation } from '../lib/pg-error'
-import { countBrewsUsing } from '../lib/shelf'
+import { countBrewsUsing, stampFallenBrews } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 function rethrowUniqueDeviceConflict(err: unknown): never {
@@ -131,6 +131,9 @@ export const brewingDeviceRouter = createTRPCRouter({
   delete: authedProcedure
     .input(z.uuid())
     .mutation(async ({ ctx, input }) => {
+      // Its Brews go with it, which can promote a fallen Coffee (ADR-0004).
+      await stampFallenBrews(ctx.session.user.id, ctx.plan)
+
       const deleted = await db
         .delete(brewingDevices)
         .where(
