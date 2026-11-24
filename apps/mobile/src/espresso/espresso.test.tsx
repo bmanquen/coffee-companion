@@ -1087,6 +1087,7 @@ describe('log espresso shot', () => {
       await render(
         <ShotForm
           catalog={catalog()}
+          unresolvedSaves={new Map()}
           idempotencyKeys={new Map()}
           busy={false}
           error={null}
@@ -1461,6 +1462,105 @@ describe('log espresso shot', () => {
     expect(sent[1]).toEqual(sent[0])
     expect(await screen.findByTestId(`${SHOT_ROW_TEST_ID_PREFIX}shot-saved`)).toBeTruthy()
     expect(screen.getAllByText('Ethiopia Guji')).toHaveLength(1)
+  })
+
+  // The lost create commits; then another device logs a newer shot of the
+  // coffee with another roast date, which a fresh lookup would prefill.
+  const lostThenNewerElsewhere = () => {
+    const sent: Array<ShotCreate> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog()),
+      loadPrefill: () =>
+        Promise.resolve(
+          sent.length === 0
+            ? seedShot()
+            : seedShot({ id: 'shot-elsewhere', roastDate: '2026-05-02' }),
+        ),
+      create: (input) =>
+        Promise.resolve().then(() => {
+          sent.push(input)
+          if (sent.length === 1) throw new Error('Network request failed')
+        }),
+    }
+    return { api, sent }
+  }
+
+  it('retries a lost create as sent after the coffee is picked again', async () => {
+    const { api, sent } = lostThenNewerElsewhere()
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
+
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await act(async () => {})
+    await press(LOG)
+    expect(sent).toHaveLength(2)
+    expect(sent[1]).toEqual(sent[0])
+  })
+
+  it('retries a lost create as sent after Back and the same recipe again', async () => {
+    const { api, sent } = lostThenNewerElsewhere()
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickCoffee()
+    await enterRecipe()
+    await press(LOG)
+    expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
+    await press(BACK)
+
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await act(async () => {})
+    await enterRecipe()
+    await press(LOG)
+    expect(sent).toHaveLength(2)
+    expect(sent[1]).toEqual(sent[0])
+  })
+
+  it('gives a refilled draft no save sent its own key', async () => {
+    const sent: Array<ShotCreate> = []
+    const api: EspressoApi = {
+      ...pagingFor(() => []),
+      load: () => Promise.resolve(catalog()),
+      loadPrefill: () => Promise.resolve(null),
+      create: (input) =>
+        Promise.resolve().then(() => {
+          sent.push(input)
+          throw new Error('Network request failed')
+        }),
+    }
+    const dose = (value: string) =>
+      fireEvent.changeText(screen.getByLabelText(LABEL_DOSE), value)
+    const roastDate = (value: string) =>
+      fireEvent.changeText(screen.getByLabelText(LABEL_ROAST_DATE), value)
+    await render(<App auth={signedIn} espresso={api} />)
+    await openForm()
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await pickSelect(LABEL_GRINDER, GRINDER)
+    await pickSelect(LABEL_DEVICE, ESP_DEVICE)
+    await enterRecipe()
+    // Lost saves: A at 18 g with no roast date, then B at 19 g on May 3.
+    await press(LOG)
+    await dose('19')
+    await roastDate('2026-05-03')
+    await press(LOG)
+    // Back to A's draft; picking the coffee again fills B's roast date.
+    await dose('18')
+    await roastDate('')
+    await pickSelect(LABEL_COFFEE, COFFEE)
+    await act(async () => {})
+    expect(screen.getByDisplayValue('2026-05-03')).toBeTruthy()
+
+    // A draft no save sent replays neither key: under A's the API refuses it.
+    await press(LOG)
+    expect(sent).toHaveLength(3)
+    expect(sent[2].roastDate).toBe('2026-05-03')
+    expect(sent[2].idempotencyKey).not.toBe(sent[0].idempotencyKey)
+    expect(sent[2].idempotencyKey).not.toBe(sent[1].idempotencyKey)
   })
 
   it('saves a new shot on the next Log after its key turns out deleted', async () => {
@@ -1990,7 +2090,13 @@ describe('log espresso shot', () => {
         prefills += 1
         return prefills === 1 ? stale : Promise.resolve(seedShot())
       },
-      create: () => Promise.reject(new Error('Network request failed')),
+      // Refused, so nothing to replay: the next lookup reads afresh.
+      create: () =>
+        Promise.reject(
+          Object.assign(new Error('Refused'), {
+            data: { code: 'BAD_REQUEST' },
+          }),
+        ),
     }
     await render(<App auth={signedIn} espresso={api} />)
     await openForm()
@@ -2073,6 +2179,7 @@ describe('log espresso shot', () => {
           ],
         })}
         idempotencyKeys={keys}
+        unresolvedSaves={new Map()}
         busy={false}
         error={error}
         onBack={() => {}}
@@ -2123,6 +2230,7 @@ describe('log espresso shot', () => {
           ],
         })}
         idempotencyKeys={new Map()}
+        unresolvedSaves={new Map()}
         busy={false}
         error={error}
         onBack={() => {}}
@@ -2164,7 +2272,7 @@ describe('log espresso shot', () => {
     expect(loadIds.at(-1)).toBe(COFFEE_B)
   })
 
-  it('prefills from Try again after a failed save', async () => {
+  it('fills the lost save from Try again so Log replays it', async () => {
     let prefillCalls = 0
     const created: Array<ShotCreate> = []
     const api: EspressoApi = {
@@ -2195,14 +2303,14 @@ describe('log espresso shot', () => {
     expect(created).toHaveLength(1)
     expect(screen.getByText(ERROR_SAVE_FAILED)).toBeTruthy()
 
+    // A changed roast date under that key would be refused as a conflict.
     await press(TRY_AGAIN)
-    expect(prefillCalls).toBe(2)
-    expect(await screen.findByDisplayValue('2026-05-01')).toBeTruthy()
+    await act(async () => {})
+    expect(screen.queryByDisplayValue('2026-05-01')).toBeNull()
 
     await press(LOG)
     expect(created).toHaveLength(2)
-    expect(created[1].roastDate).not.toBe(created[0].roastDate)
-    expect(created[1].idempotencyKey).toBe(created[0].idempotencyKey)
+    expect(created[1]).toEqual(created[0])
   })
 
   it('prefills a newly chosen coffee after a failed save', async () => {
