@@ -176,6 +176,15 @@ function die(message, code = 1) {
   process.exit(code)
 }
 
+// For a refusal thrown below a command, such as an unreadable run claim.
+function orDie(read) {
+  try {
+    return read()
+  } catch (error) {
+    return die(error.message)
+  }
+}
+
 function ensureDir(path) {
   mkdirSync(path, { recursive: true })
 }
@@ -213,11 +222,21 @@ function ownerPath(dir) {
   return join(dir, 'owner.json')
 }
 
+// Null only when there is no claim: one that cannot be read may still be a
+// live run's, so it stops the caller rather than reading as none.
 export function readRunClaim(dir) {
+  return readClaimAt(ownerPath(dir), dir)
+}
+
+function readClaimAt(path, dir) {
   try {
-    return JSON.parse(readFileSync(ownerPath(dir), 'utf8'))
-  } catch {
-    return null
+    return JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    if (error.code === 'ENOENT') return null
+    throw new Error(
+      `Cannot read the claim on ${dir} (${error.message}). ` +
+        `Check whether its run is still going before removing ${path} by hand.`,
+    )
   }
 }
 
@@ -260,11 +279,18 @@ function claimForCleanup(dir) {
       if (error.code === 'ENOENT') continue
       throw error
     }
-    let moved = null
+    let moved
     try {
-      moved = JSON.parse(readFileSync(aside, 'utf8'))
-    } catch {
-      // Unreadable: not anyone's live claim.
+      moved = readClaimAt(aside, dir)
+    } catch (error) {
+      // Possibly a live claim: put it back rather than discard it.
+      try {
+        linkSync(aside, ownerPath(dir))
+        rmSync(aside, { force: true })
+      } catch {
+        // Another claim got in; the aside copy stays for the developer.
+      }
+      throw error
     }
     if (moved?.pid && lockPidMayBeLive(moved.pid)) {
       // Another cleanup took the stale claim over first; this moved its
@@ -284,7 +310,7 @@ function claimForCleanup(dir) {
 
 function claimRunOrDie() {
   const owner = process.env.VERIFY_OWNER || `${process.pid}-${Date.now()}`
-  const held = claimRun(runDir, owner)
+  const held = orDie(() => claimRun(runDir, owner))
   if (!held) return
   die(
     lockPidMayBeLive(held.pid) || hasLiveRecordedPids(readState())
@@ -2836,7 +2862,7 @@ async function cmdLaunch() {
     die(
       `${existing.serial} still owes AVD ${existing.avdName} its ` +
         `${STYLUS_HANDWRITING_SETTING}=${existing.stylusHandwritingBefore}. ` +
-        `Run cleanup once that emulator is back, or delete ${runDir} to drop ` +
+        `Run cleanup once that emulator is back, or delete ${statePath} to drop ` +
         'the restore, before launching.',
     )
   }
@@ -2855,7 +2881,7 @@ async function cmdLaunch() {
     die(
       `${claimed.serial} still owes AVD ${claimed.avdName} its ` +
         `${STYLUS_HANDWRITING_SETTING}=${claimed.stylusHandwritingBefore}. ` +
-        `Run cleanup once that emulator is back, or delete ${runDir} to drop ` +
+        `Run cleanup once that emulator is back, or delete ${statePath} to drop ` +
         'the restore, before launching.',
     )
   }
@@ -3313,7 +3339,7 @@ function keptStylusBaseline(existing, serial, avdName) {
     throw new Error(
       `${serial} still owes AVD ${existing.avdName} its ` +
         `${STYLUS_HANDWRITING_SETTING}=${existing.stylusHandwritingBefore}. ` +
-        `Start that AVD and run cleanup, or delete ${runDir} to drop the ` +
+        `Start that AVD and run cleanup, or delete ${statePath} to drop the ` +
         `restore, before launching ${avdName}.`,
     )
   }
@@ -4632,7 +4658,7 @@ function clearRunDir(keep = []) {
 
 async function cmdCleanup() {
   const owner = process.env.VERIFY_OWNER
-  if (owner && readRunClaim(runDir)?.owner !== owner) {
+  if (owner && orDie(() => readRunClaim(runDir))?.owner !== owner) {
     console.log(
       JSON.stringify(
         {
@@ -4648,7 +4674,7 @@ async function cmdCleanup() {
   // Unscoped cleanup claims an unclaimed dir itself and holds that claim
   // until it deletes it last, so a launch cannot claim the dir mid-cleanup
   // and lose its files to it.
-  const claim = owner ? null : claimForCleanup(runDir)
+  const claim = owner ? null : orDie(() => claimForCleanup(runDir))
   if (claim) {
     // A launch claims the dir before it records anything to stop, so a
     // cleanup now could free the dir for a second launch mid-start.
@@ -4718,7 +4744,7 @@ async function cmdCleanup() {
     ])
     die(
       `${restoreError.message}. Kept it in ${statePath}; run cleanup again ` +
-        `once that emulator is back, or delete ${runDir} to drop it.`,
+        `once that emulator is back, or delete ${statePath} to drop it.`,
     )
   }
   clearRunDir()

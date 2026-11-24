@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import {
+  chmodSync,
   existsSync,
   linkSync,
   mkdirSync,
@@ -1792,6 +1793,47 @@ describe('cleanup of the run dir', () => {
   })
 })
 
+describe('unscoped cleanup and a claim it cannot read', () => {
+  it('leaves the run alone instead of taking it over', () => {
+    const root = mkdtempSync(join(tmpdir(), 'verify-unreadable-'))
+    const bin = join(root, 'bin')
+    const run = join(root, 'run')
+    mkdirSync(bin)
+    mkdirSync(run)
+    writeFileSync(join(bin, 'adb'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+    const state = JSON.stringify({
+      serial: DEVICE_SERIAL,
+      avdName: 'verify-pixel',
+      ownedPackage: false,
+    })
+    writeFileSync(join(run, 'state.json'), state)
+    // A live launch's claim that this read fails on.
+    const launch = spawn('sleep', ['30'])
+    const claim = join(run, 'owner.json')
+    writeFileSync(claim, JSON.stringify({ owner: 'live', pid: launch.pid }))
+    chmodSync(claim, 0o000)
+    const env = { ...process.env, HOME: root, VERIFY_RUN_DIR: run }
+    delete env.VERIFY_OWNER
+    delete env.ANDROID_HOME
+    delete env.ANDROID_SDK_ROOT
+    env.PATH = `${bin}:${process.env.PATH}`
+    const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
+    try {
+      const result = spawnSync(process.execPath, [control, 'cleanup'], {
+        env,
+        encoding: 'utf8',
+        timeout: 60_000,
+      })
+      assert.notEqual(result.status, 0, result.stderr)
+      assert.equal(readFileSync(join(run, 'state.json'), 'utf8'), state)
+      assert.equal(existsSync(claim), true)
+    } finally {
+      launch.kill('SIGKILL')
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('unscoped cleanup and runs that start during it', () => {
   const control = join(dirname(fileURLToPath(import.meta.url)), 'control.mjs')
   // A run dir with a recorded stylus restore and an adb whose reverse
@@ -1847,6 +1889,18 @@ describe('unscoped cleanup and runs that start during it', () => {
       assert.equal(existsSync(signal), true, 'cleanup never reached adb reverse')
     }
     const release = () => writeFileSync(gate, '')
+    // For a cleanup that should refuse: one that wrongly gets past its claim
+    // waits at the gate, so fail rather than hang, and let done() reap it.
+    const refused = (exited) =>
+      Promise.race([
+        exited,
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('cleanup did not refuse in time')),
+            20_000,
+          ).unref(),
+        ),
+      ])
     const done = async () => {
       release()
       for (const { child, exited } of children) {
@@ -1855,7 +1909,7 @@ describe('unscoped cleanup and runs that start during it', () => {
       }
       rmSync(root, { recursive: true, force: true })
     }
-    return { run, cleanup, reversing, release, done }
+    return { run, cleanup, reversing, release, refused, done }
   }
 
   it('holds an unclaimed dir until it has deleted everything', async () => {
@@ -1881,7 +1935,7 @@ describe('unscoped cleanup and runs that start during it', () => {
       JSON.stringify({ owner: 'other-user-launch', pid: 1 }),
     )
     try {
-      const a = await t.cleanup().exited
+      const a = await t.refused(t.cleanup().exited)
       assert.notEqual(a.code, 0)
       assert.match(a.stderr, /A launch \(pid 1,/)
       assert.equal(readRunClaim(t.run)?.owner, 'other-user-launch')
@@ -1905,7 +1959,7 @@ describe('unscoped cleanup and runs that start during it', () => {
       await t.reversing()
       assert.equal(readRunClaim(t.run)?.pid, a.child.pid)
       assert.equal(claimRun(t.run, 'late-launch')?.pid, a.child.pid)
-      const b = await t.cleanup().exited
+      const b = await t.refused(t.cleanup().exited)
       assert.notEqual(b.code, 0)
       assert.match(b.stderr, /Another cleanup .* is still running/)
       // B left A's claim and the record in place.
