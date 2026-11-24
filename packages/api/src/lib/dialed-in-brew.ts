@@ -9,7 +9,7 @@ import {
   frenchpressBrews,
   pouroverBrews,
 } from '../db/schema'
-import { onOwnCoffee } from './brew-ownership'
+import { onOwnCoffee, visibleDeviceType } from './brew-ownership'
 import { isPgUniqueViolation } from './pg-error'
 import { isSealed, sealBrew, sealBrewPage, sealBrews } from './shelf'
 import type { Sealable, SealableBrew, Shelf } from './shelf'
@@ -176,8 +176,9 @@ async function deviceNameFor(
   brewingDeviceId: string,
   userId: string,
 ): Promise<string | null> {
+  // The same device the user's reads show; see ownGear.
   const device = await db.query.brewingDevices.findFirst({
-    where: { id: brewingDeviceId, userId },
+    where: { id: brewingDeviceId, userId, type: visibleDeviceType(userId) },
   })
   return device?.name ?? null
 }
@@ -290,6 +291,13 @@ export async function getDialedInBrews(
 
   const deviceName = await deviceNameFor(key.brewingDeviceId, userId)
   if (!deviceName) {
+    // A device of the user's hidden by another user's private type is left
+    // its marks: re-typing it shows them again.
+    const owned = await db.query.brewingDevices.findFirst({
+      columns: { id: true },
+      where: { id: key.brewingDeviceId, userId },
+    })
+    if (owned) return []
     await db
       .delete(dialedInBrews)
       .where(

@@ -589,6 +589,25 @@ describe('espressoShot.create', () => {
   })
 })
 
+// Polls until the create's stamp waits on the held lock. A create that
+// settles first fails the test with its own outcome, at once.
+async function untilStampWaits(
+  creating: Promise<unknown>,
+  waiting: () => Promise<boolean>,
+) {
+  let settled: { error: unknown } | undefined
+  creating.then(
+    () => (settled = { error: new Error('Create finished without waiting') }),
+    (error: unknown) => (settled = { error }),
+  )
+  const deadline = Date.now() + 5_000
+  while (!(await waiting())) {
+    if (settled) throw settled.error
+    if (Date.now() > deadline) throw new Error('Stamp never waited')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}
+
 describe('stamping before a create', () => {
   it('does not Seal a shot another request saves after the Shelf was read', async () => {
     const typeId = await types.findOrCreate(ESPRESSO_DEVICE_TYPE)
@@ -627,19 +646,16 @@ describe('stamping before a create', () => {
       await other.query('begin')
       await other.query('lock table espresso_shots in exclusive mode')
       creating = asRace.espressoShot.create(shot(latest))
-      const deadline = Date.now() + 5_000
-      for (;;) {
-        // The stamp's UPDATE: the create's INSERT would wait on this lock too.
+      // The stamp's UPDATE: the create's INSERT would wait on this lock too.
+      await untilStampWaits(creating, async () => {
         const waiting = await db.$client.query<{ n: number }>(
           `select count(*)::int as n
            from pg_locks l join pg_stat_activity a using (pid)
            where l.relation = 'espresso_shots'::regclass and not l.granted
              and a.query ilike 'update "espresso_shots"%'`,
         )
-        if (waiting.rows[0].n > 0) break
-        if (Date.now() > deadline) throw new Error('Stamp never waited')
-        await new Promise((resolve) => setTimeout(resolve, 20))
-      }
+        return waiting.rows[0].n > 0
+      })
       const saved = await other.query<{ id: string }>(
         `insert into espresso_shots
            (user_id, coffee_id, grinder_id, brewing_device_id, dose, yield)
@@ -718,18 +734,15 @@ describe('stamping before a create', () => {
         uniqRetry('Newest'),
       ])
       creating = asRetry.espressoShot.create(shot(latest))
-      const deadline = Date.now() + 5_000
-      for (;;) {
+      await untilStampWaits(creating, async () => {
         const waiting = await db.$client.query<{ n: number }>(
           `select count(*)::int as n from pg_locks
            where locktype = 'transactionid' and not granted
              and transactionid::text = $1`,
           [xid.rows[0].xid],
         )
-        if (waiting.rows[0].n > 0) break
-        if (Date.now() > deadline) throw new Error('Stamp never waited')
-        await new Promise((resolve) => setTimeout(resolve, 20))
-      }
+        return waiting.rows[0].n > 0
+      })
       await other.query('commit')
       await creating
 

@@ -278,4 +278,52 @@ describe('espressoShot', () => {
     expect(listed).not.toContain(legacy.id)
     expect(listed).toContain(control.id)
   })
+
+  it('leaves a legacy device with another user’s private type out of Dialed In', async () => {
+    const espressoType = await deviceType(ESPRESSO_DEVICE_TYPE)
+    const theirType = await asOther.brewingDeviceType.create({
+      name: uniqOther('Their dialed type'),
+    })
+    const legacy = await asOwner.brewingDevice.create({
+      name: uniq('Legacy dialed espresso'),
+      brand: 'Brand',
+      typeId: espressoType,
+    })
+    const shot = await asOwner.espressoShot.create({
+      ...own,
+      brewingDeviceId: legacy.id,
+      grindSetting: '1.5',
+      dose: '18',
+      yield: '36',
+      time: 30,
+      idempotencyKey: crypto.randomUUID(),
+    })
+    await asOwner.dialedInBrew.set({
+      brewingMethod: 'espresso',
+      brewingDeviceId: legacy.id,
+      brewId: shot.id,
+    })
+    // Only a device written before writes checked the type can do this.
+    await db
+      .update(brewingDevices)
+      .set({ typeId: theirType.id })
+      .where(eq(brewingDevices.id, legacy.id))
+
+    const key = {
+      coffeeId: own.coffeeId,
+      brewingMethod: 'espresso' as const,
+      brewingDeviceId: legacy.id,
+    }
+    const views = await asOwner.dialedInBrew.get(key)
+    expect(views.map((view) => view.deviceName)).not.toContain(legacy.name)
+
+    // Hidden, not gone: once the owner gives it a visible type again, the
+    // mark is still there.
+    await db
+      .update(brewingDevices)
+      .set({ typeId: espressoType })
+      .where(eq(brewingDevices.id, legacy.id))
+    const repaired = await asOwner.dialedInBrew.get(key)
+    expect(repaired.map((view) => view.brewId)).toEqual([shot.id])
+  })
 })
