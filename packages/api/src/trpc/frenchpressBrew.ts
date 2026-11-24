@@ -14,7 +14,7 @@ import {
   sealBrewWithDialedIn,
   sealBrewsWithDialedIn,
 } from '../lib/dialed-in-brew'
-import { isSealed, stampFallenBrews } from '../lib/shelf'
+import { sealedNow, withStampedShelf } from '../lib/shelf'
 import {
   assertOwnCoffeeAndGrinder,
   onOwnCoffee,
@@ -159,12 +159,12 @@ export const frenchpressBrewRouter = createTRPCRouter({
       await assertOwnCoffeeAndGrinder(input, ctx.session.user.id)
       await assertFrenchPressMethod(input.methodId, ctx.session.user.id)
 
-      await stampFallenBrews(ctx.session.user.id, ctx.plan)
-
-      const [brew] = await db
-        .insert(frenchpressBrews)
-        .values({ ...input, userId: ctx.session.user.id })
-        .returning()
+      const [brew] = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
+        tx
+          .insert(frenchpressBrews)
+          .values({ ...input, userId: ctx.session.user.id })
+          .returning(),
+      )
       return brew
     }),
 
@@ -173,31 +173,39 @@ export const frenchpressBrewRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
 
-      // A Sealed Brew reaches the form with its settings withheld, so saving it
-      // would write those blanks over what is stored.
-      const existing = await db.query.frenchpressBrews.findFirst({
-        where: { id, userId: ctx.session.user.id },
-      })
-      if (existing && isSealed(existing, await ctx.shelf())) {
+      await assertFrenchPressDevice(data.brewingDeviceId, ctx.session.user.id)
+      await assertOwnCoffeeAndGrinder(data, ctx.session.user.id)
+      await assertFrenchPressMethod(data.methodId, ctx.session.user.id)
+
+      // Every edit stamps, not only a move, so a stale read of the Brew's
+      // Coffee cannot skip the stamp (ADR-0004). A Sealed Brew reaches the
+      // form with its settings withheld, so saving it would write those blanks
+      // over what is stored; it is refused under the lock, since a write
+      // queued ahead of this one can Seal it, and by returning rather than
+      // throwing, so the stamps commit.
+      const updated = await withStampedShelf(
+        ctx.session.user.id,
+        ctx.plan,
+        async (tx, shelf) =>
+          (await sealedNow(tx, frenchpressBrews, id, ctx.session.user.id, shelf))
+            ? null
+            : tx
+                .update(frenchpressBrews)
+                .set(data)
+                .where(
+                  and(
+                    eq(frenchpressBrews.id, id),
+                    eq(frenchpressBrews.userId, ctx.session.user.id),
+                  ),
+                )
+                .returning(),
+      )
+      if (updated === null) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'This Brew is Sealed. Subscribe to read and edit it again.',
         })
       }
-      await assertFrenchPressDevice(data.brewingDeviceId, ctx.session.user.id)
-      await assertOwnCoffeeAndGrinder(data, ctx.session.user.id)
-      await assertFrenchPressMethod(data.methodId, ctx.session.user.id)
-
-      const updated = await db
-        .update(frenchpressBrews)
-        .set(data)
-        .where(
-          and(
-            eq(frenchpressBrews.id, id),
-            eq(frenchpressBrews.userId, ctx.session.user.id),
-          ),
-        )
-        .returning()
       if (updated.length === 0) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
       }
@@ -205,17 +213,17 @@ export const frenchpressBrewRouter = createTRPCRouter({
     }),
 
   delete: authedProcedure.input(z.uuid()).mutation(async ({ ctx, input }) => {
-    await stampFallenBrews(ctx.session.user.id, ctx.plan)
-
-    const deleted = await db
-      .delete(frenchpressBrews)
-      .where(
-        and(
-          eq(frenchpressBrews.id, input),
-          eq(frenchpressBrews.userId, ctx.session.user.id),
-        ),
-      )
-      .returning()
+    const deleted = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
+      tx
+        .delete(frenchpressBrews)
+        .where(
+          and(
+            eq(frenchpressBrews.id, input),
+            eq(frenchpressBrews.userId, ctx.session.user.id),
+          ),
+        )
+        .returning({ id: frenchpressBrews.id }),
+    )
     if (deleted.length === 0) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Brew not found' })
     }

@@ -14,6 +14,7 @@ import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAppForm } from '@/hooks/form'
+import { useMounted } from '@/hooks/use-mounted'
 import { useBrewingDeviceSelect } from '@/hooks/use-brewing-device-select'
 import { useSearchSelectResource } from '@/hooks/use-search-select-resource'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
@@ -39,6 +40,9 @@ export const Route = createFileRoute('/_authenticated/pourover/$brewId/edit')({
       context.trpc.brewingDevice.list.queryOptions(),
     )
   },
+  // Another brew's edit is a new form, so a save on this one cannot
+  // redirect away from it.
+  remountDeps: ({ params }) => params,
   component: EditPouroverBrew,
 })
 
@@ -76,6 +80,9 @@ function EditPouroverBrew() {
   // server-side in pouroverBrew.update).
   const brewingDevice = useBrewingDeviceSelect(POUR_OVER_DEVICE_TYPE)
 
+  // A save that settles after the user left the form must not navigate.
+  const mounted = useMounted()
+
   const updateBrew = useMutation(
     trpc.pouroverBrew.update.mutationOptions({
       onSuccess: () => {
@@ -84,7 +91,7 @@ function EditPouroverBrew() {
           trpc.pouroverBrew.getById.queryOptions(brewId),
         )
         invalidateDeviceDialedInQueries(queryClient, trpc)
-        navigate(brewsLogLocation('pourover'))
+        if (mounted.current) navigate(brewsLogLocation('pourover'))
       },
     }),
   )

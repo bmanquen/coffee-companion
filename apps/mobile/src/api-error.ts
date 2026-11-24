@@ -21,3 +21,10 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
   }
   return error.message
 }
+
+// The API answers a refusal with a tRPC code before it saves anything; a lost
+// response, or a server error, may have come after the save committed.
+export function mayHaveCommitted(error: unknown): boolean {
+  const code = (error as TrpcShapedError | null)?.data?.code
+  return typeof code !== 'string' || code === 'INTERNAL_SERVER_ERROR'
+}

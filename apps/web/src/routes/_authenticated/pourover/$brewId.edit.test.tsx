@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -185,6 +186,56 @@ describe('EditPouroverBrew form', () => {
           search: { method: 'pourover' },
         }),
       )
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('starts a new form for another brew id', () => {
+    // TanStack Form keeps its first defaultValues, so reusing this form for
+    // another brew would show the old brew's values and save them over it.
+    const deps = (brewId: string) =>
+      JSON.stringify(
+        Route.options.remountDeps?.({ params: { brewId } } as never),
+      )
+    expect(deps('a')).not.toBe(deps('b'))
+  })
+
+  it('does not go to Brews when the update lands after the form closed', async () => {
+    mocks.navigate.mockClear()
+    let answer: (response: Response) => void = () => {}
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve
+        }),
+    )
+    try {
+      const { queryClient, Wrapper } = seeded()
+      const { unmount } = render(<EditPouroverBrew />, { wrapper: Wrapper })
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await waitFor(() =>
+        expect(
+          fetchSpy.mock.calls.some(([url]) =>
+            String(url).includes('pouroverBrew.update'),
+          ),
+        ).toBe(true),
+      )
+
+      unmount()
+      await act(async () => {
+        answer(trpcSuccess())
+      })
+      // onSuccess has run once the mutation reads as succeeded.
+      await waitFor(() =>
+        expect(
+          queryClient
+            .getMutationCache()
+            .getAll()
+            .map((mutation) => mutation.state.status),
+        ).toContain('success'),
+      )
+      expect(mocks.navigate).not.toHaveBeenCalled()
     } finally {
       fetchSpy.mockRestore()
     }

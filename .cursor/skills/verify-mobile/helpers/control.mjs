@@ -1424,8 +1424,16 @@ function driveDeviceReversePorts(state = {}) {
   ]
 }
 
-function ensureAdbReverses(serial, ports, reverse = adbReverse) {
-  for (const port of ports) reverse(serial, port)
+// Records each port once its reverse succeeds, so cleanup removes only
+// mappings this run wrote: a failed reverse may have left the developer's.
+function addAdbReverses(record, ports, persist, reverse = adbReverse) {
+  for (const port of ports) {
+    reverse(record.serial, port)
+    if (!record.reversedPorts?.includes(port)) {
+      record.reversedPorts = [...(record.reversedPorts ?? []), port]
+      persist(record)
+    }
+  }
 }
 
 // Gboard's first text-keyboard focus opens a stylus handwriting sheet on
@@ -1574,7 +1582,7 @@ function releaseRecordedDevice(
     avdProblem = () =>
       recordedAvdProblem(state.serial, state.avdName ?? chosenAvdName()),
     uninstall = () => uninstallPackage(state.serial, state.androidPackage),
-    clearReverses = () => adbClearReverses(state.serial),
+    clearReverses = () => adbRemoveReverses(state.serial, state.reversedPorts),
     restoreStylus = () =>
       restoreStylusHandwriting(state.serial, state.stylusHandwritingBefore),
   } = {},
@@ -3092,10 +3100,14 @@ function adbReverse(serial, port) {
   }
 }
 
-function adbClearReverses(serial) {
-  runCapture(adbBin(), ['-s', serial, 'reverse', '--remove-all'], {
-    allowFail: true,
-  })
+// Only the mappings this run added: an attached emulator can hold the
+// developer's own reverses.
+function adbRemoveReverses(serial, ports = []) {
+  for (const port of ports) {
+    runCapture(adbBin(), ['-s', serial, 'reverse', '--remove', `tcp:${port}`], {
+      allowFail: true,
+    })
+  }
 }
 
 function adbReverseList(serial) {
@@ -3359,8 +3371,21 @@ function launchPartial({ avdName, attachedEmulator, keptStylus }) {
     webPid: null,
     expoPid: null,
     ownedPackage: !attachedEmulator,
+    // Overwrites an earlier run's ports: none of this run's are written yet.
+    reversedPorts: [],
     // A kept value also holds when this run boots that AVD again.
     stylusHandwritingBefore: keptStylus ?? undefined,
+  }
+}
+
+// What a failed launch keeps once teardown removed its reverses: a later
+// cleanup must not remove mappings the developer adds on those ports, nor
+// write a stylus value that is already back. A failed restore keeps its value.
+function releasedLaunchState(state, stylusRestored) {
+  return {
+    ...state,
+    reversedPorts: undefined,
+    ...(stylusRestored ? { stylusHandwritingBefore: undefined } : {}),
   }
 }
 
@@ -3415,12 +3440,17 @@ async function stopLaunchDevice(
   // only when ownedPackage is not false.
   let foreignAvd = null
   let released = false
+  let reversesCleared = false
   if (plan.clearReverses) {
     try {
       foreignAvd = releaseRecordedDevice(partial, {
         uninstallOwned: false,
         avdProblem,
-        clearReverses,
+        clearReverses: () => {
+          if (clearReverses) clearReverses()
+          else adbRemoveReverses(partial.serial, partial.reversedPorts)
+          reversesCleared = true
+        },
         restoreStylus,
       })
       released = foreignAvd == null
@@ -3435,8 +3465,8 @@ async function stopLaunchDevice(
   })
   if (partial.webPid) stopRecordedPid(partial.webPid, 'web', stopped)
   restoreEnv()
-  // True once the recorded device's setting is back, so the record can go.
-  return released
+  // released: the recorded device's setting is back, so that record can go.
+  return { released, reversesCleared }
 }
 
 async function cmdLaunchDevice(opts = {}) {
@@ -3703,8 +3733,7 @@ async function cmdLaunchDevice(opts = {}) {
     if (avdProblem) {
       throw new Error(`Not changing ${DEVICE_SERIAL}: ${avdProblem}`)
     }
-    adbReverse(DEVICE_SERIAL, metroPort)
-    adbReverse(DEVICE_SERIAL, webPort)
+    addAdbReverses(partial, [metroPort, webPort], persistLaunchPartial)
     if (attachedEmulator) {
       // A record a failed cleanup kept is the value from before any run
       // changed it; the setting may still read 0 from that run.
@@ -3725,6 +3754,7 @@ async function cmdLaunchDevice(opts = {}) {
       attachedEmulator,
       ownedPackage: partial.ownedPackage,
       stylusHandwritingBefore: partial.stylusHandwritingBefore,
+      reversedPorts: partial.reversedPorts,
       androidPackage: ANDROID_PACKAGE,
       emulatorPid,
       metroPid: metro.metroPid,
@@ -3788,10 +3818,12 @@ async function cmdLaunchDevice(opts = {}) {
       ),
     )
   } catch (error) {
-    if (await stopLaunchDevice(partial)) {
-      // Restored: a later cleanup must not write that old value again.
+    const teardown = await stopLaunchDevice(partial)
+    if (teardown.reversesCleared) {
       const recorded = readState()
-      if (recorded) writeState({ ...recorded, stylusHandwritingBefore: undefined })
+      if (recorded) {
+        writeState(releasedLaunchState(recorded, teardown.released))
+      }
     }
     die(error.message, error.exitCode)
   }
@@ -3849,7 +3881,7 @@ async function cmdDriveDevice(flow) {
       EXIT_NOT_DRIVABLE,
     )
   }
-  ensureAdbReverses(state.serial, driveDeviceReversePorts(state))
+  addAdbReverses(state, driveDeviceReversePorts(state), writeState)
   // The readiness check needs handwriting off, so it is written first. A
   // failed launch's teardown put the setting back and dropped its record, so
   // read it again before the write, or cleanup could not undo it.
@@ -4816,7 +4848,7 @@ export {
   quoteForAdbShell,
   adbReverseArgs,
   driveDeviceReversePorts,
-  ensureAdbReverses,
+  addAdbReverses,
   STYLUS_HANDWRITING_SETTING,
   stylusHandwritingProblem,
   ensureStylusHandwritingOff,
@@ -4827,6 +4859,7 @@ export {
   releaseRecordedDevice,
   stopRecordedEmulator,
   stylusRestoreRecord,
+  releasedLaunchState,
   stylusRestoreOwed,
   keptStylusBaseline,
   launchPartial,
