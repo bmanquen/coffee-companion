@@ -469,4 +469,24 @@ describe.each(methods)('%s writes', (method) => {
       asUser[method].update({ ...filledIn, id: sealedId(method) } as never),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
+
+  // createdAt ranks the Shelf and sealedAt Seals a Brew, so a client must
+  // not be able to set either.
+  it('ignores client-sent timestamps', async () => {
+    const before = await asUser[method].getById(readableId(method))
+    const forged = new Date('2099-01-01T00:00:00Z')
+
+    await asUser[method].update({
+      ...before,
+      createdAt: forged,
+      updatedAt: forged,
+      sealedAt: forged,
+    } as never)
+
+    const after = await asUser[method].getById(readableId(method))
+    expect(after.createdAt).toEqual(before.createdAt)
+    expect(after.updatedAt.getTime()).toBeLessThan(forged.getTime())
+    expect(after.sealedAt).toBeNull()
+    expect(after.sealed).toBe(false)
+  })
 })
