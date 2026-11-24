@@ -6,7 +6,7 @@ import { grinders } from '../db/schema'
 import { insertGrinderSchema } from '../db/zod'
 import { assertRoomForAnother } from '../lib/allowance'
 import { isPgUniqueViolation } from '../lib/pg-error'
-import { countBrewsUsing, stampFallenBrews } from '../lib/shelf'
+import { countBrewsUsing, withStampedShelf } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
 
 function rethrowUniqueGrinderConflict(err: unknown): never {
@@ -92,14 +92,14 @@ export const grinderRouter = createTRPCRouter({
     .input(z.uuid())
     .mutation(async ({ ctx, input }) => {
       // Its Brews go with it, which can promote a fallen Coffee (ADR-0004).
-      await stampFallenBrews(ctx.session.user.id, ctx.plan)
-
-      const deleted = await db
-        .delete(grinders)
-        .where(
-          and(eq(grinders.id, input), eq(grinders.userId, ctx.session.user.id)),
-        )
-        .returning()
+      const deleted = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
+        tx
+          .delete(grinders)
+          .where(
+            and(eq(grinders.id, input), eq(grinders.userId, ctx.session.user.id)),
+          )
+          .returning(),
+      )
       if (deleted.length === 0) {
         throw new TRPCError({
           code: 'NOT_FOUND',

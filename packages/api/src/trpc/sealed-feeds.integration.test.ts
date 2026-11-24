@@ -489,4 +489,10 @@ describe.each(methods)('%s writes', (method) => {
     expect(after.sealedAt).toBeNull()
     expect(after.sealed).toBe(false)
   })
+
+  // Last, since it removes the Sealed fixture.
+  it('returns only the id when deleting a Sealed brew', async () => {
+    const id = sealedId(method)
+    expect(await asUser[method].delete(id)).toEqual({ id })
+  })
 })
