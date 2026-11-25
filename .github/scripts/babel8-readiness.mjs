@@ -38,6 +38,7 @@ npm(
   'babel7@npm:@babel/core@7',
   'babel8@npm:@babel/core@8',
   'babel-plugin-react-compiler@latest',
+  'semver@7',
 )
 const scratchRequire = createRequire(join(scratch, 'package.json'))
 const compiler = scratchRequire.resolve('babel-plugin-react-compiler')
@@ -105,7 +106,8 @@ const sdk = createRequire(join(process.cwd(), 'apps/mobile/package.json'))(
 const versions = [].concat(
   JSON.parse(npm('view', `babel-preset-expo@^${sdk}`, 'version', '--json')),
 )
-const latestPreset = versions.at(-1)
+// npm lists versions in registry order, not semver order.
+const latestPreset = scratchRequire('semver').maxSatisfying(versions, `^${sdk}`)
 const deps = JSON.parse(
   npm('view', `babel-preset-expo@${latestPreset}`, 'dependencies', '--json'),
 )
