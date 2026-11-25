@@ -26,6 +26,10 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: "react-dom"
         update-types: [version-update:semver-major]
+      # React Compiler 1.0.0 skips components with destructured prop defaults under Babel 8
+      # (react#36868), and babel-preset-expo 58 needs Babel 7. Drop once both support 8.
+      - dependency-name: "@babel/core"
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
