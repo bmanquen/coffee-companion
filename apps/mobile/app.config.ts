@@ -51,6 +51,7 @@ const plugins: NonNullable<ExpoConfig['plugins']> = [
   'expo-apple-authentication',
   ['expo-dev-client', DEV_CLIENT_PLUGIN_CONFIG],
   'expo-web-browser',
+  'expo-status-bar',
 ]
 if (googleIosUrlScheme) {
   plugins.push([

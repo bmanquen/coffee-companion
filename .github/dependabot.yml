@@ -26,11 +26,6 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: "react-dom"
         update-types: [version-update:semver-major]
-      # jest-expo 57 is built on Jest 29; Jest 30 comes with jest-expo 58 (Expo SDK 58). Drop these then.
-      - dependency-name: "jest"
-        update-types: [version-update:semver-major]
-      - dependency-name: "@types/jest"
-        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /

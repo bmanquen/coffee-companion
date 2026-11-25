@@ -86,7 +86,7 @@ export function ShotList({
           <View accessibilityLabel={LOADING_SHOTS}>
             <ActivityIndicator />
           </View>
-        ) : failed && rows.length === 0 ? null : (
+        ) : failed && rows.length === 0 ? undefined : (
           <Text>{EMPTY_SHOTS}</Text>
         )
       }
@@ -113,7 +113,7 @@ export function ShotList({
           >
             <Text>{LOAD_MORE_SHOTS}</Text>
           </Pressable>
-        ) : null
+        ) : undefined
       }
       renderItem={({ item }) => (
         <View
