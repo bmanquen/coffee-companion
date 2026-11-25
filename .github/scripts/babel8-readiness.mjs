@@ -4,7 +4,7 @@
 //     defaults under Babel 8 (react#36868). Ready when the latest compiler
 //     compiles exactly as many functions in apps/web/src on Babel 8 as on 7.
 //  2. babel-preset-expo is built on Babel 7 plugins. Ready when the latest
-//     preset for our Expo SDK depends on no Babel 7 package.
+//     preset our installed expo accepts depends on no Babel 7 package.
 // Writes ready=true|false to $GITHUB_OUTPUT and a summary to $GITHUB_STEP_SUMMARY.
 import { execFileSync } from 'node:child_process'
 import {
@@ -99,15 +99,21 @@ const b8 = await compiled('babel8')
 const compilerReady = b7.count > 0 && b8.count === b7.count
 const newReasons = [...b8.skipped].filter((reason) => !b7.skipped.has(reason))
 
-// 2. Expo: the newest babel-preset-expo in the SDK we're on.
-const sdk = createRequire(join(process.cwd(), 'apps/mobile/package.json'))(
+// 2. Expo: the newest babel-preset-expo our installed expo accepts.
+const expo = createRequire(join(process.cwd(), 'apps/mobile/package.json'))(
   'expo/package.json',
-).version.split('.')[0]
+)
+const presetRange = expo.dependencies['babel-preset-expo']
 const versions = [].concat(
-  JSON.parse(npm('view', `babel-preset-expo@^${sdk}`, 'version', '--json')),
+  JSON.parse(
+    npm('view', `babel-preset-expo@${presetRange}`, 'version', '--json'),
+  ),
 )
 // npm lists versions in registry order, not semver order.
-const latestPreset = scratchRequire('semver').maxSatisfying(versions, `^${sdk}`)
+const latestPreset = scratchRequire('semver').maxSatisfying(
+  versions,
+  presetRange,
+)
 const deps = JSON.parse(
   npm('view', `babel-preset-expo@${latestPreset}`, 'dependencies', '--json'),
 )
@@ -122,7 +128,7 @@ const summary = [
   '',
   `- React Compiler ${compilerVersion}: ${b8.count} functions compiled on Babel ${b8.version} vs ${b7.count} on ${b7.version} (${files.length} files) - ${compilerReady ? 'ready' : 'not ready'}`,
   ...newReasons.map((reason) => `  - skipped only under Babel 8: ${reason}`),
-  `- babel-preset-expo ${latestPreset} (SDK ${sdk}): ${expoReady ? 'no Babel 7 dependencies - ready' : `${babel7Deps.length} Babel 7 dependencies, e.g. ${babel7Deps[0].join('@')} - not ready`}`,
+  `- babel-preset-expo ${latestPreset} (expo ${expo.version} accepts ${presetRange}): ${expoReady ? 'no Babel 7 dependencies - ready' : `${babel7Deps.length} Babel 7 dependencies, e.g. ${babel7Deps[0].join('@')} - not ready`}`,
 ].join('\n')
 console.log(summary)
 if (process.env.GITHUB_STEP_SUMMARY)
