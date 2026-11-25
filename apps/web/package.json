@@ -34,10 +34,10 @@
     "@tanstack/react-form-start": "^1.33.5",
     "@tanstack/react-query": "^5.107.1",
     "@tanstack/react-query-devtools": "^5.107.1",
-    "@tanstack/react-router": "1.170.42",
+    "@tanstack/react-router": "1.170.46",
     "@tanstack/react-router-devtools": "^1.167.3",
     "@tanstack/react-router-ssr-query": "^1.167.3",
-    "@tanstack/react-start": "~1.168.61",
+    "@tanstack/react-start": "~1.169.7",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/router-plugin": "^1.169.0",
     "@trpc/client": "^11.28.2",
@@ -65,8 +65,10 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.13",
     "@playwright/test": "^1.65.0",
     "@resvg/resvg-js": "^2.6.2",
+    "@rolldown/plugin-babel": "^0.3.1",
     "@tanstack/devtools-vite": "^0.8.7",
     "@tanstack/eslint-config": "^0.5.0",
     "@testing-library/dom": "^10.4.2",
@@ -74,7 +76,7 @@
     "@types/node": "^25.0.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^5.1.2",
+    "@vitejs/plugin-react": "^6.3.0",
     "@vitest/coverage-v8": "^4.1.9",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^10.14.0",
@@ -83,7 +85,7 @@
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vite": "^7.3.7",
+    "vite": "^8.3.8",
     "vitest": "^4.1.11"
   }
 }

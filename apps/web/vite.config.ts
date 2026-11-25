@@ -2,7 +2,8 @@ import { defineConfig } from 'vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import { sentryTanstackStart } from '@sentry/tanstackstart-react/vite'
-import viteReact from '@vitejs/plugin-react'
+import viteReact, { reactCompilerPreset } from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
@@ -52,11 +53,9 @@ const config = defineConfig({
     tanstackStart({
       router: { routeFileIgnorePattern: '\\.test\\.tsx?$' },
     }),
-    viteReact({
-      babel: {
-        plugins: ['babel-plugin-react-compiler'],
-      },
-    }),
+    viteReact(),
+    // plugin-react 6 dropped its babel option; the compiler runs through Rolldown's Babel plugin.
+    babel({ presets: [reactCompilerPreset()] }),
     ...sentrySourceMaps(),
   ],
 })
