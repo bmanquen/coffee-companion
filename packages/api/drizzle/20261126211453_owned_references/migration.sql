@@ -101,6 +101,14 @@ BEGIN
 		('dialed_in_brews', 'coffee_id', 'coffees', NULL, NULL),
 		('dialed_in_brews', 'brewing_device_id', 'brewing_devices', NULL, NULL);
 
+	-- Hold off writers from the count until this transaction commits, so no
+	-- row can slip in between the count and the triggers.
+	FOR tbl IN
+		SELECT DISTINCT t FROM owned_references, unnest(ARRAY[owned_references.tbl, target]) AS t ORDER BY t
+	LOOP
+		EXECUTE format('LOCK TABLE %I IN SHARE MODE', tbl);
+	END LOOP;
+
 	-- Rows that already break the rule have no safe automatic fix (a Coffee's
 	-- roaster is required), so stop and report them instead.
 	FOR ref IN SELECT * FROM owned_references LOOP
