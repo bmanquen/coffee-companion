@@ -16,6 +16,7 @@ import {
   createCoffeeFor,
   seedUsers,
   uniqFor,
+  writeLegacy,
 } from '../../test/trpc'
 
 const USER_A = 'coffee-user-a'
@@ -118,21 +119,30 @@ describe('coffee.create', () => {
       createCoffee(uniq('Stolen process'), {
         origins: [{ countryId: country.id, processId: hidden.id }],
       }),
-    ).rejects.toThrow(/process not found/i)
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Process not found',
+    })
   })
 
   it('rejects another user’s private roaster', async () => {
     const hidden = await asB.roaster.create({ name: uniq('Secret roaster') })
     await expect(
       createCoffee(uniq('Stolen roaster'), { roasterId: hidden.id }),
-    ).rejects.toThrow(/roaster not found/i)
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Roaster not found',
+    })
   })
 
   it('rejects another user’s private roast level', async () => {
     const hidden = await asB.roastLevel.create({ name: uniq('Secret level') })
     await expect(
       createCoffee(uniq('Stolen level'), { roastLevelId: hidden.id }),
-    ).rejects.toThrow(/roast level not found/i)
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Roast level not found',
+    })
   })
 
   it('lists a legacy coffee without another user’s private roaster or level', async () => {
@@ -142,10 +152,12 @@ describe('coffee.create', () => {
       asB.roastLevel.create({ name: uniq('Secret level') }),
     ])
     // Only a row written before the coffee router checked lookups can do this.
-    await db
-      .update(coffees)
-      .set({ roasterId: roaster.id, roastLevelId: level.id })
-      .where(eq(coffees.id, coffee.id))
+    await writeLegacy((tx) =>
+      tx
+        .update(coffees)
+        .set({ roasterId: roaster.id, roastLevelId: level.id })
+        .where(eq(coffees.id, coffee.id)),
+    )
 
     // A shared (userId null) level does not cascade with the test users.
     const [shared] = await db
@@ -241,7 +253,10 @@ describe('coffee.create', () => {
       createCoffee(uniq('Stolen origin'), {
         origins: [{ countryId: hidden.id }],
       }),
-    ).rejects.toThrow(/country not found/i)
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Country not found',
+    })
   })
 
   it('rejects another user’s private region', async () => {
@@ -255,7 +270,10 @@ describe('coffee.create', () => {
       createCoffee(uniq('Stolen region'), {
         origins: [{ countryId: country.id, regionId: hiddenRegion.id }],
       }),
-    ).rejects.toThrow(/region not found/i)
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Region not found',
+    })
   })
 
   it('rejects a region that belongs to a different country', async () => {
@@ -375,7 +393,10 @@ describe('coffee.update', () => {
         roasterId: hidden.id,
         roastLevelId: created.roastLevelId!,
       }),
-    ).rejects.toThrow(/roaster not found/i)
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Roaster not found',
+    })
   })
 
   it('keeps stored origins when origins are omitted', async () => {
@@ -522,13 +543,15 @@ describe('brewCount for coffee, grinder and brewing device', () => {
       grinderId,
       brewingDeviceId: espressoDeviceId,
     }
-    await db.insert(espressoShots).values([
-      { ...gear, userId: USER_A },
-      { ...gear, userId: USER_A },
-      // Another user's row on A's gear: deleting A's coffee cascades to it, but
-      // A must never learn it exists.
-      { ...gear, userId: USER_B },
-    ])
+    await writeLegacy((tx) =>
+      tx.insert(espressoShots).values([
+        { ...gear, userId: USER_A },
+        { ...gear, userId: USER_A },
+        // Another user's row on A's gear: deleting A's coffee cascades to it, but
+        // A must never learn it exists.
+        { ...gear, userId: USER_B },
+      ]),
+    )
     await db.insert(coldBrewBrews).values({ ...gear, userId: USER_A })
 
     expect(await counts()).toEqual([3, grinderBefore + 3, deviceBefore + 3])

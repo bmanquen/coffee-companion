@@ -329,36 +329,21 @@ async function loadRecentPage(
   )
 }
 
-// Every reference must be the user's own, and the device an Espresso one.
+// The device must be the user's own and an Espresso one. The database refuses
+// another user's Coffee or grinder.
 async function assertOwnEspressoGear(
-  input: { coffeeId: string; grinderId: string; brewingDeviceId: string },
+  input: { brewingDeviceId: string },
   userId: string,
 ) {
-  const [coffee, grinder, device] = await Promise.all([
-    db.query.coffees.findFirst({
-      where: { id: input.coffeeId, userId },
-      columns: { id: true },
-    }),
-    db.query.grinders.findFirst({
-      where: { id: input.grinderId, userId },
-      columns: { id: true },
-    }),
-    // Only a device the user can list, as ownGear reads it back.
-    db.query.brewingDevices.findFirst({
-      where: {
-        id: input.brewingDeviceId,
-        userId,
-        type: visibleDeviceType(userId),
-      },
-      with: { type: true },
-    }),
-  ])
-  if (!coffee) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
-  }
-  if (!grinder) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Grinder not found' })
-  }
+  // Only a device the user can list, as ownGear reads it back.
+  const device = await db.query.brewingDevices.findFirst({
+    where: {
+      id: input.brewingDeviceId,
+      userId,
+      type: visibleDeviceType(userId),
+    },
+    with: { type: true },
+  })
   if (!device) {
     throw new TRPCError({
       code: 'NOT_FOUND',

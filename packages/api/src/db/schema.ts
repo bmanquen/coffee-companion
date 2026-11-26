@@ -2,6 +2,7 @@ import {
 
   boolean,
   date,
+  foreignKey,
   index,
   integer,
   numeric,
@@ -133,6 +134,7 @@ export const coffees = pgTable(
       table.roasterId,
       table.name,
     ),
+    unique('coffees_id_user_id_key').on(table.id, table.userId),
   ],
 )
 
@@ -222,6 +224,7 @@ export const grinders = pgTable(
   (table) => [
     index().on(table.userId),
     uniqueIndex().on(table.name, table.userId),
+    unique('grinders_id_user_id_key').on(table.id, table.userId),
   ],
 )
 
@@ -248,6 +251,7 @@ export const brewingDevices = pgTable(
   (table) => [
     index().on(table.userId),
     uniqueIndex().on(table.name, table.userId),
+    unique('brewing_devices_id_user_id_key').on(table.id, table.userId),
   ],
 )
 
@@ -259,22 +263,51 @@ const brewBase = {
   userId: text('user_id')
     .references(() => user.id, { onDelete: 'cascade' })
     .notNull(),
-  coffeeId: uuid('coffee_id')
-    .references(() => coffees.id, { onDelete: 'cascade' })
-    .notNull(),
+  // Foreign keys in ownedBy(), paired with user_id.
+  coffeeId: uuid('coffee_id').notNull(),
   roastDate: date('roast_date', { mode: 'string' }),
-  grinderId: uuid('grinder_id')
-    .references(() => grinders.id, { onDelete: 'cascade' })
-    .notNull(),
-  brewingDeviceId: uuid('brewing_device_id')
-    .references(() => brewingDevices.id, { onDelete: 'cascade' })
-    .notNull(),
+  grinderId: uuid('grinder_id').notNull(),
+  brewingDeviceId: uuid('brewing_device_id').notNull(),
   grindSetting: text('grind_setting'),
   notes: text(),
   // Timezone-aware for the same reason plan_grants.expires_at is: the app
   // writes it and compares it against now().
   sealedAt: timestamp('sealed_at', { withTimezone: true }),
   ...timestamps,
+}
+
+// Each key includes user_id, so a row can only point at its own owner's
+// Coffee, grinder or brewing device, which are never shared.
+function ownedBy(
+  name: string,
+  table: {
+    userId: PgColumn
+    coffeeId: PgColumn
+    brewingDeviceId: PgColumn
+    grinderId?: PgColumn
+  },
+) {
+  return [
+    foreignKey({
+      name: `${name}_coffee_owner_fk`,
+      columns: [table.coffeeId, table.userId],
+      foreignColumns: [coffees.id, coffees.userId],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: `${name}_brewing_device_owner_fk`,
+      columns: [table.brewingDeviceId, table.userId],
+      foreignColumns: [brewingDevices.id, brewingDevices.userId],
+    }).onDelete('cascade'),
+    ...(table.grinderId
+      ? [
+          foreignKey({
+            name: `${name}_grinder_owner_fk`,
+            columns: [table.grinderId, table.userId],
+            foreignColumns: [grinders.id, grinders.userId],
+          }).onDelete('cascade'),
+        ]
+      : []),
+  ]
 }
 
 export const espressoShots = pgTable(
@@ -286,6 +319,7 @@ export const espressoShots = pgTable(
     time: integer(),
   },
   (table) => [
+    ...ownedBy('espresso_shots', table),
     index('espresso_shots_user_created_id_idx').on(
       table.userId,
       table.createdAt,
@@ -349,6 +383,7 @@ export const aeropressBrews = pgTable(
     steepTime: integer('steep_time'),
   },
   (table) => [
+    ...ownedBy('aeropress_brews', table),
     index('aeropress_brews_user_idx').on(table.userId),
     index('aeropress_brews_user_coffee_idx').on(table.userId, table.coffeeId),
   ],
@@ -380,6 +415,7 @@ export const pouroverBrews = pgTable(
     waterTemp: integer('water_temp'),
   },
   (table) => [
+    ...ownedBy('pourover_brews', table),
     index('pourover_brews_user_idx').on(table.userId),
     index('pourover_brews_user_coffee_idx').on(table.userId, table.coffeeId),
   ],
@@ -407,6 +443,7 @@ export const frenchpressBrews = pgTable(
     waterTemp: integer('water_temp'),
   },
   (table) => [
+    ...ownedBy('frenchpress_brews', table),
     index('frenchpress_brews_user_idx').on(table.userId),
     index('frenchpress_brews_user_coffee_idx').on(table.userId, table.coffeeId),
   ],
@@ -437,6 +474,7 @@ export const coldBrewBrews = pgTable(
     brewEnvironment: brewEnvironmentEnum('brew_environment'),
   },
   (table) => [
+    ...ownedBy('cold_brew_brews', table),
     index('cold_brew_brews_user_idx').on(table.userId),
     index('cold_brew_brews_user_coffee_idx').on(table.userId, table.coffeeId),
   ],
@@ -464,17 +502,14 @@ export const dialedInBrews = pgTable(
     userId: text('user_id')
       .references(() => user.id, { onDelete: 'cascade' })
       .notNull(),
-    coffeeId: uuid('coffee_id')
-      .references(() => coffees.id, { onDelete: 'cascade' })
-      .notNull(),
+    coffeeId: uuid('coffee_id').notNull(),
     brewingMethod: brewingMethodEnum('brewing_method').notNull(),
-    brewingDeviceId: uuid('brewing_device_id')
-      .references(() => brewingDevices.id, { onDelete: 'cascade' })
-      .notNull(),
+    brewingDeviceId: uuid('brewing_device_id').notNull(),
     brewId: uuid('brew_id').notNull(),
     ...timestamps,
   },
   (table) => [
+    ...ownedBy('dialed_in_brews', table),
     uniqueIndex('dialed_in_brews_brew_idx').on(table.brewId),
     index('dialed_in_brews_user_idx').on(table.userId),
     uniqueIndex('dialed_in_brews_triple_idx').on(

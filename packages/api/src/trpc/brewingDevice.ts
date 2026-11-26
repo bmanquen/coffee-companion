@@ -5,10 +5,7 @@ import { db } from '../db'
 import { brewingDevices } from '../db/schema'
 import { insertBrewingDeviceSchema } from '../db/zod'
 import { assertRoomForAnother } from '../lib/allowance'
-import {
-  assertVisibleDeviceType,
-  visibleDeviceType,
-} from '../lib/brew-ownership'
+import { visibleDeviceType } from '../lib/brew-ownership'
 import { isPgUniqueViolation } from '../lib/pg-error'
 import { countBrewsUsing, withStampedShelf } from '../lib/shelf'
 import { authedProcedure, createTRPCRouter } from './init'
@@ -58,8 +55,6 @@ export const brewingDeviceRouter = createTRPCRouter({
         'brewingDevices',
         ctx.session.user.id,
       )
-      await assertVisibleDeviceType(input.typeId, ctx.session.user.id)
-
       try {
         const [device] = await db
           .insert(brewingDevices)
@@ -76,7 +71,6 @@ export const brewingDeviceRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
       const userId = ctx.session.user.id
-      await assertVisibleDeviceType(data.typeId, userId)
       // A hidden device takes no Free slot, so giving it a visible type adds
       // one, and must fit the allowance like a create.
       const listed = await db.query.brewingDevices.findFirst({

@@ -13,7 +13,6 @@ import {
 } from '../lib/dialed-in-brew'
 import { sealedNow, withStampedShelf } from '../lib/shelf'
 import {
-  assertOwnCoffeeAndGrinder,
   onOwnCoffee,
   ownGear,
 } from '../lib/brew-ownership'
@@ -44,19 +43,6 @@ async function assertPourOverDevice(brewingDeviceId: string, userId: string) {
       code: 'BAD_REQUEST',
       message: `Pour over brews require a ${POUR_OVER_DEVICE_TYPE} brewing device`,
     })
-  }
-}
-
-// The method must be a system default (null userId) or owned by the user.
-async function assertPourOverMethod(methodId: string, userId: string) {
-  const method = await db.query.pouroverMethods.findFirst({
-    where: {
-      id: methodId,
-      OR: [{ userId: { isNull: true } }, { userId }],
-    },
-  })
-  if (!method) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Method not found' })
   }
 }
 
@@ -153,8 +139,6 @@ export const pouroverBrewRouter = createTRPCRouter({
     .input(insertPouroverBrewSchema)
     .mutation(async ({ ctx, input }) => {
       await assertPourOverDevice(input.brewingDeviceId, ctx.session.user.id)
-      await assertOwnCoffeeAndGrinder(input, ctx.session.user.id)
-      await assertPourOverMethod(input.methodId, ctx.session.user.id)
 
       const [brew] = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
         tx
@@ -171,8 +155,6 @@ export const pouroverBrewRouter = createTRPCRouter({
       const { id, ...data } = input
 
       await assertPourOverDevice(data.brewingDeviceId, ctx.session.user.id)
-      await assertOwnCoffeeAndGrinder(data, ctx.session.user.id)
-      await assertPourOverMethod(data.methodId, ctx.session.user.id)
 
       // Every edit stamps, not only a move, so a stale read of the Brew's
       // Coffee cannot skip the stamp (ADR-0004). A Sealed Brew reaches the

@@ -2,13 +2,7 @@ import { and, count, eq, inArray, isNull, or } from 'drizzle-orm'
 import { TRPCError } from '@trpc/server'
 import z from 'zod'
 import { db } from '../db'
-import {
-  coffeeOrigins,
-  coffeeProcesses,
-  coffees,
-  countries,
-  regions,
-} from '../db/schema'
+import { coffeeOrigins, coffees, regions } from '../db/schema'
 import { insertCoffeeSchema } from '../db/zod'
 import { coffeeIdsWithDialedIn } from '../lib/dialed-in-brew'
 import { isPgUniqueViolation } from '../lib/pg-error'
@@ -64,95 +58,38 @@ function originRows(coffeeId: string, origins: Array<CoffeeOriginInput>) {
   })
 }
 
-function visibleTo(userId: string) {
-  return or(isNull(countries.userId), eq(countries.userId, userId))
-}
-
 function regionVisibleTo(userId: string) {
   return or(isNull(regions.userId), eq(regions.userId, userId))
 }
 
-function processVisibleTo(userId: string) {
-  return or(isNull(coffeeProcesses.userId), eq(coffeeProcesses.userId, userId))
-}
-
-async function assertLookupsWritable(
-  userId: string,
-  input: Pick<InsertCoffee, 'roasterId' | 'roastLevelId'>,
-) {
-  const visible = { OR: [{ userId: { isNull: true as const } }, { userId }] }
-  const [roaster, roastLevel] = await Promise.all([
-    db.query.roasters.findFirst({
-      where: { id: input.roasterId, ...visible },
-      columns: { id: true },
-    }),
-    db.query.roastLevels.findFirst({
-      where: { id: input.roastLevelId, ...visible },
-      columns: { id: true },
-    }),
-  ])
-  if (!roaster) {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Roaster not found' })
-  }
-  if (!roastLevel) {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Roast level not found' })
-  }
-}
-
-async function assertOriginsWritable(
+// The database refuses a lookup the user may not use. Whether a region sits
+// in its origin's country is the router's to say.
+async function assertRegionsInCountries(
   userId: string,
   origins: Array<CoffeeOriginInput>,
 ) {
-  const countryIds = [...new Set(origins.map((origin) => origin.countryId))]
-  if (countryIds.length > 0) {
-    const found = await db
-      .select({ id: countries.id })
-      .from(countries)
-      .where(and(inArray(countries.id, countryIds), visibleTo(userId)))
-    if (found.length !== countryIds.length) {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Country not found' })
-    }
-  }
-
   const regionIds = [
     ...new Set(
       origins.flatMap((origin) => (origin.regionId ? [origin.regionId] : [])),
     ),
   ]
-  if (regionIds.length > 0) {
-    const found = await db
-      .select({ id: regions.id, countryId: regions.countryId })
-      .from(regions)
-      .where(and(inArray(regions.id, regionIds), regionVisibleTo(userId)))
-    const countryByRegion = new Map(found.map((row) => [row.id, row.countryId]))
-    for (const origin of origins) {
-      if (!origin.regionId) continue
-      const regionCountryId = countryByRegion.get(origin.regionId)
-      if (regionCountryId === undefined) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Region not found' })
-      }
-      if (regionCountryId !== origin.countryId) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Region must belong to its origin country',
-        })
-      }
+  if (regionIds.length === 0) return
+  const found = await db
+    .select({ id: regions.id, countryId: regions.countryId })
+    .from(regions)
+    .where(and(inArray(regions.id, regionIds), regionVisibleTo(userId)))
+  const countryByRegion = new Map(found.map((row) => [row.id, row.countryId]))
+  for (const origin of origins) {
+    if (!origin.regionId) continue
+    const regionCountryId = countryByRegion.get(origin.regionId)
+    // Missing or not the user's: the insert refuses it as not found.
+    if (regionCountryId === undefined) continue
+    if (regionCountryId !== origin.countryId) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Region must belong to its origin country',
+      })
     }
-  }
-
-  const processIds = [
-    ...new Set(
-      origins.flatMap((origin) => (origin.processId ? [origin.processId] : [])),
-    ),
-  ]
-  if (processIds.length === 0) return
-
-  const foundProcesses = await db
-    .select({ id: coffeeProcesses.id })
-    .from(coffeeProcesses)
-    .where(and(inArray(coffeeProcesses.id, processIds), processVisibleTo(userId)))
-  if (foundProcesses.length !== processIds.length) {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Process not found' })
   }
 }
 
@@ -231,8 +168,7 @@ export const coffeeRouter = createTRPCRouter({
     .input(insertCoffeeSchema)
     .mutation(async ({ ctx, input }) => {
       const origins = input.origins ?? []
-      await assertLookupsWritable(ctx.session.user.id, input)
-      await assertOriginsWritable(ctx.session.user.id, origins)
+      await assertRegionsInCountries(ctx.session.user.id, origins)
       try {
         return await db.transaction(async (tx) => {
           const [coffee] = await tx
@@ -261,9 +197,8 @@ export const coffeeRouter = createTRPCRouter({
       if (!existing) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Coffee not found' })
       }
-      await assertLookupsWritable(ctx.session.user.id, data)
       if (data.origins) {
-        await assertOriginsWritable(ctx.session.user.id, data.origins)
+        await assertRegionsInCountries(ctx.session.user.id, data.origins)
       }
       try {
         return await db.transaction(async (tx) => {
