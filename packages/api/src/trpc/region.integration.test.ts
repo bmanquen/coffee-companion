@@ -1,7 +1,7 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '../db'
-import { countries, regions } from '../db/schema'
+import { countries } from '../db/schema'
 import { callerFor, seedUsers, uniqFor } from '../../test/trpc'
 
 const USER_A = 'region-user-a'
@@ -10,7 +10,14 @@ const asA = callerFor(USER_A)
 const asB = callerFor(USER_B)
 const uniq = uniqFor(USER_A)
 
-seedUsers([USER_A, USER_B])
+let sharedCountryId: string | undefined
+
+// The user cascade removes the regions; the shared country has no owner.
+seedUsers([USER_A, USER_B], async () => {
+  if (sharedCountryId) {
+    await db.delete(countries).where(eq(countries.id, sharedCountryId))
+  }
+})
 
 describe('region', () => {
   it('creates then lists by country', async () => {
@@ -25,13 +32,9 @@ describe('region', () => {
 })
 
 describe('region.create country visibility', () => {
-  let sharedCountryId: string | undefined
-
-  afterAll(async () => {
-    if (sharedCountryId) {
-      await db.delete(regions).where(eq(regions.countryId, sharedCountryId))
-      await db.delete(countries).where(eq(countries.id, sharedCountryId))
-    }
+  it('accepts a region with no country', async () => {
+    const region = await asA.region.create({ name: uniq('No country') })
+    expect(region.countryId).toBeNull()
   })
 
   it('refuses another user’s private country', async () => {
