@@ -17,6 +17,8 @@ To build this application for production:
 pnpm build
 ```
 
+Railway applies database migrations before each deploy goes live: `railway.json` sets the pre-deploy command to `pnpm db:migrate`, which reads the service's `DATABASE_URL`. Migrations already applied are skipped. A migration that fails stops the deploy, and the running version keeps serving. Every other Railway setting still lives in the dashboard.
+
 ## Testing
 
 This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
