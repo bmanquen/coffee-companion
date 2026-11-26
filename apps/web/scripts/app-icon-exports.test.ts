@@ -142,6 +142,8 @@ describe('app icon exports', () => {
     expect(svg).toContain('#C4703F')
     expect(svg).toContain('#2D4A3E')
     expect(svg).not.toContain('c2pa')
+    // The export loads no fonts, so text would vanish from the icons.
+    expect(svg).not.toContain('<text')
   })
 
   it('emits a PNG at each store and listing size', () => {
