@@ -195,6 +195,8 @@ export function FrenchpressBrewsSection() {
     // v9 closes open rows whenever data changes, even a refetch with the
     // same rows; v8 only did that for grouped rows.
     autoResetExpanded: false,
+    // By id, so an open row stays with its record when rows above it go.
+    getRowId: (row) => row.id,
     getRowCanExpand: (row) => !row.original.sealed,
   })
 
