@@ -21,6 +21,7 @@ import {
   grantPlan,
   seedUsers,
   uniqFor,
+  writeLegacy,
 } from '../../test/trpc'
 
 // A user only sees their own Coffees, grinders and devices on a Brew: writes
@@ -160,13 +161,15 @@ describe.each(methods)('$router', ({ router, table }) => {
   it('hides another user’s grinder and device on a legacy Brew', async () => {
     const brew = await create[router](own)
     // Only a row written before writes checked ownership can do this.
-    await db
-      .update(table)
-      .set({
-        grinderId: foreign.grinderId,
-        brewingDeviceId: foreign.brewingDeviceId,
-      })
-      .where(eq(table.id, brew.id))
+    await writeLegacy((tx) =>
+      tx
+        .update(table)
+        .set({
+          grinderId: foreign.grinderId,
+          brewingDeviceId: foreign.brewingDeviceId,
+        })
+        .where(eq(table.id, brew.id)),
+    )
 
     const listed = (await asOwner[router].getAll()).find(
       (row) => row.id === brew.id,
@@ -180,10 +183,12 @@ describe.each(methods)('$router', ({ router, table }) => {
     const brew = await create[router](own)
     // On the owner's Coffee, so an empty result cannot pass for filtering.
     const control = await create[router](own)
-    await db
-      .update(table)
-      .set({ coffeeId: foreign.coffeeId })
-      .where(eq(table.id, brew.id))
+    await writeLegacy((tx) =>
+      tx
+        .update(table)
+        .set({ coffeeId: foreign.coffeeId })
+        .where(eq(table.id, brew.id)),
+    )
 
     const all = await asOwner[router].getAll()
     expect(all.map((row) => row.id)).not.toContain(brew.id)
@@ -218,10 +223,12 @@ describe('espressoShot', () => {
     const shot = await logShot()
     // On the owner's Coffee, so an empty page cannot pass for filtering.
     const control = await logShot()
-    await db
-      .update(espressoShots)
-      .set({ coffeeId: foreign.coffeeId })
-      .where(eq(espressoShots.id, shot.id))
+    await writeLegacy((tx) =>
+      tx
+        .update(espressoShots)
+        .set({ coffeeId: foreign.coffeeId })
+        .where(eq(espressoShots.id, shot.id)),
+    )
 
     const recent = await asOwner.espressoShot.getRecent({ limit: 50 })
     expect(recent.items.map((row) => row.id)).not.toContain(shot.id)
@@ -264,10 +271,12 @@ describe('espressoShot', () => {
     const shot = await logShot(legacy.id)
     const controlShot = await logShot(control.id)
     // Only a device written before writes checked the type can do this.
-    await db
-      .update(brewingDevices)
-      .set({ typeId: theirType.id })
-      .where(eq(brewingDevices.id, legacy.id))
+    await writeLegacy((tx) =>
+      tx
+        .update(brewingDevices)
+        .set({ typeId: theirType.id })
+        .where(eq(brewingDevices.id, legacy.id)),
+    )
 
     const { items } = await asOwner.espressoShot.getRecent({ limit: 50 })
     const deviceOf = (id: string) =>
@@ -304,10 +313,12 @@ describe('espressoShot', () => {
       brewId: shot.id,
     })
     // Only a device written before writes checked the type can do this.
-    await db
-      .update(brewingDevices)
-      .set({ typeId: theirType.id })
-      .where(eq(brewingDevices.id, legacy.id))
+    await writeLegacy((tx) =>
+      tx
+        .update(brewingDevices)
+        .set({ typeId: theirType.id })
+        .where(eq(brewingDevices.id, legacy.id)),
+    )
 
     const key = {
       coffeeId: own.coffeeId,

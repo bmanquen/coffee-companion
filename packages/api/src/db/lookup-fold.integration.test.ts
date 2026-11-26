@@ -182,8 +182,8 @@ describe('lookup_fold', () => {
       ).rows
       const [yirgacheffe] = (
         await client.query<{ id: string }>(
-          `INSERT INTO regions (name, country_id) VALUES ('Yirgacheffe', $1) RETURNING id`,
-          [ethiopiaCopy.id],
+          `INSERT INTO regions (name, country_id, user_id) VALUES ('Yirgacheffe', $1, $2) RETURNING id`,
+          [ethiopiaCopy.id, ALICE],
         )
       ).rows
       await client.query(

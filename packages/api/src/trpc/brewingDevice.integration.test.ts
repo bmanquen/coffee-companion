@@ -9,6 +9,7 @@ import {
   seedUsers,
   subscribePlan,
   uniqFor,
+  writeLegacy,
 } from '../../test/trpc'
 
 const USER_A = 'device-user-a'
@@ -258,10 +259,12 @@ describe('brewingDevice plan limits', () => {
       ),
     )
     // Only rows written before writes checked the type can carry B's.
-    await db
-      .update(brewingDevices)
-      .set({ typeId })
-      .where(eq(brewingDevices.id, devices[0].id))
+    await writeLegacy((tx) =>
+      tx
+        .update(brewingDevices)
+        .set({ typeId })
+        .where(eq(brewingDevices.id, devices[0].id)),
+    )
     expect(await asLegacy.brewingDevice.list()).toHaveLength(2)
 
     // The hidden one cannot be removed from the list, so it takes no slot.

@@ -17,6 +17,7 @@ import {
   grantPlan,
   seedUsers,
   uniqFor,
+  writeLegacy,
 } from '../../test/trpc'
 import {
   SHOT_IDEMPOTENCY_DELETED,
@@ -281,15 +282,17 @@ describe('espressoShot.create', () => {
       .insert(brewingDeviceTypes)
       .values({ name: uniq('Private type'), userId: USER_B })
       .returning({ id: brewingDeviceTypes.id })
-    const [device] = await db
-      .insert(brewingDevices)
-      .values({
-        userId: USER_A,
-        name: uniq('Legacy machine'),
-        brand: 'Legacy',
-        typeId: type.id,
-      })
-      .returning({ id: brewingDevices.id })
+    const [device] = await writeLegacy((tx) =>
+      tx
+        .insert(brewingDevices)
+        .values({
+          userId: USER_A,
+          name: uniq('Legacy machine'),
+          brand: 'Legacy',
+          typeId: type.id,
+        })
+        .returning({ id: brewingDevices.id }),
+    )
     try {
       await expect(
         asA.espressoShot.create({
@@ -1486,10 +1489,12 @@ describe('espressoShot.getRecent', () => {
     const secret = uniq('Secret roaster')
     const hidden = await asB.roaster.create({ name: secret })
     // Only a row written before the coffee router checked roasters can do this.
-    await db
-      .update(coffees)
-      .set({ roasterId: hidden.id })
-      .where(eq(coffees.id, coffee.id))
+    await writeLegacy((tx) =>
+      tx
+        .update(coffees)
+        .set({ roasterId: hidden.id })
+        .where(eq(coffees.id, coffee.id)),
+    )
     const shot = await asA.espressoShot.create({
       coffeeId: coffee.id,
       grinderId,
@@ -1536,10 +1541,12 @@ describe('espressoShot.getRecent', () => {
       idempotencyKey: crypto.randomUUID(),
     })
     // Only a row written before writes checked gear ownership can do this.
-    await db
-      .update(espressoShots)
-      .set({ grinderId: foreignGrinderId })
-      .where(eq(espressoShots.id, shot.id))
+    await writeLegacy((tx) =>
+      tx
+        .update(espressoShots)
+        .set({ grinderId: foreignGrinderId })
+        .where(eq(espressoShots.id, shot.id)),
+    )
 
     const recent = await asA.espressoShot.getRecent({
       limit: 50,
@@ -1839,27 +1846,31 @@ describe('espressoShot.getLatestUnsealed', () => {
       asB,
       uniqFor(USER_B),
     )(uniqFor(USER_B)('Shared Legacy Coffee'))
-    const [own] = await db
-      .insert(espressoShots)
-      .values({
-        userId: USER_B,
+    const [own] = await writeLegacy((tx) =>
+      tx
+        .insert(espressoShots)
+        .values({
+          userId: USER_B,
+          coffeeId: coffee.id,
+          grinderId,
+          brewingDeviceId: espressoDeviceId,
+          dose: '18',
+          yield: '36',
+          createdAt: daysAgo(2),
+        })
+        .returning(),
+    )
+    await writeLegacy((tx) =>
+      tx.insert(espressoShots).values({
+        userId: USER_A,
         coffeeId: coffee.id,
         grinderId,
         brewingDeviceId: espressoDeviceId,
-        dose: '18',
-        yield: '36',
-        createdAt: daysAgo(2),
-      })
-      .returning()
-    await db.insert(espressoShots).values({
-      userId: USER_A,
-      coffeeId: coffee.id,
-      grinderId,
-      brewingDeviceId: espressoDeviceId,
-      dose: '19',
-      yield: '38',
-      createdAt: daysAgo(1),
-    })
+        dose: '19',
+        yield: '38',
+        createdAt: daysAgo(1),
+      }),
+    )
     const found = await asB.espressoShot.getLatestUnsealed({
       coffeeId: coffee.id,
     })

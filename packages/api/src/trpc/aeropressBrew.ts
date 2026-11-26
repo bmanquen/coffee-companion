@@ -13,7 +13,6 @@ import {
 } from '../lib/dialed-in-brew'
 import { sealedNow, withStampedShelf } from '../lib/shelf'
 import {
-  assertOwnCoffeeAndGrinder,
   onOwnCoffee,
   ownGear,
 } from '../lib/brew-ownership'
@@ -44,19 +43,6 @@ async function assertAeropressDevice(brewingDeviceId: string, userId: string) {
       code: 'BAD_REQUEST',
       message: `AeroPress brews require an ${AEROPRESS_DEVICE_TYPE} brewing device`,
     })
-  }
-}
-
-// The method must be a system default (null userId) or owned by the user.
-async function assertAeropressMethod(methodId: string, userId: string) {
-  const method = await db.query.aeropressMethods.findFirst({
-    where: {
-      id: methodId,
-      OR: [{ userId: { isNull: true } }, { userId }],
-    },
-  })
-  if (!method) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Method not found' })
   }
 }
 
@@ -153,8 +139,6 @@ export const aeropressBrewRouter = createTRPCRouter({
     .input(insertAeropressBrewSchema)
     .mutation(async ({ ctx, input }) => {
       await assertAeropressDevice(input.brewingDeviceId, ctx.session.user.id)
-      await assertOwnCoffeeAndGrinder(input, ctx.session.user.id)
-      await assertAeropressMethod(input.methodId, ctx.session.user.id)
 
       const [brew] = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
         tx
@@ -171,8 +155,6 @@ export const aeropressBrewRouter = createTRPCRouter({
       const { id, ...data } = input
 
       await assertAeropressDevice(data.brewingDeviceId, ctx.session.user.id)
-      await assertOwnCoffeeAndGrinder(data, ctx.session.user.id)
-      await assertAeropressMethod(data.methodId, ctx.session.user.id)
 
       // Every edit stamps, not only a move, so a stale read of the Brew's
       // Coffee cannot skip the stamp (ADR-0004). A Sealed Brew reaches the

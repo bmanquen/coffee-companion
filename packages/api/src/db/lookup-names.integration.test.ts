@@ -56,22 +56,23 @@ function scopeField(lookup: Lookup) {
   return null
 }
 
+// Shared, so both users and shared rows may sit under it.
 async function parentIdFor(lookup: Lookup) {
   if (lookup.sqlName === 'regions') {
     const [country] = await db
       .insert(countries)
-      .values({ name: uniq('Country'), userId: ALICE })
+      .values({ name: uniq('Country') })
       .returning()
     return country.id
   }
   if (lookup.sqlName === 'farms') {
     const [country] = await db
       .insert(countries)
-      .values({ name: uniq('Country'), userId: ALICE })
+      .values({ name: uniq('Country') })
       .returning()
     const [region] = await db
       .insert(regions)
-      .values({ name: uniq('Region'), userId: ALICE, countryId: country.id })
+      .values({ name: uniq('Region'), countryId: country.id })
       .returning()
     return region.id
   }

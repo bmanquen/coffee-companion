@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach } from 'vitest'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import { db } from '../src/db'
 import { REQUEST_ID_HEADER, setLogSink } from '../src/lib/log'
 import {
@@ -214,6 +214,17 @@ export function createCoffeeFor(
     return caller.coffee.create({ name, ...ids, ...extras })
   }
 }
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+// A row saved before the database refused another user's data, for the reads
+// that still hide one. Skips foreign keys and triggers for this transaction
+// only, which takes a superuser, as the test databases have.
+export const writeLegacy = <T>(write: (tx: Tx) => Promise<T>) =>
+  db.transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL session_replication_role = replica`)
+    return write(tx)
+  })
 
 // Registers beforeAll/afterAll to seed the given test users and tear them down.
 // Deleting the users cascades all their scoped rows, so most files need no other

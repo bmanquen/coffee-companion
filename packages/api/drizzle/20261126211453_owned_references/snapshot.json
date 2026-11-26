@@ -1,0 +1,1311 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "62c01bb8-2868-4c82-b53a-f62fb56fe087",
+  "prevIds": [
+    "4c4c810b-5550-4bfb-8ce9-abf2519fc7b5"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "aeropress_brews"
+      ],
+      "writes": [
+        "s|fk|public.aeropress_brews.aeropress_brews_coffee_id_coffees_id_fkey",
+        "n|fk|public.aeropress_brews.aeropress_brews_coffee_id_coffees_id_fkey",
+        "e|fk|public.aeropress_brews.aeropress_brews_coffee_id_coffees_id_fkey",
+        "n|con|public.aeropress_brews.aeropress_brews_coffee_id_coffees_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.aeropress_brews",
+        "n|sch|public",
+        "e|col|public.aeropress_brews.coffee_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "aeropress_brews"
+      ],
+      "writes": [
+        "s|fk|public.aeropress_brews.aeropress_brews_grinder_id_grinders_id_fkey",
+        "n|fk|public.aeropress_brews.aeropress_brews_grinder_id_grinders_id_fkey",
+        "e|fk|public.aeropress_brews.aeropress_brews_grinder_id_grinders_id_fkey",
+        "n|con|public.aeropress_brews.aeropress_brews_grinder_id_grinders_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.aeropress_brews",
+        "n|sch|public",
+        "e|col|public.aeropress_brews.grinder_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "aeropress_brews"
+      ],
+      "writes": [
+        "s|fk|public.aeropress_brews.aeropress_brews_brewing_device_id_brewing_devices_id_fkey",
+        "n|fk|public.aeropress_brews.aeropress_brews_brewing_device_id_brewing_devices_id_fkey",
+        "e|fk|public.aeropress_brews.aeropress_brews_brewing_device_id_brewing_devices_id_fkey",
+        "n|con|public.aeropress_brews.aeropress_brews_brewing_device_id_brewing_devices_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.aeropress_brews",
+        "n|sch|public",
+        "e|col|public.aeropress_brews.brewing_device_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "cold_brew_brews"
+      ],
+      "writes": [
+        "s|fk|public.cold_brew_brews.cold_brew_brews_coffee_id_coffees_id_fkey",
+        "n|fk|public.cold_brew_brews.cold_brew_brews_coffee_id_coffees_id_fkey",
+        "e|fk|public.cold_brew_brews.cold_brew_brews_coffee_id_coffees_id_fkey",
+        "n|con|public.cold_brew_brews.cold_brew_brews_coffee_id_coffees_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.cold_brew_brews",
+        "n|sch|public",
+        "e|col|public.cold_brew_brews.coffee_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "cold_brew_brews"
+      ],
+      "writes": [
+        "s|fk|public.cold_brew_brews.cold_brew_brews_grinder_id_grinders_id_fkey",
+        "n|fk|public.cold_brew_brews.cold_brew_brews_grinder_id_grinders_id_fkey",
+        "e|fk|public.cold_brew_brews.cold_brew_brews_grinder_id_grinders_id_fkey",
+        "n|con|public.cold_brew_brews.cold_brew_brews_grinder_id_grinders_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.cold_brew_brews",
+        "n|sch|public",
+        "e|col|public.cold_brew_brews.grinder_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "cold_brew_brews"
+      ],
+      "writes": [
+        "s|fk|public.cold_brew_brews.cold_brew_brews_brewing_device_id_brewing_devices_id_fkey",
+        "n|fk|public.cold_brew_brews.cold_brew_brews_brewing_device_id_brewing_devices_id_fkey",
+        "e|fk|public.cold_brew_brews.cold_brew_brews_brewing_device_id_brewing_devices_id_fkey",
+        "n|con|public.cold_brew_brews.cold_brew_brews_brewing_device_id_brewing_devices_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.cold_brew_brews",
+        "n|sch|public",
+        "e|col|public.cold_brew_brews.brewing_device_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "dialed_in_brews"
+      ],
+      "writes": [
+        "s|fk|public.dialed_in_brews.dialed_in_brews_brewing_device_id_brewing_devices_id_fkey",
+        "n|fk|public.dialed_in_brews.dialed_in_brews_brewing_device_id_brewing_devices_id_fkey",
+        "e|fk|public.dialed_in_brews.dialed_in_brews_brewing_device_id_brewing_devices_id_fkey",
+        "n|con|public.dialed_in_brews.dialed_in_brews_brewing_device_id_brewing_devices_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.dialed_in_brews",
+        "n|sch|public",
+        "e|col|public.dialed_in_brews.brewing_device_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "dialed_in_brews"
+      ],
+      "writes": [
+        "s|fk|public.dialed_in_brews.dialed_in_brews_coffee_id_coffees_id_fkey",
+        "n|fk|public.dialed_in_brews.dialed_in_brews_coffee_id_coffees_id_fkey",
+        "e|fk|public.dialed_in_brews.dialed_in_brews_coffee_id_coffees_id_fkey",
+        "n|con|public.dialed_in_brews.dialed_in_brews_coffee_id_coffees_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.dialed_in_brews",
+        "n|sch|public",
+        "e|col|public.dialed_in_brews.coffee_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shots"
+      ],
+      "writes": [
+        "s|fk|public.espresso_shots.espresso_shots_coffee_id_coffees_id_fkey",
+        "n|fk|public.espresso_shots.espresso_shots_coffee_id_coffees_id_fkey",
+        "e|fk|public.espresso_shots.espresso_shots_coffee_id_coffees_id_fkey",
+        "n|con|public.espresso_shots.espresso_shots_coffee_id_coffees_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "e|col|public.espresso_shots.coffee_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shots"
+      ],
+      "writes": [
+        "s|fk|public.espresso_shots.espresso_shots_grinder_id_grinders_id_fkey",
+        "n|fk|public.espresso_shots.espresso_shots_grinder_id_grinders_id_fkey",
+        "e|fk|public.espresso_shots.espresso_shots_grinder_id_grinders_id_fkey",
+        "n|con|public.espresso_shots.espresso_shots_grinder_id_grinders_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "e|col|public.espresso_shots.grinder_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shots"
+      ],
+      "writes": [
+        "s|fk|public.espresso_shots.espresso_shots_brewing_device_id_brewing_devices_id_fkey",
+        "n|fk|public.espresso_shots.espresso_shots_brewing_device_id_brewing_devices_id_fkey",
+        "e|fk|public.espresso_shots.espresso_shots_brewing_device_id_brewing_devices_id_fkey",
+        "n|con|public.espresso_shots.espresso_shots_brewing_device_id_brewing_devices_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "e|col|public.espresso_shots.brewing_device_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "frenchpress_brews"
+      ],
+      "writes": [
+        "s|fk|public.frenchpress_brews.frenchpress_brews_coffee_id_coffees_id_fkey",
+        "n|fk|public.frenchpress_brews.frenchpress_brews_coffee_id_coffees_id_fkey",
+        "e|fk|public.frenchpress_brews.frenchpress_brews_coffee_id_coffees_id_fkey",
+        "n|con|public.frenchpress_brews.frenchpress_brews_coffee_id_coffees_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.frenchpress_brews",
+        "n|sch|public",
+        "e|col|public.frenchpress_brews.coffee_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "frenchpress_brews"
+      ],
+      "writes": [
+        "s|fk|public.frenchpress_brews.frenchpress_brews_grinder_id_grinders_id_fkey",
+        "n|fk|public.frenchpress_brews.frenchpress_brews_grinder_id_grinders_id_fkey",
+        "e|fk|public.frenchpress_brews.frenchpress_brews_grinder_id_grinders_id_fkey",
+        "n|con|public.frenchpress_brews.frenchpress_brews_grinder_id_grinders_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.frenchpress_brews",
+        "n|sch|public",
+        "e|col|public.frenchpress_brews.grinder_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "frenchpress_brews"
+      ],
+      "writes": [
+        "s|fk|public.frenchpress_brews.frenchpress_brews_brewing_device_id_brewing_devices_id_fkey",
+        "n|fk|public.frenchpress_brews.frenchpress_brews_brewing_device_id_brewing_devices_id_fkey",
+        "e|fk|public.frenchpress_brews.frenchpress_brews_brewing_device_id_brewing_devices_id_fkey",
+        "n|con|public.frenchpress_brews.frenchpress_brews_brewing_device_id_brewing_devices_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.frenchpress_brews",
+        "n|sch|public",
+        "e|col|public.frenchpress_brews.brewing_device_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "pourover_brews"
+      ],
+      "writes": [
+        "s|fk|public.pourover_brews.pourover_brews_coffee_id_coffees_id_fkey",
+        "n|fk|public.pourover_brews.pourover_brews_coffee_id_coffees_id_fkey",
+        "e|fk|public.pourover_brews.pourover_brews_coffee_id_coffees_id_fkey",
+        "n|con|public.pourover_brews.pourover_brews_coffee_id_coffees_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.pourover_brews",
+        "n|sch|public",
+        "e|col|public.pourover_brews.coffee_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "pourover_brews"
+      ],
+      "writes": [
+        "s|fk|public.pourover_brews.pourover_brews_grinder_id_grinders_id_fkey",
+        "n|fk|public.pourover_brews.pourover_brews_grinder_id_grinders_id_fkey",
+        "e|fk|public.pourover_brews.pourover_brews_grinder_id_grinders_id_fkey",
+        "n|con|public.pourover_brews.pourover_brews_grinder_id_grinders_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.pourover_brews",
+        "n|sch|public",
+        "e|col|public.pourover_brews.grinder_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "pourover_brews"
+      ],
+      "writes": [
+        "s|fk|public.pourover_brews.pourover_brews_brewing_device_id_brewing_devices_id_fkey",
+        "n|fk|public.pourover_brews.pourover_brews_brewing_device_id_brewing_devices_id_fkey",
+        "e|fk|public.pourover_brews.pourover_brews_brewing_device_id_brewing_devices_id_fkey",
+        "n|con|public.pourover_brews.pourover_brews_brewing_device_id_brewing_devices_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.pourover_brews",
+        "n|sch|public",
+        "e|col|public.pourover_brews.brewing_device_id"
+      ]
+    },
+    {
+      "statementType": "add_unique",
+      "statementTarget": [
+        "table",
+        "public",
+        "brewing_devices"
+      ],
+      "writes": [
+        "s|uq|public.brewing_devices.brewing_devices_id_user_id_key",
+        "n|uq|public.brewing_devices.brewing_devices_id_user_id_key",
+        "e|uq|public.brewing_devices.brewing_devices_id_user_id_key",
+        "n|con|public.brewing_devices.brewing_devices_id_user_id_key",
+        "n|rel|public.brewing_devices_id_user_id_key"
+      ],
+      "reads": [
+        "n|tbl|public.brewing_devices",
+        "n|sch|public",
+        "n|col|public.brewing_devices.id",
+        "n|col|public.brewing_devices.user_id"
+      ]
+    },
+    {
+      "statementType": "add_unique",
+      "statementTarget": [
+        "table",
+        "public",
+        "coffees"
+      ],
+      "writes": [
+        "s|uq|public.coffees.coffees_id_user_id_key",
+        "n|uq|public.coffees.coffees_id_user_id_key",
+        "e|uq|public.coffees.coffees_id_user_id_key",
+        "n|con|public.coffees.coffees_id_user_id_key",
+        "n|rel|public.coffees_id_user_id_key"
+      ],
+      "reads": [
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.coffees.id",
+        "n|col|public.coffees.user_id"
+      ]
+    },
+    {
+      "statementType": "add_unique",
+      "statementTarget": [
+        "table",
+        "public",
+        "grinders"
+      ],
+      "writes": [
+        "s|uq|public.grinders.grinders_id_user_id_key",
+        "n|uq|public.grinders.grinders_id_user_id_key",
+        "e|uq|public.grinders.grinders_id_user_id_key",
+        "n|con|public.grinders.grinders_id_user_id_key",
+        "n|rel|public.grinders_id_user_id_key"
+      ],
+      "reads": [
+        "n|tbl|public.grinders",
+        "n|sch|public",
+        "n|col|public.grinders.id",
+        "n|col|public.grinders.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "aeropress_brews"
+      ],
+      "writes": [
+        "s|fk|public.aeropress_brews.aeropress_brews_coffee_owner_fk",
+        "n|fk|public.aeropress_brews.aeropress_brews_coffee_owner_fk",
+        "e|fk|public.aeropress_brews.aeropress_brews_coffee_owner_fk",
+        "n|con|public.aeropress_brews.aeropress_brews_coffee_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.aeropress_brews",
+        "n|sch|public",
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.aeropress_brews.coffee_id",
+        "n|col|public.aeropress_brews.user_id",
+        "n|col|public.coffees.id",
+        "n|col|public.coffees.user_id",
+        "e|uniqueness|public.coffees.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "aeropress_brews"
+      ],
+      "writes": [
+        "s|fk|public.aeropress_brews.aeropress_brews_brewing_device_owner_fk",
+        "n|fk|public.aeropress_brews.aeropress_brews_brewing_device_owner_fk",
+        "e|fk|public.aeropress_brews.aeropress_brews_brewing_device_owner_fk",
+        "n|con|public.aeropress_brews.aeropress_brews_brewing_device_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.aeropress_brews",
+        "n|sch|public",
+        "n|tbl|public.brewing_devices",
+        "n|sch|public",
+        "n|col|public.aeropress_brews.brewing_device_id",
+        "n|col|public.aeropress_brews.user_id",
+        "n|col|public.brewing_devices.id",
+        "n|col|public.brewing_devices.user_id",
+        "e|uniqueness|public.brewing_devices.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "aeropress_brews"
+      ],
+      "writes": [
+        "s|fk|public.aeropress_brews.aeropress_brews_grinder_owner_fk",
+        "n|fk|public.aeropress_brews.aeropress_brews_grinder_owner_fk",
+        "e|fk|public.aeropress_brews.aeropress_brews_grinder_owner_fk",
+        "n|con|public.aeropress_brews.aeropress_brews_grinder_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.aeropress_brews",
+        "n|sch|public",
+        "n|tbl|public.grinders",
+        "n|sch|public",
+        "n|col|public.aeropress_brews.grinder_id",
+        "n|col|public.aeropress_brews.user_id",
+        "n|col|public.grinders.id",
+        "n|col|public.grinders.user_id",
+        "e|uniqueness|public.grinders.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "cold_brew_brews"
+      ],
+      "writes": [
+        "s|fk|public.cold_brew_brews.cold_brew_brews_coffee_owner_fk",
+        "n|fk|public.cold_brew_brews.cold_brew_brews_coffee_owner_fk",
+        "e|fk|public.cold_brew_brews.cold_brew_brews_coffee_owner_fk",
+        "n|con|public.cold_brew_brews.cold_brew_brews_coffee_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.cold_brew_brews",
+        "n|sch|public",
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.cold_brew_brews.coffee_id",
+        "n|col|public.cold_brew_brews.user_id",
+        "n|col|public.coffees.id",
+        "n|col|public.coffees.user_id",
+        "e|uniqueness|public.coffees.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "cold_brew_brews"
+      ],
+      "writes": [
+        "s|fk|public.cold_brew_brews.cold_brew_brews_brewing_device_owner_fk",
+        "n|fk|public.cold_brew_brews.cold_brew_brews_brewing_device_owner_fk",
+        "e|fk|public.cold_brew_brews.cold_brew_brews_brewing_device_owner_fk",
+        "n|con|public.cold_brew_brews.cold_brew_brews_brewing_device_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.cold_brew_brews",
+        "n|sch|public",
+        "n|tbl|public.brewing_devices",
+        "n|sch|public",
+        "n|col|public.cold_brew_brews.brewing_device_id",
+        "n|col|public.cold_brew_brews.user_id",
+        "n|col|public.brewing_devices.id",
+        "n|col|public.brewing_devices.user_id",
+        "e|uniqueness|public.brewing_devices.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "cold_brew_brews"
+      ],
+      "writes": [
+        "s|fk|public.cold_brew_brews.cold_brew_brews_grinder_owner_fk",
+        "n|fk|public.cold_brew_brews.cold_brew_brews_grinder_owner_fk",
+        "e|fk|public.cold_brew_brews.cold_brew_brews_grinder_owner_fk",
+        "n|con|public.cold_brew_brews.cold_brew_brews_grinder_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.cold_brew_brews",
+        "n|sch|public",
+        "n|tbl|public.grinders",
+        "n|sch|public",
+        "n|col|public.cold_brew_brews.grinder_id",
+        "n|col|public.cold_brew_brews.user_id",
+        "n|col|public.grinders.id",
+        "n|col|public.grinders.user_id",
+        "e|uniqueness|public.grinders.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "dialed_in_brews"
+      ],
+      "writes": [
+        "s|fk|public.dialed_in_brews.dialed_in_brews_coffee_owner_fk",
+        "n|fk|public.dialed_in_brews.dialed_in_brews_coffee_owner_fk",
+        "e|fk|public.dialed_in_brews.dialed_in_brews_coffee_owner_fk",
+        "n|con|public.dialed_in_brews.dialed_in_brews_coffee_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.dialed_in_brews",
+        "n|sch|public",
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.dialed_in_brews.coffee_id",
+        "n|col|public.dialed_in_brews.user_id",
+        "n|col|public.coffees.id",
+        "n|col|public.coffees.user_id",
+        "e|uniqueness|public.coffees.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "dialed_in_brews"
+      ],
+      "writes": [
+        "s|fk|public.dialed_in_brews.dialed_in_brews_brewing_device_owner_fk",
+        "n|fk|public.dialed_in_brews.dialed_in_brews_brewing_device_owner_fk",
+        "e|fk|public.dialed_in_brews.dialed_in_brews_brewing_device_owner_fk",
+        "n|con|public.dialed_in_brews.dialed_in_brews_brewing_device_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.dialed_in_brews",
+        "n|sch|public",
+        "n|tbl|public.brewing_devices",
+        "n|sch|public",
+        "n|col|public.dialed_in_brews.brewing_device_id",
+        "n|col|public.dialed_in_brews.user_id",
+        "n|col|public.brewing_devices.id",
+        "n|col|public.brewing_devices.user_id",
+        "e|uniqueness|public.brewing_devices.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shots"
+      ],
+      "writes": [
+        "s|fk|public.espresso_shots.espresso_shots_coffee_owner_fk",
+        "n|fk|public.espresso_shots.espresso_shots_coffee_owner_fk",
+        "e|fk|public.espresso_shots.espresso_shots_coffee_owner_fk",
+        "n|con|public.espresso_shots.espresso_shots_coffee_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.espresso_shots.coffee_id",
+        "n|col|public.espresso_shots.user_id",
+        "n|col|public.coffees.id",
+        "n|col|public.coffees.user_id",
+        "e|uniqueness|public.coffees.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shots"
+      ],
+      "writes": [
+        "s|fk|public.espresso_shots.espresso_shots_brewing_device_owner_fk",
+        "n|fk|public.espresso_shots.espresso_shots_brewing_device_owner_fk",
+        "e|fk|public.espresso_shots.espresso_shots_brewing_device_owner_fk",
+        "n|con|public.espresso_shots.espresso_shots_brewing_device_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|tbl|public.brewing_devices",
+        "n|sch|public",
+        "n|col|public.espresso_shots.brewing_device_id",
+        "n|col|public.espresso_shots.user_id",
+        "n|col|public.brewing_devices.id",
+        "n|col|public.brewing_devices.user_id",
+        "e|uniqueness|public.brewing_devices.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "espresso_shots"
+      ],
+      "writes": [
+        "s|fk|public.espresso_shots.espresso_shots_grinder_owner_fk",
+        "n|fk|public.espresso_shots.espresso_shots_grinder_owner_fk",
+        "e|fk|public.espresso_shots.espresso_shots_grinder_owner_fk",
+        "n|con|public.espresso_shots.espresso_shots_grinder_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.espresso_shots",
+        "n|sch|public",
+        "n|tbl|public.grinders",
+        "n|sch|public",
+        "n|col|public.espresso_shots.grinder_id",
+        "n|col|public.espresso_shots.user_id",
+        "n|col|public.grinders.id",
+        "n|col|public.grinders.user_id",
+        "e|uniqueness|public.grinders.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "frenchpress_brews"
+      ],
+      "writes": [
+        "s|fk|public.frenchpress_brews.frenchpress_brews_coffee_owner_fk",
+        "n|fk|public.frenchpress_brews.frenchpress_brews_coffee_owner_fk",
+        "e|fk|public.frenchpress_brews.frenchpress_brews_coffee_owner_fk",
+        "n|con|public.frenchpress_brews.frenchpress_brews_coffee_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.frenchpress_brews",
+        "n|sch|public",
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.frenchpress_brews.coffee_id",
+        "n|col|public.frenchpress_brews.user_id",
+        "n|col|public.coffees.id",
+        "n|col|public.coffees.user_id",
+        "e|uniqueness|public.coffees.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "frenchpress_brews"
+      ],
+      "writes": [
+        "s|fk|public.frenchpress_brews.frenchpress_brews_brewing_device_owner_fk",
+        "n|fk|public.frenchpress_brews.frenchpress_brews_brewing_device_owner_fk",
+        "e|fk|public.frenchpress_brews.frenchpress_brews_brewing_device_owner_fk",
+        "n|con|public.frenchpress_brews.frenchpress_brews_brewing_device_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.frenchpress_brews",
+        "n|sch|public",
+        "n|tbl|public.brewing_devices",
+        "n|sch|public",
+        "n|col|public.frenchpress_brews.brewing_device_id",
+        "n|col|public.frenchpress_brews.user_id",
+        "n|col|public.brewing_devices.id",
+        "n|col|public.brewing_devices.user_id",
+        "e|uniqueness|public.brewing_devices.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "frenchpress_brews"
+      ],
+      "writes": [
+        "s|fk|public.frenchpress_brews.frenchpress_brews_grinder_owner_fk",
+        "n|fk|public.frenchpress_brews.frenchpress_brews_grinder_owner_fk",
+        "e|fk|public.frenchpress_brews.frenchpress_brews_grinder_owner_fk",
+        "n|con|public.frenchpress_brews.frenchpress_brews_grinder_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.frenchpress_brews",
+        "n|sch|public",
+        "n|tbl|public.grinders",
+        "n|sch|public",
+        "n|col|public.frenchpress_brews.grinder_id",
+        "n|col|public.frenchpress_brews.user_id",
+        "n|col|public.grinders.id",
+        "n|col|public.grinders.user_id",
+        "e|uniqueness|public.grinders.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "pourover_brews"
+      ],
+      "writes": [
+        "s|fk|public.pourover_brews.pourover_brews_coffee_owner_fk",
+        "n|fk|public.pourover_brews.pourover_brews_coffee_owner_fk",
+        "e|fk|public.pourover_brews.pourover_brews_coffee_owner_fk",
+        "n|con|public.pourover_brews.pourover_brews_coffee_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.pourover_brews",
+        "n|sch|public",
+        "n|tbl|public.coffees",
+        "n|sch|public",
+        "n|col|public.pourover_brews.coffee_id",
+        "n|col|public.pourover_brews.user_id",
+        "n|col|public.coffees.id",
+        "n|col|public.coffees.user_id",
+        "e|uniqueness|public.coffees.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "pourover_brews"
+      ],
+      "writes": [
+        "s|fk|public.pourover_brews.pourover_brews_brewing_device_owner_fk",
+        "n|fk|public.pourover_brews.pourover_brews_brewing_device_owner_fk",
+        "e|fk|public.pourover_brews.pourover_brews_brewing_device_owner_fk",
+        "n|con|public.pourover_brews.pourover_brews_brewing_device_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.pourover_brews",
+        "n|sch|public",
+        "n|tbl|public.brewing_devices",
+        "n|sch|public",
+        "n|col|public.pourover_brews.brewing_device_id",
+        "n|col|public.pourover_brews.user_id",
+        "n|col|public.brewing_devices.id",
+        "n|col|public.brewing_devices.user_id",
+        "e|uniqueness|public.brewing_devices.id.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "pourover_brews"
+      ],
+      "writes": [
+        "s|fk|public.pourover_brews.pourover_brews_grinder_owner_fk",
+        "n|fk|public.pourover_brews.pourover_brews_grinder_owner_fk",
+        "e|fk|public.pourover_brews.pourover_brews_grinder_owner_fk",
+        "n|con|public.pourover_brews.pourover_brews_grinder_owner_fk"
+      ],
+      "reads": [
+        "n|tbl|public.pourover_brews",
+        "n|sch|public",
+        "n|tbl|public.grinders",
+        "n|sch|public",
+        "n|col|public.pourover_brews.grinder_id",
+        "n|col|public.pourover_brews.user_id",
+        "n|col|public.grinders.id",
+        "n|col|public.grinders.user_id",
+        "e|uniqueness|public.grinders.id.user_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "aeropress_brews",
+        "name": "aeropress_brews_coffee_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "coffee_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "coffees",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "aeropress_brews",
+        "name": "aeropress_brews_brewing_device_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "brewing_device_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "brewing_devices",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "aeropress_brews",
+        "name": "aeropress_brews_grinder_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "grinder_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "grinders",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cold_brew_brews",
+        "name": "cold_brew_brews_coffee_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "coffee_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "coffees",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cold_brew_brews",
+        "name": "cold_brew_brews_brewing_device_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "brewing_device_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "brewing_devices",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "cold_brew_brews",
+        "name": "cold_brew_brews_grinder_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "grinder_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "grinders",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "dialed_in_brews",
+        "name": "dialed_in_brews_coffee_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "coffee_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "coffees",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "dialed_in_brews",
+        "name": "dialed_in_brews_brewing_device_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "brewing_device_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "brewing_devices",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shots",
+        "name": "espresso_shots_coffee_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "coffee_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "coffees",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shots",
+        "name": "espresso_shots_brewing_device_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "brewing_device_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "brewing_devices",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "espresso_shots",
+        "name": "espresso_shots_grinder_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "grinder_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "grinders",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "frenchpress_brews",
+        "name": "frenchpress_brews_coffee_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "coffee_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "coffees",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "frenchpress_brews",
+        "name": "frenchpress_brews_brewing_device_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "brewing_device_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "brewing_devices",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "frenchpress_brews",
+        "name": "frenchpress_brews_grinder_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "grinder_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "grinders",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "pourover_brews",
+        "name": "pourover_brews_coffee_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "coffee_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "coffees",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "pourover_brews",
+        "name": "pourover_brews_brewing_device_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "brewing_device_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "brewing_devices",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "pourover_brews",
+        "name": "pourover_brews_grinder_owner_fk",
+        "nameExplicit": true,
+        "columns": [
+          "grinder_id",
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "grinders",
+        "columnsTo": [
+          "id",
+          "user_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "brewing_devices",
+        "name": "brewing_devices_id_user_id_key",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "user_id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "coffees",
+        "name": "coffees_id_user_id_key",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "user_id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "grinders",
+        "name": "grinders_id_user_id_key",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "user_id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"espresso_shots\",\"espresso_shots_coffee_id_coffees_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"espresso_shots\",\"espresso_shots_grinder_id_grinders_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"espresso_shots\",\"espresso_shots_brewing_device_id_brewing_devices_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"aeropress_brews\",\"aeropress_brews_coffee_id_coffees_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"aeropress_brews\",\"aeropress_brews_grinder_id_grinders_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"aeropress_brews\",\"aeropress_brews_brewing_device_id_brewing_devices_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"pourover_brews\",\"pourover_brews_coffee_id_coffees_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"pourover_brews\",\"pourover_brews_grinder_id_grinders_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"pourover_brews\",\"pourover_brews_brewing_device_id_brewing_devices_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"frenchpress_brews\",\"frenchpress_brews_coffee_id_coffees_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"frenchpress_brews\",\"frenchpress_brews_grinder_id_grinders_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"frenchpress_brews\",\"frenchpress_brews_brewing_device_id_brewing_devices_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"cold_brew_brews\",\"cold_brew_brews_coffee_id_coffees_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"cold_brew_brews\",\"cold_brew_brews_grinder_id_grinders_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"cold_brew_brews\",\"cold_brew_brews_brewing_device_id_brewing_devices_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"dialed_in_brews\",\"dialed_in_brews_brewing_device_id_brewing_devices_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"dialed_in_brews\",\"dialed_in_brews_coffee_id_coffees_id_fkey\"]"
+    }
+  ]
+}

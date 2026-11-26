@@ -15,6 +15,7 @@ import {
   grantPlan,
   seedUsers,
   uniqFor,
+  writeLegacy,
 } from '../../test/trpc'
 
 // A Free user whose oldest Coffee has fallen off the Shelf, so every Brew on
@@ -291,19 +292,21 @@ describe('account.export', () => {
 
   it('omits another user’s Coffee or grinder nested on an owned Brew', async () => {
     // The API now refuses this; rows saved before it did can still exist.
-    const [shot] = await db
-      .insert(espressoShots)
-      .values({
-        userId: USER,
-        coffeeId: otherCoffeeId,
-        grinderId: otherGrinderId,
-        brewingDeviceId: userEspressoDeviceId,
-        dose: '20',
-        yield: '40',
-        time: 25,
-        grindSetting: 'cross-user',
-      })
-      .returning()
+    const [shot] = await writeLegacy((tx) =>
+      tx
+        .insert(espressoShots)
+        .values({
+          userId: USER,
+          coffeeId: otherCoffeeId,
+          grinderId: otherGrinderId,
+          brewingDeviceId: userEspressoDeviceId,
+          dose: '20',
+          yield: '40',
+          time: 25,
+          grindSetting: 'cross-user',
+        })
+        .returning(),
+    )
 
     const exported = await asUser.account.export()
     const brew = exported.brews.espresso.find((row) => row.id === shot.id)

@@ -13,7 +13,6 @@ import {
 } from '../lib/dialed-in-brew'
 import { sealedNow, withStampedShelf } from '../lib/shelf'
 import {
-  assertOwnCoffeeAndGrinder,
   onOwnCoffee,
   ownGear,
 } from '../lib/brew-ownership'
@@ -119,7 +118,6 @@ export const coldBrewBrewRouter = createTRPCRouter({
     .input(insertColdBrewBrewSchema)
     .mutation(async ({ ctx, input }) => {
       await assertColdBrewDevice(input.brewingDeviceId, ctx.session.user.id)
-      await assertOwnCoffeeAndGrinder(input, ctx.session.user.id)
 
       const [brew] = await withStampedShelf(ctx.session.user.id, ctx.plan, (tx) =>
         tx
@@ -136,7 +134,6 @@ export const coldBrewBrewRouter = createTRPCRouter({
       const { id, ...data } = input
 
       await assertColdBrewDevice(data.brewingDeviceId, ctx.session.user.id)
-      await assertOwnCoffeeAndGrinder(data, ctx.session.user.id)
 
       // Every edit stamps, not only a move, so a stale read of the Brew's
       // Coffee cannot skip the stamp (ADR-0004). A Sealed Brew reaches the
