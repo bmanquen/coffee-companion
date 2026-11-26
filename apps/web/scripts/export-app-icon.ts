@@ -16,6 +16,9 @@ function rasterPng(svg: Buffer, size: number) {
     new Resvg(svg, {
       background: 'transparent',
       fitTo: { mode: 'width', value: size },
+      // The icon has no text. Scanning every system font is nearly all of a
+      // render's time and took over 5s on a cold disk cache.
+      font: { loadSystemFonts: false },
     })
       .render()
       .asPng(),
