@@ -6,11 +6,10 @@ import {
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
-  getCoreRowModel,
-  getExpandedRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  useReactTable,
+  createExpandedRowModel,
+  createFilteredRowModel,
+  createSortedRowModel,
+  useTable,
 } from '@tanstack/react-table'
 import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -25,7 +24,11 @@ import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { BrewDialedInCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { SealedRowNotice } from '@/components/brews/sealed-row'
-import { DataTable, expanderColumn } from '@/components/data-table'
+import {
+  DataTable,
+  expanderColumn,
+  withRowModels,
+} from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -35,14 +38,21 @@ import { useTRPC } from '@/integrations/trpc/react'
 import { formatSteepMinutes } from '@/lib/brew'
 import type { ColdBrewBrewWithRelations } from '@/types'
 import type { CellContext, SortingState } from '@tanstack/react-table'
+import type { AppFeatures } from '@/components/data-table'
+
+const features = withRowModels({
+  expandedRowModel: createExpandedRowModel(),
+  filteredRowModel: createFilteredRowModel(),
+  sortedRowModel: createSortedRowModel(),
+})
 
 type Brew = ColdBrewBrewWithRelations
 
-function DialedInCell({ row }: CellContext<Brew, unknown>) {
+function DialedInCell({ row }: CellContext<AppFeatures, Brew, unknown>) {
   return <BrewDialedInCell brewingMethod="coldBrew" brew={row.original} />
 }
 
-function ActionsCell({ row }: CellContext<Brew, unknown>) {
+function ActionsCell({ row }: CellContext<AppFeatures, Brew, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const deleteBrew = useMutation(
@@ -78,7 +88,7 @@ function ActionsCell({ row }: CellContext<Brew, unknown>) {
   )
 }
 
-const columnHelper = createColumnHelper<Brew>()
+const columnHelper = createColumnHelper<AppFeatures, Brew>()
 
 // The dial-in summary (see ADR-0002): coffee identity, then the cold brew
 // levers — Grind · Dose · Water · Steep (steep in hours/minutes). Cold brew is
@@ -86,7 +96,7 @@ const columnHelper = createColumnHelper<Brew>()
 // Environment, days off roast and notes are demoted to the expander
 // (BrewDetails), reached on both the mobile card and the desktop sub-row
 // (see ADR-0003).
-const columns = [
+const columns = columnHelper.columns([
   columnHelper.display({
     id: 'dialedIn',
     header: '',
@@ -106,14 +116,14 @@ const columns = [
   columnHelper.accessor('dose', {
     header: 'Dose',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    sortingFn: (a, b) =>
+    sortFn: (a, b) =>
       Number(a.original.dose ?? 0) - Number(b.original.dose ?? 0),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('water', {
     header: 'Water',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    sortingFn: (a, b) =>
+    sortFn: (a, b) =>
       Number(a.original.water ?? 0) - Number(b.original.water ?? 0),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
@@ -131,7 +141,7 @@ const columns = [
     meta: { cardHideLabel: true },
   }),
   expanderColumn<Brew>(),
-]
+])
 
 // The Cold Brew log on /brews. Mirrors the other brew
 // sections: a per-coffee dialed-in toggle, the recipe columns, and per-row
@@ -166,7 +176,8 @@ export function ColdBrewBrewsSection() {
     [brews, coffeeId],
   )
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: visibleBrews,
     columns,
     // Both layouts collapse to the dial-in summary; expansion (accordion)
@@ -177,10 +188,6 @@ export function ColdBrewBrewsSection() {
     onGlobalFilterChange: setGlobalFilter,
     onExpandedChange: expansion.onExpandedChange,
     enableSorting: false,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
     // A Sealed Brew has no settings to reveal.
     getRowCanExpand: (row) => !row.original.sealed,
   })

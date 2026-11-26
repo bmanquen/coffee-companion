@@ -6,11 +6,10 @@ import {
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
-  getCoreRowModel,
-  getExpandedRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  useReactTable,
+  createExpandedRowModel,
+  createFilteredRowModel,
+  createSortedRowModel,
+  useTable,
 } from '@tanstack/react-table'
 import { Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -24,7 +23,11 @@ import { DeleteBrewDialog } from '@/components/brews/delete-brew-dialog'
 import { BrewDialedInCell } from '@/components/brews/dialed-in-toggle-cell'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { SealedRowNotice } from '@/components/brews/sealed-row'
-import { DataTable, expanderColumn } from '@/components/data-table'
+import {
+  DataTable,
+  expanderColumn,
+  withRowModels,
+} from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -34,16 +37,23 @@ import { useTRPC } from '@/integrations/trpc/react'
 import { formatBrewSeconds } from '@/lib/brew'
 import type { AeropressBrewWithRelations } from '@/types'
 import type { CellContext, SortingState } from '@tanstack/react-table'
+import type { AppFeatures } from '@/components/data-table'
+
+const features = withRowModels({
+  expandedRowModel: createExpandedRowModel(),
+  filteredRowModel: createFilteredRowModel(),
+  sortedRowModel: createSortedRowModel(),
+})
 
 type Brew = AeropressBrewWithRelations
 
-const columnHelper = createColumnHelper<Brew>()
+const columnHelper = createColumnHelper<AppFeatures, Brew>()
 
-function DialedInCell({ row }: CellContext<Brew, unknown>) {
+function DialedInCell({ row }: CellContext<AppFeatures, Brew, unknown>) {
   return <BrewDialedInCell brewingMethod="aeropress" brew={row.original} />
 }
 
-function ActionsCell({ row }: CellContext<Brew, unknown>) {
+function ActionsCell({ row }: CellContext<AppFeatures, Brew, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const deleteBrew = useMutation(
@@ -84,7 +94,7 @@ function ActionsCell({ row }: CellContext<Brew, unknown>) {
 // roast and notes are demoted to the expander (BrewDetails), reached on both the
 // mobile card and the desktop sub-row (see ADR-0003). AeroPress has no water
 // temp, so no method-specific `extra` field.
-const columns = [
+const columns = columnHelper.columns([
   columnHelper.display({
     id: 'dialedIn',
     header: '',
@@ -108,14 +118,14 @@ const columns = [
   columnHelper.accessor('dose', {
     header: 'Dose',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    sortingFn: (a, b) =>
+    sortFn: (a, b) =>
       Number(a.original.dose ?? 0) - Number(b.original.dose ?? 0),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('water', {
     header: 'Water',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    sortingFn: (a, b) =>
+    sortFn: (a, b) =>
       Number(a.original.water ?? 0) - Number(b.original.water ?? 0),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
@@ -133,7 +143,7 @@ const columns = [
     meta: { cardHideLabel: true },
   }),
   expanderColumn<Brew>(),
-]
+])
 
 // The AeroPress brew log on /brews. Mirrors the equipment
 // page's section components (heading + add button + filters + table).
@@ -167,7 +177,8 @@ export function AeropressBrewsSection() {
     [brews, coffeeId],
   )
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: visibleBrews,
     columns,
     // Both layouts collapse to the dial-in summary; expansion (accordion)
@@ -178,10 +189,6 @@ export function AeropressBrewsSection() {
     onGlobalFilterChange: setGlobalFilter,
     onExpandedChange: expansion.onExpandedChange,
     enableSorting: false,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
     // A Sealed Brew has no settings to reveal.
     getRowCanExpand: (row) => !row.original.sealed,
   })

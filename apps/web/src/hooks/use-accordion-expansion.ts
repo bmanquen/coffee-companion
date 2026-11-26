@@ -4,10 +4,10 @@ import type { ExpandedState, OnChangeFn } from '@tanstack/react-table'
 // Controlled row-expansion state that behaves as an accordion: opening one row
 // collapses whichever was open. TanStack's installed types don't expose an
 // `enableMultiRowExpansion` option, so we enforce single-open ourselves —
-// keeping only the newly-opened row id. Spread the result into useReactTable:
+// keeping only the newly-opened row id. Spread the result into useTable:
 //   const expansion = useAccordionExpansion()
-//   useReactTable({ ..., state: { expanded: expansion.expanded },
-//     onExpandedChange: expansion.onExpandedChange, getExpandedRowModel: ... })
+//   useTable({ ..., state: { expanded: expansion.expanded },
+//     onExpandedChange: expansion.onExpandedChange })
 export function useAccordionExpansion(): {
   expanded: ExpandedState
   onExpandedChange: OnChangeFn<ExpandedState>

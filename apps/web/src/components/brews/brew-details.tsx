@@ -6,6 +6,7 @@ import { sealedRowClass } from '@/components/brews/sealed-row'
 import { DetailList } from '@/components/detail-list'
 import { daysOffRoast as computeDaysOffRoast } from '@/lib/brew'
 import type { ReactNode } from 'react'
+import type { AppFeatures } from '@/components/data-table'
 
 export function brewLogRowClass(sealed: boolean, isDialedIn: boolean) {
   if (sealed) return sealedRowClass
@@ -118,7 +119,7 @@ export function dialedInCoffeeColumn<
     coffee: { name: string; roaster?: { name: string | null } | null }
   },
 >() {
-  return createColumnHelper<T>().accessor(
+  return createColumnHelper<AppFeatures, T>().accessor(
     (row) => coffeeOptionLabel(row.coffee),
     {
       id: 'coffee',

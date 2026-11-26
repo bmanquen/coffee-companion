@@ -5,17 +5,16 @@ import {
 } from '@tanstack/react-query'
 import {
   createColumnHelper,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
+  createFilteredRowModel,
+  createPaginatedRowModel,
+  createSortedRowModel,
+  useTable,
 } from '@tanstack/react-table'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { Pencil } from 'lucide-react'
 import { gearLimitSentence } from '@coffee-companion/api/lib/plan'
 import { useState } from 'react'
-import { DataTable } from '@/components/data-table'
+import { DataTable, withRowModels } from '@/components/data-table'
 import { DeleteWithBrewsDialog } from '@/components/delete-with-brews-dialog'
 import { EquipmentAddAction } from '@/components/equipment-add-action'
 import { H1 } from '@/components/typography/h1'
@@ -25,6 +24,13 @@ import { Input } from '@/components/ui/input'
 import { useTRPC } from '@/integrations/trpc/react'
 import { cn } from '@/lib/utils'
 import type { CellContext, SortingState } from '@tanstack/react-table'
+import type { AppFeatures } from '@/components/data-table'
+
+const features = withRowModels({
+  filteredRowModel: createFilteredRowModel(),
+  paginatedRowModel: createPaginatedRowModel(),
+  sortedRowModel: createSortedRowModel(),
+})
 
 export const Route = createFileRoute('/_authenticated/equipment/')({
   loader: ({ context }) => {
@@ -48,9 +54,9 @@ type Grinder = {
   brand: string
 }
 
-const columnHelper = createColumnHelper<Grinder>()
+const columnHelper = createColumnHelper<AppFeatures, Grinder>()
 
-function GrinderActionsCell({ row }: CellContext<Grinder, unknown>) {
+function GrinderActionsCell({ row }: CellContext<AppFeatures, Grinder, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const deleteGrinder = useMutation(
@@ -89,7 +95,7 @@ function GrinderActionsCell({ row }: CellContext<Grinder, unknown>) {
   )
 }
 
-const columns = [
+const columns = columnHelper.columns([
   // Card layout: Brand + Name make up the card title (see cardTitle); no body.
   columnHelper.accessor('brand', {
     header: 'Brand',
@@ -106,7 +112,7 @@ const columns = [
     enableSorting: false,
     meta: { cardHideLabel: true },
   }),
-]
+])
 
 type BrewingDevice = {
   id: string
@@ -115,9 +121,9 @@ type BrewingDevice = {
   type: { name: string }
 }
 
-const deviceColumnHelper = createColumnHelper<BrewingDevice>()
+const deviceColumnHelper = createColumnHelper<AppFeatures, BrewingDevice>()
 
-function DeviceActionsCell({ row }: CellContext<BrewingDevice, unknown>) {
+function DeviceActionsCell({ row }: CellContext<AppFeatures, BrewingDevice, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const deleteDevice = useMutation(
@@ -156,7 +162,7 @@ function DeviceActionsCell({ row }: CellContext<BrewingDevice, unknown>) {
   )
 }
 
-const deviceColumns = [
+const deviceColumns = deviceColumnHelper.columns([
   // Card layout: Brand + Name make up the card title (see cardTitle); Type shows
   // in the summary line. Equipment cards are flat — no expander (see grilling).
   deviceColumnHelper.accessor('brand', {
@@ -178,7 +184,7 @@ const deviceColumns = [
     enableSorting: false,
     meta: { cardHideLabel: true },
   }),
-]
+])
 
 function GrindersSection() {
   'use no memo'
@@ -191,17 +197,14 @@ function GrindersSection() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: grinders,
     columns,
     state: { sorting, globalFilter },
-    initialState: { pagination: { pageSize: 10 } },
+    initialState: { pagination: { pageIndex: 0, pageSize: 10 } },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
   })
 
   return (
@@ -254,17 +257,14 @@ function BrewingDevicesSection() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: devices,
     columns: deviceColumns,
     state: { sorting, globalFilter },
-    initialState: { pagination: { pageSize: 10 } },
+    initialState: { pagination: { pageIndex: 0, pageSize: 10 } },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
   })
 
   return (

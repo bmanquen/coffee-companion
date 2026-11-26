@@ -3,10 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
-  getCoreRowModel,
-  getExpandedRowModel,
-  getSortedRowModel,
-  useReactTable,
+  createExpandedRowModel,
+  createSortedRowModel,
+  useTable,
 } from '@tanstack/react-table'
 import { Pencil, Plus } from 'lucide-react'
 import { createContext, useContext, useMemo, useState } from 'react'
@@ -21,7 +20,11 @@ import { BrewDialedInCell } from '@/components/brews/dialed-in-toggle-cell'
 import { EspressoShotPager } from '@/components/brews/espresso-shot-pager'
 import { CoffeeFilter } from '@/components/coffee-filter'
 import { SealedRowNotice } from '@/components/brews/sealed-row'
-import { DataTable, expanderColumn } from '@/components/data-table'
+import {
+  DataTable,
+  expanderColumn,
+  withRowModels,
+} from '@/components/data-table'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -39,6 +42,12 @@ import {
 } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 import type { CellContext, SortingState } from '@tanstack/react-table'
+import type { AppFeatures } from '@/components/data-table'
+
+const features = withRowModels({
+  expandedRowModel: createExpandedRowModel(),
+  sortedRowModel: createSortedRowModel(),
+})
 
 type Shot = {
   id: string
@@ -58,15 +67,15 @@ type Shot = {
   sealed: boolean
 }
 
-const columnHelper = createColumnHelper<Shot>()
+const columnHelper = createColumnHelper<AppFeatures, Shot>()
 
 const RemoveShotContext = createContext<(shotId: string) => void>(() => {})
 
-function DialedInCell({ row }: CellContext<Shot, unknown>) {
+function DialedInCell({ row }: CellContext<AppFeatures, Shot, unknown>) {
   return <BrewDialedInCell brewingMethod="espresso" brew={row.original} />
 }
 
-function ActionsCell({ row }: CellContext<Shot, unknown>) {
+function ActionsCell({ row }: CellContext<AppFeatures, Shot, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const removeShot = useContext(RemoveShotContext)
@@ -114,7 +123,7 @@ function ActionsCell({ row }: CellContext<Shot, unknown>) {
 // notes are demoted to the expander (BrewDetails), reached on both the mobile
 // card and the desktop sub-row (see ADR-0003). Leading dialed-in toggle and
 // trailing edit/delete are cardHideLabel controls; the chevron is desktop-only.
-const columns = [
+const columns = columnHelper.columns([
   columnHelper.display({
     id: 'dialedIn',
     header: '',
@@ -135,14 +144,14 @@ const columns = [
   columnHelper.accessor('dose', {
     header: 'Dose',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    sortingFn: (a, b) =>
+    sortFn: (a, b) =>
       Number(a.original.dose ?? 0) - Number(b.original.dose ?? 0),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   columnHelper.accessor('yield', {
     header: 'Yield',
     cell: (info) => (info.getValue() ? `${info.getValue()}g` : '-'),
-    sortingFn: (a, b) =>
+    sortFn: (a, b) =>
       Number(a.original.yield ?? 0) - Number(b.original.yield ?? 0),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
@@ -160,7 +169,7 @@ const columns = [
     meta: { cardHideLabel: true },
   }),
   expanderColumn<Shot>(),
-]
+])
 
 // The Espresso brew log on /brews. Mirrors the equipment
 // page's section components (heading + add button + filters + table).
@@ -215,7 +224,8 @@ export function EspressoBrewsSection() {
     [coffees],
   )
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: shots,
     columns,
     // Both layouts collapse to the dial-in summary; expansion (accordion)
@@ -226,9 +236,6 @@ export function EspressoBrewsSection() {
     onExpandedChange: expansion.onExpandedChange,
     enableSorting: false,
     getRowId: (shot) => shot.id,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
     // A Sealed Brew has no settings to reveal.
     getRowCanExpand: (row) => !row.original.sealed,
   })

@@ -5,6 +5,7 @@ import { BrewFeed } from './brew-feed'
 import type * as ReactRouter from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
+import type { AppFeatures } from '@/components/data-table'
 
 vi.mock('@/components/ui/command', () => ({
   Command: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -49,7 +50,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 const BREW_FEED_PAGE_SIZE = 5
 const SHOTS_PER_COFFEE = 6
 
-const columns: Array<ColumnDef<ReturnType<typeof makeRecentShot>, unknown>> = [
+const columns: Array<ColumnDef<AppFeatures, ReturnType<typeof makeRecentShot>, unknown>> = [
   {
     accessorFn: (row) => row.coffee.name,
     id: 'coffee',

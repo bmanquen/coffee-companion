@@ -6,14 +6,17 @@ import {
 import { Link, createFileRoute } from '@tanstack/react-router'
 import {
   createColumnHelper,
-  getCoreRowModel,
-  getExpandedRowModel,
-  useReactTable,
+  createExpandedRowModel,
+  useTable,
 } from '@tanstack/react-table'
 import { CoffeeIcon, Pencil, Plus } from 'lucide-react'
 import { formatOriginNames } from '@/components/coffees/format-coffee-origins'
 import { CoffeeDetails } from '@/components/coffees/coffee-details'
-import { DataTable, expanderColumn } from '@/components/data-table'
+import {
+  DataTable,
+  expanderColumn,
+  withRowModels,
+} from '@/components/data-table'
 import { DeleteWithBrewsDialog } from '@/components/delete-with-brews-dialog'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
@@ -29,6 +32,11 @@ import {
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { useTRPC } from '@/integrations/trpc/react'
 import type { CellContext } from '@tanstack/react-table'
+import type { AppFeatures } from '@/components/data-table'
+
+const features = withRowModels({
+  expandedRowModel: createExpandedRowModel(),
+})
 
 export const Route = createFileRoute('/_authenticated/coffees/')({
   loader: ({ context }) => {
@@ -57,9 +65,11 @@ type CoffeeRow = {
   isDialedIn: boolean
 }
 
-const columnHelper = createColumnHelper<CoffeeRow>()
+const columnHelper = createColumnHelper<AppFeatures, CoffeeRow>()
 
-function CoffeeActionsCell({ row }: CellContext<CoffeeRow, unknown>) {
+function CoffeeActionsCell({
+  row,
+}: CellContext<AppFeatures, CoffeeRow, unknown>) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const deleteCoffee = useMutation(
@@ -101,7 +111,7 @@ function CoffeeActionsCell({ row }: CellContext<CoffeeRow, unknown>) {
 // varieties, the dialed-in espresso recipe and notes are demoted to the expander
 // (CoffeeDetails), reached on both the mobile card and the desktop sub-row (see
 // ADR-0003). The trailing chevron is desktop-only.
-const columns = [
+const columns = columnHelper.columns([
   columnHelper.accessor('name', {
     header: 'Name',
     meta: { cardTitle: true },
@@ -132,7 +142,7 @@ const columns = [
     meta: { cardHideLabel: true },
   }),
   expanderColumn<CoffeeRow>(),
-]
+])
 
 export function Coffee() {
   'use no memo'
@@ -141,7 +151,8 @@ export function Coffee() {
 
   const expansion = useAccordionExpansion()
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: coffees as Array<CoffeeRow>,
     columns,
     // Both layouts collapse to the identity summary; expansion (accordion)
@@ -150,8 +161,6 @@ export function Coffee() {
     // mobile, a desktop sub-row (see ADR-0003).
     state: { expanded: expansion.expanded },
     onExpandedChange: expansion.onExpandedChange,
-    getCoreRowModel: getCoreRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
     getRowCanExpand: () => true,
   })
 

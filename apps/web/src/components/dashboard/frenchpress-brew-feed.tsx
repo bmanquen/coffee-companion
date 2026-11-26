@@ -11,14 +11,18 @@ import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
 import { formatBrewSeconds } from '@/lib/brew'
 import type { FrenchpressBrewWithRelations } from '@/types'
+import type { AppFeatures } from '@/components/data-table'
 
-const columnHelper = createColumnHelper<FrenchpressBrewWithRelations>()
+const columnHelper = createColumnHelper<
+  AppFeatures,
+  FrenchpressBrewWithRelations
+>()
 
 // The dial-in summary (see ADR-0002): coffee identity, the Method Variant, then
 // the french press levers — grind, real weights (dose→water), and steep time.
 // Grinder, device, water temp, days off roast and notes live in the expander
 // (BrewDetails).
-const columns = [
+const columns = columnHelper.columns([
   dialedInCoffeeColumn<FrenchpressBrewWithRelations>(),
   columnHelper.accessor('method.name', {
     header: 'Method',
@@ -47,7 +51,7 @@ const columns = [
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   expanderColumn<FrenchpressBrewWithRelations>(),
-]
+])
 
 // The French Press tab of the dashboard: the full french press history as a
 // reference-only feed. Loads the method's getAll and hands it to BrewFeed.

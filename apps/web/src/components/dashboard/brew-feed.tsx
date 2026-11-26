@@ -1,16 +1,15 @@
 import { Link } from '@tanstack/react-router'
 import {
-  getCoreRowModel,
-  getExpandedRowModel,
-  getPaginationRowModel,
-  useReactTable,
+  createExpandedRowModel,
+  createPaginatedRowModel,
+  useTable,
 } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BrewsEmptyState } from '@/components/brews/brews-empty-state'
 import { SealedRowNotice, sealedRowClass } from '@/components/brews/sealed-row'
 import { CoffeeFilter } from '@/components/coffee-filter'
-import { DataTable } from '@/components/data-table'
+import { DataTable, withRowModels } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
@@ -18,6 +17,12 @@ import type { CoffeeFilterOption } from '@/components/coffee-filter'
 import type { ReactNode } from 'react'
 import type { ColumnDef, PaginationState, Row } from '@tanstack/react-table'
 import type { LinkProps } from '@tanstack/react-router'
+import type { AppFeatures } from '@/components/data-table'
+
+const features = withRowModels({
+  expandedRowModel: createExpandedRowModel(),
+  paginatedRowModel: createPaginatedRowModel(),
+})
 
 // The minimum a brew needs to expose to be shown in the feed: an id, whether
 // it's the dialed-in reference, and its coffee (for the highlight and filter).
@@ -61,8 +66,8 @@ export function BrewFeed<T extends BrewRow>({
   title: string
   brews: Array<T>
   // TanStack itself types its columns option with `any` for the cell value.
-  columns: Array<ColumnDef<T, any>>
-  renderDetails: (row: Row<T>) => ReactNode
+  columns: Array<ColumnDef<AppFeatures, T, any>>
+  renderDetails: (row: Row<AppFeatures, T>) => ReactNode
   newTo: LinkProps['to']
   logLabel: string
   emptyMessage: string
@@ -202,7 +207,8 @@ export function BrewFeed<T extends BrewRow>({
     })
   }, [visibleBrews.length])
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: visibleBrews,
     columns,
     // Accordion: opening one brew collapses the others (see grilling decision).
@@ -221,9 +227,6 @@ export function BrewFeed<T extends BrewRow>({
     autoResetPageIndex: false,
     // By id, so a filter or refresh cannot move the open row to another brew.
     getRowId: (brew) => brew.id,
-    getCoreRowModel: getCoreRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     // A Sealed Brew has no settings to reveal.
     getRowCanExpand: (row) => !row.original.sealed,
     enableSorting: false,

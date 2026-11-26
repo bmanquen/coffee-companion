@@ -1,4 +1,16 @@
-import { createColumnHelper, flexRender } from '@tanstack/react-table'
+import {
+  columnFilteringFeature,
+  createColumnHelper,
+  flexRender,
+  globalFilteringFeature,
+  rowExpandingFeature,
+  rowPaginationFeature,
+  rowSortingFeature,
+  sortFn_alphanumeric,
+  sortFn_datetime,
+  sortFn_text,
+  tableFeatures,
+} from '@tanstack/react-table'
 import {
   ArrowDown,
   ArrowUp,
@@ -21,17 +33,55 @@ import { cn } from '@/lib/utils'
 import type { ReactNode } from 'react'
 import type {
   Cell,
+  CellData,
   Column,
   Row,
   RowData,
+  TableFeatures,
   Table as TanstackTable,
 } from '@tanstack/react-table'
+
+// Every table registers the same features. TanStack Table v9 types are
+// invariant in their feature set, so one set lets DataTable and the shared
+// columns type-check against every table. The sort fns are the ones v8's
+// 'auto' sorting picked from.
+export const appFeatures = tableFeatures({
+  columnFilteringFeature,
+  globalFilteringFeature,
+  rowExpandingFeature,
+  rowPaginationFeature,
+  rowSortingFeature,
+  sortFns: {
+    alphanumeric: sortFn_alphanumeric,
+    datetime: sortFn_datetime,
+    text: sortFn_text,
+  },
+})
+export type AppFeatures = typeof appFeatures
+
+// Tables differ only in the row models they register, as in v8: a table
+// without a paginated row model shows every row.
+export function withRowModels(
+  rowModels: Pick<
+    TableFeatures,
+    | 'expandedRowModel'
+    | 'filteredRowModel'
+    | 'paginatedRowModel'
+    | 'sortedRowModel'
+  >,
+): AppFeatures {
+  return { ...appFeatures, ...rowModels }
+}
 
 // Controls how each column renders in the card layout (< lg: phones + tablets).
 // A card is split into an always-visible summary and a detail region revealed
 // on expand (see DataCard). Columns with no meta become a labeled detail row.
 declare module '@tanstack/react-table' {
-  interface ColumnMeta<TData extends RowData, TValue> {
+  interface ColumnMeta<
+    in out TFeatures extends TableFeatures,
+    in out TData extends RowData,
+    TValue extends CellData = CellData,
+  > {
     // Render this column as the card's heading (no label).
     cardTitle?: boolean
     // Render this column's value without a label, in the card's top-right
@@ -59,8 +109,8 @@ declare module '@tanstack/react-table' {
 // renderSubComponent. Generic across entities (brews, coffees): the desktop
 // table shows this column; the mobile card renders its own toggle (hence
 // cardHidden).
-export function expanderColumn<T>() {
-  return createColumnHelper<T>().display({
+export function expanderColumn<T extends RowData>() {
+  return createColumnHelper<AppFeatures, T>().display({
     id: 'expander',
     header: '',
     cell: ({ row }) =>
@@ -80,7 +130,9 @@ export function expanderColumn<T>() {
 // small fixed thing. Left alone the table's auto layout gives them an equal
 // share of the width; w-px plus nowrap shrinks them to their content and hands
 // the rest back to the data.
-function isControlColumn<T>(column: Column<T, unknown>): boolean {
+function isControlColumn<T extends RowData>(
+  column: Column<AppFeatures, T, unknown>,
+): boolean {
   const meta = column.columnDef.meta
   return Boolean(meta?.cardHideLabel || meta?.cardHidden)
 }
@@ -89,7 +141,9 @@ const controlColumnClass = 'w-px whitespace-nowrap'
 
 // The card layout has no header row, so derive a label from the column's
 // header when it's a plain string, falling back to the column id.
-function cardLabel<T>(column: Column<T, unknown>): string {
+function cardLabel<T extends RowData>(
+  column: Column<AppFeatures, T, unknown>,
+): string {
   const header = column.columnDef.header
   return typeof header === 'string' ? header : column.id
 }
@@ -100,11 +154,11 @@ function hasSummaryValue(value: unknown): boolean {
 
 // A stack of label/value rows for a card's expanded detail region — one field
 // per row, with labels aligned in a fixed-width column so values line up.
-function CardRows<T>({
+function CardRows<T extends RowData>({
   cells,
   className,
 }: {
-  cells: Array<Cell<T, unknown>>
+  cells: Array<Cell<AppFeatures, T, unknown>>
   className?: string
 }) {
   'use no memo'
@@ -131,19 +185,19 @@ function CardRows<T>({
 // When a record has no detail (e.g. equipment), the card is flat: no chevron,
 // not tappable. Otherwise tapping the card toggles its detail; action buttons
 // stop the tap so they don't also expand it.
-function DataCard<T>({
+function DataCard<T extends RowData>({
   row,
   renderSubComponent,
   replaceRow,
   className,
 }: {
-  row: Row<T>
-  renderSubComponent?: (row: Row<T>) => ReactNode
-  replaceRow?: (row: Row<T>) => ReactNode | null
+  row: Row<AppFeatures, T>
+  renderSubComponent?: (row: Row<AppFeatures, T>) => ReactNode
+  replaceRow?: (row: Row<AppFeatures, T>) => ReactNode | null
   className?: string
 }) {
   'use no memo'
-  const cells = row.getVisibleCells()
+  const cells = row.getAllCells()
   const titleCells = cells.filter(
     (cell) => cell.column.columnDef.meta?.cardTitle,
   )
@@ -298,29 +352,29 @@ function DataCard<T>({
   )
 }
 
-interface DataTableProps<T> {
-  table: TanstackTable<T>
+interface DataTableProps<T extends RowData> {
+  table: TanstackTable<AppFeatures, T>
   // When provided, rows become clickable to toggle an expanded detail row
   // rendered by this function. Requires the table to enable row expansion
-  // (getExpandedRowModel + getRowCanExpand).
-  renderSubComponent?: (row: Row<T>) => ReactNode
+  // (expandedRowModel + getRowCanExpand).
+  renderSubComponent?: (row: Row<AppFeatures, T>) => ReactNode
   // When it returns a node, the row's cells are replaced by that node spanning
   // every column but the row's title — for a row whose data is unavailable
   // rather than absent. Such a row is not clickable and cannot expand.
-  replaceRow?: (row: Row<T>) => ReactNode | null
+  replaceRow?: (row: Row<AppFeatures, T>) => ReactNode | null
   // When true, renders pagination controls and pads the current page with
   // blank rows so the table keeps a constant height that fits a full page.
-  // Requires the table to enable pagination (getPaginationRowModel).
+  // Requires the table to enable pagination (paginatedRowModel).
   paginated?: boolean
   // Extra classes applied per row (desktop <tr>) and per card (mobile), derived
   // from the row's data — e.g. to highlight rows that match some condition.
-  rowClassName?: (row: Row<T>) => string | undefined
+  rowClassName?: (row: Row<AppFeatures, T>) => string | undefined
   // When provided, Next stays enabled on the last page and calls this instead,
   // for a table whose rows continue past what is loaded.
   loadNextPage?: () => void
 }
 
-export function DataTable<T>({
+export function DataTable<T extends RowData>({
   table,
   renderSubComponent,
   replaceRow,
@@ -400,7 +454,7 @@ export function DataTable<T>({
                 // and gives the rest of its width to the replacement. The
                 // columns before the title still render, empty, so the title
                 // stays under its own header instead of sliding left.
-                const allCells = row.getVisibleCells()
+                const allCells = row.getAllCells()
                 const lastTitle = allCells.reduce(
                   (last, cell, index) =>
                     cell.column.columnDef.meta?.cardTitle ? index : last,
@@ -454,7 +508,7 @@ export function DataTable<T>({
                   {renderSubComponent && replacement == null && (
                     <TableRow className="border-0 hover:bg-transparent">
                       <TableCell
-                        colSpan={row.getVisibleCells().length}
+                        colSpan={row.getAllCells().length}
                         className="border-0 p-0"
                       >
                         <div
@@ -502,7 +556,7 @@ export function DataTable<T>({
       {paginated && (
         <div className="flex items-center justify-between px-2 pt-4">
           <p className="text-sm text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of{' '}
+            Page {table.store.state.pagination.pageIndex + 1} of{' '}
             {table.getPageCount() || 1}
           </p>
           <div className="flex items-center gap-2">
