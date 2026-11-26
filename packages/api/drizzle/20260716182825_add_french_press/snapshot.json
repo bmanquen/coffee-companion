@@ -1,6 +1,6 @@
 {
   "type": "diff",
-  "version": "9",
+  "version": "10",
   "dialect": "postgres",
   "id": "5be178bf-31bb-4094-8914-88aa5d24c0e4",
   "prevIds": [
@@ -641,7 +641,6 @@
         "where": null,
         "with": "",
         "method": "btree",
-        "concurrently": false,
         "entityType": "indexes"
       }
     },
@@ -672,7 +671,6 @@
         "where": null,
         "with": "",
         "method": "btree",
-        "concurrently": false,
         "entityType": "indexes"
       }
     },
@@ -703,7 +701,6 @@
         "where": "is_dialed_in",
         "with": "",
         "method": "btree",
-        "concurrently": false,
         "entityType": "indexes"
       }
     },
@@ -727,7 +724,6 @@
         "where": null,
         "with": "",
         "method": "btree",
-        "concurrently": false,
         "entityType": "indexes"
       }
     },
