@@ -9,9 +9,10 @@ runs:
     # here as well, the two can drift and the action fails the run.
     - uses: pnpm/action-setup@v6
 
+    # Railway's Railpack reads the same file, so CI and production share one Node pin.
     - uses: actions/setup-node@v7
       with:
-        node-version: 22
+        node-version-file: .nvmrc
         cache: pnpm
 
     - name: Install dependencies
