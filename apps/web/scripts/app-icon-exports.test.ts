@@ -143,7 +143,10 @@ describe('app icon exports', () => {
     expect(svg).toContain('#2D4A3E')
     expect(svg).not.toContain('c2pa')
     // The export loads no fonts, so text would vanish from the icons.
-    expect(svg).not.toContain('<text')
+    const doc = new DOMParser().parseFromString(svg, 'image/svg+xml')
+    expect(
+      doc.getElementsByTagNameNS('http://www.w3.org/2000/svg', 'text'),
+    ).toHaveLength(0)
   })
 
   it('emits a PNG at each store and listing size', () => {
