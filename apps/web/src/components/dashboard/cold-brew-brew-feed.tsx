@@ -11,15 +11,19 @@ import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
 import { formatSteepMinutes } from '@/lib/brew'
 import type { ColdBrewBrewWithRelations } from '@/types'
+import type { AppFeatures } from '@/components/data-table'
 
-const columnHelper = createColumnHelper<ColdBrewBrewWithRelations>()
+const columnHelper = createColumnHelper<
+  AppFeatures,
+  ColdBrewBrewWithRelations
+>()
 
 // The dial-in summary (see ADR-0002): coffee identity, then the cold brew
 // levers — grind, real weights (dose→water), steep time (in hours/minutes, not
 // seconds). Cold brew is methodless (ADR-0001), so no
 // Method Variant column. Grinder, device, Brew Environment, days off roast and
 // notes live in the expander (BrewDetails).
-const columns = [
+const columns = columnHelper.columns([
   dialedInCoffeeColumn<ColdBrewBrewWithRelations>(),
   columnHelper.accessor('grindSetting', {
     header: 'Grind',
@@ -44,7 +48,7 @@ const columns = [
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   expanderColumn<ColdBrewBrewWithRelations>(),
-]
+])
 
 // The Cold Brew tab of the dashboard: the full cold brew history as a
 // reference-only feed. Loads the method's getAll and hands it to BrewFeed.

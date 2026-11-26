@@ -1,24 +1,31 @@
 import {
   createColumnHelper,
-  getCoreRowModel,
-  getExpandedRowModel,
-  getPaginationRowModel,
-  useReactTable,
+  createExpandedRowModel,
+  createPaginatedRowModel,
+  useTable,
 } from '@tanstack/react-table'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
-import { DataTable } from './data-table'
+import { DataTable, appFeatures, withRowModels } from './data-table'
 import type { ColumnDef, Row } from '@tanstack/react-table'
+import type { AppFeatures } from './data-table'
 import type { ReactNode } from 'react'
+
+const pagedFeatures = withRowModels({
+  paginatedRowModel: createPaginatedRowModel(),
+})
+const expandingFeatures = withRowModels({
+  expandedRowModel: createExpandedRowModel(),
+})
 
 type CoffeeRow = { name: string; roaster: string; notes?: string }
 
-const columnHelper = createColumnHelper<CoffeeRow>()
-const columns = [
+const columnHelper = createColumnHelper<AppFeatures, CoffeeRow>()
+const columns = columnHelper.columns([
   columnHelper.accessor('name', { header: 'Coffee' }),
   columnHelper.accessor('roaster', { header: 'Roaster' }),
-]
+])
 
 // DataTable takes a built TanStack Table instance; this wrapper supplies one.
 function DataTableHarness({
@@ -27,13 +34,13 @@ function DataTableHarness({
   rowClassName,
 }: {
   data: Array<CoffeeRow>
-  columns?: Array<ColumnDef<CoffeeRow, string>>
-  rowClassName?: (row: Row<CoffeeRow>) => string | undefined
+  columns?: Array<ColumnDef<AppFeatures, CoffeeRow, any>>
+  rowClassName?: (row: Row<AppFeatures, CoffeeRow>) => string | undefined
 }) {
-  const table = useReactTable({
+  const table = useTable({
+    features: appFeatures,
     data,
     columns: cols,
-    getCoreRowModel: getCoreRowModel(),
   })
   return <DataTable table={table} rowClassName={rowClassName} />
 }
@@ -48,11 +55,10 @@ function cardRegion(container: HTMLElement): HTMLElement {
 // Pagination is opt-in, and needs the paginated row model plus a page size the
 // data actually exceeds — otherwise both controls sit disabled.
 function PaginatedHarness({ data }: { data: Array<CoffeeRow> }) {
-  const table = useReactTable({
+  const table = useTable({
+    features: pagedFeatures,
     data,
     columns,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     initialState: { pagination: { pageIndex: 0, pageSize: 1 } },
   })
   return <DataTable table={table} paginated />
@@ -150,7 +156,7 @@ describe('DataTable', () => {
         cell: (info) => info.getValue(),
         meta: { cardFullWidth: true },
       }),
-    ] as Array<ColumnDef<CoffeeRow, string>>
+    ] as Array<ColumnDef<AppFeatures, CoffeeRow, any>>
 
     it('renders a cardFullWidth column outside the two-column body', () => {
       const { container } = render(
@@ -189,7 +195,7 @@ describe('DataTable', () => {
           cell: (info) => info.getValue(),
           meta: { cardFullWidth: true },
         }),
-      ] as Array<ColumnDef<CoffeeRow, string>>
+      ] as Array<ColumnDef<AppFeatures, CoffeeRow, any>>
       const { container } = render(
         <DataTableHarness
           columns={onlyNotes}
@@ -210,7 +216,7 @@ describe('DataTable', () => {
       grind: string
       grinder: string
     }
-    const brewHelper = createColumnHelper<BrewLike>()
+    const brewHelper = createColumnHelper<AppFeatures, BrewLike>()
     // name = title, grind = summary (labeled), grinder = detail (default).
     const brewColumns = [
       brewHelper.accessor('name', {
@@ -222,7 +228,7 @@ describe('DataTable', () => {
         meta: { cardSummary: true, cardSummaryLabel: true },
       }),
       brewHelper.accessor('grinder', { header: 'Grinder' }),
-    ] as Array<ColumnDef<BrewLike, string>>
+    ] as Array<ColumnDef<AppFeatures, BrewLike, any>>
 
     // A DataTable with accordion expansion wired (as every real caller does).
     function ExpandableHarness({
@@ -231,17 +237,16 @@ describe('DataTable', () => {
       renderSubComponent,
     }: {
       data: Array<BrewLike>
-      columns: Array<ColumnDef<BrewLike, string>>
-      renderSubComponent?: (row: Row<BrewLike>) => ReactNode
+      columns: Array<ColumnDef<AppFeatures, BrewLike, any>>
+      renderSubComponent?: (row: Row<AppFeatures, BrewLike>) => ReactNode
     }) {
       const expansion = useAccordionExpansion()
-      const table = useReactTable({
+      const table = useTable({
+        features: expandingFeatures,
         data,
         columns: cols,
         state: { expanded: expansion.expanded },
         onExpandedChange: expansion.onExpandedChange,
-        getCoreRowModel: getCoreRowModel(),
-        getExpandedRowModel: getExpandedRowModel(),
         getRowCanExpand: () => true,
       })
       return (
@@ -259,7 +264,7 @@ describe('DataTable', () => {
 
     it('omits a summary cell whose renderer returns nothing', () => {
       type BrewWithRatio = BrewLike & { ratio: string | null }
-      const helper = createColumnHelper<BrewWithRatio>()
+      const helper = createColumnHelper<AppFeatures, BrewWithRatio>()
       const columnsWithRatio = [
         helper.accessor('name', {
           header: 'Coffee',
@@ -278,17 +283,16 @@ describe('DataTable', () => {
             cardSkipEmpty: true,
           },
         }),
-      ] as Array<ColumnDef<BrewWithRatio, string | null>>
+      ] as Array<ColumnDef<AppFeatures, BrewWithRatio, any>>
 
       function RatioHarness({ data }: { data: Array<BrewWithRatio> }) {
         const expansion = useAccordionExpansion()
-        const table = useReactTable({
+        const table = useTable({
+          features: expandingFeatures,
           data,
           columns: columnsWithRatio,
           state: { expanded: expansion.expanded },
           onExpandedChange: expansion.onExpandedChange,
-          getCoreRowModel: getCoreRowModel(),
-          getExpandedRowModel: getExpandedRowModel(),
           getRowCanExpand: () => true,
         })
         return <DataTable table={table} />
@@ -380,7 +384,7 @@ describe('DataTable', () => {
           header: 'Grind',
           meta: { cardSummary: true, cardSummaryLabel: true },
         }),
-      ] as Array<ColumnDef<BrewLike, string>>
+      ] as Array<ColumnDef<AppFeatures, BrewLike, any>>
       const { container } = render(
         <ExpandableHarness
           columns={flatColumns}
@@ -410,7 +414,7 @@ describe('DataTable', () => {
           ),
           meta: { cardHideLabel: true },
         }),
-      ] as Array<ColumnDef<BrewLike, string>>
+      ] as Array<ColumnDef<AppFeatures, BrewLike, any>>
       const { container } = render(
         <ExpandableHarness
           columns={actionColumns}

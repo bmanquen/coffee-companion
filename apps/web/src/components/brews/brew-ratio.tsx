@@ -1,11 +1,12 @@
 import { createColumnHelper } from '@tanstack/react-table'
 import { formatBrewRatio } from '@/lib/brew'
+import type { AppFeatures } from '@/components/data-table'
 
 // Computed 1:x as its own summary piece — derived, never stored, never typed.
 export function ratioColumn<T extends { dose: string | null }>(
   output: (row: T) => string | null,
 ) {
-  return createColumnHelper<T>().accessor(
+  return createColumnHelper<AppFeatures, T>().accessor(
     (row) => formatBrewRatio(row.dose, output(row)),
     {
       id: 'ratio',
