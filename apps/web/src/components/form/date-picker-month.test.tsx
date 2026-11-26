@@ -134,4 +134,21 @@ describe('DatePicker month', () => {
       expectedYear,
     )
   })
+
+  it('keeps an open calendar clickable when the form re-renders', async () => {
+    const today = new Date()
+    const { rerender } = render(<Harness />)
+    await openPicker()
+    const day = screen.getByRole('button', { name: SELECTED_DAY_NAME })
+
+    // An async prefill landing while the calendar is open re-renders it.
+    rerender(<Harness />)
+    await act(async () => {
+      fireEvent.click(day)
+    })
+
+    expect(screen.getByTestId('stored-roast-date').textContent).toBe(
+      `"${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${SELECTED_DAY}"`,
+    )
+  })
 })
