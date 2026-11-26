@@ -18,15 +18,19 @@ import {
 } from '@/hooks/use-espresso-shot-pages'
 import { useTRPC } from '@/integrations/trpc/react'
 import type { EspressoShotWithRelations } from '@/types'
+import type { AppFeatures } from '@/components/data-table'
 
-const columnHelper = createColumnHelper<EspressoShotWithRelations>()
+const columnHelper = createColumnHelper<
+  AppFeatures,
+  EspressoShotWithRelations
+>()
 
 // The dial-in summary (see ADR-0002): coffee identity, then the levers you turn
 // dialing in espresso — grind, real weights (dose→yield), and time. Grinder,
 // device, days off roast and notes live in the expander
 // (BrewDetails). On desktop these are scannable columns; on mobile they collapse
 // into the card's summary line, everything else revealed on expand.
-export const espressoSummaryColumns = [
+export const espressoSummaryColumns = columnHelper.columns([
   dialedInCoffeeColumn<EspressoShotWithRelations>(),
   columnHelper.accessor('grindSetting', {
     header: 'Grind',
@@ -49,14 +53,14 @@ export const espressoSummaryColumns = [
     cell: (info) => (info.getValue() ? `${info.getValue()}s` : '-'),
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
-]
+])
 
 // The feed's own columns: the shared summary plus the expander that reveals
 // grinder, device, days off roast and notes.
-const columns = [
+const columns = columnHelper.columns([
   ...espressoSummaryColumns,
   expanderColumn<EspressoShotWithRelations>(),
-]
+])
 
 // onChoose runs whenever the user changes a filter, pages on, or opens a
 // shot, which the dashboard takes as choosing Espresso.

@@ -1,0 +1,35 @@
+name: Babel 8 readiness
+
+# @babel/core is held at 7 (see .github/dependabot.yml). This checks weekly
+# whether what blocks Babel 8 has been fixed, and opens one issue when it has.
+on:
+  schedule:
+    - cron: '23 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: Check whether Babel 8 is unblocked
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - id: readiness
+        run: node .github/scripts/babel8-readiness.mjs
+      - name: Open the upgrade issue
+        if: steps.readiness.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: 'Babel 8 is unblocked: remove the @babel/core hold'
+        run: |
+          if [ -n "$(gh issue list --state all --search "in:title \"$TITLE\"" --json number --jq '.[].number')" ]; then
+            echo "Issue already exists"; exit 0
+          fi
+          gh issue create --title "$TITLE" --body "The weekly readiness check passed: the latest React Compiler compiles as many functions in apps/web on Babel 8 as on Babel 7, and the newest babel-preset-expo our expo accepts no longer depends on Babel 7. See ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
+
+          To upgrade: remove the @babel/core ignore from .github/dependabot.yml (Dependabot then opens the bump), and delete this workflow and .github/scripts/babel8-readiness.mjs."

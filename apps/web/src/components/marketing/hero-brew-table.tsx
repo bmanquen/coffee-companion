@@ -1,5 +1,5 @@
-import { getCoreRowModel, useReactTable } from '@tanstack/react-table'
-import { DataTable } from '@/components/data-table'
+import { useTable } from '@tanstack/react-table'
+import { DataTable, appFeatures } from '@/components/data-table'
 import { espressoSummaryColumns } from '@/components/dashboard/espresso-brew-feed'
 import { sampleShots } from '@/components/marketing/sample-brews'
 import { Card } from '@/components/ui/card'
@@ -13,10 +13,10 @@ export function HeroBrewTable() {
   // Mirrors DataTable's own opt-out: the table instance is stable and mutable,
   // and the React Compiler would over-memoize its row model.
   'use no memo'
-  const table = useReactTable({
+  const table = useTable({
+    features: appFeatures,
     data: sampleShots,
     columns: espressoSummaryColumns,
-    getCoreRowModel: getCoreRowModel(),
     enableSorting: false,
   })
 

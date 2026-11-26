@@ -31,7 +31,7 @@ Links — which is why buying is a redirect away from the app and not a form ins
 Two versions matter and they are not the same thing.
 
 **What we send.** `packages/api/src/lib/billing.ts` passes no `apiVersion`, so the
-installed `stripe` package's own default applies — `2026-07-29.dahlia` in stripe@22.4.0.
+installed `stripe` package's own default applies — `2026-11-18.endive` in stripe@23.2.0.
 Leaving it unpinned is deliberate: the SDK's types are generated for exactly its default
 version, and an `apiVersion` string written here is free to drift away from the types
 sitting next to it. Upgrade the package to move the version; don't pin a newer string
@@ -39,15 +39,15 @@ against older types.
 
 **What we receive.** Webhook events are rendered in the version set on the endpoint
 itself, chosen when you create it in step 5. Set it to the version the SDK speaks —
-`2026-07-29.dahlia` — rather than whatever the account happens to default to. A version
+`2026-11-18.endive` — rather than whatever the account happens to default to. A version
 older or newer than the SDK is allowed to move fields the handlers read: basil moved
 `current_period_start` off the Subscription and onto its items, and that is exactly the
 field the subscription handler wants.
 
 Managed Payments itself only needs `2025-03-31.basil` or later, so the feature never
 constrains this. What does is `@better-auth/stripe`, whose peer range gates which SDK
-majors are installable — `^18 || ^19 || ^20 || ^21 || ^22` as of 1.6.5. Check it before
-bumping the SDK past a major.
+majors are installable — `^18 || ^19 || ^20 || ^21 || ^22 || ^23` as of 1.7.28. Check it
+before bumping the SDK past a major.
 
 ## 3. Create the Pro prices
 
@@ -139,7 +139,7 @@ test purchases locally through `stripe listen`.
 A destination in test mode may only take your **account's default** version or "latest" —
 an arbitrary version is not on offer. "Latest" moves the day Stripe ships a new one, which
 is the drift step 2 warns about. So set the account default to the version the SDK speaks
-(Workbench → **API versions**, currently `2026-07-29.dahlia`) and give the destination the
+(Workbench → **API versions**, currently `2026-11-18.endive`) and give the destination the
 default.
 
 That also settles local forwarding. `stripe listen` has no way to name a version — it

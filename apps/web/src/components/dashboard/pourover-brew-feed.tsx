@@ -11,14 +11,18 @@ import { expanderColumn } from '@/components/data-table'
 import { useTRPC } from '@/integrations/trpc/react'
 import { formatBrewSeconds } from '@/lib/brew'
 import type { PouroverBrewWithRelations } from '@/types'
+import type { AppFeatures } from '@/components/data-table'
 
-const columnHelper = createColumnHelper<PouroverBrewWithRelations>()
+const columnHelper = createColumnHelper<
+  AppFeatures,
+  PouroverBrewWithRelations
+>()
 
 // The dial-in summary (see ADR-0002): coffee identity, the Method Variant, then
 // the pour over levers — grind, real weights (dose→water), and brew time.
 // Grinder, device, water temp, days off roast and notes live
 // in the expander (BrewDetails).
-const columns = [
+const columns = columnHelper.columns([
   dialedInCoffeeColumn<PouroverBrewWithRelations>(),
   columnHelper.accessor('method.name', {
     header: 'Method',
@@ -47,7 +51,7 @@ const columns = [
     meta: { cardSummary: true, cardSummaryLabel: true },
   }),
   expanderColumn<PouroverBrewWithRelations>(),
-]
+])
 
 // The Pour Over tab of the dashboard: the full pour over history as a
 // reference-only feed. Loads the method's getAll and hands it to BrewFeed.
