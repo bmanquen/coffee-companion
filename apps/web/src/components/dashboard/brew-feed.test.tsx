@@ -273,6 +273,39 @@ describe('BrewFeed', () => {
     expect(screen.queryAllByText(/^Open:/)).toHaveLength(0)
   })
 
+  it('keeps an opened brew open when a refetch replaces the brews', async () => {
+    const guji = makeRecentShot({
+      id: 's1',
+      coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+    })
+    const feed = (brews: Array<ReturnType<typeof makeRecentShot>>) => (
+      <BrewFeed
+        title="Espresso"
+        brews={brews}
+        columns={columns}
+        renderDetails={(row) =>
+          row.getIsExpanded() ? <p>Open: {row.original.coffee.name}</p> : null
+        }
+        newTo="/espresso/new"
+        logLabel="Log Shot"
+        emptyMessage="No espresso shots yet."
+        emptyLinkLabel="Log your first shot"
+      />
+    )
+    const { rerender } = render(feed([guji]))
+    fireEvent.click(within(screen.getByRole('table')).getByText('Ethiopia Guji'))
+    expect(screen.getAllByText('Open: Ethiopia Guji')).not.toHaveLength(0)
+
+    // A refetch hands back equal brews in a new array.
+    rerender(feed([{ ...guji }]))
+    // The table schedules its auto-resets; let them land.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(screen.getAllByText('Open: Ethiopia Guji')).not.toHaveLength(0)
+  })
+
   it('does not call the history empty while another page is available', () => {
     renderFeed({ brews: [], hasMore: true })
     expect(screen.queryByText(/No espresso shots yet/i)).toBeNull()

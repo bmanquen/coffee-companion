@@ -228,6 +228,9 @@ export function BrewFeed<T extends BrewRow>({
     // By id, so a filter or refresh cannot move the open row to another brew.
     getRowId: (brew) => brew.id,
     // A Sealed Brew has no settings to reveal.
+    // v9 closes open rows whenever data changes, even a refetch with the
+    // same rows; v8 only did that for grouped rows.
+    autoResetExpanded: false,
     getRowCanExpand: (row) => !row.original.sealed,
     enableSorting: false,
   })

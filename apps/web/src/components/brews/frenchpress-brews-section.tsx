@@ -192,6 +192,9 @@ export function FrenchpressBrewsSection() {
     onExpandedChange: expansion.onExpandedChange,
     enableSorting: false,
     // A Sealed Brew has no settings to reveal.
+    // v9 closes open rows whenever data changes, even a refetch with the
+    // same rows; v8 only did that for grouped rows.
+    autoResetExpanded: false,
     getRowCanExpand: (row) => !row.original.sealed,
   })
 

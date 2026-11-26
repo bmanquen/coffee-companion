@@ -161,6 +161,9 @@ export function Coffee() {
     // mobile, a desktop sub-row (see ADR-0003).
     state: { expanded: expansion.expanded },
     onExpandedChange: expansion.onExpandedChange,
+    // v9 closes open rows whenever data changes, even a refetch with the
+    // same rows; v8 only did that for grouped rows.
+    autoResetExpanded: false,
     getRowCanExpand: () => true,
   })
 
