@@ -290,6 +290,20 @@ describe('coffee.create', () => {
     ).rejects.toThrow(/belong to its origin country/i)
   })
 
+  it('reports another user’s private country before a region mismatch', async () => {
+    const hidden = await asB.country.create({ name: uniq('Hidden') })
+    const colombia = await asA.country.create({ name: uniq('Colombia') })
+    const huila = await asA.region.create({
+      name: uniq('Huila'),
+      countryId: colombia.id,
+    })
+    await expect(
+      createCoffee(uniq('Hidden with region'), {
+        origins: [{ countryId: hidden.id, regionId: huila.id }],
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Country not found' })
+  })
+
   it('accepts a shared country', async () => {
     const [shared] = await db
       .insert(countries)

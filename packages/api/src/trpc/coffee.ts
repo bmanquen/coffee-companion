@@ -85,6 +85,15 @@ async function assertRegionsInCountries(
     // Missing or not the user's: the insert refuses it as not found.
     if (regionCountryId === undefined) continue
     if (regionCountryId !== origin.countryId) {
+      // Another user's private country: the insert refuses it as not found.
+      const country = await db.query.countries.findFirst({
+        where: {
+          id: origin.countryId,
+          OR: [{ userId: { isNull: true } }, { userId }],
+        },
+        columns: { id: true },
+      })
+      if (!country) continue
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: 'Region must belong to its origin country',
