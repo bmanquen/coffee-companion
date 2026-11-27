@@ -1,10 +1,12 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from '@testing-library/react-native'
+import { BackHandler } from 'react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SignedInHome } from '../auth/SignedInHome'
 import { writeHostTreeArtifacts } from '../test/host-tree'
@@ -276,6 +278,30 @@ describe('Coffees', () => {
       'wet-hulled',
     )
     expect(visibleCoffeeIds()).toEqual([LINTONG])
+  })
+
+  it('returns to the list on Android hardware back', async () => {
+    const addListener = jest.spyOn(BackHandler, 'addEventListener')
+    try {
+      await renderHome(fakeApi().api)
+      await openCoffeesTab()
+      await fireEvent.press(
+        screen.getByTestId(`${COFFEE_ROW_TEST_ID_PREFIX}${LINTONG}`),
+      )
+      await screen.findByTestId(COFFEE_DETAIL_TEST_ID)
+      const backListener = addListener.mock.calls.at(-1)?.[1]
+
+      let handled: boolean | null | undefined
+      await act(() => {
+        handled = backListener?.({ type: 'hardwareBackPress', timeStamp: 0 })
+      })
+
+      expect(handled).toBe(true)
+      expect(await screen.findByTestId(COFFEE_LIST_TEST_ID)).toBeTruthy()
+      expect(screen.queryByTestId(COFFEE_DETAIL_TEST_ID)).toBeNull()
+    } finally {
+      addListener.mockRestore()
+    }
   })
 
   it("retries a Coffee's Brews that failed to load", async () => {
