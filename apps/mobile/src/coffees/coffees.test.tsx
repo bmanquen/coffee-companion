@@ -113,7 +113,13 @@ const LINTONG_BREWS: Array<BrewRow> = [
     output: '250',
     time: 165,
   }),
-  brew({ id: 'shot-sealed', method: 'Espresso', sealed: true }),
+  // Sealed, yet still its Coffee's dial-in, as the seeded Free library has it.
+  brew({
+    id: 'shot-sealed',
+    method: 'Espresso',
+    sealed: true,
+    isDialedIn: true,
+  }),
   brew({
     id: 'cold-1',
     method: 'Cold Brew',
@@ -249,6 +255,10 @@ describe('Coffees', () => {
       // Cold Brew reads in hours and minutes, as on web.
       'Time 0m',
     ])
+    // As on web, a Sealed row keeps its method and date but no Dialed-in mark.
+    const sealed = screen.getByTestId(`${BREW_ROW_TEST_ID_PREFIX}shot-sealed`)
+    expect(within(sealed).getByText(/^Espresso · /)).toBeTruthy()
+    expect(within(sealed).queryByText(new RegExp(DIALED_IN))).toBeNull()
     const cold = screen.getByTestId(`${BREW_ROW_TEST_ID_PREFIX}cold-1`)
     expect(
       within(cold).getByText(new RegExp(`Cold Brew.*${DIALED_IN}`)),

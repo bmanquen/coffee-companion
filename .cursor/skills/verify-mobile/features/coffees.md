@@ -24,11 +24,14 @@ Preconditions:
 - Drive is React Native Testing Library in-process with an injected session and a fake Coffees API. It does not call the live API.
 
 - **Search and open a Coffee.** Run `helpers/control drive coffees`. The drive taps `testID=tab-coffees`, types each searchable field into `testID=coffee-search`, opens `testID=coffee-row-coffee-lintong`, and reads the Brews on `testID=coffee-detail`. `tree.txt` must show `Sumatra Lintong`, `Indonesia, Lintong, Wet-Hulled`, `Grind 24 · Dose 15g · Water 250g · Ratio 1:16.67 · Time 2m 45s`, and the Sealed copy.
-- **Device (where an AVD or iOS Simulator exists).** Run Maestro `flows/browse-coffees.yaml` signed in as `e2e-user-free` (set `EXPO_PUBLIC_E2E_USER=e2e-user-free`). It searches `wet-hulled`, opens Sumatra Lintong, and expects its seeded Shot to be Sealed, since that Coffee is off Free's Shelf. Back keeps the search; clearing it and opening Kenya Nyeri shows a readable Shot.
+- **Device (iOS Simulator or Android emulator).** Start the web app on `VERIFY_PORT` with the e2e seed (as `launch-device` does), then start Metro as the Free persona and run the flow from the sign-in screen:
+  - `cd apps/mobile && CI=1 EXPO_PUBLIC_API_URL=http://127.0.0.1:3910 EXPO_PUBLIC_E2E_USER=e2e-user-free pnpm exec expo start --dev-client --port 8081 --clear`
+  - `maestro --device <simulator UDID or emulator-5554> test .cursor/skills/verify-mobile/flows/browse-coffees.yaml`
+  - It searches `wet-hulled`, opens Sumatra Lintong, and expects its seeded Shot to be Sealed, since that Coffee is off Free's Shelf. Back keeps the search; searching `kenya` and opening Kenya Nyeri shows a readable Shot. Screenshots `coffees-list`, `coffees-search`, `coffee-detail-sealed` and `coffee-detail-readable` are the proof.
 
 ## Gotchas
 
-- The Coffee list does not page. The detail reads each non-Espresso method's whole history and keeps this Coffee's; Espresso pages through this Coffee's Shots only.
-- Search is client-side over what `coffee.getAll` returned. Sealing is the server's: a Sealed Brew arrives with its settings blanked.
-- `verify-device` defaults to the `sign-in-and-out` flow and `e2e-user-with-data`, which holds a Grant, so nothing is Sealed for it. Use `e2e-user-free` to see Sealed rows.
+- Search reads only the Coffee's own fields, never its Brews.
+- `verify-device` defaults to `sign-in-and-out` as `e2e-user-with-data`, which holds a Grant, so nothing is Sealed for it. Use `e2e-user-free` to see Sealed rows.
+- On iOS, a tap on a row under the keyboard types a letter, and Maestro's `hideKeyboard` can open another row. Narrow the search so the row sits above the keyboard.
 - Handles live in `apps/mobile/src/coffees/copy.ts`.

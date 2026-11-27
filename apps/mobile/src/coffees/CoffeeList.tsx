@@ -25,9 +25,9 @@ import {
 } from './copy'
 import type { CoffeeRow, CoffeesApi } from './types'
 
-export const COFFEES_QUERY_KEY = 'coffees'
+const COFFEES_QUERY_KEY = 'coffees'
 
-export function useCoffees(api: CoffeesApi, userId: string) {
+function useCoffees(api: CoffeesApi, userId: string) {
   return useQuery({
     queryKey: [COFFEES_QUERY_KEY, userId],
     queryFn: () => api.list(),

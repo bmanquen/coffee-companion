@@ -148,7 +148,8 @@ export function CoffeeDetail({
         >
           <Text style={styles.label}>
             {item.method} · {item.createdAt.toLocaleDateString()}
-            {item.isDialedIn ? ` · ${DIALED_IN}` : ''}
+            {/* As on web, a Sealed row shows no Dialed-in mark. */}
+            {item.isDialedIn && !item.sealed ? ` · ${DIALED_IN}` : ''}
           </Text>
           <Text testID={BREW_SUMMARY_TEST_ID}>{brewSummary(item)}</Text>
         </View>

@@ -155,7 +155,7 @@ export function createLiveCoffeesApi(): CoffeesApi {
           client.frenchpressBrew.getAll.query(),
           client.coldBrewBrew.getAll.query(),
         ])
-      const base = (
+      const toBrewRow = (
         brew: {
           id: string
           createdAt: Date
@@ -178,18 +178,22 @@ export function createLiveCoffeesApi(): CoffeesApi {
         output,
         time,
       })
-      const own = <T extends { coffeeId: string }>(brews: Array<T>) =>
+      const ofThisCoffee = <T extends { coffeeId: string }>(brews: Array<T>) =>
         brews.filter((brew) => brew.coffeeId === coffeeId)
       return [
-        ...shots.map((b) => base(b, 'Espresso', b.yield, b.time)),
-        ...own(pourOver).map((b) => base(b, 'Pour Over', b.water, b.brewTime)),
-        ...own(aeropress).map((b) =>
-          base(b, 'AeroPress', b.water, b.steepTime),
+        ...shots.map((b) => toBrewRow(b, 'Espresso', b.yield, b.time)),
+        ...ofThisCoffee(pourOver).map((b) =>
+          toBrewRow(b, 'Pour Over', b.water, b.brewTime),
         ),
-        ...own(frenchPress).map((b) =>
-          base(b, 'French Press', b.water, b.steepTime),
+        ...ofThisCoffee(aeropress).map((b) =>
+          toBrewRow(b, 'AeroPress', b.water, b.steepTime),
         ),
-        ...own(coldBrew).map((b) => base(b, 'Cold Brew', b.water, b.steepTime)),
+        ...ofThisCoffee(frenchPress).map((b) =>
+          toBrewRow(b, 'French Press', b.water, b.steepTime),
+        ),
+        ...ofThisCoffee(coldBrew).map((b) =>
+          toBrewRow(b, 'Cold Brew', b.water, b.steepTime),
+        ),
       ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     },
   }
