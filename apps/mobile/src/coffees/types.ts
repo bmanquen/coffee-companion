@@ -26,8 +26,9 @@ export type BrewRow = {
 
 export type CoffeesApi = {
   list: () => Promise<Array<CoffeeRow>>
-  // Newest first, across every Brewing Method.
-  listBrews: (coffeeId: string) => Promise<Array<BrewRow>>
+  // Newest first, across every Brewing Method. signal aborts every request
+  // when its query is cancelled.
+  listBrews: (coffeeId: string, signal?: AbortSignal) => Promise<Array<BrewRow>>
 }
 
 export const idleCoffeesApi: CoffeesApi = {

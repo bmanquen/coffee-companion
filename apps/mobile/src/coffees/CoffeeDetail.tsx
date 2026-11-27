@@ -56,7 +56,9 @@ export function CoffeeDetail({
 }) {
   const brews = useQuery({
     queryKey: [COFFEE_BREWS_QUERY_KEY, userId, coffee.id],
-    queryFn: () => api.listBrews(coffee.id),
+    // Reading signal lets closing the Coffee cancel the read, so reopening
+    // it starts a new one rather than joining one begun before a save.
+    queryFn: ({ signal }) => api.listBrews(coffee.id, signal),
     // A Brew logged on another tab must show the next time this opens.
     staleTime: 0,
   })
@@ -116,6 +118,22 @@ export function CoffeeDetail({
           <Text accessibilityRole="header" style={styles.subtitle}>
             {BREWS_HEADING}
           </Text>
+          {/* In the header, so a failed refresh shows beside Brews already read. */}
+          {brews.isError ? (
+            <View style={styles.error}>
+              <Text accessibilityRole="alert">
+                {apiErrorMessage(brews.error, ERROR_LOAD_BREWS)}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: retrying, busy: retrying }}
+                disabled={retrying}
+                onPress={() => void brews.refetch()}
+              >
+                <Text>{retrying ? TRYING_AGAIN : TRY_AGAIN}</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
       }
       ListEmptyComponent={
@@ -123,21 +141,7 @@ export function CoffeeDetail({
           <View accessibilityLabel={LOADING_BREWS}>
             <ActivityIndicator />
           </View>
-        ) : brews.isError ? (
-          <View style={styles.error}>
-            <Text accessibilityRole="alert">
-              {apiErrorMessage(brews.error, ERROR_LOAD_BREWS)}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: retrying, busy: retrying }}
-              disabled={retrying}
-              onPress={() => void brews.refetch()}
-            >
-              <Text>{retrying ? TRYING_AGAIN : TRY_AGAIN}</Text>
-            </Pressable>
-          </View>
-        ) : (
+        ) : brews.isError ? undefined : (
           <Text>{EMPTY_BREWS}</Text>
         )
       }

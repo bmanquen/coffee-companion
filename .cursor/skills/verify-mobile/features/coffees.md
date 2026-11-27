@@ -32,6 +32,6 @@ Preconditions:
 ## Gotchas
 
 - Search reads only the Coffee's own fields, never its Brews.
-- `verify-device` defaults to `sign-in-and-out` as `e2e-user-with-data`, which holds a Grant, so nothing is Sealed for it. Use `e2e-user-free` to see Sealed rows.
+- `launch-device` and `verify-device` always sign in as `e2e-user-with-data`, which holds a Grant, so nothing is Sealed for it, and the device recipe above fails on purpose there. Start Metro yourself as shown. `launch-device` also writes `apps/mobile/.env.development.local`, which wins over the shell's `EXPO_PUBLIC_E2E_USER`; run `helpers/control cleanup` (or check that file is absent) first.
 - On iOS, a tap on a row under the keyboard types a letter, and Maestro's `hideKeyboard` can open another row. Narrow the search so the row sits above the keyboard.
 - Handles live in `apps/mobile/src/coffees/copy.ts`.

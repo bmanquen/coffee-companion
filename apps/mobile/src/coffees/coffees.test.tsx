@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SignedInHome } from '../auth/SignedInHome'
 import { writeHostTreeArtifacts } from '../test/host-tree'
 import { CoffeeDetail } from './CoffeeDetail'
+import { CoffeeList } from './CoffeeList'
 import {
   BREW_ROW_TEST_ID_PREFIX,
   BREW_SUMMARY_TEST_ID,
@@ -22,6 +23,7 @@ import {
   DIALED_IN,
   EMPTY_COFFEES,
   ERROR_LOAD_BREWS,
+  ERROR_LOAD_COFFEES,
   NO_MATCHING_COFFEES,
   SEALED_BREW,
   TAB_COFFEES_TEST_ID,
@@ -237,7 +239,7 @@ describe('Coffees', () => {
     )
 
     const detail = await screen.findByTestId(COFFEE_DETAIL_TEST_ID)
-    expect(listBrews).toHaveBeenCalledWith(LINTONG)
+    expect(listBrews).toHaveBeenCalledWith(LINTONG, expect.any(AbortSignal))
     expect(within(detail).getByText('Dark')).toBeTruthy()
     expect(
       within(detail).getByText('Indonesia, Lintong, Wet-Hulled'),
@@ -378,6 +380,122 @@ describe('Coffees', () => {
 
       expect(
         await screen.findByTestId(`${BREW_ROW_TEST_ID_PREFIX}pour-1`),
+      ).toBeTruthy()
+    } finally {
+      client.clear()
+    }
+  })
+
+  // Production cache settings: test clients drop queries on unmount.
+  function productionClient(staleTime = 30_000) {
+    return new QueryClient({
+      defaultOptions: { queries: { staleTime, retry: false } },
+    })
+  }
+
+  it('does not reuse a Brews read begun before the Coffee closed', async () => {
+    const client = productionClient()
+    const reads: Array<AbortSignal | undefined> = []
+    const { api } = fakeApi({
+      listBrews: (_coffeeId, signal) => {
+        reads.push(signal)
+        // The first read never answers, as on a stalled network.
+        return reads.length === 1
+          ? new Promise(() => {})
+          : Promise.resolve(LINTONG_BREWS)
+      },
+    })
+    const detail = () => (
+      <QueryClientProvider client={client}>
+        <CoffeeDetail
+          api={api}
+          userId="user-ada"
+          coffee={COFFEES[1]}
+          onBack={() => {}}
+        />
+      </QueryClientProvider>
+    )
+    try {
+      const first = await render(detail())
+      await first.unmount()
+      await render(detail())
+
+      expect(
+        await screen.findByTestId(`${BREW_ROW_TEST_ID_PREFIX}pour-1`),
+      ).toBeTruthy()
+      expect(reads[0]?.aborted).toBe(true)
+    } finally {
+      client.clear()
+    }
+  })
+
+  it('shows a failed Brews refresh beside the Brews already read', async () => {
+    const client = productionClient()
+    let fail = false
+    const { api } = fakeApi({
+      listBrews: () =>
+        fail
+          ? Promise.reject(new Error('offline'))
+          : Promise.resolve(LINTONG_BREWS),
+    })
+    const detail = () => (
+      <QueryClientProvider client={client}>
+        <CoffeeDetail
+          api={api}
+          userId="user-ada"
+          coffee={COFFEES[1]}
+          onBack={() => {}}
+        />
+      </QueryClientProvider>
+    )
+    try {
+      const first = await render(detail())
+      await screen.findByTestId(`${BREW_ROW_TEST_ID_PREFIX}pour-1`)
+      await first.unmount()
+
+      fail = true
+      await render(detail())
+
+      expect(await screen.findByText(ERROR_LOAD_BREWS)).toBeTruthy()
+      expect(screen.getByText('Try again')).toBeTruthy()
+      expect(
+        screen.getByTestId(`${BREW_ROW_TEST_ID_PREFIX}pour-1`),
+      ).toBeTruthy()
+    } finally {
+      client.clear()
+    }
+  })
+
+  it('shows a failed Coffees refresh beside the Coffees already read', async () => {
+    const client = productionClient(0)
+    let fail = false
+    const { api } = fakeApi({
+      list: () =>
+        fail ? Promise.reject(new Error('offline')) : Promise.resolve(COFFEES),
+    })
+    const list = () => (
+      <QueryClientProvider client={client}>
+        <CoffeeList
+          api={api}
+          userId="user-ada"
+          search=""
+          onSearch={() => {}}
+          onOpen={() => {}}
+        />
+      </QueryClientProvider>
+    )
+    try {
+      const first = await render(list())
+      await screen.findByTestId(`${COFFEE_ROW_TEST_ID_PREFIX}${GUJI}`)
+      await first.unmount()
+
+      fail = true
+      await render(list())
+
+      expect(await screen.findByText(ERROR_LOAD_COFFEES)).toBeTruthy()
+      expect(screen.getByText('Try again')).toBeTruthy()
+      expect(
+        screen.getByTestId(`${COFFEE_ROW_TEST_ID_PREFIX}${GUJI}`),
       ).toBeTruthy()
     } finally {
       client.clear()

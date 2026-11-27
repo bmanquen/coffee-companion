@@ -164,4 +164,25 @@ describe('createLiveCoffeesApi', () => {
     // Shots are asked for this Coffee only, page after page.
     expect(shotCoffeeIds).toEqual([LINTONG, LINTONG])
   })
+
+  it("cancels a Coffee's Brew reads when its query is cancelled", async () => {
+    const signals: Array<AbortSignal | null | undefined> = []
+    global.fetch = jest.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      signals.push(init?.signal)
+      return new Promise<Response>(() => {})
+    }) as typeof fetch
+    const controller = new AbortController()
+
+    void createLiveCoffeesApi()
+      .listBrews(LINTONG, controller.signal)
+      .catch(() => {})
+    // tRPC batches on a later tick, after reading the session cookie.
+    for (let i = 0; i < 20 && signals.length === 0; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    controller.abort()
+
+    expect(signals.length).toBeGreaterThan(0)
+    expect(signals.every((signal) => signal?.aborted)).toBe(true)
+  })
 })

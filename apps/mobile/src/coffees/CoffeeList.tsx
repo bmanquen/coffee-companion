@@ -88,6 +88,22 @@ export function CoffeeList({
               style={styles.search}
             />
           ) : null}
+          {/* In the header, so a failed refresh shows beside Coffees already read. */}
+          {coffees.isError ? (
+            <View style={styles.error}>
+              <Text accessibilityRole="alert">
+                {apiErrorMessage(coffees.error, ERROR_LOAD_COFFEES)}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: retrying, busy: retrying }}
+                disabled={retrying}
+                onPress={() => void coffees.refetch()}
+              >
+                <Text>{retrying ? TRYING_AGAIN : TRY_AGAIN}</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
       }
       ListEmptyComponent={
@@ -95,21 +111,7 @@ export function CoffeeList({
           <View accessibilityLabel={LOADING_COFFEES}>
             <ActivityIndicator />
           </View>
-        ) : coffees.isError ? (
-          <View style={styles.error}>
-            <Text accessibilityRole="alert">
-              {apiErrorMessage(coffees.error, ERROR_LOAD_COFFEES)}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: retrying, busy: retrying }}
-              disabled={retrying}
-              onPress={() => void coffees.refetch()}
-            >
-              <Text>{retrying ? TRYING_AGAIN : TRY_AGAIN}</Text>
-            </Pressable>
-          </View>
-        ) : (
+        ) : coffees.isError ? undefined : (
           <Text>
             {coffees.data.length === 0 ? EMPTY_COFFEES : NO_MATCHING_COFFEES}
           </Text>

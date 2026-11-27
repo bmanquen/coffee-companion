@@ -124,15 +124,22 @@ export function createLiveEspressoApi(): EspressoApi {
 type Client = ReturnType<typeof createClient>
 
 // Every page of one Coffee's Shots, so its Brews list is complete.
-async function allShotsOf(client: Client, coffeeId: string) {
+async function allShotsOf(
+  client: Client,
+  coffeeId: string,
+  signal?: AbortSignal,
+) {
   const shots: Array<ShotRecord> = []
   let cursor: string | undefined
   do {
-    const page = await client.espressoShot.getRecent.query({
-      limit: 50,
-      coffeeId,
-      ...(cursor ? { cursor } : {}),
-    })
+    const page = await client.espressoShot.getRecent.query(
+      {
+        limit: 50,
+        coffeeId,
+        ...(cursor ? { cursor } : {}),
+      },
+      { signal },
+    )
     shots.push(...page.items)
     cursor = page.nextCursor ?? undefined
   } while (cursor)
@@ -143,17 +150,20 @@ export function createLiveCoffeesApi(): CoffeesApi {
   const client = createClient()
   return {
     list: () => client.coffee.getAll.query(),
-    async listBrews(coffeeId: string): Promise<Array<BrewRow>> {
+    async listBrews(
+      coffeeId: string,
+      signal?: AbortSignal,
+    ): Promise<Array<BrewRow>> {
       // shortcut: the other methods have no per-Coffee feed, so this reads
       // each method's whole (sealed) history and keeps this Coffee's; add a
       // coffeeId input to their getAll if histories grow large.
       const [shots, pourOver, aeropress, frenchPress, coldBrew] =
         await Promise.all([
-          allShotsOf(client, coffeeId),
-          client.pouroverBrew.getAll.query(),
-          client.aeropressBrew.getAll.query(),
-          client.frenchpressBrew.getAll.query(),
-          client.coldBrewBrew.getAll.query(),
+          allShotsOf(client, coffeeId, signal),
+          client.pouroverBrew.getAll.query(undefined, { signal }),
+          client.aeropressBrew.getAll.query(undefined, { signal }),
+          client.frenchpressBrew.getAll.query(undefined, { signal }),
+          client.coldBrewBrew.getAll.query(undefined, { signal }),
         ])
       const toBrewRow = (
         brew: {
