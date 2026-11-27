@@ -49,7 +49,7 @@ export const plans: Array<Plan> = [
   {
     id: 'pro',
     name: 'Pro',
-    tagline: 'Your whole history, searchable, on as much gear as you own.',
+    tagline: 'Your whole history, on as much gear as you own.',
     price: { monthly: 4.99, annual: 44.99 },
     sellable: true,
     cta: 'Subscribe',
@@ -73,14 +73,6 @@ export const planFeatures: Array<PlanFeature> = [
       free: 'Your 5 most-recently-brewed coffees',
       pro: 'Everything',
       proPlus: 'Everything',
-    },
-  },
-  {
-    label: 'Search',
-    values: {
-      free: 'Coffee names and roasters',
-      pro: 'Notes, origin, brews, dial-ins',
-      proPlus: 'Notes, origin, brews, dial-ins',
     },
   },
   {
@@ -109,6 +101,7 @@ export const planIncludes: Array<string> = [
   'Unlimited brews',
   'Every brewing method',
   'Cross-device sync',
+  'Search coffees and brews',
 ]
 
 export const FALLBACK_CURRENCY = 'USD'

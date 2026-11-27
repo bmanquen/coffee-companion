@@ -33,7 +33,7 @@ import type { BillingPeriod, PlanId, PlanPrice } from '@/lib/plans'
 
 const TITLE = 'Pricing — Coffee Companion'
 const DESCRIPTION =
-  'Free keeps your five most-recently-brewed coffees. Pro keeps everything, searchable, on as much gear as you own. Logging is never limited on any plan.'
+  'Free keeps your five most-recently-brewed coffees. Pro keeps everything, on as much gear as you own. Logging is never limited on any plan.'
 
 export const Route = createFileRoute('/_marketing/pricing')({
   head: () =>
@@ -431,7 +431,7 @@ export function PricingPage({
         <h2 className="text-2xl font-bold tracking-tight">
           On every plan, including Free
         </h2>
-        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {planIncludes.map((item) => (
             <li key={item} className="flex items-center gap-2 text-sm">
               <Check

@@ -290,6 +290,96 @@ describe('PouroverBrewsSection', () => {
     expect(table.getByText('Colombia Huila')).toBeTruthy()
   })
 
+  // Search is the same on every Plan: notes and gear match too, not only the
+  // columns in the row.
+  it('also matches notes, grinder and device in the free-text filter', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    const base = makePouroverBrew()
+    queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+      makePouroverBrew({
+        id: 'b1',
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        notes: 'Jasmine and bergamot',
+        grinder: { ...base.grinder!, name: 'Comandante' },
+        brewingDevice: { ...base.brewingDevice!, name: 'Origami' },
+        brewTime: 165,
+      }),
+      makePouroverBrew({
+        id: 'b2',
+        coffeeId: 'c2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+        notes: 'Chocolate',
+        brewTime: 200,
+      }),
+    ])
+
+    render(<PouroverBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    const search = (value: string) =>
+      fireEvent.change(screen.getByPlaceholderText('Filter brews...'), {
+        target: { value },
+      })
+
+    for (const term of ['jasmine', 'COMANDANTE', 'origami']) {
+      search(term)
+      expect(table.getByText('Ethiopia Guji')).toBeTruthy()
+      expect(table.queryByText('Colombia Huila')).toBeNull()
+    }
+
+    // The time column shows 2m 45s, so that is what a reader types.
+    search('2m 45s')
+    expect(table.getByText('Ethiopia Guji')).toBeTruthy()
+    expect(table.queryByText('Colombia Huila')).toBeNull()
+
+    search('')
+    expect(table.getByText('Ethiopia Guji')).toBeTruthy()
+    expect(table.getByText('Colombia Huila')).toBeTruthy()
+  })
+
+  // A Sealed Brew arrives blanked (withSealing), so its notes and settings can
+  // never match; only its Coffee, which stays readable, can.
+  it('never matches a Sealed brew by what it withholds', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
+      makePouroverBrew({
+        id: 'sealed',
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Sumatra Lintong' }),
+        sealed: true,
+        sealedAt: new Date('2026-07-01T00:00:00.000Z'),
+        isDialedIn: false,
+        dose: null,
+        water: null,
+        brewTime: null,
+        waterTemp: null,
+        grindSetting: null,
+        notes: null,
+        grinder: null,
+        brewingDevice: null,
+        method: null,
+      }),
+    ])
+
+    render(<PouroverBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    const search = (value: string) =>
+      fireEvent.change(screen.getByPlaceholderText('Filter brews...'), {
+        target: { value },
+      })
+
+    // What the default fixture would hold: notes, grinder, device, method.
+    for (const term of ['floral', 'Ode', 'V60', 'Standard']) {
+      search(term)
+      expect(table.queryByText('Sumatra Lintong')).toBeNull()
+    }
+
+    search('Lintong')
+    expect(table.getByText('Sumatra Lintong')).toBeTruthy()
+  })
+
   it('reflects each brew’s dialed-in state on the crosshair toggle', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.pouroverBrew.getAll.queryKey(), [
