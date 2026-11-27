@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server'
 import { and, eq, isNull, notInArray, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { db } from '../db'
@@ -141,15 +142,9 @@ export async function withStampedShelf<T>(
   plan: PlanId,
   write: (tx: ShelfTx, shelf: Shelf) => Promise<T>,
 ): Promise<T> {
-  const client = await db.$client.connect()
+  const client = await lockShelf(userId)
   let broken = false
   try {
-    // A session lock taken before BEGIN, so the snapshot below starts after
-    // the previous holder committed. A transaction lock would be taken inside
-    // the snapshot and miss that commit.
-    await client.query('select pg_advisory_lock(hashtextextended($1, 0))', [
-      userId,
-    ])
     const locked = drizzle({ client, relations })
     // The Shelf, the stamps and the write from one snapshot, so a Brew saved
     // outside the lock after this Shelf read is not stamped. A concurrent
@@ -179,6 +174,41 @@ export async function withStampedShelf<T>(
       broken = true
     }
     client.release(broken)
+  }
+}
+
+const SHELF_LOCK_WAIT_MS = 10_000
+
+export const SHELF_BUSY = 'Your last change is still saving. Try again in a moment.'
+
+// The user's Shelf lock, on the client that will run the write. A session lock
+// taken before BEGIN, so the write's snapshot starts after the previous holder
+// committed; a transaction lock would be taken inside the snapshot and miss
+// that commit. Waiting hands the client back to the pool, so one user's burst
+// of writes cannot hold every connection.
+// shortcut: polling serves waiters in no particular order; queue them per
+// user if writes ever need to land in arrival order.
+async function lockShelf(userId: string) {
+  const deadline = Date.now() + SHELF_LOCK_WAIT_MS
+  for (let pause = 5; ; pause = Math.min(pause * 2, 100)) {
+    const client = await db.$client.connect()
+    let held: boolean
+    try {
+      const { rows } = await client.query<{ held: boolean }>(
+        'select pg_try_advisory_lock(hashtextextended($1, 0)) as held',
+        [userId],
+      )
+      held = rows[0].held
+    } catch (error) {
+      client.release(true)
+      throw error
+    }
+    if (held) return client
+    client.release()
+    if (Date.now() >= deadline) {
+      throw new TRPCError({ code: 'TIMEOUT', message: SHELF_BUSY })
+    }
+    await new Promise((resolve) => setTimeout(resolve, pause))
   }
 }
 

@@ -713,19 +713,21 @@ describe('espressoShot.create idempotency', () => {
         asA.espressoShot.create(input),
         asA.espressoShot.create({ ...input, dose: secondDose }),
       ])
+      // One create holds the Shelf lock with its insert waiting on the row.
+      // The other waits for that lock from the app, where Postgres can't see
+      // it, so it gets a moment to get there.
       let blocked = 0
-      for (let i = 0; i < 200 && blocked < 2; i++) {
+      for (let i = 0; i < 200 && blocked < 1; i++) {
         const waiting = await db.execute<{ n: number }>(
           sql`SELECT count(*)::int AS n FROM pg_stat_activity
-              WHERE (${blockerPid} = ANY(pg_blocking_pids(pid))
-                  AND query ILIKE 'insert into "espresso_shots"%')
-                 OR (wait_event_type = 'Lock'
-                  AND query ILIKE 'select pg_advisory_lock%')`,
+              WHERE ${blockerPid} = ANY(pg_blocking_pids(pid))
+                AND query ILIKE 'insert into "espresso_shots"%'`,
         )
         blocked = waiting.rows[0].n
-        if (blocked < 2) await new Promise((resolve) => setTimeout(resolve, 25))
+        if (blocked < 1) await new Promise((resolve) => setTimeout(resolve, 25))
       }
-      expect(blocked).toBe(2)
+      expect(blocked).toBe(1)
+      await new Promise((resolve) => setTimeout(resolve, 300))
     } finally {
       release()
       await Promise.allSettled([holder, creates])
