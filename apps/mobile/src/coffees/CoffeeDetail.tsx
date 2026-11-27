@@ -57,6 +57,8 @@ export function CoffeeDetail({
   const brews = useQuery({
     queryKey: [COFFEE_BREWS_QUERY_KEY, userId, coffee.id],
     queryFn: () => api.listBrews(coffee.id),
+    // A Brew logged on another tab must show the next time this opens.
+    staleTime: 0,
   })
   const retrying = brews.isFetching
 

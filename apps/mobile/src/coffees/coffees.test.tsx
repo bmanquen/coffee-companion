@@ -5,8 +5,10 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SignedInHome } from '../auth/SignedInHome'
 import { writeHostTreeArtifacts } from '../test/host-tree'
+import { CoffeeDetail } from './CoffeeDetail'
 import {
   BREW_ROW_TEST_ID_PREFIX,
   BREW_SUMMARY_TEST_ID,
@@ -281,5 +283,40 @@ describe('Coffees', () => {
 
     expect(await screen.findByTestId('shot-list')).toBeTruthy()
     expect(screen.queryByTestId(COFFEE_LIST_TEST_ID)).toBeNull()
+  })
+
+  it('reads the Brews again each time a Coffee opens', async () => {
+    // Production cache settings: test clients drop queries on unmount.
+    const client = new QueryClient({
+      defaultOptions: { queries: { staleTime: 30_000, retry: false } },
+    })
+    let brews = LINTONG_BREWS.slice(1)
+    const { api } = fakeApi({ listBrews: () => Promise.resolve(brews) })
+    const lintong = COFFEES[1]
+    const detail = () => (
+      <QueryClientProvider client={client}>
+        <CoffeeDetail
+          api={api}
+          userId="user-ada"
+          coffee={lintong}
+          onBack={() => {}}
+        />
+      </QueryClientProvider>
+    )
+    try {
+      const first = await render(detail())
+      await screen.findByTestId(`${BREW_ROW_TEST_ID_PREFIX}shot-sealed`)
+      await first.unmount()
+
+      // A Brew logged on another tab before the Coffee is opened again.
+      brews = LINTONG_BREWS
+      await render(detail())
+
+      expect(
+        await screen.findByTestId(`${BREW_ROW_TEST_ID_PREFIX}pour-1`),
+      ).toBeTruthy()
+    } finally {
+      client.clear()
+    }
   })
 })
