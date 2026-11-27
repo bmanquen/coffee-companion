@@ -5,12 +5,7 @@ const COFFEE = 'coffee-1'
 const GRINDER = 'grinder-1'
 const DEVICE = 'device-1'
 
-const empty = {
-  coffeeId: '',
-  grinderId: '',
-  brewingDeviceId: '',
-  roastDate: '',
-}
+const empty = { coffeeId: '', grinderId: '', brewingDeviceId: '', roastDate: '' }
 const latest = {
   grinderId: GRINDER,
   brewingDeviceId: DEVICE,
@@ -57,24 +52,14 @@ describe('applyCoffeePrefill', () => {
       brewingDeviceId: 'typed-device',
       roastDate: '2026-06-15',
     }
-    const next = applyCoffeePrefill(
-      draft,
-      COFFEE,
-      latest,
-      { grinderId: true },
-      '',
-    )
+    const next = applyCoffeePrefill(draft, COFFEE, latest, { grinderId: true }, '')
     expect(next.grinderId).toBe('typed-grinder')
     expect(next.brewingDeviceId).toBe(DEVICE)
     expect(next.roastDate).toBe('2026-05-01')
   })
 
   it('falls back only for a field the latest shot does not have', () => {
-    const draft = {
-      ...empty,
-      grinderId: 'typed-grinder',
-      roastDate: '2026-06-15',
-    }
+    const draft = { ...empty, grinderId: 'typed-grinder', roastDate: '2026-06-15' }
     const next = applyCoffeePrefill(
       draft,
       COFFEE,
