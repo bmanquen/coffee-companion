@@ -250,6 +250,26 @@ describe('Coffees', () => {
     expect(screen.queryByTestId(COFFEE_DETAIL_TEST_ID)).toBeNull()
   })
 
+  it('keeps the search when coming back from a Coffee', async () => {
+    await renderHome(fakeApi().api)
+    await openCoffeesTab()
+    await fireEvent.changeText(
+      screen.getByTestId(COFFEE_SEARCH_TEST_ID),
+      'wet-hulled',
+    )
+
+    await fireEvent.press(
+      screen.getByTestId(`${COFFEE_ROW_TEST_ID_PREFIX}${LINTONG}`),
+    )
+    await fireEvent.press(await screen.findByTestId(COFFEE_DETAIL_BACK_TEST_ID))
+
+    await screen.findByTestId(COFFEE_LIST_TEST_ID)
+    expect(screen.getByTestId(COFFEE_SEARCH_TEST_ID).props.value).toBe(
+      'wet-hulled',
+    )
+    expect(visibleCoffeeIds()).toEqual([LINTONG])
+  })
+
   it("retries a Coffee's Brews that failed to load", async () => {
     let fail = true
     const { api } = fakeApi({

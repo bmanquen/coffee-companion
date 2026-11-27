@@ -1,6 +1,6 @@
 import { coffeeMatchesSearch } from '@coffee-companion/brew-display'
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -44,14 +44,18 @@ function originSummary(coffee: CoffeeRow): string {
 export function CoffeeList({
   api,
   userId,
+  search,
+  onSearch,
   onOpen,
 }: {
   api: CoffeesApi
   userId: string
+  // Held by the caller, so it survives opening a Coffee and coming back.
+  search: string
+  onSearch: (search: string) => void
   onOpen: (coffee: CoffeeRow) => void
 }) {
   const coffees = useCoffees(api, userId)
-  const [search, setSearch] = useState('')
   const rows = useMemo(
     () => (coffees.data ?? []).filter((c) => coffeeMatchesSearch(search, c)),
     [coffees.data, search],
@@ -76,7 +80,7 @@ export function CoffeeList({
               accessibilityLabel={SEARCH_COFFEES}
               placeholder={SEARCH_COFFEES}
               value={search}
-              onChangeText={setSearch}
+              onChangeText={onSearch}
               autoCapitalize="none"
               autoCorrect={false}
               clearButtonMode="while-editing"

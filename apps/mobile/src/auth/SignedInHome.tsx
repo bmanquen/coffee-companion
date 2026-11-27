@@ -81,6 +81,7 @@ function Home({
 }) {
   const [screen, setScreen] = useState<Screen>('list')
   const [openCoffee, setOpenCoffee] = useState<CoffeeRow | null>(null)
+  const [coffeeSearch, setCoffeeSearch] = useState('')
   const closeCoffee = useCallback(() => setOpenCoffee(null), [])
   const idempotencyKeys = useRef(new Map<string, string>())
   const unresolvedSaves = useRef(new Map<string, Map<string, PrefillSource>>())
@@ -178,7 +179,13 @@ function Home({
             onBack={closeCoffee}
           />
         ) : (
-          <CoffeeList api={coffees} userId={userId} onOpen={setOpenCoffee} />
+          <CoffeeList
+            api={coffees}
+            userId={userId}
+            search={coffeeSearch}
+            onSearch={setCoffeeSearch}
+            onOpen={setOpenCoffee}
+          />
         )
       ) : screen === 'form' && catalog ? (
         <ShotForm
