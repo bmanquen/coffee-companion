@@ -294,6 +294,10 @@ function holdCoffeeRow(coffeeId: string) {
   }
 }
 
+// A request waiting for the Shelf lock retries from the app and holds no
+// connection, so Postgres can't show it waiting. Give it time to get there.
+const reachShelfLock = () => new Promise((resolve) => setTimeout(resolve, 300))
+
 async function waitForLockWaiters(count: number) {
   for (let attempt = 0; attempt < 400; attempt++) {
     const { rows } = await db.execute<{ waiting: number }>(sql`
@@ -371,7 +375,7 @@ describe('concurrent Shelf-changing writes', () => {
       moveB0 = as.espressoShot.update({ ...b0, coffeeId: c0.id } as never)
       // It can be refused while the test still awaits moveB2 or the release.
       moveB0.catch(() => {})
-      await waitForLockWaiters(2)
+      await reachShelfLock()
       await toC2.release()
       await moveB2
       await toC0.release()
@@ -436,7 +440,7 @@ describe('concurrent Shelf-changing writes', () => {
         notes: 'overwritten',
       } as never)
       editing.catch(() => {})
-      await waitForLockWaiters(1)
+      await reachShelfLock()
       await createCoffee(uniq('newest'))
       await holder.query('select pg_advisory_unlock(hashtextextended($1, 0))', [
         userId,
