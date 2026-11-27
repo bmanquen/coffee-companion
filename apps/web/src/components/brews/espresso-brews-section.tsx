@@ -1,5 +1,5 @@
 import { coffeeOptionLabel } from '@coffee-companion/brew-display'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
@@ -8,7 +8,7 @@ import {
   useTable,
 } from '@tanstack/react-table'
 import { Pencil, Plus } from 'lucide-react'
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 import {
   brewLogRowClass,
   renderBrewDetails,
@@ -31,9 +31,9 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { useEspressoCoffeeFilter } from '@/hooks/use-espresso-coffee-filter'
 import {
   ESPRESSO_COFFEES_LOAD_FAILED,
-  ESPRESSO_COFFEES_STALE_TIME_MS,
   ESPRESSO_LOADING_SHOTS,
   ESPRESSO_SHOT_FILTER_DEBOUNCE_MS,
   ESPRESSO_SHOT_Q_MAX,
@@ -175,25 +175,10 @@ const columns = columnHelper.columns([
 // page's section components (heading + add button + filters + table).
 export function EspressoBrewsSection() {
   'use no memo'
-  const trpc = useTRPC()
-  const coffeesQuery = useQuery({
-    ...trpc.coffee.getAll.queryOptions(),
-    staleTime: ESPRESSO_COFFEES_STALE_TIME_MS,
-  })
-  const coffees = coffeesQuery.data ?? []
+  const { coffeesQuery, coffees, coffeeOptions, coffeeId, setCoffeeId } =
+    useEspressoCoffeeFilter()
   const [sorting, setSorting] = useState<SortingState>([])
   const [q, setQ] = useState('')
-  const [pickedCoffeeId, setCoffeeId] = useState('')
-  // A coffee deleted elsewhere drops out of the filter once the catalog loads
-  // without it; until then (or if that refresh fails) the pick stands. The
-  // pick is cleared, not just hidden, so a later failed refresh (which keeps
-  // the old data but is no longer a success) cannot bring it back.
-  const pickRemoved =
-    coffeesQuery.isSuccess &&
-    pickedCoffeeId !== '' &&
-    !coffees.some((coffee) => coffee.id === pickedCoffeeId)
-  if (pickRemoved) setCoffeeId('')
-  const coffeeId = pickRemoved ? '' : pickedCoffeeId
   const expansion = useAccordionExpansion()
   const debouncedQ = useDebouncedValue(q, ESPRESSO_SHOT_FILTER_DEBOUNCE_MS)
   const filtering = Boolean(coffeeId || debouncedQ.trim())
@@ -212,17 +197,6 @@ export function EspressoBrewsSection() {
     coffeeId: coffeeId || undefined,
     q: debouncedQ.trim() || undefined,
   })
-
-  const coffeeOptions = useMemo(
-    () =>
-      coffees
-        .map((coffee) => ({
-          value: coffee.id,
-          label: coffeeOptionLabel(coffee),
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [coffees],
-  )
 
   const table = useTable({
     features,

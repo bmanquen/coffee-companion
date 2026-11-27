@@ -1,7 +1,5 @@
-import { coffeeOptionLabel } from '@coffee-companion/brew-display'
-import { useQuery } from '@tanstack/react-query'
 import { createColumnHelper } from '@tanstack/react-table'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   dialedInCoffeeColumn,
   renderBrewDetails,
@@ -12,11 +10,10 @@ import { expanderColumn } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import {
   ESPRESSO_COFFEES_LOAD_FAILED,
-  ESPRESSO_COFFEES_STALE_TIME_MS,
   ESPRESSO_LOADING_SHOTS,
   useEspressoShotPages,
 } from '@/hooks/use-espresso-shot-pages'
-import { useTRPC } from '@/integrations/trpc/react'
+import { useEspressoCoffeeFilter } from '@/hooks/use-espresso-coffee-filter'
 import type { EspressoShotWithRelations } from '@/types'
 import type { AppFeatures } from '@/components/data-table'
 
@@ -65,34 +62,9 @@ const columns = columnHelper.columns([
 // onChoose runs whenever the user changes a filter, pages on, or opens a
 // shot, which the dashboard takes as choosing Espresso.
 export function EspressoBrewFeed({ onChoose }: { onChoose?: () => void } = {}) {
-  const trpc = useTRPC()
-  const coffeesQuery = useQuery({
-    ...trpc.coffee.getAll.queryOptions(),
-    staleTime: ESPRESSO_COFFEES_STALE_TIME_MS,
-  })
-  const coffees = coffeesQuery.data ?? []
-  const [pickedCoffeeId, setCoffeeId] = useState('')
-  // A coffee deleted elsewhere drops out of the filter once the catalog loads
-  // without it; until then (or if that refresh fails) the pick stands. The
-  // pick is cleared, not just hidden, so a later failed refresh (which keeps
-  // the old data but is no longer a success) cannot bring it back.
-  const pickRemoved =
-    coffeesQuery.isSuccess &&
-    pickedCoffeeId !== '' &&
-    !coffees.some((coffee) => coffee.id === pickedCoffeeId)
-  if (pickRemoved) setCoffeeId('')
-  const coffeeId = pickRemoved ? '' : pickedCoffeeId
+  const { coffeesQuery, coffees, coffeeOptions, coffeeId, setCoffeeId } =
+    useEspressoCoffeeFilter()
   const [dialedInOnly, setDialedInOnly] = useState(false)
-  const coffeeOptions = useMemo(
-    () =>
-      coffees
-        .map((coffee) => ({
-          value: coffee.id,
-          label: coffeeOptionLabel(coffee),
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [coffees],
-  )
   const {
     items,
     hasMore,
