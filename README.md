@@ -17,6 +17,8 @@ To build this application for production:
 pnpm build
 ```
 
+Railway applies database migrations before each deploy goes live. The pre-deploy command is set in the service's settings — Settings → Deploy → Pre-deploy Command, set to `pnpm db:migrate` — not from a file in this repo, so each new environment needs it set once. It reads the service's `DATABASE_URL`, and it runs `drizzle-kit`, a dev dependency, so the build must keep dev dependencies installed. Migrations already applied are skipped. A migration that fails stops the deploy, and the running version keeps serving.
+
 ## Testing
 
 This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
