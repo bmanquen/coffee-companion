@@ -35,7 +35,8 @@ import { Input } from '@/components/ui/input'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { invalidateDeviceDialedInQueries } from '@/hooks/use-device-dialed-in'
 import { useTRPC } from '@/integrations/trpc/react'
-import { formatBrewSeconds } from '@/lib/brew'
+import { brewMatchesSearch } from '@/lib/search'
+import { formatBrewRatio, formatBrewSeconds } from '@/lib/brew'
 import type { FrenchpressBrewWithRelations } from '@/types'
 import type { CellContext, SortingState } from '@tanstack/react-table'
 import type { AppFeatures } from '@/components/data-table'
@@ -157,7 +158,7 @@ export function FrenchpressBrewsSection() {
   )
 
   const [sorting, setSorting] = useState<SortingState>([])
-  const [globalFilter, setGlobalFilter] = useState('')
+  const [search, setSearch] = useState('')
   const [coffeeId, setCoffeeId] = useState('')
   const expansion = useAccordionExpansion()
 
@@ -175,8 +176,13 @@ export function FrenchpressBrewsSection() {
   // Memoized so the filtered array keeps a stable reference between renders
   // (a fresh array each render trips the table's autoReset into a render loop).
   const visibleBrews = useMemo(
-    () => (coffeeId ? brews.filter((b) => b.coffeeId === coffeeId) : brews),
-    [brews, coffeeId],
+    () =>
+      brews.filter(
+        (b) =>
+          (!coffeeId || b.coffeeId === coffeeId) &&
+          brewMatchesSearch(search, b, [b.method?.name, formatBrewRatio(b.dose, b.water), b.steepTime, formatBrewSeconds(b.steepTime)]),
+      ),
+    [brews, coffeeId, search],
   )
 
   const table = useTable({
@@ -186,9 +192,8 @@ export function FrenchpressBrewsSection() {
     // Both layouts collapse to the dial-in summary; expansion (accordion)
     // reveals grinder, device, water temp, days off roast and notes via
     // BrewDetails — a card detail region on mobile, a desktop sub-row (ADR-0003).
-    state: { sorting, globalFilter, expanded: expansion.expanded },
+    state: { sorting, expanded: expansion.expanded },
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
     onExpandedChange: expansion.onExpandedChange,
     enableSorting: false,
     // A Sealed Brew has no settings to reveal.
@@ -227,8 +232,8 @@ export function FrenchpressBrewsSection() {
             />
             <Input
               placeholder="Filter brews..."
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="flex-1"
             />
           </div>

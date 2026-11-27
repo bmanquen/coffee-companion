@@ -178,6 +178,58 @@ describe('Coffees page', () => {
     expect(table.queryByText('-, -')).toBeNull()
   })
 
+  // Search is the same on every Plan: it reaches roaster, origin, process,
+  // roast level, varieties and notes, not only the name.
+  it('searches coffees by name, roaster, origin and notes', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [
+      makeCoffeeRow({
+        id: 'cf1',
+        name: 'Guji Natural',
+        roaster: 'Onyx',
+        origins: [{ country: 'Ethiopia', region: 'Guji', process: 'Natural' }],
+        roastLevel: 'Light',
+        varieties: ['Heirloom'],
+        notes: 'Blueberry jam',
+      }),
+      makeCoffeeRow({
+        id: 'cf2',
+        name: 'Huila Washed',
+        roaster: 'Counter Culture',
+        origins: [{ country: 'Colombia', region: 'Huila', process: 'Washed' }],
+        roastLevel: 'Medium',
+        varieties: ['Caturra'],
+        notes: 'Milk chocolate',
+      }),
+    ])
+
+    render(<Coffee />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    const search = (value: string) =>
+      fireEvent.change(screen.getByPlaceholderText('Search coffees...'), {
+        target: { value },
+      })
+
+    for (const term of [
+      'onyx',
+      'ethiopia',
+      'guji',
+      'natural',
+      'light',
+      'heirloom',
+      'BLUEBERRY',
+    ]) {
+      search(term)
+      expect(table.getByText('Guji Natural')).toBeTruthy()
+      expect(table.queryByText('Huila Washed')).toBeNull()
+    }
+
+    search('')
+    expect(table.getByText('Guji Natural')).toBeTruthy()
+    expect(table.getByText('Huila Washed')).toBeTruthy()
+  })
+
   it('expands a desktop row on click to reveal the coffee detail', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.coffee.getAll.queryKey(), [

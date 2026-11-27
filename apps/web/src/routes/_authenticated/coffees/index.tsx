@@ -10,6 +10,7 @@ import {
   useTable,
 } from '@tanstack/react-table'
 import { CoffeeIcon, Pencil, Plus } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { formatOriginNames } from '@/components/coffees/format-coffee-origins'
 import { CoffeeDetails } from '@/components/coffees/coffee-details'
 import {
@@ -21,6 +22,7 @@ import { DeleteWithBrewsDialog } from '@/components/delete-with-brews-dialog'
 import { H1 } from '@/components/typography/h1'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import {
   Empty,
   EmptyContent,
@@ -31,6 +33,7 @@ import {
 } from '@/components/ui/empty'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { useTRPC } from '@/integrations/trpc/react'
+import { matchesSearch } from '@/lib/search'
 import type { CellContext } from '@tanstack/react-table'
 import type { AppFeatures } from '@/components/data-table'
 
@@ -150,10 +153,31 @@ export function Coffee() {
   const { data: coffees } = useSuspenseQuery(trpc.coffee.getAll.queryOptions())
 
   const expansion = useAccordionExpansion()
+  const [search, setSearch] = useState('')
+
+  // Memoized so the table keeps a stable data reference between renders.
+  const visibleCoffees = useMemo(
+    () =>
+      (coffees as Array<CoffeeRow>).filter((c) =>
+        matchesSearch(search, [
+          c.name,
+          c.roaster?.name,
+          c.roastLevel?.name,
+          c.notes,
+          ...c.varieties.map((v) => v.name),
+          ...c.origins.flatMap((o) => [
+            o.country?.name,
+            o.region?.name,
+            o.process?.name,
+          ]),
+        ]),
+      ),
+    [coffees, search],
+  )
 
   const table = useTable({
     features,
-    data: coffees as Array<CoffeeRow>,
+    data: visibleCoffees,
     columns,
     // Both layouts collapse to the identity summary; expansion (accordion)
     // reveals process, roast level, varieties, whether the coffee has a
@@ -206,6 +230,11 @@ export function Coffee() {
         </Link>
       </div>
       <Card className="flex flex-col gap-4 w-full bg-white p-6">
+        <Input
+          placeholder="Search coffees..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
         <DataTable
           table={table}
           renderSubComponent={(row) => (

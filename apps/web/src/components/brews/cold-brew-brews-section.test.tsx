@@ -173,6 +173,49 @@ describe('ColdBrewBrewsSection', () => {
     expect(table.getByText('Colombia Huila')).toBeTruthy()
   })
 
+  // Search is the same on every Plan: notes and gear match too, not only the
+  // columns in the row.
+  it('also matches notes, grinder and device in the free-text filter', () => {
+    const { queryClient, trpc, Wrapper } = createTestProviders()
+    const base = makeColdBrewBrew()
+    queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [
+      makeColdBrewBrew({
+        id: 'b1',
+        coffeeId: 'c1',
+        coffee: makeRecentCoffee({ id: 'c1', name: 'Ethiopia Guji' }),
+        notes: 'Jasmine and bergamot',
+        grinder: { ...base.grinder!, name: 'Comandante' },
+        brewingDevice: { ...base.brewingDevice!, name: 'Origami' },
+        steepTime: 165,
+      }),
+      makeColdBrewBrew({
+        id: 'b2',
+        coffeeId: 'c2',
+        coffee: makeRecentCoffee({ id: 'c2', name: 'Colombia Huila' }),
+        notes: 'Chocolate',
+        steepTime: 200,
+      }),
+    ])
+
+    render(<ColdBrewBrewsSection />, { wrapper: Wrapper })
+
+    const table = within(screen.getByRole('table'))
+    const search = (value: string) =>
+      fireEvent.change(screen.getByPlaceholderText('Filter brews...'), {
+        target: { value },
+      })
+
+    for (const term of ['jasmine', 'COMANDANTE', 'origami']) {
+      search(term)
+      expect(table.getByText('Ethiopia Guji')).toBeTruthy()
+      expect(table.queryByText('Colombia Huila')).toBeNull()
+    }
+
+    search('')
+    expect(table.getByText('Ethiopia Guji')).toBeTruthy()
+    expect(table.getByText('Colombia Huila')).toBeTruthy()
+  })
+
   it('reflects each brew’s dialed-in state on the crosshair toggle', () => {
     const { queryClient, trpc, Wrapper } = createTestProviders()
     queryClient.setQueryData(trpc.coldBrewBrew.getAll.queryKey(), [

@@ -72,7 +72,6 @@ const expected = {
     monthly: '$0',
     annual: '$0',
     'Brew history': 'Your 5 most-recently-brewed coffees',
-    Search: 'Coffee names and roasters',
     Grinders: '1',
     'Brewing Devices': '3',
     'AI calls': '5 lifetime',
@@ -81,7 +80,6 @@ const expected = {
     monthly: '$4.99',
     annual: '$44.99',
     'Brew history': 'Everything',
-    Search: 'Notes, origin, brews, dial-ins',
     Grinders: 'Unlimited',
     'Brewing Devices': 'Unlimited',
     'AI calls': '30 / month',
@@ -90,7 +88,6 @@ const expected = {
     monthly: '$7.99',
     annual: '$74.99',
     'Brew history': 'Everything',
-    Search: 'Notes, origin, brews, dial-ins',
     Grinders: 'Unlimited',
     'Brewing Devices': 'Unlimited',
     'AI calls': 'Unlimited',
@@ -111,6 +108,21 @@ describe('PricingPage', () => {
     )
   })
 
+  // Search works the same on every Plan, so it is listed with what every Plan
+  // gets and never as a difference between Plans.
+  it('lists search with what every Plan gets, not per Plan', () => {
+    renderPricing()
+    const everyPlan = screen
+      .getByRole('heading', { name: /On every plan/, level: 2 })
+      .closest('section')!
+    expect(
+      within(everyPlan).getByText('Search coffees and brews'),
+    ).toBeTruthy()
+    for (const name of planNames) {
+      expect(planCard(name).queryByText('Search')).toBeNull()
+    }
+  })
+
   it.each(planNames)('shows every advertised value for %s', (name) => {
     renderPricing()
     const card = planCard(name)
@@ -119,7 +131,6 @@ describe('PricingPage', () => {
     expect(card.getByText(rows.annual)).toBeTruthy()
     for (const label of [
       'Brew history',
-      'Search',
       'Grinders',
       'Brewing Devices',
       'AI calls',
