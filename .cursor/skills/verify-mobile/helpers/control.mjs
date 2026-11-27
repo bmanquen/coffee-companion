@@ -30,6 +30,11 @@ const repoRoot = process.env.VERIFY_REPO_ROOT ?? resolve(skillDir, '../../..')
 const mobileDir = join(repoRoot, 'apps/mobile')
 const runDir = process.env.VERIFY_RUN_DIR ?? join(skillDir, '.run')
 const statePath = join(runDir, 'state.json')
+// After a failed launch-device, state.json also holds the pids, package and
+// adb reverse ports cleanup would undo, not only an owed stylus restore.
+const deleteStateDrops =
+  `Deleting ${statePath} instead gives up that restore and anything ` +
+  'cleanup would still stop, uninstall, or un-reverse.'
 const artifactsDir = join(skillDir, 'artifacts')
 
 function requireTcpPort(raw, name, fallback) {
@@ -2870,8 +2875,8 @@ async function cmdLaunch() {
     die(
       `${existing.serial} still owes AVD ${existing.avdName} its ` +
         `${STYLUS_HANDWRITING_SETTING}=${existing.stylusHandwritingBefore}. ` +
-        `Run cleanup once that emulator is back, or delete ${statePath} to drop ` +
-        'the restore, before launching.',
+        'Run cleanup first, once that emulator is back, before launching. ' +
+        deleteStateDrops,
     )
   }
 
@@ -2889,8 +2894,8 @@ async function cmdLaunch() {
     die(
       `${claimed.serial} still owes AVD ${claimed.avdName} its ` +
         `${STYLUS_HANDWRITING_SETTING}=${claimed.stylusHandwritingBefore}. ` +
-        `Run cleanup once that emulator is back, or delete ${statePath} to drop ` +
-        'the restore, before launching.',
+        'Run cleanup first, once that emulator is back, before launching. ' +
+        deleteStateDrops,
     )
   }
   ensureDir(runDir)
@@ -3351,8 +3356,8 @@ function keptStylusBaseline(existing, serial, avdName) {
     throw new Error(
       `${serial} still owes AVD ${existing.avdName} its ` +
         `${STYLUS_HANDWRITING_SETTING}=${existing.stylusHandwritingBefore}. ` +
-        `Start that AVD and run cleanup, or delete ${statePath} to drop the ` +
-        `restore, before launching ${avdName}.`,
+        `Run cleanup first, with that AVD started, before launching ${avdName}. ` +
+        deleteStateDrops,
     )
   }
   return existing.stylusHandwritingBefore
@@ -4776,7 +4781,8 @@ async function cmdCleanup() {
     ])
     die(
       `${restoreError.message}. Kept it in ${statePath}; run cleanup again ` +
-        `once that emulator is back, or delete ${statePath} to drop it.`,
+        `once that emulator is back. That record holds only the restore, so ` +
+        `deleting ${statePath} instead gives up only that.`,
     )
   }
   clearRunDir()
