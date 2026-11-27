@@ -1659,6 +1659,11 @@ describe('keptStylusBaseline', () => {
       () => keptStylusBaseline(kept, DEVICE_SERIAL, 'Pixel_7'),
       /still owes AVD verify-pixel its stylus_handwriting_enabled=1/,
     )
+    // Deleting state.json drops more than the restore after a failed launch.
+    assert.throws(
+      () => keptStylusBaseline(kept, DEVICE_SERIAL, 'Pixel_7'),
+      /Run cleanup first.*gives up that restore and anything cleanup would still stop or uninstall/s,
+    )
   })
 
   it('has nothing to reuse without an owed record', () => {
@@ -1718,6 +1723,10 @@ describe('cleanup with a kept stylus record', () => {
       const launch = cli('launch')
       assert.notEqual(launch.status, 0, launch.stdout)
       assert.match(launch.stderr, /still owes AVD verify-pixel/)
+      assert.match(
+        launch.stderr,
+        /Run cleanup first.*gives up that restore and anything cleanup would still stop or uninstall/s,
+      )
       assert.deepEqual(kept(), record)
 
       // An owner-scoped cleanup keeps its claim, so that owner can retry and
