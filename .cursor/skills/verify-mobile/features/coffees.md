@@ -13,7 +13,7 @@ A signed-in user opens the Coffees tab, searches their Coffees, and opens one to
 
 - Open the app while signed in and tap `Coffees` above the list.
 - Type in `Search coffees...`.
-- Tap a Coffee to open it. `Back` (or Android hardware back) returns to the list.
+- Tap a Coffee to open it. `Back` (or Android hardware back) returns to the list with the search kept.
 - Tap `Espresso` to return to the Espresso list.
 
 ## Driving it with control
@@ -24,7 +24,7 @@ Preconditions:
 - Drive is React Native Testing Library in-process with an injected session and a fake Coffees API. It does not call the live API.
 
 - **Search and open a Coffee.** Run `helpers/control drive coffees`. The drive taps `testID=tab-coffees`, types each searchable field into `testID=coffee-search`, opens `testID=coffee-row-coffee-lintong`, and reads the Brews on `testID=coffee-detail`. `tree.txt` must show `Sumatra Lintong`, `Indonesia, Lintong, Wet-Hulled`, `Grind 24 · Dose 15g · Water 250g · Ratio 1:16.67 · Time 2m 45s`, and the Sealed copy.
-- **Device (where an AVD or iOS Simulator exists).** Run Maestro `flows/browse-coffees.yaml` signed in as `e2e-user-free` (set `EXPO_PUBLIC_E2E_USER=e2e-user-free`). It searches `wet-hulled`, opens Sumatra Lintong, and expects its seeded Shot to be Sealed, since that Coffee is off Free's Shelf.
+- **Device (where an AVD or iOS Simulator exists).** Run Maestro `flows/browse-coffees.yaml` signed in as `e2e-user-free` (set `EXPO_PUBLIC_E2E_USER=e2e-user-free`). It searches `wet-hulled`, opens Sumatra Lintong, and expects its seeded Shot to be Sealed, since that Coffee is off Free's Shelf. Back keeps the search; clearing it and opening Kenya Nyeri shows a readable Shot.
 
 ## Gotchas
 

@@ -166,7 +166,7 @@ export function createLiveCoffeesApi(): CoffeesApi {
         },
         method: BrewMethod,
         output: string | null,
-        seconds: number | null,
+        time: number | null,
       ): BrewRow => ({
         id: brew.id,
         method,
@@ -176,7 +176,7 @@ export function createLiveCoffeesApi(): CoffeesApi {
         grindSetting: brew.grindSetting,
         dose: brew.dose,
         output,
-        seconds,
+        time,
       })
       const own = <T extends { coffeeId: string }>(brews: Array<T>) =>
         brews.filter((brew) => brew.coffeeId === coffeeId)
@@ -189,14 +189,7 @@ export function createLiveCoffeesApi(): CoffeesApi {
         ...own(frenchPress).map((b) =>
           base(b, 'French Press', b.water, b.steepTime),
         ),
-        ...own(coldBrew).map((b) =>
-          base(
-            b,
-            'Cold Brew',
-            b.water,
-            b.steepTime == null ? null : b.steepTime * 60,
-          ),
-        ),
+        ...own(coldBrew).map((b) => base(b, 'Cold Brew', b.water, b.steepTime)),
       ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     },
   }

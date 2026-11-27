@@ -154,11 +154,11 @@ describe('createLiveCoffeesApi', () => {
     const brews = await createLiveCoffeesApi().listBrews(LINTONG)
 
     expect(
-      brews.map((b) => [b.id, b.method, b.output, b.seconds, b.sealed]),
+      brews.map((b) => [b.id, b.method, b.output, b.time, b.sealed]),
     ).toEqual([
       ['shot-new', 'Espresso', '36', 30, false],
       ['pour', 'Pour Over', '250', 165, false],
-      ['cold', 'Cold Brew', '1000', 1080 * 60, false],
+      ['cold', 'Cold Brew', '1000', 1080, false],
       ['shot-old', 'Espresso', null, null, true],
     ])
     // Shots are asked for this Coffee only, page after page.

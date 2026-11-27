@@ -41,9 +41,19 @@ appId: dev.offbyonelabs.coffeecompanion
     id: coffee-detail-back
 - assertVisible:
     id: coffee-list
+# The search is kept across opening a Coffee.
+- assertVisible: "Sumatra Lintong"
+- assertNotVisible: "Kenya Nyeri"
 - tapOn:
     id: coffee-search
 - eraseText: 20
+- extendedWaitUntil:
+    visible: "Kenya Nyeri"
+    timeout: 10000
+# Narrow to it so its row sits above the keyboard: a tap on a row under the
+# keyboard types a letter, and hideKeyboard on iOS can open another row.
+- inputText: "kenya"
+- assertNotVisible: "Sumatra Lintong"
 - tapOn: "Kenya Nyeri"
 - extendedWaitUntil:
     visible:

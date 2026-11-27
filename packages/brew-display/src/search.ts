@@ -20,7 +20,8 @@ export type SearchableCoffee = {
     region: { name: string } | null
     process: { name: string } | null
   }>
-  // null where a legacy Coffee points at a lookup the reader can't see.
+  // Nullable only in type: coffee.getAll's variety relation is not marked
+  // required, though its foreign key never leaves it empty.
   varieties: ReadonlyArray<{ name: string } | null>
 }
 

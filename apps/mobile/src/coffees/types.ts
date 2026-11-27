@@ -20,8 +20,8 @@ export type BrewRow = {
   dose: string | null
   // Espresso's yield, or the other methods' water.
   output: string | null
-  // Whole seconds; Cold Brew's whole minutes are converted on the way in.
-  seconds: number | null
+  // Whole seconds, except Cold Brew's whole minutes, as each table stores it.
+  time: number | null
 }
 
 export type CoffeesApi = {

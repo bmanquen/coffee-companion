@@ -94,7 +94,7 @@ function brew(overrides: Partial<BrewRow>): BrewRow {
     grindSetting: null,
     dose: null,
     output: null,
-    seconds: null,
+    time: null,
     ...overrides,
   }
 }
@@ -109,7 +109,7 @@ const LINTONG_BREWS: Array<BrewRow> = [
     grindSetting: '24',
     dose: '15',
     output: '250',
-    seconds: 165,
+    time: 165,
   }),
   brew({ id: 'shot-sealed', method: 'Espresso', sealed: true }),
   brew({
@@ -118,8 +118,14 @@ const LINTONG_BREWS: Array<BrewRow> = [
     createdAt: new Date('2026-11-10T12:00:00Z'),
     dose: '100',
     output: '1000',
-    seconds: 18 * 3600,
+    time: 1080,
     isDialedIn: true,
+  }),
+  brew({
+    id: 'cold-0',
+    method: 'Cold Brew',
+    createdAt: new Date('2026-11-09T12:00:00Z'),
+    time: 0,
   }),
 ]
 
@@ -238,6 +244,8 @@ describe('Coffees', () => {
       'Grind 24 · Dose 15g · Water 250g · Ratio 1:16.67 · Time 2m 45s',
       SEALED_BREW,
       'Dose 100g · Water 1000g · Ratio 1:10 · Time 18h',
+      // Cold Brew reads in hours and minutes, as on web.
+      'Time 0m',
     ])
     const cold = screen.getByTestId(`${BREW_ROW_TEST_ID_PREFIX}cold-1`)
     expect(
