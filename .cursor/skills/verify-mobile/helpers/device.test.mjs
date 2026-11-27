@@ -1662,7 +1662,7 @@ describe('keptStylusBaseline', () => {
     // Deleting state.json drops more than the restore after a failed launch.
     assert.throws(
       () => keptStylusBaseline(kept, DEVICE_SERIAL, 'Pixel_7'),
-      /Run cleanup first.*gives up that restore and anything cleanup would still stop or uninstall/s,
+      /Run cleanup first.*gives up that restore and anything cleanup would still stop, uninstall, or un-reverse/s,
     )
   })
 
@@ -1717,6 +1717,7 @@ describe('cleanup with a kept stylus record', () => {
       const result = cli('cleanup')
       assert.notEqual(result.status, 0, result.stdout)
       assert.match(result.stderr, /Could not restore stylus_handwriting_enabled=1/)
+      assert.match(result.stderr, /record holds only the restore/)
       assert.deepEqual(kept(), record)
 
       // A plain launch would overwrite the record with Metro's state.
@@ -1725,7 +1726,7 @@ describe('cleanup with a kept stylus record', () => {
       assert.match(launch.stderr, /still owes AVD verify-pixel/)
       assert.match(
         launch.stderr,
-        /Run cleanup first.*gives up that restore and anything cleanup would still stop or uninstall/s,
+        /Run cleanup first.*gives up that restore and anything cleanup would still stop, uninstall, or un-reverse/s,
       )
       assert.deepEqual(kept(), record)
 

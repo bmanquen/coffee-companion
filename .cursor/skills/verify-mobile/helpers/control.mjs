@@ -30,11 +30,11 @@ const repoRoot = process.env.VERIFY_REPO_ROOT ?? resolve(skillDir, '../../..')
 const mobileDir = join(repoRoot, 'apps/mobile')
 const runDir = process.env.VERIFY_RUN_DIR ?? join(skillDir, '.run')
 const statePath = join(runDir, 'state.json')
-// After a failed launch-device, state.json also holds the pids and package
-// cleanup would stop or uninstall, not only an owed stylus restore.
+// After a failed launch-device, state.json also holds the pids, package and
+// adb reverse ports cleanup would undo, not only an owed stylus restore.
 const deleteStateDrops =
   `Deleting ${statePath} instead gives up that restore and anything ` +
-  'cleanup would still stop or uninstall.'
+  'cleanup would still stop, uninstall, or un-reverse.'
 const artifactsDir = join(skillDir, 'artifacts')
 
 function requireTcpPort(raw, name, fallback) {
