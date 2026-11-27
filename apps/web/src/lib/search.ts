@@ -1,14 +1,5 @@
-// Free-text search: does any value contain the query, ignoring case? Search is
-// the same on every Plan. Sealed Brews arrive with their settings already
-// blanked, so a search can only match what the reader is allowed to see.
-export function matchesSearch(
-  query: string,
-  values: ReadonlyArray<string | number | null | undefined>,
-): boolean {
-  const q = query.trim().toLowerCase()
-  if (!q) return true
-  return values.some((v) => v != null && String(v).toLowerCase().includes(q))
-}
+// The matcher is shared with mobile (@coffee-companion/brew-display).
+import { matchesSearch } from '@coffee-companion/brew-display'
 
 type SearchableBrew = {
   coffee: { name: string }

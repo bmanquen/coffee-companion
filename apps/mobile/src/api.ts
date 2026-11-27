@@ -7,6 +7,7 @@ import { apiBaseUrl } from './auth/config'
 import { espressoDevicesFrom } from './espresso/devices'
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server'
 import type { TRPCRouter } from '@coffee-companion/api/trpc/router'
+import type { BrewMethod, BrewRow, CoffeesApi } from './coffees/types'
 import type {
   EspressoApi,
   EspressoCatalog,
@@ -56,8 +57,8 @@ function toShotRow(shot: ShotRecord): ShotRow {
   }
 }
 
-export function createLiveEspressoApi(): EspressoApi {
-  const client = createTRPCClient<TRPCRouter>({
+function createClient() {
+  return createTRPCClient<TRPCRouter>({
     links: [
       httpBatchLink({
         url: `${apiBaseUrl()}/api/trpc`,
@@ -67,6 +68,10 @@ export function createLiveEspressoApi(): EspressoApi {
       }),
     ],
   })
+}
+
+export function createLiveEspressoApi(): EspressoApi {
+  const client = createClient()
 
   return {
     async load(): Promise<EspressoCatalog> {
@@ -112,6 +117,94 @@ export function createLiveEspressoApi(): EspressoApi {
     async create(input: ShotCreate): Promise<void> {
       const payload: ShotCreateInput = input
       await client.espressoShot.create.mutate(payload)
+    },
+  }
+}
+
+type Client = ReturnType<typeof createClient>
+
+// Every page of one Coffee's Shots, so its Brews list is complete.
+async function allShotsOf(
+  client: Client,
+  coffeeId: string,
+  signal?: AbortSignal,
+) {
+  const shots: Array<ShotRecord> = []
+  let cursor: string | undefined
+  do {
+    const page = await client.espressoShot.getRecent.query(
+      {
+        limit: 50,
+        coffeeId,
+        ...(cursor ? { cursor } : {}),
+      },
+      { signal },
+    )
+    shots.push(...page.items)
+    cursor = page.nextCursor ?? undefined
+  } while (cursor)
+  return shots
+}
+
+export function createLiveCoffeesApi(): CoffeesApi {
+  const client = createClient()
+  return {
+    list: () => client.coffee.getAll.query(),
+    async listBrews(
+      coffeeId: string,
+      signal?: AbortSignal,
+    ): Promise<Array<BrewRow>> {
+      // shortcut: the other methods have no per-Coffee feed, so this reads
+      // each method's whole (sealed) history and keeps this Coffee's; add a
+      // coffeeId input to their getAll if histories grow large.
+      const [shots, pourOver, aeropress, frenchPress, coldBrew] =
+        await Promise.all([
+          allShotsOf(client, coffeeId, signal),
+          client.pouroverBrew.getAll.query(undefined, { signal }),
+          client.aeropressBrew.getAll.query(undefined, { signal }),
+          client.frenchpressBrew.getAll.query(undefined, { signal }),
+          client.coldBrewBrew.getAll.query(undefined, { signal }),
+        ])
+      const toBrewRow = (
+        brew: {
+          id: string
+          createdAt: Date
+          sealed: boolean
+          isDialedIn: boolean
+          grindSetting: string | null
+          dose: string | null
+        },
+        method: BrewMethod,
+        output: string | null,
+        time: number | null,
+      ): BrewRow => ({
+        id: brew.id,
+        method,
+        createdAt: brew.createdAt,
+        sealed: brew.sealed,
+        isDialedIn: brew.isDialedIn,
+        grindSetting: brew.grindSetting,
+        dose: brew.dose,
+        output,
+        time,
+      })
+      const ofThisCoffee = <T extends { coffeeId: string }>(brews: Array<T>) =>
+        brews.filter((brew) => brew.coffeeId === coffeeId)
+      return [
+        ...shots.map((b) => toBrewRow(b, 'Espresso', b.yield, b.time)),
+        ...ofThisCoffee(pourOver).map((b) =>
+          toBrewRow(b, 'Pour Over', b.water, b.brewTime),
+        ),
+        ...ofThisCoffee(aeropress).map((b) =>
+          toBrewRow(b, 'AeroPress', b.water, b.steepTime),
+        ),
+        ...ofThisCoffee(frenchPress).map((b) =>
+          toBrewRow(b, 'French Press', b.water, b.steepTime),
+        ),
+        ...ofThisCoffee(coldBrew).map((b) =>
+          toBrewRow(b, 'Cold Brew', b.water, b.steepTime),
+        ),
+      ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     },
   }
 }

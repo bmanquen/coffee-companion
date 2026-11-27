@@ -4555,13 +4555,38 @@ const DRIVES = {
       coffeeSearchTestID: 'select-search-coffee',
     },
   },
+  coffees: {
+    test: 'src/coffees/coffees.test.tsx',
+    identity: 'data',
+    fail: 'coffees drive failed — the RNTL render did not open a Coffee and list its Brews',
+    required: [
+      'Coffee Companion',
+      'coffee-detail',
+      'Sumatra Lintong',
+      'Indonesia, Lintong, Wet-Hulled',
+      'Grind 24 · Dose 15g · Water 250g · Ratio 1:16.67 · Time 2m 45s',
+      'Sealed — Subscribe to Pro to read this brew',
+    ],
+    observed: {
+      coffee: 'Sumatra Lintong',
+      detailTestID: 'coffee-detail',
+      sealedRow: 'brew-row-shot-sealed',
+    },
+    handles: {
+      tabTestID: 'tab-coffees',
+      listTestID: 'coffee-list',
+      searchTestID: 'coffee-search',
+      rowTestIDPrefix: 'coffee-row-',
+      backTestID: 'coffee-detail-back',
+    },
+  },
 }
 
 async function cmdDrive(feature) {
   const recipe = DRIVES[feature]
   if (!recipe) {
     die(
-      `Only \`drive welcome\`, \`drive sign-in\`, and \`drive espresso\` are implemented as one-shot recipes. ` +
+      `Only \`drive welcome\`, \`drive sign-in\`, \`drive espresso\`, and \`drive coffees\` are implemented as one-shot recipes. ` +
         `${feature ? `"${feature}"` : 'That feature'} is mapped under features/ — drive it from its file. ` +
         `Do not treat a missing drive stub as verification.`,
     )
@@ -4819,6 +4844,7 @@ function usage() {
   drive welcome       Render the signed-in welcome screen with React Native Testing Library
   drive sign-in       Render the signed-out sign-in screen with React Native Testing Library
   drive espresso      Log an Espresso Shot through the signed-in list and form
+  drive coffees       Search Coffees, open one, and read its Brews (Sealed ones withheld)
   drive-device <flow> Run Maestro flows/<flow>.yaml on ${DEVICE_SERIAL}; refuse clearState when ownedPackage is false; re-apply reverses and disable stylus handwriting
   verify-device [flow] cleanup → launch-device → doctor → drive-device (default ${DEFAULT_VERIFY_DEVICE_FLOW}); refuse a clearState flow on an attached preexisting install before Expo; the instance stays up if a later step fails
   cleanup             Stop recorded pids, free ports this helper recorded, uninstall a package this run owns; keep artifacts/

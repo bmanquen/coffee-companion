@@ -9,6 +9,7 @@ import {
   createExpandedRowModel,
   useTable,
 } from '@tanstack/react-table'
+import { coffeeMatchesSearch } from '@coffee-companion/brew-display'
 import { CoffeeIcon, Pencil, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { formatOriginNames } from '@/components/coffees/format-coffee-origins'
@@ -33,7 +34,6 @@ import {
 } from '@/components/ui/empty'
 import { useAccordionExpansion } from '@/hooks/use-accordion-expansion'
 import { useTRPC } from '@/integrations/trpc/react'
-import { matchesSearch } from '@/lib/search'
 import type { CellContext } from '@tanstack/react-table'
 import type { AppFeatures } from '@/components/data-table'
 
@@ -159,18 +159,7 @@ export function Coffee() {
   const visibleCoffees = useMemo(
     () =>
       (coffees as Array<CoffeeRow>).filter((c) =>
-        matchesSearch(search, [
-          c.name,
-          c.roaster?.name,
-          c.roastLevel?.name,
-          c.notes,
-          ...c.varieties.map((v) => v.name),
-          ...c.origins.flatMap((o) => [
-            o.country?.name,
-            o.region?.name,
-            o.process?.name,
-          ]),
-        ]),
+        coffeeMatchesSearch(search, c),
       ),
     [coffees, search],
   )

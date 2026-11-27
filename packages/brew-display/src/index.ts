@@ -1,5 +1,8 @@
 export { coffeeOptionLabel } from './coffee-option-label'
 export { formatBrewRatio } from './format-brew-ratio'
+export { formatBrewSeconds, formatSteepMinutes } from './format-brew-time'
 export { SEALED_SHOT } from './copy'
 export { applyCoffeePrefill } from './coffee-prefill'
 export type { PrefillKeep } from './coffee-prefill'
+export { coffeeMatchesSearch, matchesSearch } from './search'
+export type { SearchableCoffee } from './search'

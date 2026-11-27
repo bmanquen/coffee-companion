@@ -10,7 +10,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Signed-out identity is the sign-in screen. Signed-in identity is the welcome screen with Sign Out. Drive mocks the session; it does not mint a real Google or Apple token.
 - Drive uses React Native Testing Library in-process on every machine. That tier is the gate.
 - On a machine that has the Android Studio SDK and an AVD, also run `launch-device` and `drive-device`. Default AVD name is `verify-pixel`; set `VERIFY_AVD` when that name is missing from `emulator -list-avds`. Homebrew/linuxbrew SDK trees are skipped; a complete Studio SDK is accepted even if an ancestor folder is named `android-commandlinetools`. The device web app listens on port `3910` (`VERIFY_PORT`) so it does not collide with `pnpm dev` on `3000`. Gradle needs Java 17–21. This VM has no SDK, so that tier is not available here.
-- Coffee, brew, equipment, and shelf features are web-only today, except Espresso logging ([espresso.md](./espresso.md)). The other brew methods stay web-only. Add a mobile feature file here when another surface ships.
+- Coffee, brew, equipment, and shelf features are web-only today, except Espresso logging ([espresso.md](./espresso.md)) and browsing Coffees ([coffees.md](./coffees.md)). The other brew methods stay web-only. Add a mobile feature file here when another surface ships.
 - Do not remove proof artifacts during cleanup.
 
 ## Driving conventions
@@ -18,7 +18,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Start every recipe from the baseline state unless its preconditions say otherwise.
 - Prefer `testID`, `accessibilityRole`, and `accessibilityLabel` over coordinates or tree position.
 - Treat every command as literal. Keep quoted names and flags unchanged.
-- Run screen assertions through `helpers/control drive welcome`, `helpers/control drive sign-in`, or `helpers/control drive espresso` (or the same RNTL queries those tests use).
+- Run screen assertions through `helpers/control drive welcome`, `helpers/control drive sign-in`, `helpers/control drive espresso`, or `helpers/control drive coffees` (or the same RNTL queries those tests use).
 - Where an AVD exists, run `helpers/control verify-device` (cleanup → launch-device → doctor → drive-device). The default Maestro flow starts with `clearState`, so `verify-device` refuses it before Expo when the app was already on an attached emulator (`ownedPackage` is false). `drive-device` still refuses that case. Boot an isolated AVD (default `verify-pixel`) instead. Maestro selectors are `testID`s only, except `runFlow when visible` Continue / Close / Back that dismiss Expo developer-menu overlays whenever they appear while waiting for `sign-in-screen` (until a 60s wall-clock deadline).
 
 ## Proof and skip reporting
@@ -46,3 +46,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Welcome screen](./welcome.md) is the signed-in home: the `Coffee Companion` heading, Espresso list, and Sign Out. Shortcut: `helpers/control drive welcome`. Device: `helpers/control drive-device sign-in-and-out`.
 - [Sign-in screen](./sign-in.md) is the signed-out home: Google, Apple on iOS, sign-up, the error copy, and the hidden E2E handle. Shortcut: `helpers/control drive sign-in`. Device: `helpers/control drive-device sign-in-and-out`.
 - [Log an Espresso Shot](./espresso.md) is pick a Coffee, enter Shot settings, save, and see the Shot in the list. Shortcut: `helpers/control drive espresso`. Device: `helpers/control drive-device log-espresso` (opens `select-trigger-coffee` and chooses `select-option-00000000-0000-4000-8000-000000000001`).
+- [Browse Coffees](./coffees.md) is the Coffees tab: search, open a Coffee, and read its Brews with Sealed ones withheld. Shortcut: `helpers/control drive coffees`. Device: `maestro --device <device> test .cursor/skills/verify-mobile/flows/browse-coffees.yaml` with Metro started as `EXPO_PUBLIC_E2E_USER=e2e-user-free` (see the feature file).

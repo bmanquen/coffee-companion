@@ -1,0 +1,70 @@
+appId: dev.offbyonelabs.coffeecompanion
+# Signed in as e2e-user-free (EXPO_PUBLIC_E2E_USER), whose Sumatra Lintong is
+# off the Free Shelf, so its seeded Shot is Sealed. Starts on sign-in-screen.
+---
+- extendedWaitUntil:
+    visible:
+      id: sign-in-screen
+    timeout: 60000
+- tapOn:
+    id: e2e-sign-in
+- extendedWaitUntil:
+    visible:
+      id: welcome-screen
+    timeout: 60000
+- tapOn:
+    id: tab-coffees
+- extendedWaitUntil:
+    visible:
+      id: coffee-search
+    timeout: 30000
+- takeScreenshot: coffees-list
+- tapOn:
+    id: coffee-search
+- inputText: "wet-hulled"
+# The list filters as text arrives, so wait for it to settle.
+- extendedWaitUntil:
+    visible: "Sumatra Lintong.*"
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible: "Kenya Nyeri.*"
+    timeout: 10000
+- takeScreenshot: coffees-search
+- tapOn: "Sumatra Lintong.*"
+- extendedWaitUntil:
+    visible:
+      id: coffee-detail
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: brew-summary
+      text: "Sealed — Subscribe to Pro to read this brew"
+    timeout: 30000
+- assertNotVisible: "Grind 26.*"
+- takeScreenshot: coffee-detail-sealed
+- tapOn:
+    id: coffee-detail-back
+- assertVisible:
+    id: coffee-list
+# The search is kept across opening a Coffee.
+- assertVisible: "Sumatra Lintong.*"
+- assertNotVisible: "Kenya Nyeri.*"
+- tapOn:
+    id: coffee-search
+- eraseText: 20
+- extendedWaitUntil:
+    visible: "Kenya Nyeri.*"
+    timeout: 10000
+# Narrow to it so its row sits above the keyboard: a tap on a row under the
+# keyboard types a letter, and hideKeyboard on iOS can open another row.
+- inputText: "kenya"
+- extendedWaitUntil:
+    notVisible: "Sumatra Lintong.*"
+    timeout: 10000
+- tapOn: "Kenya Nyeri.*"
+- extendedWaitUntil:
+    visible:
+      id: brew-summary
+      text: "Grind 21 · Dose 18g · Yield 36g · Ratio 1:2 · Time 30s"
+    timeout: 30000
+- takeScreenshot: coffee-detail-readable

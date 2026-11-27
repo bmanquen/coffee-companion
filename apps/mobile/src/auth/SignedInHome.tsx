@@ -1,7 +1,16 @@
 import { SHOT_IDEMPOTENCY_DELETED } from '@coffee-companion/api/lib/espresso'
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { apiErrorMessage, mayHaveCommitted } from '../api-error'
+import { CoffeeDetail } from '../coffees/CoffeeDetail'
+import { CoffeeList } from '../coffees/CoffeeList'
+import {
+  TAB_COFFEES,
+  TAB_COFFEES_TEST_ID,
+  TAB_ESPRESSO,
+  TAB_ESPRESSO_TEST_ID,
+} from '../coffees/copy'
+import { idleCoffeesApi } from '../coffees/types'
 import { ShotForm } from '../espresso/ShotForm'
 import { ShotList } from '../espresso/ShotList'
 import { TRYING_AGAIN, TRY_AGAIN } from '../espresso/copy'
@@ -17,10 +26,11 @@ import {
   welcomeMessage,
 } from '../welcome'
 import { SIGN_OUT } from './copy'
+import type { CoffeeRow, CoffeesApi } from '../coffees/types'
 import type { PrefillSource } from '../espresso/ShotForm'
 import type { EspressoApi } from '../espresso/types'
 
-type Screen = 'list' | 'form'
+type Screen = 'list' | 'form' | 'coffees'
 
 export function SignedInHome({
   name,
@@ -28,12 +38,14 @@ export function SignedInHome({
   onSignOut,
   signOutError = null,
   espresso = idleEspressoApi,
+  coffees = idleCoffeesApi,
 }: {
   name: string
   userId: string
   onSignOut: () => void
   signOutError?: string | null
   espresso?: EspressoApi
+  coffees?: CoffeesApi
 }) {
   return (
     <QueryProvider>
@@ -46,6 +58,7 @@ export function SignedInHome({
         onSignOut={onSignOut}
         signOutError={signOutError}
         espresso={espresso}
+        coffees={coffees}
       />
     </QueryProvider>
   )
@@ -57,14 +70,19 @@ function Home({
   onSignOut,
   signOutError,
   espresso,
+  coffees,
 }: {
   name: string
   userId: string
   onSignOut: () => void
   signOutError: string | null
   espresso: EspressoApi
+  coffees: CoffeesApi
 }) {
   const [screen, setScreen] = useState<Screen>('list')
+  const [openCoffee, setOpenCoffee] = useState<CoffeeRow | null>(null)
+  const [coffeeSearch, setCoffeeSearch] = useState('')
+  const closeCoffee = useCallback(() => setOpenCoffee(null), [])
   const idempotencyKeys = useRef(new Map<string, string>())
   const unresolvedSaves = useRef(new Map<string, Map<string, PrefillSource>>())
   const {
@@ -128,7 +146,48 @@ function Home({
           </Pressable>
         </View>
       ) : null}
-      {screen === 'form' && catalog ? (
+      {screen !== 'form' ? (
+        <View accessibilityRole="tablist" style={styles.tabs}>
+          {(
+            [
+              ['list', TAB_ESPRESSO, TAB_ESPRESSO_TEST_ID],
+              ['coffees', TAB_COFFEES, TAB_COFFEES_TEST_ID],
+            ] as const
+          ).map(([tab, label, testID]) => (
+            <Pressable
+              key={tab}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: screen === tab }}
+              testID={testID}
+              style={[styles.tab, screen === tab && styles.tabSelected]}
+              onPress={() => {
+                setOpenCoffee(null)
+                setScreen(tab)
+              }}
+            >
+              <Text>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {screen === 'coffees' ? (
+        openCoffee ? (
+          <CoffeeDetail
+            api={coffees}
+            userId={userId}
+            coffee={openCoffee}
+            onBack={closeCoffee}
+          />
+        ) : (
+          <CoffeeList
+            api={coffees}
+            userId={userId}
+            search={coffeeSearch}
+            onSearch={setCoffeeSearch}
+            onOpen={setOpenCoffee}
+          />
+        )
+      ) : screen === 'form' && catalog ? (
         <ShotForm
           catalog={catalog}
           busy={busy}
@@ -209,6 +268,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 16,
+  },
+  tabs: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  tabSelected: {
+    backgroundColor: '#eee',
+    borderColor: '#999',
   },
   loadError: {
     alignItems: 'center',

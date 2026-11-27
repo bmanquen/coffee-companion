@@ -137,6 +137,7 @@ The RNTL harness is the gate on every machine. Selectors below are the same `tes
 .cursor/skills/verify-mobile/helpers/control drive welcome
 .cursor/skills/verify-mobile/helpers/control drive sign-in
 .cursor/skills/verify-mobile/helpers/control drive espresso
+.cursor/skills/verify-mobile/helpers/control drive coffees
 ```
 
 Each drive first confirms the recorded Metro is up and answering — the same pid, port-ownership, `/status`, and bundle checks as `doctor`. A dead Metro or a leftover `.run/state.json` fails with exit `2` and does not run the screen test. When that check is green, drive renders the screen in-process and writes the host tree under `artifacts/<runId>/<feature>/`.
@@ -215,6 +216,7 @@ All scripts are executable. Run them from anywhere; they resolve the repo root t
 | `helpers/control drive welcome` | Confirm Metro is answering, then the signed-in welcome screen |
 | `helpers/control drive sign-in` | Confirm Metro is answering, then the signed-out sign-in screen |
 | `helpers/control drive espresso` | Confirm Metro is answering, then open the Coffee picker, choose an option, log a Shot, and read it on the list |
+| `helpers/control drive coffees` | Confirm Metro is answering, then search Coffees, open one, and read its Brews with a Sealed one withheld |
 | `helpers/control drive-device <flow>` | Re-apply adb reverse, set `stylus_handwriting_enabled` to `0`, refuse a `clearState` flow when `ownedPackage` is false, print host preflight OK/FAIL and device OK/SKIP/WARN, then `Running Maestro flow <flow>` on `emulator-5554`; copy screenshots to `artifacts/`; print `PASS`/`FAIL artifacts at …` (exit non-zero on fail) |
 | `helpers/control verify-device [flow]` | One shot: cleanup → launch-device → doctor → drive-device. Refuses a `clearState` flow on an attached preexisting install before Expo. Leaves the instance up if doctor or drive-device fails. |
 | `helpers/control cleanup` | Stop recorded pids and leftover listeners that still belong to this helper; report a later process on those ports without signalling it; `emu kill`, wait for the pid/group (SIGTERM then SIGKILL), wait for the serial and AVD locks; uninstall the package only when this run owns it; keep artifacts |
