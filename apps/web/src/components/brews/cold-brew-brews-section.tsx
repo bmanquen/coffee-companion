@@ -177,7 +177,11 @@ export function ColdBrewBrewsSection() {
       brews.filter(
         (b) =>
           (!coffeeId || b.coffeeId === coffeeId) &&
-          brewMatchesSearch(search, b, [formatBrewRatio(b.dose, b.water), b.steepTime, formatSteepMinutes(b.steepTime)]),
+          brewMatchesSearch(search, b, [
+            formatBrewRatio(b.dose, b.water),
+            b.steepTime,
+            formatSteepMinutes(b.steepTime),
+          ]),
       ),
     [brews, coffeeId, search],
   )

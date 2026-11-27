@@ -78,7 +78,9 @@ function makeCoffeeRow(over: {
 // The detail region for a row: its sibling sub-row's animating grid-rows wrap
 // (grid-rows-[1fr] open, grid-rows-[0fr] collapsed). Always in the DOM.
 const detailRegionFor = (name: string): HTMLElement => {
-  const dataRow = within(screen.getByRole('table')).getByText(name).closest('tr')!
+  const dataRow = within(screen.getByRole('table'))
+    .getByText(name)
+    .closest('tr')!
   return dataRow.nextElementSibling!.querySelector(
     '[class*="grid-rows-"]',
   ) as HTMLElement

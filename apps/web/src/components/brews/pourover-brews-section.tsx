@@ -178,7 +178,12 @@ export function PouroverBrewsSection() {
       brews.filter(
         (b) =>
           (!coffeeId || b.coffeeId === coffeeId) &&
-          brewMatchesSearch(search, b, [b.method?.name, formatBrewRatio(b.dose, b.water), b.brewTime, formatBrewSeconds(b.brewTime)]),
+          brewMatchesSearch(search, b, [
+            b.method?.name,
+            formatBrewRatio(b.dose, b.water),
+            b.brewTime,
+            formatBrewSeconds(b.brewTime),
+          ]),
       ),
     [brews, coffeeId, search],
   )

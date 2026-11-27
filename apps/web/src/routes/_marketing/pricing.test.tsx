@@ -115,9 +115,7 @@ describe('PricingPage', () => {
     const everyPlan = screen
       .getByRole('heading', { name: /On every plan/, level: 2 })
       .closest('section')!
-    expect(
-      within(everyPlan).getByText('Search coffees and brews'),
-    ).toBeTruthy()
+    expect(within(everyPlan).getByText('Search coffees and brews')).toBeTruthy()
     for (const name of planNames) {
       expect(planCard(name).queryByText('Search')).toBeNull()
     }

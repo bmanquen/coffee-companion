@@ -178,7 +178,12 @@ export function AeropressBrewsSection() {
       brews.filter(
         (b) =>
           (!coffeeId || b.coffeeId === coffeeId) &&
-          brewMatchesSearch(search, b, [b.method?.name, formatBrewRatio(b.dose, b.water), b.steepTime, formatBrewSeconds(b.steepTime)]),
+          brewMatchesSearch(search, b, [
+            b.method?.name,
+            formatBrewRatio(b.dose, b.water),
+            b.steepTime,
+            formatBrewSeconds(b.steepTime),
+          ]),
       ),
     [brews, coffeeId, search],
   )
